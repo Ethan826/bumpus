@@ -3,9 +3,9 @@ module Program.Main (main) where
 import Prelude
 import Data.Either (either)
 import Effect (Effect)
-import Format.Diagnostic (codeName)
+import Format.Diagnostic (Response, codeName)
 import Program.Compile (compile)
-import Runtime.Node (Response, launch)
+import Runtime.Node (launch)
 
 main ∷ Effect Unit
 main = launch respond

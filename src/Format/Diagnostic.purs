@@ -1,6 +1,10 @@
-module Format.Diagnostic (codeName) where
+module Format.Diagnostic (WireDiagnostic, Response, codeName) where
 
-import Domain.Syntax (ErrorCode(..))
+import Domain.Syntax (ErrorCode(..), Span)
+
+type WireDiagnostic = { code ∷ String, message ∷ String, span ∷ Span }
+type Response =
+  { ok ∷ Boolean, go ∷ String, diagnostics ∷ Array WireDiagnostic }
 
 codeName ∷ ErrorCode → String
 codeName = case _ of
