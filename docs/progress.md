@@ -166,6 +166,13 @@ uncommitted. No push or publication occurred.
 recursive types, nested patterns with Maranget usefulness, type/match brace
 syntax, tagged value-struct representation and sequential first-match
 lowering. User review added CtorId identity, nil-guarded projections,
-inhabitedness, canonical witnesses and two-pass type resolution. Draft spec:
+inhabitedness, canonical witnesses and two-pass type resolution. Approved spec:
 docs/plans/2026-10-07-closed-adts-design.md. Documentation only; no compiler
 source changed, so no verification run is claimed for this step.
+
+2026-10-07: spec approved and committed (1d71f2f). writing-plans produced
+docs/plans/2026-10-07-closed-adts-plan.md: five tasks (syntax; types and
+construction; patterns and match; coverage; docs and review). Plan-time spec
+amendments: E_DUPLICATE at the first duplicate (Stage 0 rule), depth-named
+match parameters, and the Float row moving from E_SYNTAX to E_UNBOUND.
+Documentation only; no compiler source changed.

@@ -39,5 +39,7 @@ documented limitations. Fresh review found no blocking issue; E004 is minor.
 A001 design: user approved representation A, sequential lowering, recursive
 types, nested Maranget coverage and type/match syntax, then reviewed the
 design; revisions are folded into docs/plans/2026-10-07-closed-adts-design.md.
-The user approved the written spec; next is the writing-plans output.
+The user approved the written spec (commit 1d71f2f). Plan written:
+docs/plans/2026-10-07-closed-adts-plan.md. Next: user reviews the plan and
+chooses subagent-driven or native execution; then run Task 1.
 No A001 code exists yet. Preserve Stage 0.

@@ -68,8 +68,8 @@ Namespaces:
 
 | Namespace | Members | Duplicate rule |
 |---|---|---|
-| Types | declared type names | E_DUPLICATE at the second type |
-| Globals | functions and constructors together | E_DUPLICATE at the later declaration |
+| Types | declared type names | E_DUPLICATE at the first duplicated type |
+| Globals | functions and constructors together | E_DUPLICATE at the first duplicated declaration |
 | Locals | parameters, then pattern binders | E_DUPLICATE within one parameter list or pattern |
 
 Constructors are global across all types. `type A = X; type B = X;` is
@@ -213,8 +213,9 @@ constructor receives the argument by value, which is a copy, and stores that
 copy's address. Values are never mutated. Go evaluates call arguments in
 lexical left-to-right order, so construction keeps strict source order.
 
-Each match lowers to an immediately invoked function, like `if`. Within each
-function, matches are numbered in source pre-order (`sprigMatch<k>`):
+Each match lowers to an immediately invoked function, like `if`. Its parameter
+is named by match nesting depth (`sprigMatch<d>`), counting only enclosing
+arm bodies; a scrutinee is lowered at its enclosing depth:
 
 ```go
 func(sprigMatch0 sprigTy0) int32 {
@@ -335,5 +336,17 @@ Documentation:
   literals (section 1).
 - The witness selection policy is specified (section 4).
 - The IR has no MatchId; lowering numbers matches (sections 5 and 6).
+
+Plan-time amendments (2026-10-07, during writing-plans):
+
+- E_DUPLICATE reports at the first duplicated declaration, as Stage 0's
+  function and parameter checks already do, instead of the later one. This
+  keeps Stage 0 behavior unchanged and applies one rule everywhere.
+- Match parameters are named by nesting depth rather than a pre-order
+  counter. Inner names shadow outer ones only where the outer scrutinee is
+  no longer referenced, so names stay collision-free without threading a
+  counter through lowering.
+- Implied by section 1 and pinned by the plan: `fn main(): Float = 1;` moves
+  from E_SYNTAX to E_UNBOUND, and a lowercase type such as `int` is E_SYNTAX.
 - The IR uses CtorId; the tag exists only in lowering (sections 3, 5 and 6).
 - The panic is an impossible-state guard only (section 6).

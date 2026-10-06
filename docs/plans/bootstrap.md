@@ -72,4 +72,4 @@ the merged branch/worktree were removed after evidence preservation.
 See the migrated plan and docs/progress.md. Closed ADTs
 and exhaustive matching remain a separate future design/plan, not implemented.
 A001 design spec drafted 2026-10-07 in docs/plans/2026-10-07-closed-adts-design.md;
-it was approved by the user; the implementation plan follows.
+it was approved by the user. Implementation plan: docs/plans/2026-10-07-closed-adts-plan.md.
