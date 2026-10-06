@@ -9,14 +9,6 @@ type Span = { start ∷ Position, end ∷ Position }
 type Diagnostic = { code ∷ ErrorCode, message ∷ String, span ∷ Span }
 type Token = { text ∷ String, span ∷ Span }
 
-data Ty = TInt | TBool
-
-derive instance eqType ∷ Eq Ty
-
-instance showType ∷ Show Ty where
-  show TInt = "Int"
-  show TBool = "Bool"
-
 data Expr
   = Integer Span Int
   | Boolean Span Boolean

@@ -182,3 +182,9 @@ reserved `type`/`match`/`_`, TypeRef, Parse.Declaration and Program dispatch;
 Resolve maps NamedRef to E_UNBOUND transitionally. New test/adt-syntax.test.mjs
 (7 tests) failed against pre-change source, then passed. `npm run verify`
 exit 0 (26 tests, regression proof, answer.go unchanged).
+
+2026-10-07: closed-ADT Task 2 (types and construction) done. Ty moved to Resolved
+with TData; two-pass type table, shared global table, Construct through Check
+and Go (Go.Data). test/adt-types.test.mjs (6 tests) failed before the change
+(unbound-type errors), then passed. `npm run verify` exit 0 (32 tests, regression
+proof, answer.go unchanged).

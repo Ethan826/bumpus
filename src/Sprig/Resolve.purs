@@ -3,175 +3,102 @@ module Sprig.Resolve (resolve) where
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Foldable (traverse_, for_)
 import Data.Maybe (maybe')
 import Data.Traversable (traverse)
 import Sprig.Model as Syntax
+import Sprig.Resolve.Expression (Global, expression)
+import Sprig.Resolve.Types (resolveType, typeTable)
 import Sprig.Resolved as Resolved
 
-type Global = { name ∷ String, id ∷ Resolved.FunctionId }
+type Signature =
+  { parameters ∷ Array Resolved.Parameter, result ∷ Resolved.Ty }
 
-missingEntry ∷ Either Syntax.Diagnostic Resolved.FunctionId
-missingEntry = Left
-  ( Syntax.problem Syntax.EntryError
-      { start: Syntax.origin, end: Syntax.origin }
-      "Expected fn main(): Int or Bool"
-  )
+type Definition =
+  { index ∷ Int, function ∷ Syntax.FunctionDecl, signature ∷ Signature }
 
 resolve ∷ Syntax.Program → Either Syntax.Diagnostic Resolved.Program
 resolve program = do
-  unique functions
-  entry ← maybe' absentEntry resolveEntry (Array.find isEntry functions)
-  resolved ← traverse resolveDefinition
-    (Array.mapWithIndex indexedFunction functions)
-  pure { functions: resolved, entry }
+  tables ← typeTable program
+  signatures ← traverse (resolveSignature tables.types) functions
+  let
+    definitions = Array.mapWithIndex indexed
+      (Array.zipWith pair functions signatures)
+  entry ← entryPoint definitions
+  bodies ← traverse (resolveBody tables.ctors) definitions
+  pure { types: tables.types, ctors: tables.ctors, functions: bodies, entry }
   where
   functions = program.functions
-  globals = Array.mapWithIndex globalBinding functions
-  absentEntry _ = missingEntry
-  resolveEntry function = entryPoint globals function
-  resolveDefinition definition = resolveFunction globals definition
-  globalBinding index function =
-    { name: function.name, id: Resolved.FunctionId index }
-  indexedFunction index function = { index, function }
-  isEntry function = function.name == "main"
+  pair function signature = { function, signature }
+  indexed index entry =
+    { index, function: entry.function, signature: entry.signature }
+  resolveBody ctors definition = resolveFunction (globals ctors) ctors
+    definition
+  globals ctors = Array.mapWithIndex functionGlobal functions
+    <> Array.mapWithIndex ctorGlobal ctors
+
+functionGlobal ∷ Int → Syntax.FunctionDecl → Global
+functionGlobal index function =
+  { name: function.name, ref: Resolved.FunctionRef (Resolved.FunctionId index) }
+
+ctorGlobal ∷ Int → Resolved.CtorInfo → Global
+ctorGlobal index info =
+  { name: info.name, ref: Resolved.CtorRef (Resolved.CtorId index) }
+
+resolveSignature
+  ∷ Array Resolved.TypeInfo
+  → Syntax.FunctionDecl
+  → Either Syntax.Diagnostic Signature
+resolveSignature types function = do
+  parameters ← traverse resolveParameter function.parameters
+  result ← resolveType types function.result
+  pure { parameters, result }
+  where
+  resolveParameter parameter = withType parameter
+    <$> resolveType types parameter.ty
+  withType parameter ty = { name: parameter.name, ty, span: parameter.span }
 
 entryPoint
-  ∷ Array Global
-  → Syntax.FunctionDecl
-  → Either Syntax.Diagnostic Resolved.FunctionId
-entryPoint globals function =
-  if Array.null function.parameters then lookupGlobal globals function.span
-    "main"
-  else invalidEntry
+  ∷ Array Definition → Either Syntax.Diagnostic Resolved.FunctionId
+entryPoint definitions = maybe' absent checkEntry
+  (Array.find isEntry definitions)
   where
-  invalidEntry = Left
-    ( Syntax.problem Syntax.EntryError function.span
-        "main must have no parameters"
+  isEntry definition = definition.function.name == "main"
+  absent _ = Left
+    ( Syntax.problem Syntax.EntryError
+        { start: Syntax.origin, end: Syntax.origin }
+        "Expected fn main(): Int or Bool"
     )
 
-unique ∷ Array Syntax.FunctionDecl → Either Syntax.Diagnostic Unit
-unique functions = for_ functions uniqueFunction
+checkEntry ∷ Definition → Either Syntax.Diagnostic Resolved.FunctionId
+checkEntry definition =
+  if not (Array.null definition.function.parameters) then invalid
+    "main must have no parameters"
+  else if isData definition.signature.result then invalid
+    "main must return Int or Bool"
+  else pure (Resolved.FunctionId definition.index)
   where
-  uniqueFunction function = do
-    when (Array.length (Array.filter namedFunction functions) > 1)
-      ( Left
-          ( Syntax.problem Syntax.DuplicateName function.span
-              ("Duplicate function " <> function.name)
-          )
-      )
-    traverse_ checkParameter function.parameters
-    where
-    checkParameter parameter = uniqueParameter function.parameters parameter
-    namedFunction other = other.name == function.name
-
-uniqueParameter
-  ∷ Array Syntax.Parameter → Syntax.Parameter → Either Syntax.Diagnostic Unit
-uniqueParameter parameters parameter =
-  when (Array.length (Array.filter sameName parameters) > 1)
-    ( Left
-        ( Syntax.problem Syntax.DuplicateName parameter.span
-            ("Duplicate parameter " <> parameter.name)
-        )
-    )
-  where
-  sameName other = other.name == parameter.name
+  invalid message = Left
+    (Syntax.problem Syntax.EntryError definition.function.span message)
+  isData = case _ of
+    Resolved.TData _ → true
+    _ → false
 
 resolveFunction
   ∷ Array Global
-  → { index ∷ Int, function ∷ Syntax.FunctionDecl }
+  → Array Resolved.CtorInfo
+  → Definition
   → Either Syntax.Diagnostic Resolved.FunctionDecl
-resolveFunction globals { index, function } = do
-  parameters ← traverse resolveParameter function.parameters
-  result ← resolveType function.result
-  body ← expression globals function.parameters function.body
-  pure
-    { id: Resolved.FunctionId index
-    , parameters
-    , result
+resolveFunction globals ctors definition = withBody <$> expression scope
+  definition.function.body
+  where
+  scope = { globals, ctors, locals }
+  locals = Array.mapWithIndex parameterLocal definition.signature.parameters
+  parameterLocal index parameter =
+    { name: parameter.name, id: Resolved.LocalId index }
+  withBody body =
+    { id: Resolved.FunctionId definition.index
+    , parameters: definition.signature.parameters
+    , result: definition.signature.result
     , body
-    , span: function.span
+    , span: definition.function.span
     }
-
--- Transitional: Task 2 replaces this with declared-type resolution.
-resolveType ∷ Syntax.TypeRef → Either Syntax.Diagnostic Syntax.Ty
-resolveType = case _ of
-  Syntax.IntRef _ → pure Syntax.TInt
-  Syntax.BoolRef _ → pure Syntax.TBool
-  Syntax.NamedRef span name → Left
-    (Syntax.problem Syntax.UnboundName span ("Unbound type " <> name))
-
-resolveParameter
-  ∷ Syntax.Parameter → Either Syntax.Diagnostic Resolved.Parameter
-resolveParameter parameter = withType <$> resolveType parameter.ty
-  where
-  withType ty = { name: parameter.name, ty, span: parameter.span }
-
-lookupGlobal
-  ∷ Array Global
-  → Syntax.Span
-  → String
-  → Either Syntax.Diagnostic Resolved.FunctionId
-lookupGlobal globals span name = maybe' missing found
-  (Array.find namedGlobal globals)
-  where
-  missing _ = Left
-    (Syntax.problem Syntax.UnboundName span ("Unbound function " <> name))
-  found global = Right global.id
-  namedGlobal global = global.name == name
-
-expression
-  ∷ Array Global
-  → Array Syntax.Parameter
-  → Syntax.Expr
-  → Either Syntax.Diagnostic Resolved.Expr
-expression globals parameters = case _ of
-  Syntax.Integer span value → pure (Resolved.Integer span value)
-  Syntax.Boolean span value → pure (Resolved.Boolean span value)
-  Syntax.Variable span name → localReference parameters span name
-  Syntax.Call span name arguments → callReference globals parameters span name
-    arguments
-  Syntax.Add span left right → resolveAddition span left right
-  Syntax.If span condition yes no → resolveConditional span condition yes no
-  where
-  resolveAddition span left right = Resolved.Add span
-    <$> expression globals parameters left
-    <*> expression globals parameters right
-  resolveConditional span condition yes no = Resolved.If span
-    <$> expression globals parameters condition
-    <*> expression globals parameters yes
-    <*> expression globals parameters no
-
-localReference
-  ∷ Array Syntax.Parameter
-  → Syntax.Span
-  → String
-  → Either Syntax.Diagnostic Resolved.Expr
-localReference parameters span name = maybe' missing found
-  (Array.findIndex namedParameter parameters)
-  where
-  missing _ = Left
-    (Syntax.problem Syntax.UnboundName span ("Unbound local " <> name))
-  found index = pure (Resolved.Local span (Resolved.LocalId index))
-  namedParameter parameter = parameter.name == name
-
-callReference
-  ∷ Array Global
-  → Array Syntax.Parameter
-  → Syntax.Span
-  → String
-  → Array Syntax.Expr
-  → Either Syntax.Diagnostic Resolved.Expr
-callReference globals parameters span name arguments = do
-  when (Array.any namedParameter parameters)
-    ( Left
-        ( Syntax.problem Syntax.NotCallable span
-            ("Local is not callable: " <> name)
-        )
-    )
-  id ← lookupGlobal globals span name
-  resolved ← traverse resolveArgument arguments
-  pure (Resolved.Call span id resolved)
-  where
-  resolveArgument argument = expression globals parameters argument
-  namedParameter parameter = parameter.name == name

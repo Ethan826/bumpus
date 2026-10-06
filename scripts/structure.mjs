@@ -19,10 +19,13 @@ const dependencies = {
   'Sprig.Parse.Declaration': ['Sprig.Model', 'Sprig.Lex', 'Sprig.Parse.Core'],
   'Sprig.Parse.Expression': ['Sprig.Model', 'Sprig.Lex', 'Sprig.Parse.Core'],
   'Sprig.Parse': ['Sprig.Model', 'Sprig.Lex', 'Sprig.Parse.Core', 'Sprig.Parse.Declaration', 'Sprig.Parse.Expression'],
-  'Sprig.Resolve': ['Sprig.Model', 'Sprig.Resolved'],
+  'Sprig.Resolve.Types': ['Sprig.Model', 'Sprig.Resolved'],
+  'Sprig.Resolve.Expression': ['Sprig.Model', 'Sprig.Resolved'],
+  'Sprig.Resolve': ['Sprig.Model', 'Sprig.Resolved', 'Sprig.Resolve.Types', 'Sprig.Resolve.Expression'],
   'Sprig.IR.Internal': ['Sprig.Model', 'Sprig.Resolved'],
   'Sprig.Check': ['Sprig.Model', 'Sprig.Resolved', 'Sprig.IR.Internal'],
-  'Sprig.Go': ['Sprig.Check', 'Sprig.Model', 'Sprig.Resolved', 'Sprig.IR.Internal'],
+  'Sprig.Go.Data': ['Sprig.Resolved'],
+  'Sprig.Go': ['Sprig.Check', 'Sprig.Resolved', 'Sprig.IR.Internal', 'Sprig.Go.Data'],
   'Sprig.Compiler': ['Sprig.Model', 'Sprig.Parse', 'Sprig.Resolve', 'Sprig.Check', 'Sprig.Go'],
   'Shell.CLI': ['Sprig.Compiler', 'Sprig.Model']
 };

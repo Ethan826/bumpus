@@ -1,10 +1,15 @@
 module Sprig.IR.Internal where
 
-import Sprig.Model (Span, Ty)
-import Sprig.Resolved (FunctionId, LocalId)
+import Sprig.Model (Span)
+import Sprig.Resolved (CtorId, CtorInfo, FunctionId, LocalId, Ty, TypeInfo)
 
 -- Constructors are internal to elaboration and lowering, enforced by the gate.
-newtype Program = Program { functions ∷ Array FunctionDecl, entry ∷ FunctionId }
+newtype Program = Program
+  { types ∷ Array TypeInfo
+  , ctors ∷ Array CtorInfo
+  , functions ∷ Array FunctionDecl
+  , entry ∷ FunctionId
+  }
 
 type FunctionDecl =
   { id ∷ FunctionId
@@ -21,6 +26,7 @@ data Node
   | Boolean Boolean
   | Local LocalId
   | Call FunctionId (Array Expr)
+  | Construct CtorId (Array Expr)
   | Add Expr Expr
   | If Expr Expr Expr
 
