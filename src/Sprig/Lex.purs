@@ -3,15 +3,27 @@ module Sprig.Lex (lex, isName, endPosition) where
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Maybe (maybe, maybe')
+import Data.Maybe (Maybe(..), maybe, maybe')
 import Data.String.CodeUnits as String
 import Sprig.Model (ErrorCode(..), Diagnostic, Position, Token, origin, problem)
 
 punctuation ∷ Array Char
-punctuation = [ '(', ')', ':', ',', '=', ';', '+', '-' ]
+punctuation = [ '(', ')', ':', ',', '=', ';', '+', '-', '|', '{', '}' ]
 
 reserved ∷ Array String
-reserved = [ "fn", "if", "then", "else", "true", "false", "Int", "Bool" ]
+reserved =
+  [ "fn"
+  , "if"
+  , "then"
+  , "else"
+  , "true"
+  , "false"
+  , "Int"
+  , "Bool"
+  , "type"
+  , "match"
+  , "_"
+  ]
 
 lex ∷ String → Either Diagnostic (Array Token)
 lex source = scan origin (String.toCharArray source) []
@@ -34,6 +46,7 @@ scan position characters tokens = maybe' finished scanHead
     | isSpace head = scan (advance position head) tail tokens
     | isLetter head = word position characters tokens isNameChar
     | isDigit head = word position characters tokens isDigit
+    | head == '=' && Array.head tail == Just '>' = arrow position tail tokens
     | Array.elem head punctuation = scanPunctuation position head tail tokens
     | otherwise = unexpected position head
 
@@ -45,6 +58,17 @@ scanPunctuation position character tail tokens = scan next tail
   next = advance position character
   token =
     { text: String.singleton character, span: { start: position, end: next } }
+
+arrow ∷ Position → Array Char → Array Token → Either Diagnostic (Array Token)
+arrow position tail tokens = scan next (Array.drop 1 tail)
+  (Array.snoc tokens token)
+  where
+  next =
+    { offset: position.offset + 2
+    , line: position.line
+    , column: position.column + 2
+    }
+  token = { text: "=>", span: { start: position, end: next } }
 
 unexpected ∷ Position → Char → Either Diagnostic (Array Token)
 unexpected position character = Left

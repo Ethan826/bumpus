@@ -4,25 +4,33 @@ import Prelude
 import Data.Array as Array
 import Data.Either (Either)
 import Sprig.Lex (lex, endPosition)
-import Sprig.Model (Diagnostic, FunctionDecl, Parameter)
-import Sprig.Parse.Core (Parser, State, commaList, expect, name, peek, typeName)
+import Sprig.Model (Diagnostic, FunctionDecl, Parameter, Program)
+import Sprig.Parse.Core (Parser, State, commaList, expect, name, peek, typeRef)
+import Sprig.Parse.Declaration (typeDeclaration)
 import Sprig.Parse.Expression (expression)
 
-parse ∷ String → Either Diagnostic (Array FunctionDecl)
+parse ∷ String → Either Diagnostic Program
 parse source = do
   tokens ← lex source
-  functions { tokens, eof: endPosition source }
+  declarations { tokens, eof: endPosition source }
 
-functions ∷ State → Either Diagnostic (Array FunctionDecl)
-functions state =
-  if peek state == "<end>" then pure []
-  else nextFunction state
+declarations ∷ State → Either Diagnostic Program
+declarations state
+  | peek state == "<end>" = pure { types: [], functions: [] }
+  | peek state == "type" = nextType state
+  | otherwise = nextFunction state
 
-nextFunction ∷ State → Either Diagnostic (Array FunctionDecl)
+nextType ∷ State → Either Diagnostic Program
+nextType state = do
+  first ← typeDeclaration state
+  rest ← declarations first.rest
+  pure rest { types = Array.cons first.value rest.types }
+
+nextFunction ∷ State → Either Diagnostic Program
 nextFunction state = do
   first ← function state
-  rest ← functions first.rest
-  pure (Array.cons first.value rest)
+  rest ← declarations first.rest
+  pure rest { functions = Array.cons first.value rest.functions }
 
 function ∷ Parser FunctionDecl
 function state = do
@@ -32,7 +40,7 @@ function state = do
   parameters ← commaList parameter open.rest
   close ← expect ")" parameters.rest
   colon ← expect ":" close.rest
-  result ← typeName colon.rest
+  result ← typeRef colon.rest
   equals ← expect "=" result.rest
   body ← expression equals.rest
   semicolon ← expect ";" body.rest
@@ -52,7 +60,7 @@ parameter ∷ Parser Parameter
 parameter state = do
   identifier ← name state
   colon ← expect ":" identifier.rest
-  ty ← typeName colon.rest
+  ty ← typeRef colon.rest
   pure
     { value:
         { name: identifier.value.text

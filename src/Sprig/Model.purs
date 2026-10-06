@@ -1,6 +1,8 @@
 module Sprig.Model where
 
 import Prelude
+import Data.Maybe (maybe)
+import Data.String.CodeUnits as String
 
 type Position = { offset ∷ Int, line ∷ Int, column ∷ Int }
 type Span = { start ∷ Position, end ∷ Position }
@@ -23,14 +25,21 @@ data Expr
   | Add Span Expr Expr
   | If Span Expr Expr Expr
 
-type Parameter = { name ∷ String, ty ∷ Ty, span ∷ Span }
+data TypeRef = IntRef Span | BoolRef Span | NamedRef Span String
+
+type CtorDecl = { name ∷ String, fields ∷ Array TypeRef, span ∷ Span }
+type TypeDecl = { name ∷ String, ctors ∷ Array CtorDecl, span ∷ Span }
+
+type Parameter = { name ∷ String, ty ∷ TypeRef, span ∷ Span }
 type FunctionDecl =
   { name ∷ String
   , parameters ∷ Array Parameter
-  , result ∷ Ty
+  , result ∷ TypeRef
   , body ∷ Expr
   , span ∷ Span
   }
+
+type Program = { types ∷ Array TypeDecl, functions ∷ Array FunctionDecl }
 
 data ErrorCode
   = LexError
@@ -57,6 +66,11 @@ exprSpan = case _ of
   Call span _ _ → span
   Add span _ _ → span
   If span _ _ _ → span
+
+isUpper ∷ String → Boolean
+isUpper text = maybe false upper (String.charAt 0 text)
+  where
+  upper character = character >= 'A' && character <= 'Z'
 
 problem ∷ ErrorCode → Span → String → Diagnostic
 problem code span message = { code, span, message }

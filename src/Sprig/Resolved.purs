@@ -1,6 +1,6 @@
 module Sprig.Resolved where
 
-import Sprig.Model (Parameter, Span, Ty)
+import Sprig.Model (Span, Ty)
 
 newtype FunctionId = FunctionId Int
 newtype LocalId = LocalId Int
@@ -12,6 +12,8 @@ data Expr
   | Call Span FunctionId (Array Expr)
   | Add Span Expr Expr
   | If Span Expr Expr Expr
+
+type Parameter = { name ∷ String, ty ∷ Ty, span ∷ Span }
 
 type FunctionDecl =
   { id ∷ FunctionId

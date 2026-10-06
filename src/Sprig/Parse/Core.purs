@@ -6,7 +6,8 @@ module Sprig.Parse.Core
   , take
   , expect
   , name
-  , typeName
+  , upperName
+  , typeRef
   , failAt
   , commaList
   ) where
@@ -16,7 +17,15 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (maybe, maybe')
 import Sprig.Lex (isName)
-import Sprig.Model (ErrorCode(..), Diagnostic, Position, Token, Ty(..), problem)
+import Sprig.Model
+  ( ErrorCode(..)
+  , Diagnostic
+  , Position
+  , Token
+  , TypeRef(..)
+  , isUpper
+  , problem
+  )
 
 type State = { tokens ∷ Array Token, eof ∷ Position }
 type Parsed a = { value ∷ a, rest ∷ State }
@@ -43,16 +52,26 @@ name state =
   if isName (peek state) then take state
   else failAt state "Expected an identifier"
 
-typeName ∷ Parser Ty
-typeName state = do
+upperName ∷ Parser Token
+upperName state =
+  if isName text && isUpper text then take state
+  else failAt state "Expected a capitalized name"
+  where
+  text = peek state
+
+typeRef ∷ Parser TypeRef
+typeRef state = do
   token ← take state
   case token.value.text of
-    "Int" → parsedType TInt token.rest
-    "Bool" → parsedType TBool token.rest
+    "Int" → parsedType (IntRef token.value.span) token.rest
+    "Bool" → parsedType (BoolRef token.value.span) token.rest
+    text
+      | isName text && isUpper text →
+          parsedType (NamedRef token.value.span text) token.rest
     _ → invalidType token.value.span
   where
   parsedType value rest = Right { value, rest }
-  invalidType span = Left (problem SyntaxError span "Expected Int or Bool")
+  invalidType span = Left (problem SyntaxError span "Expected a type")
 
 failAt ∷ ∀ a. State → String → Either Diagnostic a
 failAt state message = Left (problem SyntaxError span message)

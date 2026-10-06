@@ -41,7 +41,7 @@ test('200 generated expression trees survive independent printing and parsing', 
     const source = `fn main(): Int = ${print(expected)};`;
     const parsed = parse(source);
     assert.ok(parsed instanceof Right, source);
-    assert.deepEqual(shape(parsed.value0[0].body), expected);
+    assert.deepEqual(shape(parsed.value0.functions[0].body), expected);
     checked(source);
   }
 });

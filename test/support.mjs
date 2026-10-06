@@ -41,3 +41,33 @@ export const runGo = source => {
     return command(binary, []);
   } finally { rmSync(work, { recursive: true, force: true }); }
 };
+
+export const spanAt = (source, text, nth = 0) => {
+  let start = -1;
+  for (let found = 0; found <= nth; found++) {
+    start = source.indexOf(text, start + 1);
+    assert.notEqual(start, -1, `${text} occurrence ${nth} not found`);
+  }
+  const position = offset => ({ offset, line: 1, column: offset + 1 });
+  return { start: position(start), end: position(start + text.length) };
+};
+
+export const rejectedAt = (source, code, text, nth = 0) => {
+  const diagnostic = rejected(source, code);
+  assert.deepEqual(diagnostic.span, spanAt(source, text, nth));
+  return diagnostic;
+};
+
+export const goTest = (source, testGo) => {
+  const work = mkdtempSync(join(tmpdir(), 'sprig-gotest-'));
+  try {
+    writeFileSync(join(work, 'main.go'), checked(source));
+    writeFileSync(join(work, 'main_test.go'), testGo);
+    const result = spawnSync('go', ['test', 'main.go', 'main_test.go'], {
+      encoding: 'utf8', timeout: 120000, cwd: work,
+      env: { ...process.env, GOCACHE: resolve('.build/go-cache') }
+    });
+    assert.ifError(result.error);
+    return { status: result.status, output: result.stdout + result.stderr };
+  } finally { rmSync(work, { recursive: true, force: true }); }
+};

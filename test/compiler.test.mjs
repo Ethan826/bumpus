@@ -60,7 +60,7 @@ test('all expected semantic and boundary refusals have tags', () => {
     [program('1') + 'garbage', 'E_SYNTAX'], [program('1.0'), 'E_LEX'],
     ['fn main(): Int = 1', 'E_SYNTAX'], ['fn main(): Int = 1 + ;', 'E_SYNTAX'],
     ['fn main(): Int = if true then 1;', 'E_SYNTAX'],
-    ['fn main(): Float = 1;', 'E_SYNTAX'],
+    ['fn main(): Float = 1;', 'E_UNBOUND'],
     ['fn unused(): Int = false; fn main(): Int = 1;', 'E_TYPE']
   ]) rejected(source, code);
 });

@@ -176,3 +176,9 @@ construction; patterns and match; coverage; docs and review). Plan-time spec
 amendments: E_DUPLICATE at the first duplicate (Stage 0 rule), depth-named
 match parameters, and the Float row moving from E_SYNTAX to E_UNBOUND.
 Documentation only; no compiler source changed.
+
+2026-10-07: closed-ADT Task 1 (syntax) done. Added `|{}` and `=>` tokens,
+reserved `type`/`match`/`_`, TypeRef, Parse.Declaration and Program dispatch;
+Resolve maps NamedRef to E_UNBOUND transitionally. New test/adt-syntax.test.mjs
+(7 tests) failed against pre-change source, then passed. `npm run verify`
+exit 0 (26 tests, regression proof, answer.go unchanged).

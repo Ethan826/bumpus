@@ -18,14 +18,15 @@ missingEntry = Left
       "Expected fn main(): Int or Bool"
   )
 
-resolve ∷ Array Syntax.FunctionDecl → Either Syntax.Diagnostic Resolved.Program
-resolve functions = do
+resolve ∷ Syntax.Program → Either Syntax.Diagnostic Resolved.Program
+resolve program = do
   unique functions
   entry ← maybe' absentEntry resolveEntry (Array.find isEntry functions)
   resolved ← traverse resolveDefinition
     (Array.mapWithIndex indexedFunction functions)
   pure { functions: resolved, entry }
   where
+  functions = program.functions
   globals = Array.mapWithIndex globalBinding functions
   absentEntry _ = missingEntry
   resolveEntry function = entryPoint globals function
@@ -81,14 +82,30 @@ resolveFunction
   → { index ∷ Int, function ∷ Syntax.FunctionDecl }
   → Either Syntax.Diagnostic Resolved.FunctionDecl
 resolveFunction globals { index, function } = do
+  parameters ← traverse resolveParameter function.parameters
+  result ← resolveType function.result
   body ← expression globals function.parameters function.body
   pure
     { id: Resolved.FunctionId index
-    , parameters: function.parameters
-    , result: function.result
+    , parameters
+    , result
     , body
     , span: function.span
     }
+
+-- Transitional: Task 2 replaces this with declared-type resolution.
+resolveType ∷ Syntax.TypeRef → Either Syntax.Diagnostic Syntax.Ty
+resolveType = case _ of
+  Syntax.IntRef _ → pure Syntax.TInt
+  Syntax.BoolRef _ → pure Syntax.TBool
+  Syntax.NamedRef span name → Left
+    (Syntax.problem Syntax.UnboundName span ("Unbound type " <> name))
+
+resolveParameter
+  ∷ Syntax.Parameter → Either Syntax.Diagnostic Resolved.Parameter
+resolveParameter parameter = withType <$> resolveType parameter.ty
+  where
+  withType ty = { name: parameter.name, ty, span: parameter.span }
 
 lookupGlobal
   ∷ Array Global
