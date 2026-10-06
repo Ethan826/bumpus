@@ -6,7 +6,7 @@ are in docs/plans/bootstrap.md and docs/progress.md. No remote tracking.
 | ID | State | Next concrete work and acceptance |
 |---|---|---|
 | V001 | Done | Documentation/style audit closed after fresh review found no blockers; final closure verification is recorded in docs/progress.md. |
-| A001 | Next | Closed product/sum declarations, constructor resolution and typed construction; match patterns, exhaustiveness/redundancy checks; executable and negative examples, representation tag/payload tests. |
+| A001 | Design approved | Spec: docs/plans/2026-10-07-closed-adts-design.md (approved); implementation plan next. Closed product/sum declarations, constructor resolution and typed construction; match patterns, exhaustiveness/redundancy checks; executable and negative examples, representation tag/payload tests. |
 | P001 | Planned | Rank-1 schemes, substitution and occurs-checked unification; mandatory signatures, no polymorphic recursion; meaningful composition/idempotence/occurs-check properties and reference comparisons. |
 | K001 | Planned | Explicit kind IR/checker, constructor arities, Type/Row/arrow kinds, HKTs restricted to first-order constructor application; reject ill-kinded programs before type solving. |
 | C001 | Planned | Classes and non-overlapping coherent instances, terminating resolution, ambiguity errors, dictionary elaboration; negative overlap/coherence cases. |

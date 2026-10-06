@@ -71,3 +71,5 @@ User-authorized local merge into main and merged verification are complete;
 the merged branch/worktree were removed after evidence preservation.
 See the migrated plan and docs/progress.md. Closed ADTs
 and exhaustive matching remain a separate future design/plan, not implemented.
+A001 design spec drafted 2026-10-07 in docs/plans/2026-10-07-closed-adts-design.md;
+it was approved by the user; the implementation plan follows.

@@ -36,5 +36,8 @@ Earlier automatic approval rejected the outside-workspace write. E001/E002,
 the E003 branch-budget review target, and E004 inaccurate test titles remain
 documented limitations. Fresh review found no blocking issue; E004 is minor.
 
-Next, design/plan closed ADTs and
-exhaustive matching as a separate bounded milestone. Preserve Stage 0.
+A001 design: user approved representation A, sequential lowering, recursive
+types, nested Maranget coverage and type/match syntax, then reviewed the
+design; revisions are folded into docs/plans/2026-10-07-closed-adts-design.md.
+The user approved the written spec; next is the writing-plans output.
+No A001 code exists yet. Preserve Stage 0.

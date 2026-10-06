@@ -159,3 +159,13 @@ now resolve under that archive. Original checkout logs were not overwritten.
 Durable ledger/review remain in docs/plans and all audit commits stay in main.
 The pre-existing .vscode/settings.json spell-check additions are preserved
 uncommitted. No push or publication occurred.
+
+## A001 design (in progress)
+
+2026-10-07: brainstorming for closed ADTs and exhaustive matching. User chose
+recursive types, nested patterns with Maranget usefulness, type/match brace
+syntax, tagged value-struct representation and sequential first-match
+lowering. User review added CtorId identity, nil-guarded projections,
+inhabitedness, canonical witnesses and two-pass type resolution. Draft spec:
+docs/plans/2026-10-07-closed-adts-design.md. Documentation only; no compiler
+source changed, so no verification run is claimed for this step.
