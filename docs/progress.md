@@ -1,7 +1,7 @@
 # Bootstrap evidence and current checkpoint
 
-2026-10-07. The audit implementation is complete on audit/bootstrap-docs;
-final fresh review is pending. Main preserves baseline 9624bec. Worktree:
+2026-10-07. The documentation/style audit is complete on audit/bootstrap-docs;
+fresh review found no blockers. Main preserves baseline 9624bec. Worktree:
 .worktrees/bootstrap-audit. Task 1 commit: 4410609. No publishing or push.
 The audit plan is docs/plans/2026-10-07-bootstrap-audit.md.
 
@@ -48,8 +48,7 @@ provenance, ADRs, engineering guidance, bootstrap roadmap, and local backlog.
 
 ## Current remaining actions
 
-Finish one fresh review of the implemented audit, record its findings, then
-choose local integration or preserve the branch. Closed ADTs/exhaustive
+Choose local integration or preserve the verified audit branch. Closed ADTs/exhaustive
 matching require a separate later design and plan. F001 (fresh compiler-tool
 setup), F002 (unapplied external patch), E001/E002 and E003 remain explicit.
 
@@ -102,11 +101,38 @@ in isolation. docs/findings.md retains the complete failed-attempt account.
 
 ## Audit execution: Task 2
 
-Handoff files now identify the real baseline, audit branch, completed Task 1
-and remaining final review. Historical no-HEAD/no-commit statements are labeled
-as historical. Audit status will be closed only after the review and final
-completion verification. No ADT source or plan was added.
+Handoff files now identify the real baseline, audit branch, completed tasks
+and final fresh review. Historical no-HEAD/no-commit statements are labeled
+as historical. Review is complete; final completion verification is recorded below. No ADT source or plan was added.
 
 Task 2 pre-review `npm run verify` exited 0 on 2026-10-07: zero strict-build
 warnings/errors, 19/19 tests with no skips, style/layer gates and regression
 proof passed. Raw log: .build/audit-task-2-pre-review.log in the audit worktree.
+
+## Fresh review and closure
+
+Fresh reviewer inspected 9624bec..56cbde1 read-only: no Critical/Important
+findings. Two pre-existing test-title inaccuracies are deferred as E004;
+no assertions were changed. Full review and exhaustive scope rulings are saved
+in docs/plans/bootstrap-audit-review.md and bootstrap-audit-ledger.md.
+The server restart interrupted delivery; the same reviewer resumed, avoiding
+a second review or repeated implementation.
+
+Two separate actual CLI emit invocations produced byte-identical output,
+also equal to bootstrap/answer.go (cmp checks succeeded). The preserved
+MileAhead patch again passed git apply --check without being applied. Stage 0,
+locks, tests, example bytes and pure boundaries remain preserved. ADR 001/002
+remain unchanged. No language feature, merge, push or publication occurred.
+
+Raw failure evidence retained outside executor scratch:
+.build/audit-task-1-failed-alias.log, .build/alias-regression/failure.log,
+and .build/audit-task-1-fixed.log (the failed reproduction-helper attempt).
+Successful raw evidence: .build/audit-baseline.log, audit-task-1-green.log,
+audit-task-1-completion.log, and audit-task-2-pre-review.log in .build.
+
+Final closure `npm run verify` exited 0 on 2026-10-07: strict/pedantic build
+zero warnings/errors; 19/19 tests, zero skips; format/CST/layer gates and
+isolated branch mutation proof passed. Raw final log: .build/audit-final.log.
+Tasks 1/2 and original bootstrap tasks 7/8 are complete; no blocking review
+finding remains. E004 minor titles are intentionally deferred. Integration
+into main has not been requested or performed.

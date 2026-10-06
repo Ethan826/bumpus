@@ -33,10 +33,10 @@ Reference influences, decisions, limitations, and continuation work live on disk
    examples, independent generated-tree properties, oracle comparisons,
    architecture/style gates and their cases, isolated regression mutation.
    Latest complete run: 19 tests passed; regression proof passed.
-7. **IN REVIEW — Durable artifacts and handoff.** Documentation contracts
+7. **DONE — Durable artifacts and handoff.** Documentation contracts
    were audited against maintained code/tests. Current handoff and evidence
-   are synchronized in the audit worktree; one fresh review remains.
-8. **IN REVIEW — Final audit.** Clean-output worktree verification compiled
+   are synchronized in the audit worktree; fresh review found no blockers.
+8. **DONE — Final audit.** Clean-output worktree verification compiled
    269 modules; post-refactor verification passes 19 tests and regression
    proof. Style findings were corrected; review targets/limitations remain
    explicit in engineering, findings and backlog. No language feature added.
@@ -68,5 +68,5 @@ Do not redo completed compiler implementation; retain local durable evidence.
 User approved a local baseline (9624bec), isolated audit worktree and inline
 execution with one final fresh reviewer. Audit work is on audit/bootstrap-docs
 in .worktrees/bootstrap-audit. See the migrated plan and docs/progress.md.
-Finish fresh review and its handoff; then agree local integration. Closed ADTs
+Fresh review and audit handoff are complete; agree local integration. Closed ADTs
 and exhaustive matching remain a separate future design/plan, not implemented.

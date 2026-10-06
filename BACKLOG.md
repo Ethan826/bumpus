@@ -5,7 +5,7 @@ are in docs/plans/bootstrap.md and docs/progress.md. No remote tracking.
 
 | ID | State | Next concrete work and acceptance |
 |---|---|---|
-| V001 | In review | Audit changes committed and handoff synchronized in .worktrees/bootstrap-audit; close after one fresh review and final completion verification. |
+| V001 | Done | Documentation/style audit closed after fresh review found no blockers; final closure verification is recorded in docs/progress.md. |
 | A001 | Next | Closed product/sum declarations, constructor resolution and typed construction; match patterns, exhaustiveness/redundancy checks; executable and negative examples, representation tag/payload tests. |
 | P001 | Planned | Rank-1 schemes, substitution and occurs-checked unification; mandatory signatures, no polymorphic recursion; meaningful composition/idempotence/occurs-check properties and reference comparisons. |
 | K001 | Planned | Explicit kind IR/checker, constructor arities, Type/Row/arrow kinds, HKTs restricted to first-order constructor application; reject ill-kinded programs before type solving. |
@@ -21,3 +21,4 @@ are in docs/plans/bootstrap.md and docs/progress.md. No remote tracking.
 | W001 | Resolved | Checkpoint 9624bec preserves Stage 0 and pinned skills; user approved audit worktree/inline execution. HEAD-based task helpers now have a real BASE. |
 | F003 | Environment limit | Sandboxed Git inspection emits xcrun cache permission errors under /tmp; escalated inspection succeeds. Use approved access for Git operations and record the distinction; do not treat these as compiler failures. |
 | E003 | Reviewed target exception | src/Sprig/Model.purs codeName has ten exhaustive ErrorCode branches against the eight-branch review target. Keep the wire mapping readable; reassess grouping when diagnostics grow, preserving every tag with exact rejection tests. |
+| E004 | Minor, deferred | test/compiler.test.mjs:84 title overstates repeated CLI assertions; test/style.test.mjs:21–22 title overstates lazy-fallback fixture. Rename to snapshot agreement and named helpers with constant fallback; preserve assertions. Manual repeated emissions separately verified. |

@@ -11,10 +11,10 @@ docs/planning-skills.md and docs/plans/2026-10-07-bootstrap-audit.md from the
 active worktree. Its files supersede the baseline checkout's old handoff.
 
 User approved checkpoint/worktree/inline execution and a fresh reviewer.
-Task 1 is committed at 4410609 and verified. Task 2 handoff is implemented;
-final review and completion evidence remain to be recorded. See the active
-plan-scoped ledger at .superpowers/sdd/2026-10-07-bootstrap-audit/progress.md
-while it exists, and durable docs/progress.md for the retained handoff.
+Task 1 is committed at 4410609 and verified; Task 2 handoff and fresh review
+are complete. Final verification/commit evidence is in docs/progress.md.
+See durable docs/plans/bootstrap-audit-ledger.md and bootstrap-audit-review.md
+for execution/review decisions. Only local integration remains to be chosen.
 No merge, push, or publication has occurred; local integration is a user choice.
 
 Superpowers: 15 project-local skills in .agents/skills, pinned by
@@ -29,8 +29,9 @@ and was corrected; findings/logs retain the evidence. No gate was weakened.
 
 F001 fresh compiler-tool/cross-platform setup remains unverified. F002 external
 MileAhead edit remains unapplied: docs/patches/mileahead-eliminators.patch.
-Earlier automatic approval rejected the outside-workspace write. E001/E002
-and the E003 branch-budget review target remain documented limitations.
+Earlier automatic approval rejected the outside-workspace write. E001/E002,
+the E003 branch-budget review target, and E004 inaccurate test titles remain
+documented limitations. Fresh review found no blocking issue; E004 is minor.
 
-After the audit review and handoff are closed, design/plan closed ADTs and
+After agreeing local integration, design/plan closed ADTs and
 exhaustive matching as a separate bounded milestone. Preserve Stage 0.

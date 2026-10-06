@@ -43,7 +43,8 @@ Go 1.26.4 (tested), Node >=22.5.0; installed pinned Superpowers skills.
 User approved baseline checkpoint, isolated worktree and inline execution
 with a final fresh reviewer. Baseline: 9624bec; branch: audit/bootstrap-docs;
 worktree: .worktrees/bootstrap-audit. Migration evidence stays historical.
-Task 1 is committed/verified; Task 2 handoff and final review are in progress.
+Both task implementations are complete; fresh review found no blockers.
+Final verification/commit evidence is in docs/progress.md and the durable ledger.
 
 ### Task 1: Audit contracts and source style
 
@@ -98,7 +99,7 @@ Task 1 is committed/verified; Task 2 handoff and final review are in progress.
   Run: `npm run verify`.
   Expected: complete exit 0; record command, test count, regression result,
   date and actual log path. Distinguish proposed behavior from verified work.
-- [ ] **Step 3: Complete the chosen executor's final review and handoff.**
+- [x] **Step 3: Complete the chosen executor's final review and handoff.**
   Review the whole change with all five Review Focus items. Follow its review
   gates; retain durable rulings/evidence before scratch cleanup. Report the
   unresolved limitations and leave future ADTs for a later bounded plan.

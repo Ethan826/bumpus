@@ -125,3 +125,10 @@ Execution setup resolved W001 with baseline 9624bec and the user-authorized
 audit/bootstrap-docs worktree. Full verification from clean output passed
 there, and Task 1 changes are committed at 4410609. Docs are handoff artifacts,
 not evidence that unimplemented ADTs or hostile-IR validation exist.
+
+The fresh whole-branch review found no blockers and one minor item: two test
+titles overstate assertions (E004). The existing named-helper fixture uses
+maybe 0, not a computed maybe' fallback; the snapshot test makes one direct
+compile, not repeated CLI invocations. Manual repeated CLI emissions now
+independently agree. These titles are deferred per executor minor-finding
+policy, without weakening the tests or overstating their automated coverage.
