@@ -1,8 +1,15 @@
-# Current checkpoint
+# Bootstrap evidence and current checkpoint
 
-2026-10-07. Compiler implementation and its essential gates run successfully.
-The original bootstrap request remains active. The user requested durable
-planning artifacts mid-session; see docs/plans/bootstrap.md.
+2026-10-07. The audit implementation is complete on audit/bootstrap-docs;
+final fresh review is pending. Main preserves baseline 9624bec. Worktree:
+.worktrees/bootstrap-audit. Task 1 commit: 4410609. No publishing or push.
+The audit plan is docs/plans/2026-10-07-bootstrap-audit.md.
+
+## Historical pre-audit checkpoint
+
+The following evidence was recorded before skill installation/execution;
+new worktree evidence follows below. Earlier raw logs are in the original
+checkout, not assumed to exist in the isolated worktree.
 
 ## Verified evidence
 
@@ -39,29 +46,22 @@ Example, three negative files, and bootstrap/answer.go (example snapshot).
 Documentation: README, AGENTS/CLAUDE, plan, findings, architecture, language,
 provenance, ADRs, engineering guidance, bootstrap roadmap, and local backlog.
 
-## Remaining actions
+## Current remaining actions
 
-User requested a stopping checkpoint. Resume with the final documentation/
-style audit and review the next milestone plan. Clean verification is complete. No remote is configured and no publishing occurred.
-The desired MileAhead guidance edit is blocked by filesystem approval settings;
-a local patch is preserved rather than claiming the external edit succeeded.
-
-## Reset handoff
-
-Read docs/next-session.md for the carry-forward prompt and Superpowers links.
-At the original checkpoint, Superpowers was researched but not installed.
-The installation/backport update below supersedes that workflow status.
-No source changes are pending a failing check. The initial vertical slice is operational; broad
-language features remain planned. No commits or pushes were made by this agent.
+Finish one fresh review of the implemented audit, record its findings, then
+choose local integration or preserve the branch. Closed ADTs/exhaustive
+matching require a separate later design and plan. F001 (fresh compiler-tool
+setup), F002 (unapplied external patch), E001/E002 and E003 remain explicit.
 
 ## Superpowers installation and backport
 
-Latest steering: install skills, migrate in-flight work, then plan the run.
+Historical installation steering: install skills, migrate, then plan the run.
 15 skills installed project-locally via bunx at the revision in skills-lock.json;
 list command confirmed Codex/project scope. The unfinished audit is migrated
 to docs/plans/2026-10-07-bootstrap-audit.md with a durable historical ledger.
-No audit tasks or features were executed. Git has no HEAD (W001); execution
-setup and method remain to be agreed. Prior compiler evidence above is preserved.
+At migration, no audit task or feature had run and Git had no HEAD. User
+subsequently approved inline execution/checkpoint/worktree. W001 is resolved;
+prior compiler evidence above is preserved.
 
 Fresh migration validation: `npm run verify` on 2026-10-07 exited 0.
 Strict/pedantic build reported zero source/library warnings and errors;
@@ -99,3 +99,14 @@ warnings/errors, all gates, 19/19 tests and isolated branch mutation proof
 passed. Raw evidence: .build/audit-task-1-green.log. The earlier accidental
 IR alias edit failed the same build; its copied defect also failed compile
 in isolation. docs/findings.md retains the complete failed-attempt account.
+
+## Audit execution: Task 2
+
+Handoff files now identify the real baseline, audit branch, completed Task 1
+and remaining final review. Historical no-HEAD/no-commit statements are labeled
+as historical. Audit status will be closed only after the review and final
+completion verification. No ADT source or plan was added.
+
+Task 2 pre-review `npm run verify` exited 0 on 2026-10-07: zero strict-build
+warnings/errors, 19/19 tests with no skips, style/layer gates and regression
+proof passed. Raw log: .build/audit-task-2-pre-review.log in the audit worktree.

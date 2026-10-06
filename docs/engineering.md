@@ -63,7 +63,7 @@ unmodified under .agents/skills with its MIT notice. It is distinct from
 maintained Sprig source/tests/tooling; project gates still cover their existing
 roots without weakened checks. docs/planning-skills.md records instruction
 precedence and adoption. Migrated plans preserve historical evidence without
-asserting retroactive TDD/commit records. Execution remains a separate step.
+asserting retroactive TDD/commit records. Execution uses the installed plan/task/review helpers and real commit ranges.
 
 ## Audit review findings (2026-10-07)
 

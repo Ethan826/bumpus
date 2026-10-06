@@ -38,13 +38,12 @@ Go 1.26.4 (tested), Node >=22.5.0; installed pinned Superpowers skills.
 - Generated/example snapshots must not be described as compiler bootstrap seeds.
 - Handoff must preserve pending work and the blocked external edit accurately.
 
-## Execution Gate
+## Execution Authorization
 
-User requested installation and backport first, then joint execution planning.
-This plan has not been executed. See `docs/planning-skills.md` for the unborn
-Git prerequisite and `bootstrap-migration-ledger.md` for historical evidence.
-Agree execution method and checkpoint/isolation before using task-start.
-No baseline commit, worktree, or review range has been invented.
+User approved baseline checkpoint, isolated worktree and inline execution
+with a final fresh reviewer. Baseline: 9624bec; branch: audit/bootstrap-docs;
+worktree: .worktrees/bootstrap-audit. Migration evidence stays historical.
+Task 1 is committed/verified; Task 2 handoff and final review are in progress.
 
 ### Task 1: Audit contracts and source style
 
@@ -91,11 +90,11 @@ No baseline commit, worktree, or review range has been invented.
 - Produces: consistent local handoff marking original tasks 7/8 complete only
   when justified; A001 remains a separate, unimplemented milestone.
 
-- [ ] **Step 1: Synchronize status and limitations.**
+- [x] **Step 1: Synchronize status and limitations.**
   Check V001, original tasks 7/8, next-session and progress for agreement.
   Preserve F001/F002 and any newly observed failures. No ADT implementation
   or ADT plan is part of this audit.
-- [ ] **Step 2: Run final verification after the documentation changes.**
+- [x] **Step 2: Run final verification after the documentation changes.**
   Run: `npm run verify`.
   Expected: complete exit 0; record command, test count, regression result,
   date and actual log path. Distinguish proposed behavior from verified work.

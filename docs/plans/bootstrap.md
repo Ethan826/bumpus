@@ -33,15 +33,13 @@ Reference influences, decisions, limitations, and continuation work live on disk
    examples, independent generated-tree properties, oracle comparisons,
    architecture/style gates and their cases, isolated regression mutation.
    Latest complete run: 19 tests passed; regression proof passed.
-7. **IN PROGRESS — Durable artifacts and handoff.** README, language spec,
-   architecture, ADRs, provenance, engineering mapping, backlog, bootstrap
-   plan, progress/findings. These files now exist; audit their claims against
-   code and finish the claims/style audit. The README verification command has now
-   passed from a clean output directory.
-8. **PARTLY DONE — Final audit.** Clean strict build and full verification
-   passed (19 tests plus regression proof); evidence is in docs/progress.md.
-   User requested a stopping checkpoint before the final documentation review. Confirm no generated artifact or
-   temporary fixture is mistaken for maintained source. No feature expansion.
+7. **IN REVIEW — Durable artifacts and handoff.** Documentation contracts
+   were audited against maintained code/tests. Current handoff and evidence
+   are synchronized in the audit worktree; one fresh review remains.
+8. **IN REVIEW — Final audit.** Clean-output worktree verification compiled
+   269 modules; post-refactor verification passes 19 tests and regression
+   proof. Style findings were corrected; review targets/limitations remain
+   explicit in engineering, findings and backlog. No language feature added.
 
 ## User steering integrated
 
@@ -62,17 +60,13 @@ run its narrow check, and update evidence/status. Record unexpected failures
 in docs/findings.md and local BACKLOG.md before switching tasks. Avoid building
 additional policy tooling once current acceptance criteria are satisfied.
 
-Resume with the remaining review in tasks 7 and 8; do not redo the completed
-implementation. The research on planning skills is advisory;
-installation is not required to finish this project.
+Superpowers is installed and executing-plans is active for tasks 7/8.
+Do not redo completed compiler implementation; retain local durable evidence.
 
 ## Next step
 
-User steering changed on 2026-10-07: install the skills first, backport the
-in-flight work, then plan the run together. Skills are now installed locally.
-Remaining tasks 7/8 are mapped into
-[the migrated audit plan](2026-10-07-bootstrap-audit.md) and
-[the migration ledger](bootstrap-migration-ledger.md).
-Completed tasks 1–6 and their prior evidence are preserved. Audit execution
-and the separate ADT milestone are pending. See docs/planning-skills.md for
-execution prerequisites; do not resume the audit from the old reset prompt.
+User approved a local baseline (9624bec), isolated audit worktree and inline
+execution with one final fresh reviewer. Audit work is on audit/bootstrap-docs
+in .worktrees/bootstrap-audit. See the migrated plan and docs/progress.md.
+Finish fresh review and its handoff; then agree local integration. Closed ADTs
+and exhaustive matching remain a separate future design/plan, not implemented.

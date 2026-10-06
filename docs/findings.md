@@ -69,15 +69,14 @@ earlier npm DNS failure remains historical, not a claim of current outage.
 Fresh compiler prerequisite installation/cross-platform builds remain untested.
 All 15 pinned skills plus helper files are installed in .agents/skills.
 
-Git has no commits: git rev-parse --verify HEAD reports "Needed a single
+At migration, Git had no commits: git rev-parse --verify HEAD reported "Needed a single
 revision". task-start/task-done require HEAD/BASE and review-package requires
 commit ranges; do not invoke them until a real checkpoint exists (W001).
 Sandboxed git status also emitted xcrun temporary-cache permission errors;
 escalated Git inspection worked. Record this environment distinction (F003).
 
 The reviewed pinned writing-plans uses self-review rather than a plan-review
-subagent. The migrated audit was self-reviewed only; no execution or fresh
-review has happened. Existing docs stay durable even when scratch is cleaned.
+subagent. At migration the audit plan was self-reviewed only; execution had not begun. Existing docs stay durable even when scratch is cleaned.
 
 ## Bootstrap audit findings
 
@@ -121,3 +120,8 @@ the live fix ran, and its trailing verify re-observed the still-broken build
 in .build/audit-task-1-fixed.log. Inspected the combined saved output, confirmed
 the expected missing module, then corrected live IR references. Those logs
 remain evidence of the failed attempts, not successful fix evidence.
+
+Execution setup resolved W001 with baseline 9624bec and the user-authorized
+audit/bootstrap-docs worktree. Full verification from clean output passed
+there, and Task 1 changes are committed at 4410609. Docs are handoff artifacts,
+not evidence that unimplemented ADTs or hostile-IR validation exist.

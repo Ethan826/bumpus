@@ -36,3 +36,10 @@ No retroactive commit ranges or failing-test observations are asserted.
 `npm run verify` exited 0 on 2026-10-07: 19/19 tests, zero skips,
 strict/pedantic build and style/layer gates passed, isolated regression proof
 passed. This is installation/migration validation, not audit Task 1 completion.
+
+## Subsequent authorized execution
+
+User approved inline execution/checkpoint/worktree. W001 is resolved by
+baseline 9624bec. Task 1 commit 4410609 passes 19 tests/regression proof.
+Historical pending statuses above describe migration time only; current
+execution and final review status live in docs/progress.md and the audit plan.

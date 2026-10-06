@@ -47,22 +47,23 @@ Documentation migration does not require fabricated behavior tests. Any code
 fix found during the later audit requires a regression proven with the defect
 restored in isolation. Keep durable evidence in docs even if scratch is deleted.
 
-## Execution preparation, still pending
+## Execution setup
 
-No execution mode has been selected. Do not run migrated audit tasks yet.
-Git is unborn: `git rev-parse --verify HEAD` reported no revision.
-All existing project files are untracked. Helpers that resolve BASE or review
-commit ranges cannot run correctly until a real baseline commit exists.
-Before execution, agree the checkpoint/branch or worktree approach and review
-exact files to preserve. Do not stage all files indiscriminately or invent BASE.
-Load using-git-worktrees at that time; preserve the current in-flight files.
+User approved inline execution, a reviewed local checkpoint and isolation.
+Baseline 9624bec on main preserves the compiler/docs/tests and installed skills.
+Temporary IDE port and .worktrees are ignored; no cache was committed.
+Audit worktree: .worktrees/bootstrap-audit; branch: audit/bootstrap-docs.
+The previous unborn-Git prerequisite W001 is resolved; real BASE/HEAD values
+are available. Task helpers and the final review package use that history.
+Worktree setup copied ignored Spago caches and built compiler output from
+scratch. No npm install was required because no local npm dependencies exist.
 
 For inline execution, resolve the plan workspace with
 `.agents/skills/subagent-driven-development/scripts/sdd-workspace`, seed its
 ledger from the durable migration ledger, and then use task-start/task-done.
 Keep the historical task mapping separate from new completion records.
 For subagent execution, use that skill's corresponding setup and review gates.
-Both methods require reviewing the migrated plan before implementation.
+The migrated plan was reviewed and inline execution authorized before work.
 
 ## Earlier research
 

@@ -5,7 +5,7 @@ are in docs/plans/bootstrap.md and docs/progress.md. No remote tracking.
 
 | ID | State | Next concrete work and acceptance |
 |---|---|---|
-| V001 | In progress | Audit running inline in .worktrees/bootstrap-audit on audit/bootstrap-docs; close after task verification, synchronized handoff and fresh review. |
+| V001 | In review | Audit changes committed and handoff synchronized in .worktrees/bootstrap-audit; close after one fresh review and final completion verification. |
 | A001 | Next | Closed product/sum declarations, constructor resolution and typed construction; match patterns, exhaustiveness/redundancy checks; executable and negative examples, representation tag/payload tests. |
 | P001 | Planned | Rank-1 schemes, substitution and occurs-checked unification; mandatory signatures, no polymorphic recursion; meaningful composition/idempotence/occurs-check properties and reference comparisons. |
 | K001 | Planned | Explicit kind IR/checker, constructor arities, Type/Row/arrow kinds, HKTs restricted to first-order constructor application; reject ill-kinded programs before type solving. |

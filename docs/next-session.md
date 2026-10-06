@@ -1,35 +1,36 @@
-# Continuation after installing Superpowers
+# Continue the bootstrap audit handoff
 
-Continue Sprig in `/Users/ethan/Desktop/gofuncyourself`.
+Workspace: /Users/ethan/Desktop/gofuncyourself.
+Active worktree: .worktrees/bootstrap-audit, branch audit/bootstrap-docs.
+Main preserves the pre-audit Stage 0 baseline at 9624bec.
+Do not redo completed compiler implementation or Task 1.
 
 Read AGENTS.md, README.md, docs/plans/bootstrap.md, docs/progress.md,
 docs/findings.md, docs/engineering.md, docs/provenance.md, ADRs, BACKLOG.md,
-and docs/planning-skills.md. Preserve the completed Stage 0 compiler.
+docs/planning-skills.md and docs/plans/2026-10-07-bootstrap-audit.md from the
+active worktree. Its files supersede the baseline checkout's old handoff.
 
-Latest user steering overrides the former reset prompt: **install skills,
-backport in-flight work, then plan the run together**. Installation and plan
-migration are done; audit execution has not started. Do not automatically
-resume the audit or plan/implement ADTs.
+User approved checkpoint/worktree/inline execution and a fresh reviewer.
+Task 1 is committed at 4410609 and verified. Task 2 handoff is implemented;
+final review and completion evidence remain to be recorded. See the active
+plan-scoped ledger at .superpowers/sdd/2026-10-07-bootstrap-audit/progress.md
+while it exists, and durable docs/progress.md for the retained handoff.
+No merge, push, or publication has occurred; local integration is a user choice.
 
-Superpowers: 15 project-local skills in `.agents/skills`, pinned to
-`8ca22dba9a94f28898bbce59f2537ff4d87c747d`; skills-lock.json records hashes.
-Read installed writing-plans/executing-plans and relevant support skills.
-Project/user instructions outrank upstream defaults.
+Superpowers: 15 project-local skills in .agents/skills, pinned by
+skills-lock.json. Use installed executing-plans/support guidance, preserving
+project/user precedence and durable evidence before scratch cleanup.
 
-Review docs/plans/2026-10-07-bootstrap-audit.md and its companion
-bootstrap-migration-ledger.md with the user. Agree execution approach and
-checkpoint/isolation. Git has no HEAD; task-start/task-done and review ranges
-need a real baseline (W001). No commits or pushes have been made.
+Compiler: typed first-order functions, Int/Bool, calls, wrapping int32 addition
+and conditionals; deterministic Go, example prints 42. Clean-output baseline
+compiled 269 modules; Task 1 verification passed 19 tests plus isolated branch
+mutation. The accidental IR alias edit failed build, was reproduced in a copy,
+and was corrected; findings/logs retain the evidence. No gate was weakened.
 
-Compiler at prior checkpoint: typed first-order functions, Int/Bool, calls,
-wrapping int32 addition and conditionals; deterministic Go, example prints 42.
-Prior verification passed 19 tests plus an isolated regression mutation proof.
-Consult docs/progress.md for any fresh installation/migration verification.
-Do not invent historical TDD evidence or reimplement completed tasks.
-
+F001 fresh compiler-tool/cross-platform setup remains unverified. F002 external
 MileAhead edit remains unapplied: docs/patches/mileahead-eliminators.patch.
-Earlier automatic approval rejected the outside-workspace write. Preserve it;
-no external write or publication is authorized by skill installation.
+Earlier automatic approval rejected the outside-workspace write. E001/E002
+and the E003 branch-budget review target remain documented limitations.
 
-Finish the bounded audit when execution is agreed. Closed ADTs and exhaustive
-matching require a separate later milestone; preserve Stage 0 throughout.
+After the audit review and handoff are closed, design/plan closed ADTs and
+exhaustive matching as a separate bounded milestone. Preserve Stage 0.
