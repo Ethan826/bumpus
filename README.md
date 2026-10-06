@@ -56,7 +56,8 @@ not yet a native Go compiler executable.
 
 ## Where to continue
 
-- [Implementation plan](docs/plans/bootstrap.md) and [progress](docs/progress.md)
+- [Implementation plan](docs/plans/bootstrap.md)
+- [Progress](docs/progress.md)
 - [Language specification](docs/language.md)
 - [Architecture](docs/architecture.md) and [decisions](docs/adr/001-slice.md), [ADR 002](docs/adr/002-polymorphic-lowering.md)
 - [Engineering rules and gate coverage](docs/engineering.md)

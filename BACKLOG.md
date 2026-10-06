@@ -12,7 +12,7 @@ are in docs/plans/bootstrap.md and docs/progress.md. No remote tracking.
 | C001 | Planned | Classes and non-overlapping coherent instances, terminating resolution, ambiguity errors, dictionary elaboration; negative overlap/coherence cases. |
 | R001 | Planned | Unique-label row-polymorphic records with lacks constraints and normalized layouts; accessor evidence; extensible variants remain deferred. |
 | M001 | Planned | Modules/imports, explicit interfaces, deterministic whole-program linking/specialization; stable binary separate compilation deferred. |
-| I001 | Planned | Explicit Go FFI with refined ingress, typed foreign errors, effect sequencing and nil/zero validation; optional Go go/parser and go/types inspection helper. |
+| I001 | Planned | Explicit Go FFI with refined ingress, typed foreign errors, effect sequencing and nil/zero validation, including full-value validation of tag/payload consistency of foreign closed-ADT values (folded in from A004; wildcards and binders do not validate skipped fields today, ADR 003); optional Go go/parser and go/types inspection helper. |
 | S001 | Planned | Port scanner/parser to Sprig as equivalence pilot, then Stage 1 compiler; preserve Stage 0 and generated compiler-Go snapshot; Stage 2/3 comparisons and full tests. |
 | F001 | Environment limit | Verify fresh online tool install/package downloads on network-capable host; earlier sandbox npm lookup failed ENOTFOUND. Escalated skills installation now works; fresh compiler tool setup remains unverified. |
 | F002 | Blocked by sandbox | Apply requested MileAhead guidance patch to trailmapper/AGENTS.md; filesystem approval denied outside workspace. Patch in docs/patches; no external edit claimed. |

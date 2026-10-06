@@ -92,7 +92,7 @@ local/call indices during inference, but trusts the resolved entry/table
 structure. Documentation now states that exact contract. The CLI respects an
 existing GOCACHE; README now describes its default, rather than an override.
 
-The ten-arm codeName mapping exceeds the eight-branch review target; splitting
+The ten-arm (now twelve; see BACKLOG E003) codeName mapping exceeds the eight-branch review target; splitting
 a short exhaustive ADT tag mapping would obscure its wire contract. E003
 records it explicitly. Other declaration budgets were reviewed manually;
 module/file limits remain automatically checked. The Spago no-files message

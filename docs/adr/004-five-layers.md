@@ -13,8 +13,8 @@ Format (a foreign text format), Runtime (Node, the OS, the Go toolchain),
 Program (wiring). Domain, Features and Format are pure and may import only the
 core library allowlist. Only `Features.Check*` and `Format.Go*` import
 `Domain.IR.Internal`. `Shell` was dropped as a name: it named a position, not
-a reason to change. Automated by scripts/structure.mjs and the layer-gate test in
-test/structure.test.mjs (ten rejected import pairs, including
+a reason to change. Automated by scripts/structure.mjs and the layer-gate
+test in test/structure.test.mjs (ten rejected import pairs, including
 `Program.Command` importing Effect or Runtime, and accepted cases).
 
 ## Four-change evaluation

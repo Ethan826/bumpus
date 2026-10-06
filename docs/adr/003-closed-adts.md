@@ -58,9 +58,9 @@ proposed, not verified.
    uninhabited constructor is not required, and a wildcard whose remaining
    constructors are all uninhabited is E_REDUNDANT, never offered as a
    witness (`uninhabited constructors need no arm` and `a wildcard over only
-   uninhabited constructors is redundant`, test/adt-coverage.test.mjs). Coverage checked independently by
-   test/coverage.test.mjs, a brute-force enumeration oracle that does not use
-   Maranget's algorithm. An invalid TypeId is E_INTERNAL, not a pass
+   uninhabited constructors is redundant`, test/adt-coverage.test.mjs).
+   Coverage is also checked independently by test/coverage.test.mjs, a
+   brute-force enumeration oracle that does not use Maranget's algorithm. An invalid TypeId is E_INTERNAL, not a pass
    (test/diagnostics.test.mjs).
 
 ## Consequences
