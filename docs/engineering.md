@@ -11,7 +11,7 @@ suppressing a gate, weakening an assertion, or adding a bypass allowlist.
 - 250 physical lines for maintained PureScript/JS source, tests, and tools;
   final newlines, textual escape/suppression checks (conservative, includes
   text inside comments/strings; checker fixture strings are assembled);
-- purs graph parses imports; exact project dependency allowlist and core
+- purs graph parses imports; project-import allowlist and core
   library allowlist prevent reversed layers, effects, and unchecked IR use;
 - no JS FFI files inside Sprig; all runtime capabilities live in Shell;
 - separate language-cst-parser style package rejects let-in, anonymous lambdas,
@@ -64,3 +64,18 @@ maintained Sprig source/tests/tooling; project gates still cover their existing
 roots without weakened checks. docs/planning-skills.md records instruction
 precedence and adoption. Migrated plans preserve historical evidence without
 asserting retroactive TDD/commit records. Execution remains a separate step.
+
+## Audit review findings (2026-10-07)
+
+The audit moved computed Maybe fallbacks to named maybe' functions, contextual
+traversal callbacks into where, independent resolver bindings into where, and
+branch calculations into helpers. Private comma-list parsing functions now
+have an explicit export boundary. No language semantics or gate was relaxed.
+Numeric limits in maintained checking/mutation scripts are named constants.
+
+The 30-line/3-decision/8-branch/8-binding budgets are review targets. The
+exhaustive ten-arm ErrorCode-to-wire-tag mapping is retained together for
+readability; E003 records this specific target exception and its next review.
+All maintained code remains below 250 lines; automatic counts do not prove
+full naming/complexity compliance. No new source behavior or unification is
+claimed. Existing executable/snapshot/diagnostic tests validate this refactor.

@@ -62,20 +62,20 @@ No baseline commit, worktree, or review range has been invented.
 - Produces: audited claim-to-evidence table in `docs/progress.md`, with each
   Review Focus item covered; all findings fixed or locally tracked.
 
-- [ ] **Step 1: Compare claims and manual conventions with their sources.**
+- [x] **Step 1: Compare claims and manual conventions with their sources.**
   Read maintained source and owning tests. Record each Review Focus item with
   file references and observed behavior. Do not add tests that mirror code.
-- [ ] **Step 2: Resolve each finding with the smallest justified change.**
+- [x] **Step 2: Resolve each finding with the smallest justified change.**
   Fix prose directly. For behavior defects, first specify and observe an exact
   failing regression, then fix and prove sensitivity with the defect restored
   in an isolated copy. Record RED/GREEN commands and results. If a larger fix
   exceeds this audit, add a specific BACKLOG item with evidence and next action.
-- [ ] **Step 3: Verify the audit changes.**
+- [x] **Step 3: Verify the audit changes.**
   Run: `npm run verify`.
   Expected: strict/pedantic builds, style/architecture gates, all tests pass
   with zero skips, isolated regression proof succeeds. Baseline is 19 tests;
   any count change must be explained by real new regressions.
-- [ ] **Step 4: Record task completion and checkpoint locally.**
+- [x] **Step 4: Record task completion and checkpoint locally.**
   Use the selected executor's ledger/commit workflow after execution setup.
   Preserve durable claim evidence; no publication or push.
 

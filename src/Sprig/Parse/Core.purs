@@ -1,4 +1,15 @@
-module Sprig.Parse.Core where
+module Sprig.Parse.Core
+  ( State
+  , Parsed
+  , Parser
+  , peek
+  , take
+  , expect
+  , name
+  , typeName
+  , failAt
+  , commaList
+  ) where
 
 import Prelude
 import Data.Array as Array
@@ -36,21 +47,28 @@ typeName ∷ Parser Ty
 typeName state = do
   token ← take state
   case token.value.text of
-    "Int" → Right { value: TInt, rest: token.rest }
-    "Bool" → Right { value: TBool, rest: token.rest }
-    _ → Left (problem SyntaxError token.value.span "Expected Int or Bool")
+    "Int" → parsedType TInt token.rest
+    "Bool" → parsedType TBool token.rest
+    _ → invalidType token.value.span
+  where
+  parsedType value rest = Right { value, rest }
+  invalidType span = Left (problem SyntaxError span "Expected Int or Bool")
 
 failAt ∷ ∀ a. State → String → Either Diagnostic a
 failAt state message = Left (problem SyntaxError span message)
   where
-  span = maybe { start: state.eof, end: state.eof } tokenSpan
+  span = maybe' endSpan tokenSpan
     (Array.head state.tokens)
+  endSpan _ = { start: state.eof, end: state.eof }
   tokenSpan token = token.span
 
 commaList ∷ ∀ a. Parser a → Parser (Array a)
 commaList item state =
-  if peek state == ")" then Right { value: [], rest: state }
+  if peek state == ")" then emptyList state
   else nonEmptyList item state
+
+emptyList ∷ ∀ a. Parser (Array a)
+emptyList state = Right { value: [], rest: state }
 
 nonEmptyList ∷ ∀ a. Parser a → Parser (Array a)
 nonEmptyList item state = do
@@ -60,7 +78,7 @@ nonEmptyList item state = do
 
 commaTail ∷ ∀ a. Parser a → Parser (Array a)
 commaTail item state =
-  if peek state /= "," then Right { value: [], rest: state }
+  if peek state /= "," then emptyList state
   else afterComma item state
 
 afterComma ∷ ∀ a. Parser a → Parser (Array a)

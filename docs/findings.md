@@ -78,3 +78,46 @@ escalated Git inspection worked. Record this environment distinction (F003).
 The reviewed pinned writing-plans uses self-review rather than a plan-review
 subagent. The migrated audit was self-reviewed only; no execution or fresh
 review has happened. Existing docs stay durable even when scratch is cleaned.
+
+## Bootstrap audit findings
+
+Computed record/error fallbacks in Lex.scan, Parse.Core.failAt,
+Parse.Expression.integer, Resolve lookups, and Check.checkLocal used eager
+maybe. They now use maybe' with named fallback functions. Context-dependent
+traverse/filter callbacks in checking/resolution are named in where. Resolver
+globals moved from an independent do-let to where. Branch rendering/building
+work was extracted and private Parse.Core plumbing is no longer exported.
+
+Architecture prose overstated defensive E_INTERNAL coverage: Check checks
+local/call indices during inference, but trusts the resolved entry/table
+structure. Documentation now states that exact contract. The CLI respects an
+existing GOCACHE; README now describes its default, rather than an override.
+
+The ten-arm codeName mapping exceeds the eight-branch review target; splitting
+a short exhaustive ADT tag mapping would obscure its wire contract. E003
+records it explicitly. Other declaration budgets were reviewed manually;
+module/file limits remain automatically checked. The Spago no-files message
+for test/**/*.purs is informational: tests are Node .mjs files. Actual strict
+build tables report zero warnings/errors; no message was suppressed.
+
+A setup command accidentally ran an extra verification in the original root
+after worktree creation. It passed but is not the worktree baseline evidence.
+The separate clean-output worktree run compiled 269 modules and passed 19
+tests plus the regression proof; .build/audit-baseline.log in the worktree
+is the actual evidence. Both locations' previous outputs were preserved.
+
+Task 1 verification initially failed with ModuleNotFound for
+Sprig.IResolved.Internal. A naive R.-to-Resolved. replacement also matched
+the suffix of IR.; it corrupted the import and IR references in Check.purs.
+The replacement is corrected, not retried unchanged. The original failure
+is preserved in the execution workspace task-1-failed-alias.log. A copied
+defective source tree independently failed purs compile with the same missing
+module in .build/alias-regression/failure.log. The build itself detects this
+edit failure; no gate or assertion was disabled.
+
+The isolated reproduction helper incorrectly expected diagnostics only on
+stderr, while purs wrote them on stdout. That helper assertion failed before
+the live fix ran, and its trailing verify re-observed the still-broken build
+in .build/audit-task-1-fixed.log. Inspected the combined saved output, confirmed
+the expected missing module, then corrected live IR references. Those logs
+remain evidence of the failed attempts, not successful fix evidence.

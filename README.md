@@ -28,7 +28,8 @@ First build requires access to the PureScript registry and package downloads.
 Spago's cache is scoped to `.build/home` by scripts/cache.mjs because the
 sandbox cannot write the normal user cache. An existing Spago cache can be
 seeded there for offline work; see docs/findings.md. Do not change HOME.
-The shell and tests put Go's cache in `.build/go-cache`.
+The CLI defaults Go's cache to `.build/go-cache` when GOCACHE is unset;
+test subprocesses select that workspace cache explicitly.
 
 The initial session verified cached builds; npm package installation could
 not be tested because registry.npmjs.org DNS was unavailable in its sandbox.
@@ -63,4 +64,5 @@ not yet a native Go compiler executable.
 - [Local backlog](BACKLOG.md)
 
 The next language milestone is closed ADTs with source-located exhaustive
-pattern matching, after the current documentation and fresh-build audit.
+pattern matching. Its design and plan remain separate from the bootstrap
+audit; [audit evidence](docs/progress.md) records the current delivery status.

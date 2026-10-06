@@ -24,11 +24,14 @@ expressionFindings ∷ CST.Expr Void → Array String
 expressionFindings expression = case expression of
   CST.ExprLet _ → [ "use where instead of let-in" ]
   CST.ExprLambda _ → [ "name transformations in where; no anonymous lambda" ]
-  CST.ExprCase branches → maybeCaseFindings branches
-    <> foldMap caseBranchFindings branches.branches
-  CST.ExprIf branches → branchBlockFindings branches.true
-    <> branchBlockFindings branches.false
+  CST.ExprCase branches → caseFindings branches
+  CST.ExprIf branches → conditionalFindings branches
   _ → []
+  where
+  caseFindings branches = maybeCaseFindings branches
+    <> foldMap caseBranchFindings branches.branches
+  conditionalFindings branches = branchBlockFindings branches.true
+    <> branchBlockFindings branches.false
 
 maybeCaseFindings ∷ CST.CaseOf Void → Array String
 maybeCaseFindings branches =

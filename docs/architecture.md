@@ -17,13 +17,16 @@ filesystem, process, argv, environment, and logging work through a small FFI.
 Expected source errors use Either. Shell maps them to JSON wire diagnostics;
 IO/tool failures are tagged boundary values. The semantic core has no FFI.
 
-IR.Internal has explicit Type/span annotations on every node. Checking is the
+IR.Internal wraps each expression node with explicit Ty/span annotations. Checking is the
 only producer used by the pipeline. CheckedProgram has no publicly exported
 constructor at the Check facade; the internal representation is exported to
 checking/lowering and protected by a parsed dependency graph allowlist.
 This is an enforced project boundary, not a claim that PureScript has private
-subtrees. Resolved IDs index known definitions; defensive E_INTERNAL results
-cover malformed internal representations passed directly to checker APIs.
+subtrees. The resolver produces IDs indexing known definitions. The checker reports
+E_INTERNAL for invalid local or called-function indices encountered during
+expression checking. Its exported resolved-syntax input is a trusted phase
+interface: it does not independently validate arbitrary forged entry IDs or
+function-table IDs. This is not a general hostile-IR validator.
 
 The present Type grammar contains only two ground constructors of kind Type.
 No separate kind solver is needed yet. There are no patterns or class

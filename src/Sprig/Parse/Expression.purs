@@ -8,7 +8,7 @@ import Data.String.CodeUnits as String
 import Sprig.Lex as Lex
 import Sprig.Model as Model
 import Sprig.Parse.Core as Core
-import Data.Maybe (maybe)
+import Data.Maybe (maybe')
 import Sprig.Model (ErrorCode(..), Expr(..), exprSpan, problem)
 import Sprig.Parse.Core (Parser, commaList, expect, failAt, name, peek, take)
 
@@ -87,9 +87,9 @@ integer
   → Model.Span
   → Core.State
   → Either Model.Diagnostic (Core.Parsed Expr)
-integer text span rest = maybe outOfRange parsedInteger (Int.fromString text)
+integer text span rest = maybe' outOfRange parsedInteger (Int.fromString text)
   where
-  outOfRange = Left
+  outOfRange _ = Left
     (problem IntegerRange span "Integer literal is outside signed 32-bit range")
   parsedInteger value = Right { value: Integer span value, rest }
 
@@ -114,12 +114,15 @@ decimalToken text = Array.all isDigit (String.toCharArray text)
 named ∷ Parser Expr
 named state = do
   identifier ← name state
-  if peek identifier.rest /= "(" then
-    pure
-      { value: Variable identifier.value.span identifier.value.text
-      , rest: identifier.rest
-      }
+  if peek identifier.rest /= "(" then namedVariable identifier
   else namedCall identifier
+
+namedVariable
+  ∷ Core.Parsed Model.Token → Either Model.Diagnostic (Core.Parsed Expr)
+namedVariable identifier = pure
+  { value: Variable identifier.value.span identifier.value.text
+  , rest: identifier.rest
+  }
 
 namedCall ∷ Core.Parsed Model.Token → Either Model.Diagnostic (Core.Parsed Expr)
 namedCall identifier = do
