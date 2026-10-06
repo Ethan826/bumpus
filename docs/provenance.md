@@ -1,0 +1,42 @@
+# Provenance and licensing audit
+
+Inspected 2026-10-07. ~/Desktop/mileahead was absent; the current MileAhead
+reference was ~/Desktop/trailmapper. Syllogic was ~/Desktop/lsatchapelhill.
+The destination workspace was empty. Reference projects were read-only;
+a later explicit request for a MileAhead guidance edit was sandbox-rejected.
+
+No root LICENSE or package.json license grant was found in either reference.
+No substantive reference code, prose, tests, product logic, customer data,
+credentials, infrastructure, or local skill bodies were copied. All project
+implementation and checks were written independently. The following are
+conceptual influences, with deliberately project-specific adaptations.
+
+| New artifact/rule | Original inspected path | Why useful and what changed |
+|---|---|---|
+| AGENTS.md, engineering.md | trailmapper/AGENTS.md, CLAUDE.md, README.md | Failure ownership, explicit done/evidence, readability, 250-line cap. Local backlog replaces remote workflows; no duplicated rule prose. |
+| spago.yaml, build wrapper | trailmapper/spago.yaml, package.json, .tool-versions | Strict/pedantic packages, compiler/set pins. Minimal compiler deps and workspace-local caches; no app packages. |
+| typed errors/internal IR | trailmapper/src/Domain/Span.purs; AGENTS.md boundary/constructor sections | Refined construction and hidden constructor boundary. Compiler phases and checked IR replace domain units; access constrained by graph. |
+| dependency gate | trailmapper/scripts/check-layers.sh; tools/checks/src/Checks/Layers/Config.purs, Partial.purs | Parse actual imports and defend effect boundaries. Independent purs graph allowlist, not copied CST layer implementation. |
+| Style.Check/format/width | trailmapper/scripts/check-readable.sh; tools/checks/src/Checks/Readable.purs, Eliminators.purs; AGENTS.md lines 340–663 and formatting section; .tidyrc.json | where, named transformations, branch helpers, eliminators, Unicode/80 columns. Independent small CST checker; some budgets remain manual. Explicit user steering strengthens eliminator rule to record builders. |
+| line/suppression gates | trailmapper/scripts/check-file-length.sh; check-escape-hatches.ts; tools/checks/src/Checks/Partial.purs | Tooling/tests obey their own limits; no disabled gates. Independent checker with no exemption file. |
+| negative/regression tests | trailmapper/scripts/check-negative.sh; AGENTS.md failure ownership; test/Test/Domain/Span.purs | Test invalid programs, exact diagnostics, isolate mutation, prove defect sensitivity. Sprig inputs replace PureScript unit-type negative cases. |
+| properties/reference execution | trailmapper/test/Test/Domain/Span.purs; README.md reference implementation section; AGENTS.md Testing lessons | Compare against independent expectations and real execution. Seeded syntax trees/BigInt oracle replace geometry tests. |
+| documentation drift | trailmapper/scripts/check-claude-md-drift.sh; lsatchapelhill/apps/api/src/big-five-drift.test.ts; both CLAUDE.md files | Avoid stale guidance. Single AGENTS source plus CLAUDE pointer rather than duplicated sections needing regeneration. |
+| pure core/shell/errors | lsatchapelhill/AGENTS.md Core principles, layering, constructors; CLAUDE.md API architecture; apps/api/eslint.config.js | Immutable types, explicit dependencies, refined ingress and tagged failures. PureScript Either and Node boundary replace Effect TypeScript/HTTP/storage. |
+| durable plan/progress/backlog | lsatchapelhill/AGENTS.md Definition of done, Where findings go, handoff sections; README.md; apps/api/vitest.unit.config.ts | Acceptance evidence and findings persist. Local artifacts, no SaaS requirements or issue publishing. |
+| local skill assessment | trailmapper/.agents/skills/effect-ts/SKILL.md; lsatchapelhill/.agents/skills/api-endpoint-pattern/SKILL.md, tenant-scoped-state/SKILL.md; docs/agent-skills.md | Inspect stack-specific guidance and reject irrelevant adoption. No Effect, endpoint, tenant, or database skills installed here. |
+
+Third-party compiler libraries arrive through pinned normal Spago packages,
+not vendored reference source; the style parser is isolated in its own package.
+Earlier planning-skill research is superseded by the explicitly requested
+installation below; docs/planning-skills.md records the adopted workflow.
+
+## Installed third-party skills
+
+Explicitly requested Superpowers installation completed 2026-10-07 using
+bunx skills, project-local in .agents/skills. All 15 skills and their supporting
+files are upstream material from obra/superpowers, pinned to
+8ca22dba9a94f28898bbce59f2537ff4d87c747d. Source paths/hashes are recorded in
+skills-lock.json; MIT copyright/license notice is preserved in
+.agents/skills/SUPERPOWERS-LICENSE. These files are licensed upstream copies,
+separate from independently written Sprig code and read-only reference projects.

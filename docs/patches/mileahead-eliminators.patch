@@ -1,0 +1,25 @@
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -496,6 +496,22 @@
+ a function or return a fallback, is `maybe`, `either`, or `fromMaybe` where
+ the `Just` arm is the value itself. The eliminator says the whole decision in
+ one line: which function each outcome goes to.
++
++**Record construction is not an exception.** For a plain two-outcome
++`Maybe` or `Either`, put each response builder in a named `where` helper
++and route with `maybe` or `either`. A record-building arm should not keep
++a `case` merely because it performs a field conversion. Use `either` for
++`Either`; `maybe` is the corresponding eliminator for `Maybe`.
++
++```purescript
++respond source = either failed succeeded (compile source)
++  where
++  failed diagnostic = failureResponse diagnostic
++  succeeded generated = successResponse generated
++```
++
++Use `maybe'` with a named function when the `Nothing` fallback computes a
++value, so the computation still runs only when the input is `Nothing`.
+ 
+ ```purescript
+ renderFiles paths = do

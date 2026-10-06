@@ -1,0 +1,10 @@
+package:
+  name: sprig-style
+  dependencies:
+    - arrays
+    - foldable-traversable
+    - language-cst-parser
+    - prelude
+    - tuples
+  build:
+    pedanticPackages: true

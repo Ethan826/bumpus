@@ -1,0 +1,7 @@
+node_modules/
+.spago/
+output/
+.build/
+.DS_Store
+.psc-ide-port
+.worktrees/

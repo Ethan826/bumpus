@@ -1,0 +1,8 @@
+{
+  "importSort": "source",
+  "importWrap": "auto",
+  "indent": 2,
+  "typeArrowPlacement": "first",
+  "unicode": "always",
+  "width": 80
+}

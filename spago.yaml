@@ -1,0 +1,16 @@
+package:
+  name: sprig
+  dependencies:
+    - arrays
+    - effect
+    - either
+    - foldable-traversable
+    - integers
+    - maybe
+    - prelude
+    - strings
+  build:
+    pedanticPackages: true
+workspace:
+  packageSet:
+    registry: 81.0.0
