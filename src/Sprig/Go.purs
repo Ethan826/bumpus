@@ -5,8 +5,16 @@ import Data.Array as Array
 import Data.String.Common (joinWith)
 import Sprig.Check (CheckedProgram)
 import Sprig.IR.Internal as IR
-import Sprig.Go.Data (ctorName, declarations, goType)
-import Sprig.Resolved (FunctionId(..), LocalId(..), Ty)
+import Sprig.Go.Data
+  ( boolean
+  , ctorName
+  , declarations
+  , goType
+  , integer
+  , localName
+  )
+import Sprig.Go.Match (lowerMatch)
+import Sprig.Resolved (FunctionId(..), LocalId(..), Tables, Ty)
 
 emit ∷ CheckedProgram → String
 emit (IR.Program program) =
@@ -19,58 +27,55 @@ emit (IR.Program program) =
     <> functionName program.entry
     <> "()) }\n"
   where
-  emitFunction = function
+  emitFunction = function { types: program.types, ctors: program.ctors }
 
-function ∷ IR.FunctionDecl → String
-function definition =
+function ∷ Tables → IR.FunctionDecl → String
+function tables definition =
   "func " <> functionName definition.id <> "(" <> joinWith ", " parameters
     <> ") "
     <> goType definition.result
     <> " {\nreturn "
-    <> expression definition.body
+    <> expression tables 0 definition.body
     <> "\n}\n"
   where
   parameters = Array.mapWithIndex parameter definition.parameters
   parameter index ty = localName (LocalId index) <> " " <> goType ty
 
-expression ∷ IR.Expr → String
-expression (IR.Expr term) = case term.node of
+-- The depth counts enclosing match arm bodies; it names match parameters.
+expression ∷ Tables → Int → IR.Expr → String
+expression tables depth (IR.Expr term) = case term.node of
   IR.Integer value → integer value
   IR.Boolean value → boolean value
   IR.Local id → localName id
-  IR.Call id arguments → invoke (functionName id) arguments
-  IR.Construct id arguments → invoke (ctorName id) arguments
-  IR.Add left right → addition left right
-  IR.If condition yes no → conditional term.ty condition yes no
-
-integer ∷ Int → String
-integer value = "int32(" <> show value <> ")"
-
-boolean ∷ Boolean → String
-boolean value = if value then "true" else "false"
-
-invoke ∷ String → Array IR.Expr → String
-invoke name arguments = name <> "("
-  <> joinWith ", " (map emitArgument arguments)
-  <> ")"
+  IR.Call id arguments → invoke lower (functionName id) arguments
+  IR.Construct id arguments → invoke lower (ctorName id) arguments
+  IR.Add left right → addition lower left right
+  IR.If condition yes no → conditional lower term.ty condition yes no
+  IR.Match scrutinee arms → lowerMatch tables (expression tables) depth
+    term.ty
+    scrutinee
+    arms
   where
-  emitArgument = expression
+  lower = expression tables depth
 
-addition ∷ IR.Expr → IR.Expr → String
-addition left right = "sprigAdd(" <> expression left <> ", " <> expression right
+invoke ∷ (IR.Expr → String) → String → Array IR.Expr → String
+invoke lower name arguments = name <> "("
+  <> joinWith ", " (map lower arguments)
   <> ")"
 
-conditional ∷ Ty → IR.Expr → IR.Expr → IR.Expr → String
-conditional ty condition yes no = "func() " <> goType ty <> " { if "
-  <> expression condition
+addition ∷ (IR.Expr → String) → IR.Expr → IR.Expr → String
+addition lower left right = "sprigAdd(" <> lower left <> ", " <> lower right
+  <> ")"
+
+conditional
+  ∷ (IR.Expr → String) → Ty → IR.Expr → IR.Expr → IR.Expr → String
+conditional lower ty condition yes no = "func() " <> goType ty <> " { if "
+  <> lower condition
   <> " { return "
-  <> expression yes
+  <> lower yes
   <> " }; return "
-  <> expression no
+  <> lower no
   <> " }()"
 
 functionName ∷ FunctionId → String
 functionName (FunctionId index) = "sprigFn" <> show index
-
-localName ∷ LocalId → String
-localName (LocalId index) = "sprigLocal" <> show index

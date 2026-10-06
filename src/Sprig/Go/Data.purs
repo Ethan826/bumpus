@@ -1,17 +1,33 @@
-module Sprig.Go.Data (declarations, goType, ctorName) where
+module Sprig.Go.Data
+  ( declarations
+  , goType
+  , ctorName
+  , fieldName
+  , tagOf
+  , localName
+  , integer
+  , boolean
+  ) where
 
 import Prelude
 import Data.Array as Array
 import Data.Maybe (Maybe, maybe)
 import Data.String.Common (joinWith)
-import Sprig.Resolved (CtorId(..), CtorInfo, Ty(..), TypeId(..), TypeInfo)
+import Sprig.Resolved
+  ( CtorId(..)
+  , CtorInfo
+  , LocalId(..)
+  , Ty(..)
+  , TypeId(..)
+  , TypeInfo
+  )
 
 -- Each type becomes one tagged struct and its constructor functions.
 declarations ∷ Array TypeInfo → Array CtorInfo → String
 declarations types ctors = joinWith "" (Array.mapWithIndex typeBlock types)
   where
   typeBlock index info = structDeclaration (TypeId index) ctors info
-    <> joinWith "" (map (constructor ctors info) info.ctors)
+    <> joinWith "" (map (constructor types ctors) info.ctors)
 
 goType ∷ Ty → String
 goType = case _ of
@@ -21,6 +37,22 @@ goType = case _ of
 
 ctorName ∷ CtorId → String
 ctorName (CtorId index) = "sprigCtor" <> show index
+
+localName ∷ LocalId → String
+localName (LocalId index) = "sprigLocal" <> show index
+
+integer ∷ Int → String
+integer value = "int32(" <> show value <> ")"
+
+boolean ∷ Boolean → String
+boolean value = if value then "true" else "false"
+
+-- Tags are 1-based within the owner so the zero value never names a
+-- constructor. Constructor ids are unique across types.
+tagOf ∷ Array TypeInfo → CtorId → Int
+tagOf types id = maybe 0 (add 1) (Array.findMap position types)
+  where
+  position info = Array.elemIndex id info.ctors
 
 typeName ∷ TypeId → String
 typeName (TypeId index) = "sprigTy" <> show index
@@ -44,8 +76,8 @@ structDeclaration owner ctors info =
   lines id ctor = Array.mapWithIndex (fieldLine id) ctor.fields
   fieldLine id index ty = fieldName id index <> " " <> fieldType ty <> "\n"
 
-constructor ∷ Array CtorInfo → TypeInfo → CtorId → String
-constructor ctors info id = maybe "" declared (ctorAt ctors id)
+constructor ∷ Array TypeInfo → Array CtorInfo → CtorId → String
+constructor types ctors id = maybe "" declared (ctorAt ctors id)
   where
   declared ctor =
     "func " <> ctorName id <> "(" <> joinWith ", " (parameters ctor)
@@ -54,7 +86,7 @@ constructor ctors info id = maybe "" declared (ctorAt ctors id)
       <> " { return "
       <> typeName ctor.owner
       <> "{"
-      <> joinWith ", " ([ "tag: " <> show (tagOf info id) ] <> stores ctor)
+      <> joinWith ", " ([ "tag: " <> show (tagOf types id) ] <> stores ctor)
       <> "} }\n\n"
   parameters ctor = Array.mapWithIndex parameter ctor.fields
   parameter index ty = "f" <> show index <> " " <> goType ty
@@ -66,10 +98,6 @@ storedValue ∷ Ty → String → String
 storedValue ty name = case ty of
   TData _ → "&" <> name
   _ → name
-
--- Tags are 1-based so the zero value never names a constructor.
-tagOf ∷ TypeInfo → CtorId → Int
-tagOf info id = maybe 0 (add 1) (Array.elemIndex id info.ctors)
 
 ctorAt ∷ Array CtorInfo → CtorId → Maybe CtorInfo
 ctorAt ctors (CtorId index) = Array.index ctors index

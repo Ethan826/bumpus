@@ -5,9 +5,10 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (maybe')
 import Data.Traversable (traverse)
+import Sprig.Check.Match (Typed, checkMatch, require)
 import Sprig.IR.Internal as IR
 import Sprig.Model (ErrorCode(..), Diagnostic, Span, problem)
-import Sprig.Resolved (Ty(..), describe)
+import Sprig.Resolved (Ty(..))
 import Sprig.Resolved as Resolved
 
 type CheckedProgram = IR.Program
@@ -16,7 +17,7 @@ type Env =
   { functions ∷ Array Resolved.FunctionDecl
   , types ∷ Array Resolved.TypeInfo
   , ctors ∷ Array Resolved.CtorInfo
-  , locals ∷ Array { id ∷ Resolved.LocalId, ty ∷ Ty }
+  , locals ∷ Array Typed
   }
 
 check ∷ Resolved.Program → Either Diagnostic CheckedProgram
@@ -60,18 +61,6 @@ checkFunction env function = do
   parameterLocal index parameter =
     { id: Resolved.LocalId index, ty: parameter.ty }
 
-require ∷ Env → Ty → IR.Expr → Either Diagnostic Unit
-require env expected actual =
-  if expected == IR.typeOf actual then Right unit
-  else mismatch
-  where
-  mismatch = Left
-    ( problem TypeMismatch (IR.spanOf actual)
-        ( "Expected " <> describe env.types expected <> ", found "
-            <> describe env.types (IR.typeOf actual)
-        )
-    )
-
 infer ∷ Env → Resolved.Expr → Either Diagnostic IR.Expr
 infer env expression = case expression of
   Resolved.Integer span value → checkedInteger span value
@@ -82,6 +71,7 @@ infer env expression = case expression of
   Resolved.Add span left right → checkAddition env span left right
   Resolved.If span condition yes no → checkConditional env span condition yes
     no
+  Resolved.Match span scrutinee arms → checkMatch infer env span scrutinee arms
 
 checkedInteger ∷ Span → Int → Either Diagnostic IR.Expr
 checkedInteger span value = pure

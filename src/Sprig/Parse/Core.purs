@@ -10,6 +10,7 @@ module Sprig.Parse.Core
   , typeRef
   , failAt
   , commaList
+  , nonEmptyList
   ) where
 
 import Prelude

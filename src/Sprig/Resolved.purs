@@ -31,6 +31,21 @@ type Local = { name ∷ String, id ∷ LocalId }
 
 data GlobalRef = FunctionRef FunctionId | CtorRef CtorId
 
+-- Functions and constructors share one global namespace.
+type Global = { name ∷ String, ref ∷ GlobalRef }
+
+-- A result plus the next free LocalId, threaded in source pre-order.
+type Numbered a = { value ∷ a, next ∷ Int }
+
+data Pattern
+  = Wildcard Span
+  | Bind Span LocalId
+  | IntLit Span Int
+  | BoolLit Span Boolean
+  | Ctor Span CtorId (Array Pattern)
+
+type Arm = { pattern ∷ Pattern, body ∷ Expr, span ∷ Span }
+
 data Expr
   = Integer Span Int
   | Boolean Span Boolean
@@ -39,6 +54,7 @@ data Expr
   | Construct Span CtorId (Array Expr)
   | Add Span Expr Expr
   | If Span Expr Expr Expr
+  | Match Span Expr (Array Arm)
 
 type Parameter = { name ∷ String, ty ∷ Ty, span ∷ Span }
 
@@ -75,3 +91,4 @@ exprSpan expression = case expression of
   Construct span _ _ → span
   Add span _ _ → span
   If span _ _ _ → span
+  Match span _ _ → span

@@ -1,0 +1,137 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { checked, command, goTest, rejectedAt, runGo } from './support.mjs';
+
+const list = 'type IntList = Nil | Cons(Int, IntList);';
+const sum = 'fn sum(xs: IntList): Int = '
+  + 'match xs { Nil => 0, Cons(h, t) => h + sum(t) };';
+const run = source => runGo(source).trim();
+
+test('a list sum runs', () => {
+  const source = `${list} ${sum} `
+    + 'fn main(): Int = sum(Cons(1, Cons(2, Cons(3, Nil))));';
+  assert.equal(run(source), '6');
+});
+
+test('an evaluator special-cases a nested pattern', () => {
+  const source = 'type Exp = Lit(Int) | Plus(Exp, Exp); '
+    + 'fn eval(e: Exp): Int = match e { '
+    + 'Plus(Lit(n), Lit(m)) => n + m + 1000, '
+    + 'Plus(a, b) => eval(a) + eval(b), Lit(n) => n }; '
+    + 'fn main(): Int = eval(Plus(Plus(Lit(1), Lit(2)), '
+    + 'Plus(Lit(3), Plus(Lit(4), Lit(5)))));';
+  assert.equal(run(source), '2015');
+});
+
+test('Int and Bool literal patterns select arms', () => {
+  const ints = 'fn sign(n: Int): Int = match n { -1 => 100, 0 => 20, _ => 3 }; '
+    + 'fn main(): Int = sign(-1) + sign(0) + sign(7);';
+  assert.equal(run(ints), '123');
+  const bools = 'fn pick(b: Bool): Int = match b { true => 1, false => 2 }; '
+    + 'fn main(): Int = pick(false) + pick(true) + pick(false);';
+  assert.equal(run(bools), '5');
+});
+
+test('mutually recursive Tree and Forest sizes', () => {
+  const source = 'type Tree = Node(Int, Forest); '
+    + 'type Forest = Empty | More(Tree, Forest); '
+    + 'fn size(t: Tree): Int = match t { Node(_, f) => 1 + forest(f) }; '
+    + 'fn forest(f: Forest): Int = match f { Empty => 0, '
+    + 'More(t, rest) => size(t) + forest(rest) }; '
+    + 'fn main(): Int = size(Node(1, More(Node(2, Empty), '
+    + 'More(Node(3, More(Node(4, Empty), Empty)), Empty))));';
+  assert.equal(run(source), '4');
+});
+
+test('matches nest in arm bodies and in scrutinee position', () => {
+  const source = `${list} fn f(xs: IntList): Int = `
+    + 'match match xs { Nil => Cons(5, Nil), _ => xs } { '
+    + 'Cons(h, t) => match t { Nil => h, Cons(g, _) => h + g }, Nil => 0 }; '
+    + 'fn main(): Int = f(Nil) + f(Cons(1, Cons(2, Nil)));';
+  assert.equal(run(source), '8');
+});
+
+test('a binder shadows a parameter only in its arm', () => {
+  const source = `${list} fn f(x: Int, xs: IntList): Int = `
+    + 'match xs { Cons(x, _) => x, Nil => x }; '
+    + 'fn main(): Int = f(1, Cons(7, Nil)) + f(100, Nil);';
+  assert.equal(run(source), '107');
+});
+
+test('an 8192-element list built by doubling sums correctly', () => {
+  const source = `${list} ${sum} `
+    + 'fn append(a: IntList, b: IntList): IntList = '
+    + 'match a { Nil => b, Cons(h, t) => Cons(h, append(t, b)) }; '
+    + 'fn grow(n: Int, xs: IntList): IntList = '
+    + 'match n { 13 => xs, _ => grow(n + 1, append(xs, xs)) }; '
+    + 'fn main(): Int = sum(grow(0, Cons(1, Nil)));';
+  assert.equal(run(source), '8192');
+});
+
+test('a trailing comma is accepted', () => {
+  const source = `${list} fn main(): Int = `
+    + 'match Cons(4, Nil) { Nil => 0, Cons(h, _) => h, };';
+  assert.equal(run(source), '4');
+});
+
+test('patterns and matches are rejected precisely', () => {
+  const color = 'type Color = Red | Green;';
+  const f = body => `${list} ${color} fn f(xs: IntList, b: Bool): Int = `
+    + `${body}; fn main(): Int = 0;`;
+  const rows = [
+    [f('match xs { Cons(q, Cons(q, _)) => q, _ => 0 }'), 'E_DUPLICATE', 'q'],
+    [f('match xs { X => 0, _ => 1 }'), 'E_UNBOUND', 'X'],
+    [f('match xs { Cons(h) => 0, _ => 1 }'), 'E_ARITY', 'Cons(h)'],
+    [f('match xs { Red => 0, _ => 1 }'), 'E_TYPE', 'Red', 1],
+    [f('match b { 1 => 0, _ => 1 }'), 'E_TYPE', '1'],
+    [f('match xs { Nil => 0, Cons(_, _) => true }'), 'E_TYPE', 'true'],
+    [f('match xs { Cons(f, _) => f(1), Nil => 0 }'), 'E_NOT_CALLABLE',
+      'f(1)'],
+    [f('match xs { Cons(z, _) => z, Nil => z }'), 'E_UNBOUND', 'z', 2],
+    [f('1 + match xs { Nil => 0, _ => 1 }'), 'E_SYNTAX', 'match'],
+    [f('match xs {}'), 'E_SYNTAX', '}']
+  ];
+  for (const [source, code, text, nth] of rows) {
+    rejectedAt(source, code, text, nth ?? 0);
+  }
+});
+
+const second = `${list} fn second(xs: IntList): Int = match xs `
+  + '{ Nil => 0, Cons(_, Nil) => 1, Cons(_, Cons(y, _)) => y }; '
+  + 'fn main(): Int = second(Nil);';
+const recovering = (name, call, check) => `package main
+import "testing"
+func ${name}(t *testing.T) {
+defer func() { r := recover(); ${check} }()
+${call}
+}
+`;
+
+test('malformed values reach the unmatched panic, never a nil error', () => {
+  const check = 'if r != "sprig: unmatched value" '
+    + '{ t.Fatalf("recovered %v", r) }';
+  for (const value of ['sprigTy0{}', 'sprigTy0{tag: 2}']) {
+    const go = recovering('TestUnmatched', `sprigFn0(${value})`, check);
+    const result = goTest(second, go);
+    assert.equal(result.status, 0, result.output);
+  }
+});
+
+test('wildcards skip validation of a nil field', () => {
+  const source = `${list} fn head(xs: IntList): Int = `
+    + 'match xs { Cons(h, _) => h, Nil => 0 }; fn main(): Int = head(Nil);';
+  const go = recovering('TestHead',
+    'if v := sprigFn0(sprigTy0{tag: 2, c1f0: 5}); v != 5 '
+    + '{ t.Fatalf("got %v", v) }',
+    'if r != nil { t.Fatalf("panicked %v", r) }');
+  const result = goTest(source, go);
+  assert.equal(result.status, 0, result.output);
+});
+
+test('shapes example matches its snapshot and runs', () => {
+  const source = readFileSync('examples/shapes.sprig', 'utf8');
+  assert.equal(checked(source), readFileSync('bootstrap/shapes.go', 'utf8'));
+  assert.equal(command('node', ['scripts/sprig.mjs', 'run',
+    'examples/shapes.sprig']), '120\n');
+});

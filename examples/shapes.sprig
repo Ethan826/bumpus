@@ -1,0 +1,13 @@
+type Shape = Dot | Square(Int) | Pair(Shape, Shape);
+
+fn size(s: Shape): Int = match s {
+  Dot => 1,
+  Square(side) => side + side + side + side,
+  Pair(Dot, Dot) => 2,
+  Pair(left, right) => match left {
+    Dot => 100 + size(right),
+    _ => size(left) + size(right),
+  },
+};
+
+fn main(): Int = size(Pair(Square(3), Pair(Dot, Square(2))));

@@ -16,6 +16,16 @@ data Expr
   | Call Span String (Array Expr)
   | Add Span Expr Expr
   | If Span Expr Expr Expr
+  | Match Span Expr (Array Arm)
+
+data Pattern
+  = PWildcard Span
+  | PBind Span String
+  | PInt Span Int
+  | PBool Span Boolean
+  | PCtor Span String (Array Pattern)
+
+type Arm = { pattern ∷ Pattern, body ∷ Expr, span ∷ Span }
 
 data TypeRef = IntRef Span | BoolRef Span | NamedRef Span String
 
@@ -58,6 +68,15 @@ exprSpan = case _ of
   Call span _ _ → span
   Add span _ _ → span
   If span _ _ _ → span
+  Match span _ _ → span
+
+patternSpan ∷ Pattern → Span
+patternSpan = case _ of
+  PWildcard span → span
+  PBind span _ → span
+  PInt span _ → span
+  PBool span _ → span
+  PCtor span _ _ → span
 
 isUpper ∷ String → Boolean
 isUpper text = maybe false upper (String.charAt 0 text)

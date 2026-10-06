@@ -1,25 +1,42 @@
 import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-const root = '.build/regression';
-const commandTimeoutMs = 60_000;
-rmSync(root, { recursive: true, force: true });
-mkdirSync(root, { recursive: true });
-cpSync('src', `${root}/src`, { recursive: true });
-const file = `${root}/src/Sprig/Check.purs`;
-const original = readFileSync(file, 'utf8');
-const needle = 'require env (IR.typeOf first) second';
-assert.equal(original.split(needle).length, 2, 'mutation must have exactly one target');
-writeFileSync(file, original.replace(needle, 'require env (IR.typeOf second) second'));
+// Each row restores one defect in its own isolated copy of the sources.
+const rows = [
+  {
+    name: 'branch', file: 'src/Sprig/Check.purs',
+    needle: 'require env (IR.typeOf first) second',
+    replacement: 'require env (IR.typeOf second) second',
+    probe: 'branch', message: /branch type mismatch was accepted/
+  },
+  {
+    name: 'nil-guard', file: 'src/Sprig/Go/Match.purs',
+    needle: 'nilGuard path = path <> " != nil"',
+    replacement: 'nilGuard _ = "true"',
+    probe: 'nil-guard', message: /nil guard missing/
+  }
+];
+const base = '.build/regression';
+const commandTimeoutMs = 180_000;
 const run = (command, args) => spawnSync(command, args, { encoding: 'utf8', timeout: commandTimeoutMs });
-const built = run('purs', ['compile', `${root}/src/**/*.purs`, '.spago/p/*/src/**/*.purs', '--output', `${root}/output`]);
-assert.ifError(built.error);
-assert.equal(built.status, 0, built.stderr);
-const healthy = run('node', ['test/regression.mjs', 'output/Sprig.Compiler/index.js', 'output']);
-assert.ifError(healthy.error);
-assert.equal(healthy.status, 0, healthy.stderr);
-const broken = run('node', ['test/regression.mjs', `${root}/output/Sprig.Compiler/index.js`, `${root}/output`]);
-assert.ifError(broken.error);
-assert.equal(broken.status, 1);
-assert.match(broken.stderr, /branch type mismatch was accepted/);
-console.log('Regression proof: fixed compiler passes; restored branch-check defect fails.');
+rmSync(base, { recursive: true, force: true });
+for (const row of rows) {
+  const root = `${base}/${row.name}`;
+  mkdirSync(root, { recursive: true });
+  cpSync('src', `${root}/src`, { recursive: true });
+  const file = `${root}/${row.file}`;
+  const original = readFileSync(file, 'utf8');
+  assert.equal(original.split(row.needle).length, 2, `${row.name}: mutation must have exactly one target`);
+  writeFileSync(file, original.replace(row.needle, row.replacement));
+  const built = run('purs', ['compile', `${root}/src/**/*.purs`, '.spago/p/*/src/**/*.purs', '--output', `${root}/output`]);
+  assert.ifError(built.error);
+  assert.equal(built.status, 0, built.stderr);
+  const healthy = run('node', ['test/regression.mjs', 'output/Sprig.Compiler/index.js', 'output', row.probe]);
+  assert.ifError(healthy.error);
+  assert.equal(healthy.status, 0, healthy.stderr);
+  const broken = run('node', ['test/regression.mjs', `${root}/output/Sprig.Compiler/index.js`, `${root}/output`, row.probe]);
+  assert.ifError(broken.error);
+  assert.equal(broken.status, 1, broken.stdout + broken.stderr);
+  assert.match(broken.stderr, row.message);
+  console.log(`Regression proof (${row.name}): fixed compiler passes; restored defect fails.`);
+}

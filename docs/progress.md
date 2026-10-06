@@ -188,3 +188,10 @@ with TData; two-pass type table, shared global table, Construct through Check
 and Go (Go.Data). test/adt-types.test.mjs (6 tests) failed before the change
 (unbound-type errors), then passed. `npm run verify` exit 0 (32 tests, regression
 proof, answer.go unchanged).
+
+2026-10-07: closed-ADT Task 3 (patterns and match, no coverage) done. Parse.Literal
+and Parse.Pattern, Resolve.Pattern with pre-order LocalIds, Check.Match, Go.Match
+(depth-named IIFE, nil-guarded projections); examples/shapes.sprig with snapshot
+bootstrap/shapes.go. test/adt-match (12) and test/adt-properties (1) failed before
+the change (match was E_SYNTAX), then passed. Regression proof is a table: `branch`
+and new `nil-guard` both fail on their mutants. `npm run verify` exit 0.

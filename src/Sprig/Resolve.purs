@@ -6,8 +6,9 @@ import Data.Either (Either(..))
 import Data.Maybe (maybe')
 import Data.Traversable (traverse)
 import Sprig.Model as Syntax
-import Sprig.Resolve.Expression (Global, expression)
+import Sprig.Resolve.Expression (expression)
 import Sprig.Resolve.Types (resolveType, typeTable)
+import Sprig.Resolved (Global)
 import Sprig.Resolved as Resolved
 
 type Signature =
@@ -89,6 +90,7 @@ resolveFunction
   → Definition
   → Either Syntax.Diagnostic Resolved.FunctionDecl
 resolveFunction globals ctors definition = withBody <$> expression scope
+  (Array.length locals)
   definition.function.body
   where
   scope = { globals, ctors, locals }
@@ -99,6 +101,6 @@ resolveFunction globals ctors definition = withBody <$> expression scope
     { id: Resolved.FunctionId definition.index
     , parameters: definition.signature.parameters
     , result: definition.signature.result
-    , body
+    , body: body.value
     , span: definition.function.span
     }
