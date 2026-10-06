@@ -1,6 +1,5 @@
 module Format.Diagnostic
   ( WireDiagnostic
-  , Response
   , code
   , codeName
   , message
@@ -22,8 +21,6 @@ import Domain.Syntax (Diagnostic, ErrorCode, Span)
 import Domain.Syntax as Code
 
 type WireDiagnostic = { code ∷ String, message ∷ String, span ∷ Span }
-type Response =
-  { ok ∷ Boolean, go ∷ String, diagnostics ∷ Array WireDiagnostic }
 
 code ∷ Problem → ErrorCode
 code = case _ of

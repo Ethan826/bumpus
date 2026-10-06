@@ -17,6 +17,9 @@ const coreLibraries = /^(Prelude$|Data\.(Array|Either|Maybe|Int|String|Foldable|
 const partialModules = /(^|\.)(Unsafe|Partial)(\.|$)/;
 const irModule = 'Domain.IR.Internal';
 const irImporters = /^(Features\.Check|Format\.Go)(\.|$)/;
+// Commands run over capability ports only, so tests can pass fake hosts.
+const portCommands = ['Program.Command'];
+const hostEffects = /^(Effect|Runtime)(\.|$)/;
 
 export const layerOf = moduleName => moduleName.split('.')[0];
 
@@ -34,12 +37,14 @@ const libraryFinding = (name, dependency) => {
   return [];
 };
 
+const commandFinding = (name, dependency) =>
+  portCommands.includes(name) && hostEffects.test(dependency) ? [`port command ${name} imports ${dependency}`] : [];
+
 export const graphFindings = graph => Object.entries(graph).flatMap(([name, module]) => {
   if (!module.path.startsWith('src/')) return [];
   if (!layers.includes(layerOf(name))) return [`unlayered module: ${name}`];
-  return module.depends.flatMap(dependency => layers.includes(layerOf(dependency))
-    ? projectFinding(name, dependency)
-    : libraryFinding(name, dependency));
+  return module.depends.flatMap(dependency => [...commandFinding(name, dependency),
+    ...(layers.includes(layerOf(dependency)) ? projectFinding(name, dependency) : libraryFinding(name, dependency))]);
 });
 
 export const textFindings = (file, source) => {

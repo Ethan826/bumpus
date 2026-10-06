@@ -1,17 +1,22 @@
 module Program.Main (main) where
 
 import Prelude
-import Data.Either (either)
+import Data.Foldable (traverse_)
 import Effect (Effect)
-import Format.Diagnostic (Response, wire)
-import Program.Compile (compile)
-import Runtime.Node (launch)
+import Program.Command (command)
+import Runtime.Node
+  ( commandArguments
+  , nodeHost
+  , setExitCode
+  , wireText
+  , writeError
+  , writeOutput
+  )
 
+-- Wires the Node host into the commands, then writes the outcome.
 main ∷ Effect Unit
-main = launch respond
-
-respond ∷ String → Response
-respond source = either failed succeeded (compile source)
-  where
-  failed diagnostic = { ok: false, go: "", diagnostics: [ wire diagnostic ] }
-  succeeded go = { ok: true, go, diagnostics: [] }
+main = do
+  outcome ← command nodeHost =<< commandArguments
+  writeOutput outcome.stdout
+  traverse_ (writeError <<< wireText) outcome.stderr
+  setExitCode outcome.status

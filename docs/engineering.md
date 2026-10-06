@@ -17,7 +17,8 @@ suppressing a gate, weakening an assertion, or adding a bypass allowlist.
   and Format to the core library allowlist (no Effect, Unsafe or Partial),
   and lets only Features.Check* and Format.Go* import Domain.IR.Internal;
 - no JS FFI files outside src/Runtime; all runtime capabilities live in
-  Runtime and Program;
+  Runtime and Program; Program.Command runs over the Domain.Host ports and
+  may not import Effect or Runtime, so tests drive it with fake hosts;
 - separate language-cst-parser style package rejects let-in, anonymous lambdas,
   Maybe/Either constructor cases (including record-building or guarded cases),
   and do-blocks directly in case/if branches; parse recovery fails the gate;

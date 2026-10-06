@@ -7,7 +7,8 @@ test('layer gate rejects effects, reverse dependencies, and unchecked IR access'
     ['Domain.Syntax', 'Effect'], ['Format.Parse', 'Program.Main'],
     ['Features.Resolve', 'Domain.IR.Internal'], ['Format.Lex', 'Unsafe.Coerce'],
     ['Domain.Syntax', 'Format.Go'], ['Format.Lex', 'Data.String.Unsafe'],
-    ['Features.Resolve', 'Format.Parse'], ['Runtime.Node', 'Program.Main']
+    ['Features.Resolve', 'Format.Parse'], ['Runtime.Node', 'Program.Main'],
+    ['Program.Command', 'Effect'], ['Program.Command', 'Runtime.Node']
   ]) assert.equal(graphFindings({ [name]: { path: 'src/example.purs', depends: [dependency] } }).length, 1);
   assert.deepEqual(graphFindings({ 'Features.Check': { path: 'src/check.purs', depends: ['Domain.Syntax', 'Domain.IR.Internal', 'Data.Array'] } }), []);
   assert.deepEqual(graphFindings({ 'Program.Main': { path: 'src/main.purs', depends: ['Effect'] } }), []);
