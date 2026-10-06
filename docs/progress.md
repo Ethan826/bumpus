@@ -136,3 +136,10 @@ isolated branch mutation proof passed. Raw final log: .build/audit-final.log.
 Tasks 1/2 and original bootstrap tasks 7/8 are complete; no blocking review
 finding remains. E004 minor titles are intentionally deferred. Integration
 into main has not been requested or performed.
+
+The installed task-done helper also verified Task 2 after commit f27b499:
+19/19 tests, zero skips, strict build/gates/regression proof passed; commit
+range 4410609..f27b499 is recorded in the durable ledger. Raw completion log:
+.build/audit-task-2-completion.log. Executor scratch was copied in full to
+.build/audit-executor-evidence before cleanup; durable ledger/review remain
+committed in docs/plans. Only local branch integration is pending.

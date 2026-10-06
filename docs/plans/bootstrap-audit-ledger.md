@@ -59,3 +59,8 @@ Todo: Task 1 complete; Task 2 closure verification pending; review complete.
 Task 2 Step 3 done: one fresh reviewer, no blockers; E004 deferred.
 Final closure verify: npm run verify → exit 0,19/19,zero skips,regression
 proof,zero warnings/errors; .build/audit-final.log.
+Task 2: complete (commits 4410609..f27b499, tests: npm run verify → Verified compiler, gates, executable programs, rejection diagnostics, properties, and regression proof.)
+
+Todo: Task 1 complete; Task 2 complete; fresh review complete.
+Integration: pending user choice; main retains baseline; audit branch/worktree
+remain preserved. No push or publication.
