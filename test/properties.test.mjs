@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parse } from '../output/Sprig.Parse/index.js';
-import { Integer, Add, If, Boolean as Bool } from '../output/Sprig.Model/index.js';
+import { parse } from '../output/Format.Parse/index.js';
+import { Integer, Add, If, Boolean as Bool } from '../output/Domain.Syntax/index.js';
 import { Right } from '../output/Data.Either/index.js';
 import { checked, rejected, runGo } from './support.mjs';
 

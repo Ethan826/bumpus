@@ -11,10 +11,13 @@ vertical slice before adding language features. Task tracking is local.
   corresponding defect restored, in an isolated copy.
 - Run `npm run verify` before reporting completion. Report what actually ran
   and distinguish verified behavior from proposed behavior.
-- Keep Sprig.* pure. Effects and foreign imports belong in Shell.*. Expected
+- Keep Domain.*, Features.* and Format.* pure. Effects and foreign imports
+  belong in Runtime.* and Program.*. Imports run only to the same or an
+  earlier layer (Domain, Features, Format, Runtime, Program). Expected
   semantic failures are `Either Diagnostic`; error codes are an ADT.
 - Parsing, resolved syntax, checked IR, and Go generation are distinct.
-  Only checking and lowering may import Sprig.IR.Internal. Keep its
+  Only checking and lowering (Features.Check*, Format.Go*) may import
+  Domain.IR.Internal. Keep its
   constructors behind that enforced module boundary.
 - Prefer `where`, never `let … in`. A `let` inside `do` may depend on an
   earlier bound value. Name transformations passed to map/traverse/eliminators

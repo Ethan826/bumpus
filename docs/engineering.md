@@ -11,9 +11,13 @@ suppressing a gate, weakening an assertion, or adding a bypass allowlist.
 - 250 physical lines for maintained PureScript/JS source, tests, and tools;
   final newlines, textual escape/suppression checks (conservative, includes
   text inside comments/strings; checker fixture strings are assembled);
-- purs graph parses imports; project-import allowlist and core
-  library allowlist prevent reversed layers, effects, and unchecked IR use;
-- no JS FFI files inside Sprig; all runtime capabilities live in Shell;
+- purs graph parses imports; the five-layer gate (Domain, Features, Format,
+  Runtime, Program; docs/plans/2026-10-07-five-layers-design.md) rejects
+  unlayered modules and imports of a later layer, restricts Domain, Features
+  and Format to the core library allowlist (no Effect, Unsafe or Partial),
+  and lets only Features.Check* and Format.Go* import Domain.IR.Internal;
+- no JS FFI files outside src/Runtime; all runtime capabilities live in
+  Runtime and Program;
 - separate language-cst-parser style package rejects let-in, anonymous lambdas,
   Maybe/Either constructor cases (including record-building or guarded cases),
   and do-blocks directly in case/if branches; parse recovery fails the gate;

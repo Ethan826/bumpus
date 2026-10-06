@@ -4,19 +4,19 @@ import { spawnSync } from 'node:child_process';
 // Each row restores one defect in its own isolated copy of the sources.
 const rows = [
   {
-    name: 'branch', file: 'src/Sprig/Check.purs',
+    name: 'branch', file: 'src/Features/Check.purs',
     needle: 'require env (IR.typeOf first) second',
     replacement: 'require env (IR.typeOf second) second',
     probe: 'branch', message: /branch type mismatch was accepted/
   },
   {
-    name: 'nil-guard', file: 'src/Sprig/Go/Match.purs',
+    name: 'nil-guard', file: 'src/Format/Go/Match.purs',
     needle: 'nilGuard path = path <> " != nil"',
     replacement: 'nilGuard _ = "true"',
     probe: 'nil-guard', message: /nil guard missing/
   },
   {
-    name: 'exhaustive', file: 'src/Sprig/Check/Coverage.purs',
+    name: 'exhaustive', file: 'src/Features/Check/Coverage.purs',
     needle: 'uncovered signature',
     replacement: 'const (const Nothing)',
     probe: 'exhaustive', message: /non-exhaustive match was accepted/
@@ -37,10 +37,10 @@ for (const row of rows) {
   const built = run('purs', ['compile', `${root}/src/**/*.purs`, '.spago/p/*/src/**/*.purs', '--output', `${root}/output`]);
   assert.ifError(built.error);
   assert.equal(built.status, 0, built.stderr);
-  const healthy = run('node', ['test/regression.mjs', 'output/Sprig.Compiler/index.js', 'output', row.probe]);
+  const healthy = run('node', ['test/regression.mjs', 'output/Program.Compile/index.js', 'output', row.probe]);
   assert.ifError(healthy.error);
   assert.equal(healthy.status, 0, healthy.stderr);
-  const broken = run('node', ['test/regression.mjs', `${root}/output/Sprig.Compiler/index.js`, `${root}/output`, row.probe]);
+  const broken = run('node', ['test/regression.mjs', `${root}/output/Program.Compile/index.js`, `${root}/output`, row.probe]);
   assert.ifError(broken.error);
   assert.equal(broken.status, 1, broken.stdout + broken.stderr);
   assert.match(broken.stderr, row.message);

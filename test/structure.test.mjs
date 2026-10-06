@@ -4,12 +4,15 @@ import { graphFindings, textFindings } from '../scripts/structure.mjs';
 
 test('layer gate rejects effects, reverse dependencies, and unchecked IR access', () => {
   for (const [name, dependency] of [
-    ['Sprig.Model', 'Effect'], ['Sprig.Parse', 'Shell.CLI'],
-    ['Sprig.Resolve', 'Sprig.IR.Internal'], ['Sprig.Lex', 'Unsafe.Coerce'],
-    ['Sprig.Model', 'Sprig.Go'], ['Sprig.Lex', 'Data.String.Unsafe']
+    ['Domain.Syntax', 'Effect'], ['Format.Parse', 'Program.Main'],
+    ['Features.Resolve', 'Domain.IR.Internal'], ['Format.Lex', 'Unsafe.Coerce'],
+    ['Domain.Syntax', 'Format.Go'], ['Format.Lex', 'Data.String.Unsafe'],
+    ['Features.Resolve', 'Format.Parse'], ['Runtime.Node', 'Program.Main']
   ]) assert.equal(graphFindings({ [name]: { path: 'src/example.purs', depends: [dependency] } }).length, 1);
-  assert.deepEqual(graphFindings({ 'Sprig.Check': { path: 'src/check.purs', depends: ['Sprig.Model', 'Sprig.IR.Internal', 'Data.Array'] } }), []);
+  assert.deepEqual(graphFindings({ 'Features.Check': { path: 'src/check.purs', depends: ['Domain.Syntax', 'Domain.IR.Internal', 'Data.Array'] } }), []);
+  assert.deepEqual(graphFindings({ 'Program.Main': { path: 'src/main.purs', depends: ['Effect'] } }), []);
   assert.equal(graphFindings({ 'Unknown': { path: 'src/unknown.purs', depends: [] } }).length, 1);
+  assert.equal(graphFindings({ 'Sprig.Old': { path: 'src/Sprig/Old.purs', depends: [] } }).length, 1);
 });
 
 test('length gate counts blank lines and includes tooling and tests', () => {

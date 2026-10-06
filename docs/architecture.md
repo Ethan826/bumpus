@@ -7,14 +7,14 @@ String -> Parse -> Syntax -> Resolve -> Resolved -> Check -> typed IR -> Go
                                                     Either Diagnostic
 ```
 
-Sprig.Model owns raw syntax, ground types, spans, and tagged diagnostics.
+Domain.Syntax owns raw syntax, ground types, spans, and tagged diagnostics.
 Lex and Parse.* consume text/tokens. Resolve builds deterministic function and
 local IDs, checks duplicate definitions, and resolves names. Resolved has its
 own expression representation. Check consumes only resolved syntax, enforces
 language types, and elaborates explicit typed IR. Go consumes CheckedProgram
-and emits deterministic text. Compiler composes phases; Shell.CLI performs
-filesystem, process, argv, environment, and logging work through a small FFI.
-Expected source errors use Either. Shell maps them to JSON wire diagnostics;
+and emits deterministic text. Program.Compile composes phases; Runtime.Node
+performs filesystem, process, argv, environment, and logging work through a small FFI.
+Expected source errors use Either. Program.Main maps them to JSON wire diagnostics;
 IO/tool failures are tagged boundary values. The semantic core has no FFI.
 
 IR.Internal wraps each expression node with explicit Ty/span annotations. Checking is the

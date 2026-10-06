@@ -3,9 +3,9 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { compile } from '../output/Sprig.Compiler/index.js';
+import { compile } from '../output/Program.Compile/index.js';
 import { Left, Right } from '../output/Data.Either/index.js';
-import { codeName } from '../output/Sprig.Model/index.js';
+import { codeName } from '../output/Format.Diagnostic/index.js';
 
 export const checked = source => {
   const result = compile(source);

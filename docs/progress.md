@@ -39,8 +39,8 @@ Online installation and cross-platform execution remain unverified.
 
 ## Artifacts already on disk
 
-PureScript compiler: src/Sprig/*.purs, src/Sprig/Parse/*.purs,
-src/Sprig/IR/Internal.purs. Boundary: src/Shell/CLI.purs and CLI.js.
+PureScript compiler: src/{Domain,Features,Format,Program}/**/*.purs and
+src/Domain/IR/Internal.purs. Boundary: src/Runtime/Node.purs and Node.js.
 Style tooling: tools/style/src/Style/Check.purs (separate package).
 Tests: test/*.test.mjs and the regression witness/script.
 Example, three negative files, and bootstrap/answer.go (example snapshot).
@@ -201,3 +201,5 @@ errors); two new rejection rows failed before (E_UNBOUND) and pass after.
 `npm run verify` exit 0.
 
 2026-10-07: closed-ADT Task 4 (coverage) done. Check.Usefulness (inhabitation fixed point, U(P,q), algorithm I) and Check.Coverage (E_REDUNDANT, E_NON_EXHAUSTIVE with canonical witness) run after checking; test/adt-coverage (6) and test/coverage (300-case oracle) failed before (non-exhaustive programs compiled), then passed; regression row `exhaustive` fails on its mutant. No existing test program changed. `npm run verify` exit 0 (52 tests, three regression proofs).
+
+2026-10-07: closed-ADT Task 5 (five layers) done. Modules moved to Domain/Features/Format/Runtime/Program with git mv; Token, isUpper -> Format.Lex, codeName -> Format.Diagnostic; scripts/structure.mjs per-module table replaced by layer rules, four new structure cases failed before the gate. bootstrap/answer.go and shapes.go cmp identical, no stale Sprig./Shell. names. `npm run verify` exit 0 (52 tests, three regression proofs).

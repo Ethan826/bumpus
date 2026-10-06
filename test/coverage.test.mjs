@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compile } from '../output/Sprig.Compiler/index.js';
+import { compile } from '../output/Program.Compile/index.js';
 import { Left } from '../output/Data.Either/index.js';
-import { codeName } from '../output/Sprig.Model/index.js';
+import { codeName } from '../output/Format.Diagnostic/index.js';
 import {
   choose, declarations, enumerate, expected, generator, intDomain, matches,
   parseWitness, pattern, print

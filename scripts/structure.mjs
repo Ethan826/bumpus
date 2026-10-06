@@ -11,45 +11,35 @@ const bytesPerKibibyte = 1024;
 const graphBufferMebibytes = 4;
 const graphBufferBytes = graphBufferMebibytes * bytesPerKibibyte ** 2;
 
-const dependencies = {
-  'Sprig.Model': [],
-  'Sprig.Lex': ['Sprig.Model'],
-  'Sprig.Resolved': ['Sprig.Model'],
-  'Sprig.Parse.Core': ['Sprig.Model', 'Sprig.Lex'],
-  'Sprig.Parse.Declaration': ['Sprig.Model', 'Sprig.Lex', 'Sprig.Parse.Core'],
-  'Sprig.Parse.Literal': ['Sprig.Model', 'Sprig.Parse.Core'],
-  'Sprig.Parse.Pattern': ['Sprig.Model', 'Sprig.Lex', 'Sprig.Parse.Core', 'Sprig.Parse.Literal'],
-  'Sprig.Parse.Expression': ['Sprig.Model', 'Sprig.Lex', 'Sprig.Parse.Core', 'Sprig.Parse.Literal', 'Sprig.Parse.Pattern'],
-  'Sprig.Parse': ['Sprig.Model', 'Sprig.Lex', 'Sprig.Parse.Core', 'Sprig.Parse.Declaration', 'Sprig.Parse.Expression'],
-  'Sprig.Resolve.Types': ['Sprig.Model', 'Sprig.Resolved'],
-  'Sprig.Resolve.Pattern': ['Sprig.Model', 'Sprig.Resolved'],
-  'Sprig.Resolve.Expression': ['Sprig.Model', 'Sprig.Resolved', 'Sprig.Resolve.Pattern'],
-  'Sprig.Resolve': ['Sprig.Model', 'Sprig.Resolved', 'Sprig.Resolve.Types', 'Sprig.Resolve.Expression'],
-  'Sprig.IR.Internal': ['Sprig.Model', 'Sprig.Resolved'],
-  'Sprig.Check.Match': ['Sprig.Model', 'Sprig.Resolved', 'Sprig.IR.Internal'],
-  'Sprig.Check.Usefulness': ['Sprig.Resolved', 'Sprig.IR.Internal'],
-  'Sprig.Check.Coverage': ['Sprig.Model', 'Sprig.Resolved', 'Sprig.IR.Internal', 'Sprig.Check.Usefulness'],
-  'Sprig.Check': ['Sprig.Model', 'Sprig.Resolved', 'Sprig.IR.Internal', 'Sprig.Check.Match', 'Sprig.Check.Coverage'],
-  'Sprig.Go.Data': ['Sprig.Resolved'],
-  'Sprig.Go.Match': ['Sprig.Resolved', 'Sprig.IR.Internal', 'Sprig.Go.Data'],
-  'Sprig.Go': ['Sprig.Check', 'Sprig.Resolved', 'Sprig.IR.Internal', 'Sprig.Go.Data', 'Sprig.Go.Match'],
-  'Sprig.Compiler': ['Sprig.Model', 'Sprig.Parse', 'Sprig.Resolve', 'Sprig.Check', 'Sprig.Go'],
-  'Shell.CLI': ['Sprig.Compiler', 'Sprig.Model']
+export const layers = ['Domain', 'Features', 'Format', 'Runtime', 'Program'];
+const pureLayers = ['Domain', 'Features', 'Format'];
+const coreLibraries = /^(Prelude$|Data\.(Array|Either|Maybe|Int|String|Foldable|Traversable)(\.|$))/;
+const partialModules = /(^|\.)(Unsafe|Partial)(\.|$)/;
+const irModule = 'Domain.IR.Internal';
+const irImporters = /^(Features\.Check|Format\.Go)(\.|$)/;
+
+export const layerOf = moduleName => moduleName.split('.')[0];
+
+const projectFinding = (name, dependency) => {
+  const own = layers.indexOf(layerOf(name));
+  const target = layers.indexOf(layerOf(dependency));
+  if (target > own) return [`${name} (${layerOf(name)}) imports ${dependency} (${layerOf(dependency)})`];
+  if (dependency === irModule && !irImporters.test(name)) return [`${name} imports ${dependency}`];
+  return [];
+};
+
+const libraryFinding = (name, dependency) => {
+  if (!pureLayers.includes(layerOf(name))) return [];
+  if (partialModules.test(dependency) || !coreLibraries.test(dependency)) return [`pure module ${name} imports ${dependency}`];
+  return [];
 };
 
 export const graphFindings = graph => Object.entries(graph).flatMap(([name, module]) => {
   if (!module.path.startsWith('src/')) return [];
-  if (!(name in dependencies)) return [`unregistered module: ${name}`];
-  return module.depends.flatMap(dependency => {
-    if (dependency in dependencies) {
-      return dependencies[name].includes(dependency) ? [] : [`${name} imports ${dependency}`];
-    }
-    if (name.startsWith('Sprig.') && /(^|\.)(Unsafe|Partial)(\.|$)/.test(dependency)) return [`pure module ${name} imports ${dependency}`];
-    if (name.startsWith('Sprig.') && !/^(Prelude$|Data\.(Array|Either|Maybe|Int|String|Foldable|Traversable)(\.|$))/.test(dependency)) {
-      return [`pure module ${name} imports ${dependency}`];
-    }
-    return [];
-  });
+  if (!layers.includes(layerOf(name))) return [`unlayered module: ${name}`];
+  return module.depends.flatMap(dependency => layers.includes(layerOf(dependency))
+    ? projectFinding(name, dependency)
+    : libraryFinding(name, dependency));
 });
 
 export const textFindings = (file, source) => {
@@ -70,7 +60,7 @@ export const checkStructure = async () => {
   const files = ['src', 'test', 'scripts', 'tools/style/src'].flatMap(filesUnder).filter(file => /\.(purs|mjs|js)$/.test(file));
   const findings = files.flatMap(file => textFindings(file, readFileSync(file, 'utf8')));
   findings.push(...files.filter(file => file.endsWith('.purs')).flatMap(file => check(readFileSync(file, 'utf8')).map(message => `${file}: ${message}`)));
-  findings.push(...files.filter(file => file.startsWith('src/Sprig/') && file.endsWith('.js')).map(file => `${file}: FFI in pure core`));
+  findings.push(...files.filter(file => file.startsWith('src/') && !file.startsWith('src/Runtime/') && file.endsWith('.js')).map(file => `${file}: FFI outside Runtime`));
   const result = spawnSync('purs', ['graph', 'src/**/*.purs', '.spago/p/*/src/**/*.purs'], { encoding: 'utf8', maxBuffer: graphBufferBytes });
   if (result.error || result.status !== 0) findings.push(`purs graph failed: ${result.error?.message ?? result.stderr}`);
   else findings.push(...graphFindings(JSON.parse(result.stdout)));

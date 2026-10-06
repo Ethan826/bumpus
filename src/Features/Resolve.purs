@@ -1,0 +1,106 @@
+module Features.Resolve (resolve) where
+
+import Prelude
+import Data.Array as Array
+import Data.Either (Either(..))
+import Data.Maybe (maybe')
+import Data.Traversable (traverse)
+import Domain.Syntax as Syntax
+import Features.Resolve.Expression (expression)
+import Features.Resolve.Types (resolveType, typeTable)
+import Domain.Resolved (Global)
+import Domain.Resolved as Resolved
+
+type Signature =
+  { parameters ∷ Array Resolved.Parameter, result ∷ Resolved.Ty }
+
+type Definition =
+  { index ∷ Int, function ∷ Syntax.FunctionDecl, signature ∷ Signature }
+
+resolve ∷ Syntax.Program → Either Syntax.Diagnostic Resolved.Program
+resolve program = do
+  tables ← typeTable program
+  signatures ← traverse (resolveSignature tables.types) functions
+  let
+    definitions = Array.mapWithIndex indexed
+      (Array.zipWith pair functions signatures)
+  entry ← entryPoint definitions
+  bodies ← traverse (resolveBody tables.ctors) definitions
+  pure { types: tables.types, ctors: tables.ctors, functions: bodies, entry }
+  where
+  functions = program.functions
+  pair function signature = { function, signature }
+  indexed index entry =
+    { index, function: entry.function, signature: entry.signature }
+  resolveBody ctors definition = resolveFunction (globals ctors) ctors
+    definition
+  globals ctors = Array.mapWithIndex functionGlobal functions
+    <> Array.mapWithIndex ctorGlobal ctors
+
+functionGlobal ∷ Int → Syntax.FunctionDecl → Global
+functionGlobal index function =
+  { name: function.name, ref: Resolved.FunctionRef (Resolved.FunctionId index) }
+
+ctorGlobal ∷ Int → Resolved.CtorInfo → Global
+ctorGlobal index info =
+  { name: info.name, ref: Resolved.CtorRef (Resolved.CtorId index) }
+
+resolveSignature
+  ∷ Array Resolved.TypeInfo
+  → Syntax.FunctionDecl
+  → Either Syntax.Diagnostic Signature
+resolveSignature types function = do
+  parameters ← traverse resolveParameter function.parameters
+  result ← resolveType types function.result
+  pure { parameters, result }
+  where
+  resolveParameter parameter = withType parameter
+    <$> resolveType types parameter.ty
+  withType parameter ty = { name: parameter.name, ty, span: parameter.span }
+
+entryPoint
+  ∷ Array Definition → Either Syntax.Diagnostic Resolved.FunctionId
+entryPoint definitions = maybe' absent checkEntry
+  (Array.find isEntry definitions)
+  where
+  isEntry definition = definition.function.name == "main"
+  absent _ = Left
+    ( Syntax.problem Syntax.EntryError
+        { start: Syntax.origin, end: Syntax.origin }
+        "Expected fn main(): Int or Bool"
+    )
+
+checkEntry ∷ Definition → Either Syntax.Diagnostic Resolved.FunctionId
+checkEntry definition =
+  if not (Array.null definition.function.parameters) then invalid
+    "main must have no parameters"
+  else if isData definition.signature.result then invalid
+    "main must return Int or Bool"
+  else pure (Resolved.FunctionId definition.index)
+  where
+  invalid message = Left
+    (Syntax.problem Syntax.EntryError definition.function.span message)
+  isData = case _ of
+    Resolved.TData _ → true
+    _ → false
+
+resolveFunction
+  ∷ Array Global
+  → Array Resolved.CtorInfo
+  → Definition
+  → Either Syntax.Diagnostic Resolved.FunctionDecl
+resolveFunction globals ctors definition = withBody <$> expression scope
+  (Array.length locals)
+  definition.function.body
+  where
+  scope = { globals, ctors, locals }
+  locals = Array.mapWithIndex parameterLocal definition.signature.parameters
+  parameterLocal index parameter =
+    { name: parameter.name, id: Resolved.LocalId index }
+  withBody body =
+    { id: Resolved.FunctionId definition.index
+    , parameters: definition.signature.parameters
+    , result: definition.signature.result
+    , body: body.value
+    , span: definition.function.span
+    }

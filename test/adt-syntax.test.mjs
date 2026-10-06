@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parse } from '../output/Sprig.Parse/index.js';
-import { lex } from '../output/Sprig.Lex/index.js';
+import { parse } from '../output/Format.Parse/index.js';
+import { lex } from '../output/Format.Lex/index.js';
 import { Right } from '../output/Data.Either/index.js';
 import { rejectedAt, rejected, spanAt } from './support.mjs';
 
