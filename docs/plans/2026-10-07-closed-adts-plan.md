@@ -15,7 +15,9 @@ function as a parameter.
 **Tech Stack:** PureScript 0.15.16, Spago 1.0.4, purs-tidy 0.11.1, Node test
 runner, Go 1.26.4.
 
-**Spec:** `docs/plans/2026-10-07-closed-adts-design.md` (approved, including
+**Specs:** Tasks 5–7 implement `docs/plans/2026-10-07-five-layers-design.md`
+(approved 2026-10-07, added mid-execution). Otherwise the spec is
+`docs/plans/2026-10-07-closed-adts-design.md` (approved, including
 its plan-time amendments in section 10).
 
 ## Global Constraints
@@ -27,6 +29,10 @@ its plan-time amendments in section 10).
 - `Sprig.*` stays pure. The core library allowlist in `scripts/structure.mjs`
   stays unchanged (no `Data.Map`; use arrays).
 - Only Check/*, Go/* and `Sprig.Check`/`Sprig.Go` import `Sprig.IR.Internal`.
+- From Task 5 on, module names and the import rules are those of the
+  five-layers design: `Sprig.*` becomes Domain/Features/Format, `Shell.*`
+  becomes Runtime/Program, and the IR boundary is `Features.Check*` plus
+  `Format.Go*` importing `Domain.IR.Internal`.
 - `bootstrap/answer.go` stays byte-identical, and all 19 existing tests keep
   their assertions. Only two existing test lines change: the `Float` row (see
   Task 1) and the property test's parse accessor (`.functions[0]`).
@@ -426,7 +432,214 @@ its plan-time amendments in section 10).
   regression rows are proven.
 - [ ] **Step 7: Commit** `feat: Maranget coverage with inhabitedness (A001 T4)`.
 
-### Task 5: Documentation, closure and final review
+### Task 5: Five-layer module moves and layer gate
+
+Spec: `docs/plans/2026-10-07-five-layers-design.md`. This task is mechanical:
+no behavior, bytes, diagnostic text, spans or exit statuses change.
+
+**Files (module renames, `git mv` plus import updates):**
+
+| From | To |
+|---|---|
+| `Sprig.Model` | `Domain.Syntax`; `Token` and `isUpper` move to `Format.Lex`; `codeName` moves to `Format.Diagnostic` |
+| `Sprig.Resolved` | `Domain.Resolved` |
+| `Sprig.IR.Internal` | `Domain.IR.Internal` |
+| `Sprig.Resolve`, `Sprig.Resolve.{Expression,Pattern,Types}` | `Features.Resolve`, `Features.Resolve.{…}` |
+| `Sprig.Check`, `Sprig.Check.{Match,Usefulness,Coverage}` | `Features.Check`, `Features.Check.{…}` |
+| `Sprig.Lex` | `Format.Lex` |
+| `Sprig.Parse`, `Sprig.Parse.{Core,Declaration,Expression,Literal,Pattern}` | `Format.Parse`, `Format.Parse.{…}` |
+| `Sprig.Go`, `Sprig.Go.{Data,Match}` | `Format.Go`, `Format.Go.{…}` |
+| `Sprig.Compiler` | `Program.Compile` |
+| `Shell.CLI` (.purs) | `Program.Main` |
+| `Shell/CLI.js` (the FFI) | `Runtime.Node` (`src/Runtime/Node.purs` with its `.js`). `Program.Main` imports `launch` from it. |
+
+- Modify: `scripts/structure.mjs`, `test/structure.test.mjs` (fixture module
+  names only), `scripts/regression.mjs` and `test/regression.mjs` (paths and
+  module names), every `test/*.mjs` import of `output/<Module>`,
+  `scripts/sprig.mjs`, `AGENTS.md` (the two lines naming `Sprig.*`, `Shell.*`
+  and `Sprig.IR.Internal`), `docs/engineering.md` (the gate description).
+
+**Interfaces:**
+- Produces in `scripts/structure.mjs`:
+  - `layers = ['Domain', 'Features', 'Format', 'Runtime', 'Program']`
+  - `layerOf(moduleName)` returns the first segment. A module under `src/`
+    whose first segment is not a layer is a finding: "unlayered module".
+- Rules replacing today's per-module `dependencies` table:
+  1. A project import must go to the same or an earlier layer; otherwise
+     "`A` (Layer) imports `B` (LaterLayer)".
+  2. Domain/Features/Format import only `Prelude`, `Data.(Array|Either|Maybe|
+     Int|String|Foldable|Traversable)` and project modules. `Unsafe`/
+     `Partial`, `Effect` and any FFI file are findings.
+  3. Only `Features.Check*` and `Format.Go*` import `Domain.IR.Internal`.
+  4. `.js` files under `src/` exist only under `src/Runtime/`.
+- `graphFindings` and `textFindings` keep their exported names and shapes.
+
+- [ ] **Step 1: Update `test/structure.test.mjs`**
+  - Rename the existing fixture modules to their new names. Each existing
+    case keeps its meaning: an effect in Domain, a reverse dependency, an
+    unchecked IR access, `Unsafe.Coerce` in Format, Domain importing
+    `Format.Go`, `Data.String.Unsafe`, the accepted `Features.Check`
+    case, and an unknown module.
+  - Add failing cases:
+    - `Features.Resolve` importing `Format.Parse` → 1 finding (a later
+      layer).
+    - `Runtime.Node` importing `Program.Main` → 1 finding.
+    - `Program.Main` importing `Effect` → 0 findings.
+    - `Sprig.Old` under `src/` → 1 "unlayered module" finding.
+- [ ] **Step 2: Run** `npm run build && node --test test/structure.test.mjs`.
+  Expected: FAIL (the new layer cases).
+- [ ] **Step 3: Implement** the moves and the gate rules above. Update every
+  import, script path and regression needle path.
+- [ ] **Step 4: Run** `npm run verify`. Expected: exit 0, test count
+  unchanged plus the new structure cases, all three regression rows proven.
+  `cmp` shows `bootstrap/answer.go` and `bootstrap/shapes.go` unchanged.
+  `git grep -n "Sprig\.\|Shell\." src scripts test` shows no stale module
+  names (prose mentioning the language name Sprig is fine).
+- [ ] **Step 5: Commit** `refactor: adopt five named layers (A001 T5)`.
+
+### Task 6: Structured diagnostics rendered by Format
+
+Spec: five-layers design, evaluation 1. Messages stay byte-identical.
+
+**Files:**
+- Modify: `src/Domain/Syntax.purs`, the `Features.*` modules that build
+  messages, `Format.Lex`/`Format.Parse*` (diagnostic construction only),
+  `src/Format/Diagnostic.purs`, `src/Program/Main.purs`,
+  `src/Domain/Resolved.purs` (`describe` leaves), `scripts/structure.mjs`
+  if imports change
+- Create: `test/diagnostics.test.mjs`
+
+**Interfaces:**
+- Domain:
+  - `type Diagnostic = { problem ∷ Problem, span ∷ Span }`
+  - `data TypeName = IntName | BoolName | DataName String`
+  - `data Witness = WAny | WCtor String (Array Witness) | WInt Int | WBool
+    Boolean` (constructor names resolved; no surface syntax)
+  - `data Problem` has one constructor per distinct message family produced
+    today, carrying data rather than text. It must include:
+    - `TypeMismatch TypeName TypeName`
+    - `NonExhaustive Witness`
+    - `RedundantArm`
+    - `Unbound UnboundKind String`
+    - `Duplicate DuplicateKind String`
+    - `Arity`
+    - `NotCallable String`
+    - `EntryProblem EntryKind`
+    - `IntegerOutOfRange`
+    - `Internal String`
+    - `Lexical` and `Syntax String`. The parser and lexer are Format, so
+      their payload may be text.
+  - `ErrorCode` stays the closed ADT in Domain.
+- Format:
+  - `Format.Diagnostic.code ∷ Problem → ErrorCode`
+  - `Format.Diagnostic.codeName ∷ ErrorCode → String` (moved in Task 5)
+  - `Format.Diagnostic.message ∷ Problem → String`. It renders type names
+    (`Int`, `Bool`, the declared name) and witnesses (`Cons(_, Nil)`,
+    `-1`, `true`, `_`) exactly as today.
+  - `Format.Diagnostic.wire ∷ Diagnostic → { code ∷ String, message ∷
+    String, span ∷ Span }`
+- Features modules no longer build message strings, and `describe` and
+  `renderWitness` leave Features/Domain. Coverage returns `NonExhaustive
+  (Witness …)` with names resolved from `CtorInfo`.
+
+- [ ] **Step 1: Write `test/diagnostics.test.mjs` as a characterization test
+  at HEAD before any change.** For one source per message family (every
+  rejection source already used in compiler, adt-syntax, adt-types,
+  adt-match and adt-coverage tests is acceptable), record
+  `{code, span, message}` from the current compiler into the test as
+  literal expected values, and assert them exactly. Run it. Expected: PASS
+  at HEAD. This is the behavior-preservation baseline; there is no RED for
+  a refactor.
+- [ ] **Step 2: Add the failing structural assertion**
+  - Import `Format.Diagnostic.message` from `output/` and assert that
+    `message` applied to a constructed `TypeMismatch (DataName "IntList")
+    IntName` gives `"Expected IntList, found Int"`.
+  - Add `NonExhaustive` with a constructed nested witness for `Cons(_,
+    Nil)` and assert its exact text.
+  - Run. Expected: FAIL (module/constructors absent).
+- [ ] **Step 3: Implement.** Change every diagnostic site to construct
+  `Problem` data. Have `Program.Main`/`Program.Compile` render through
+  `Format.Diagnostic.wire`.
+- [ ] **Step 4: Run** `npm run verify`. Expected: exit 0; the
+  characterization test is unchanged and passing; the regression rows'
+  probes still match on code (update a probe only if it asserted a
+  constructor name that moved, and keep its assertion's meaning).
+- [ ] **Step 5: Commit** `refactor: structured diagnostics rendered in Format (A001 T6)`.
+
+### Task 7: Capability ports and fakeable commands
+
+Spec: five-layers design, evaluations 3–4. CLI behavior stays identical:
+- usage error is `E_USAGE`, status 2;
+- IO failure is `E_IO`, status 1;
+- tool failure is `E_TOOL`, status 1, wire `{ ok: false, code, message,
+  command }`;
+- a source diagnostic is status 1, wire `{ code, message, span, file }`;
+- emit writes the Go text; build writes the binary; run prints the
+  program's stdout;
+- the temporary directory is always removed; `GOCACHE` handling is
+  unchanged.
+
+**Files:**
+- Create: `src/Domain/Host.purs`, `src/Format/Arguments.purs`,
+  `src/Program/Command.purs`, `test/program.test.mjs`
+- Modify: `src/Runtime/Node.purs` and `src/Runtime/Node.js` (they become
+  port implementations only, with no command logic and no argv
+  interpretation), `src/Program/Main.purs`, `scripts/structure.mjs`
+
+**Interfaces:**
+- `Domain.Host`:
+  - `data HostFailure = IoFailure String | ToolFailure { message ∷ String,
+    command ∷ String }`
+  - ```text
+    type Host m =
+      { readSource ∷ String → m (Either HostFailure String)
+      , writeText ∷ String → String → m (Either HostFailure Unit)
+      , buildExecutable ∷ String → String → m (Either HostFailure Unit)
+      , runProgram ∷ String → m (Either HostFailure String)
+      }
+    ```
+  - `buildExecutable goSource binaryPath` and `runProgram goSource` own
+    their temporary directory and its removal in Runtime.
+- `Format.Arguments`:
+  - `data Invocation = Emit String String | Build String String | Run String`
+  - `invocation ∷ Array String → Either String Invocation`. The Left is the
+    usage text, unchanged.
+- `Program.Command`:
+  - `type Outcome = { status ∷ Int, stdout ∷ String, stderr ∷ Maybe
+    WireRecord }`
+  - `command ∷ ∀ m. Monad m ⇒ Host m → Array String → m Outcome`
+  - `WireRecord` is the plain record Format builds for each failure kind.
+    Runtime JSON-serializes it.
+- `Runtime.Node`: `nodeHost ∷ Host Effect`, plus the argv, stdout/stderr
+  and exit-code primitives `Program.Main` uses.
+- `Program.Main.main` wires `nodeHost` into `command`, then writes the
+  outcome.
+
+- [ ] **Step 1: Write failing `test/program.test.mjs`**
+  - Import `command` from `output/Program.Command` and `monadEffect` from
+    `output/Effect`. Build fake hosts as JS records whose functions return
+    Effect thunks producing `Left`/`Right` values from `output/Data.Either`.
+  - Assert exact `status`, `stdout` and parsed `stderr` for:
+    - bad arguments → 2, `E_USAGE`;
+    - `readSource` → `IoFailure` → 1, `E_IO`;
+    - a source with a type error → 1, the wire diagnostic with `file`;
+    - `emit` → the fake `writeText` received exactly `checked(source)` at
+      the destination;
+    - `build` with `ToolFailure` → 1, `E_TOOL` with `ok: false` and
+      `command`;
+    - `run` → stdout is the fake `runProgram`'s output.
+  - The fakes record calls, so the test also asserts that `run` never calls
+    `writeText` and that a failed read calls nothing else.
+  - Run. Expected: FAIL (module absent).
+- [ ] **Step 2: Implement** `Domain.Host`, `Format.Arguments`,
+  `Program.Command`, `Runtime.Node` (ports) and `Program.Main` (wiring).
+  Register them in `structure.mjs`; `Runtime.Node` holds the only FFI.
+- [ ] **Step 3: Run** `npm run verify`. Expected: exit 0. The existing
+  end-to-end `test/shell.test.mjs`, which spawns real processes, passes
+  unchanged, alongside the new fake-host tests.
+- [ ] **Step 4: Commit** `refactor: capability ports with fakeable commands (A001 T7)`.
+
+### Task 8: Documentation, closure and final review
 
 **Files:**
 - Create: `docs/adr/003-closed-adts.md`. It covers representation A, the
@@ -436,10 +649,15 @@ its plan-time amendments in section 10).
 - Modify:
   - `docs/language.md`: the full grammar from spec section 1 and the
     semantics from sections 2–4.
-  - `docs/architecture.md`: the coverage phase, the type table, and the
-    future-stages line.
+  - `docs/architecture.md`: rewritten around the five layers (from the
+    layers design), plus the coverage phase, the type table, and the
+    future-stages line (target-neutral `Features.Lower` deferred).
+  - Create `docs/adr/004-five-layers.md`: the layer rule, the four-change
+    evaluation, ports, structured diagnostics, and the UTF-16 offset leak.
   - `docs/provenance.md`: a Maranget JFP 2007 row, independent
-    implementation.
+    implementation; a row for MileAhead `AGENTS.md` "Layers, and where
+    PureScript stops" and "Dependencies are values", and
+    `docs/writing/2026-09-16-an-svg-is-not-a-drawing.md` (conceptual only).
   - `docs/engineering.md`: the allowlist modules, the regression rows, and
     the E003 count.
   - `BACKLOG.md`: A001 Done. E003 widens to twelve arms. New Planned rows:
@@ -449,7 +667,7 @@ its plan-time amendments in section 10).
     `docs/next-session.md`, and `README.md` if it lists language features.
 
 - [ ] **Step 1:** Write the docs above. Docs claim only behavior that a test
-  in Tasks 1–4 verifies; label everything else as proposed.
+  in Tasks 1–7 verifies; label everything else as proposed.
 - [ ] **Step 2:** Run `npm run verify` to `.build/a001-final.log`. Expected:
   exit 0, all tests (19 original plus the new files), zero skips, and three
   regression rows proven.
@@ -457,6 +675,6 @@ its plan-time amendments in section 10).
   byte-equal to each other and to `bootstrap/shapes.go`; `answer.go` is
   unchanged (`cmp`).
 - [ ] **Step 4:** Dispatch one fresh reviewer over the A001 commit range
-  against the spec. Record the findings in
+  against both specs. Record the findings in
   `docs/plans/closed-adts-review.md`, and fix or backlog every one.
 - [ ] **Step 5: Commit** `docs: close A001 closed ADTs milestone`.
