@@ -1,10 +1,11 @@
 module Domain.Syntax where
 
 import Prelude
+import Domain.Problem (Problem)
 
 type Position = { offset ∷ Int, line ∷ Int, column ∷ Int }
 type Span = { start ∷ Position, end ∷ Position }
-type Diagnostic = { code ∷ ErrorCode, message ∷ String, span ∷ Span }
+type Diagnostic = { problem ∷ Problem, span ∷ Span }
 
 data Expr
   = Integer Span Int
@@ -40,6 +41,7 @@ type FunctionDecl =
 
 type Program = { types ∷ Array TypeDecl, functions ∷ Array FunctionDecl }
 
+-- Wire codes; Format.Diagnostic maps each Problem to one.
 data ErrorCode
   = LexError
   | SyntaxError
@@ -77,5 +79,5 @@ patternSpan = case _ of
   PBool span _ → span
   PCtor span _ _ → span
 
-problem ∷ ErrorCode → Span → String → Diagnostic
-problem code span message = { code, span, message }
+problemAt ∷ Problem → Span → Diagnostic
+problemAt problem span = { problem, span }

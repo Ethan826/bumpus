@@ -18,13 +18,8 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (maybe, maybe')
 import Format.Lex (Token, isName, isUpper)
-import Domain.Syntax
-  ( ErrorCode(..)
-  , Diagnostic
-  , Position
-  , TypeRef(..)
-  , problem
-  )
+import Domain.Problem (Problem(..))
+import Domain.Syntax (Diagnostic, Position, TypeRef(..), problemAt)
 
 type State = { tokens ∷ Array Token, eof ∷ Position }
 type Parsed a = { value ∷ a, rest ∷ State }
@@ -70,10 +65,10 @@ typeRef state = do
     _ → invalidType token.value.span
   where
   parsedType value rest = Right { value, rest }
-  invalidType span = Left (problem SyntaxError span "Expected a type")
+  invalidType span = Left (problemAt (Syntax "Expected a type") span)
 
 failAt ∷ ∀ a. State → String → Either Diagnostic a
-failAt state message = Left (problem SyntaxError span message)
+failAt state message = Left (problemAt (Syntax message) span)
   where
   span = maybe' endSpan tokenSpan
     (Array.head state.tokens)

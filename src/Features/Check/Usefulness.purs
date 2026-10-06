@@ -1,30 +1,22 @@
-module Features.Check.Usefulness
-  ( Signature
-  , Witness(..)
-  , inhabitation
-  , uncovered
-  , useful
-  ) where
+module Features.Check.Usefulness (uncovered, useful) where
 
 import Prelude
 import Data.Array as Array
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe, maybe')
+import Data.Traversable (traverse)
 import Domain.IR.Internal as IR
-import Domain.Resolved (CtorId(..), CtorInfo, Ty(..), TypeId(..), TypeInfo)
-
--- `inhabited` is indexed by CtorId.
-type Signature =
-  { types ∷ Array TypeInfo
-  , ctors ∷ Array CtorInfo
-  , inhabited ∷ Array Boolean
-  }
-
-data Witness = WAny | WCtor CtorId (Array Witness) | WInt Int | WBool Boolean
-
--- Literals are nullary heads, so one specialization serves every type.
-data Head = HCtor CtorId | HInt Int | HBool Boolean
-
-derive instance eqHead ∷ Eq Head
+import Domain.Problem (Problem(..), Witness(..))
+import Domain.Resolved (Ty(..))
+import Features.Check.Signature
+  ( Head(..)
+  , Lookup
+  , Signature
+  , arity
+  , candidates
+  , fieldTypes
+  , witnessOf
+  )
 
 -- Binders and wildcards are indistinguishable to coverage.
 data Pat = Any | Headed Head (Array Pat)
@@ -33,124 +25,109 @@ type Vector = Array Pat
 
 type Column = { ty ∷ Ty, tys ∷ Array Ty, pat ∷ Pat, rest ∷ Vector }
 
--- The least fixed point: start from nothing inhabited and grow.
-inhabitation ∷ Array TypeInfo → Array CtorInfo → Array Boolean
-inhabitation types ctors = settle (Array.replicate (Array.length ctors) false)
-  where
-  settle current = if next == current then current else settle next
-    where
-    next = map (ctorInhabited types current) ctors
-
 -- U(P, q): whether some value matches q and no row of P.
-useful ∷ Signature → Array (Array IR.Pattern) → Array IR.Pattern → Boolean
+useful
+  ∷ Signature → Array (Array IR.Pattern) → Array IR.Pattern → Lookup Boolean
 useful signature rows q = usefulRows signature (map patternType q)
   (map simplifyRow rows)
   (simplifyRow q)
 
 -- Algorithm I: a witness vector of the given types that no row matches.
 uncovered
-  ∷ Signature → Array (Array IR.Pattern) → Array Ty → Maybe (Array Witness)
+  ∷ Signature
+  → Array (Array IR.Pattern)
+  → Array Ty
+  → Lookup (Maybe (Array Witness))
 uncovered signature rows tys = missing signature tys (map simplifyRow rows)
 
-ctorInhabited ∷ Array TypeInfo → Array Boolean → CtorInfo → Boolean
-ctorInhabited types inhabited ctor = Array.all fieldInhabited ctor.fields
-  where
-  fieldInhabited = case _ of
-    TInt → true
-    TBool → true
-    TData (TypeId index) → maybe false anyCtor (Array.index types index)
-  anyCtor info = Array.any isInhabited info.ctors
-  isInhabited (CtorId index) = Array.index inhabited index == Just true
-
-usefulRows ∷ Signature → Array Ty → Array Vector → Vector → Boolean
+usefulRows ∷ Signature → Array Ty → Array Vector → Vector → Lookup Boolean
 usefulRows signature tys rows q =
-  if Array.null rows then true
-  else maybe false (usefulColumn signature rows) (column tys q)
+  if Array.null rows then Right true
+  else column tys q >>= maybe (Right false) (usefulColumn signature rows)
 
 -- An explicit head specializes syntactically; a wildcard head splits only
 -- when the column's heads are complete.
-usefulColumn ∷ Signature → Array Vector → Column → Boolean
+usefulColumn ∷ Signature → Array Vector → Column → Lookup Boolean
 usefulColumn signature rows split = case split.pat of
   Headed head fields → specialized head fields
-  Any →
-    if complete signature split.ty (headsOf rows) then
-      Array.any expanded (candidates signature split.ty)
-    else usefulRows signature split.tys (defaults rows) split.rest
+  Any → complete signature split.ty (headsOf rows) >>= splitWildcard
   where
-  specialized head fields = usefulRows signature
-    (fieldTypes signature head <> split.tys)
-    (specialize signature head rows)
-    (fields <> split.rest)
-  expanded head = specialized head (wildcards (arity signature head))
+  splitWildcard whole =
+    if whole then candidates signature split.ty >>= Array.foldM anyUseful
+      false
+    else usefulRows signature split.tys (defaults rows) split.rest
+  specialized head fields = do
+    types ← fieldTypes signature head
+    specializedRows ← specialize signature head rows
+    usefulRows signature (types <> split.tys) specializedRows
+      (fields <> split.rest)
+  anyUseful found head =
+    if found then Right true else arity signature head >>= expanded head
+  expanded head count = specialized head (wildcards count)
 
-missing ∷ Signature → Array Ty → Array Vector → Maybe (Array Witness)
+missing
+  ∷ Signature → Array Ty → Array Vector → Lookup (Maybe (Array Witness))
 missing signature tys rows =
   maybe' exhausted (missingColumn signature rows) (Array.uncons tys)
   where
-  exhausted _ = if Array.null rows then Just [] else Nothing
+  exhausted _ = Right (if Array.null rows then Just [] else Nothing)
 
 -- Canonical choice: the first inhabited head in declaration order.
 missingColumn
   ∷ Signature
   → Array Vector
   → { head ∷ Ty, tail ∷ Array Ty }
-  → Maybe (Array Witness)
-missingColumn signature rows split =
-  if complete signature split.head heads then
-    Array.findMap expanded (candidates signature split.head)
-  else map prepend (missing signature split.tail (defaults rows))
+  → Lookup (Maybe (Array Witness))
+missingColumn signature rows split = do
+  whole ← complete signature split.head heads
+  if whole then candidates signature split.head >>= Array.foldM firstMissing
+    Nothing
+  else missing signature split.tail (defaults rows) >>= traverse prepend
   where
   heads = headsOf rows
-  expanded head = map (rebuild signature head)
-    ( missing signature (fieldTypes signature head <> split.tail)
-        (specialize signature head rows)
-    )
-  prepend witnesses = Array.cons (absent signature split.head heads)
-    witnesses
+  firstMissing found head = maybe' (expanded head) settled found
+  settled witnesses = Right (Just witnesses)
+  expanded head _ = do
+    types ← fieldTypes signature head
+    specializedRows ← specialize signature head rows
+    witnesses ← missing signature (types <> split.tail) specializedRows
+    traverse (rebuild signature head) witnesses
+  prepend witnesses = flip Array.cons witnesses <$> absent signature
+    split.head
+    heads
 
 -- The head an incomplete column lacks: `_` when no head is present.
-absent ∷ Signature → Ty → Array Head → Witness
+absent ∷ Signature → Ty → Array Head → Lookup Witness
 absent signature ty heads =
-  if Array.null heads then WAny
-  else maybe WAny (opened signature) (Array.find lacking (choices ty))
+  if Array.null heads then Right WAny
+  else choices ty >>= maybe' unfound (opened signature) <<< Array.find lacking
   where
   lacking head = not (Array.elem head heads)
   choices = case _ of
-    TInt → [ HInt (freeInteger heads 0) ]
+    TInt → Right [ HInt (freeInteger heads 0) ]
     other → candidates signature other
+  unfound _ = Left (Internal "Incomplete column lacks no head")
 
 freeInteger ∷ Array Head → Int → Int
 freeInteger heads value =
   if Array.elem (HInt value) heads then freeInteger heads (value + 1)
   else value
 
--- Heads whose presence makes a column complete, in declaration order.
--- A type with no inhabited constructor has none, so it is vacuously
--- complete.
-candidates ∷ Signature → Ty → Array Head
-candidates signature = case _ of
-  TInt → []
-  TBool → [ HBool true, HBool false ]
-  TData (TypeId index) →
-    maybe [] inhabitedHeads (Array.index signature.types index)
-  where
-  inhabitedHeads info = map HCtor (Array.filter isInhabited info.ctors)
-  isInhabited (CtorId index) = Array.index signature.inhabited index ==
-    Just true
-
 -- Int has unboundedly many heads, so it is never complete.
-complete ∷ Signature → Ty → Array Head → Boolean
+complete ∷ Signature → Ty → Array Head → Lookup Boolean
 complete signature ty heads =
-  ty /= TInt && Array.all present (candidates signature ty)
+  if ty == TInt then Right false
+  else Array.all present <$> candidates signature ty
   where
   present head = Array.elem head heads
 
-specialize ∷ Signature → Head → Array Vector → Array Vector
-specialize signature head = Array.mapMaybe specializeRow
+specialize ∷ Signature → Head → Array Vector → Lookup (Array Vector)
+specialize signature head rows = specializeRows <$> arity signature head
   where
-  specializeRow row = Array.uncons row >>= specializeSplit
-  specializeSplit split = case split.head of
-    Any → Just (wildcards (arity signature head) <> split.tail)
+  specializeRows count = Array.mapMaybe (specializeRow count) rows
+  specializeRow count row = Array.uncons row >>= specializeSplit count
+  specializeSplit count split = case split.head of
+    Any → Just (wildcards count <> split.tail)
     Headed found fields →
       if found == head then Just (fields <> split.tail) else Nothing
 
@@ -170,42 +147,32 @@ headsOf = Array.mapMaybe firstHead
     Any → Nothing
     Headed head _ → Just head
 
-column ∷ Array Ty → Vector → Maybe Column
-column tys q = do
-  types ← Array.uncons tys
-  patterns ← Array.uncons q
-  pure
-    { ty: types.head, tys: types.tail, pat: patterns.head, rest: patterns.tail }
-
-fieldTypes ∷ Signature → Head → Array Ty
-fieldTypes signature = case _ of
-  HCtor (CtorId index) → maybe [] fieldsOf (Array.index signature.ctors index)
-  _ → []
+-- Types and patterns advance together; unequal lengths are a compiler bug.
+column ∷ Array Ty → Vector → Lookup (Maybe Column)
+column tys q = maybe' noTypes withTypes (Array.uncons tys)
   where
-  fieldsOf ctor = ctor.fields
-
-arity ∷ Signature → Head → Int
-arity signature head = Array.length (fieldTypes signature head)
+  noTypes _ = if Array.null q then Right Nothing else mismatch
+  withTypes types = maybe mismatch (Right <<< Just <<< split types)
+    (Array.uncons q)
+  mismatch = Left (Internal "Coverage vector length mismatch")
+  split types patterns =
+    { ty: types.head, tys: types.tail, pat: patterns.head, rest: patterns.tail }
 
 wildcards ∷ Int → Vector
 wildcards count = Array.replicate count Any
 
-opened ∷ Signature → Head → Witness
-opened signature head = witnessOf head
-  (Array.replicate (arity signature head) WAny)
+opened ∷ Signature → Head → Lookup Witness
+opened signature head = arity signature head >>= witnessOf signature head
+  <<< flip Array.replicate WAny
 
-rebuild ∷ Signature → Head → Array Witness → Array Witness
-rebuild signature head witnesses = Array.cons
-  (witnessOf head (Array.take count witnesses))
-  (Array.drop count witnesses)
-  where
-  count = arity signature head
-
-witnessOf ∷ Head → Array Witness → Witness
-witnessOf head fields = case head of
-  HCtor id → WCtor id fields
-  HInt value → WInt value
-  HBool value → WBool value
+-- Folds a head's field witnesses back into one constructor witness.
+rebuild ∷ Signature → Head → Array Witness → Lookup (Array Witness)
+rebuild signature head witnesses = do
+  count ← arity signature head
+  when (Array.length witnesses < count)
+    (Left (Internal "Witness vector too short"))
+  first ← witnessOf signature head (Array.take count witnesses)
+  pure (Array.cons first (Array.drop count witnesses))
 
 simplifyRow ∷ Array IR.Pattern → Vector
 simplifyRow = map simplify

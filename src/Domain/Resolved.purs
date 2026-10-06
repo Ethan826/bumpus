@@ -1,8 +1,6 @@
 module Domain.Resolved where
 
 import Prelude
-import Data.Array as Array
-import Data.Maybe (maybe)
 import Domain.Syntax (Span)
 
 newtype FunctionId = FunctionId Int
@@ -72,15 +70,6 @@ type Program =
   , functions ∷ Array FunctionDecl
   , entry ∷ FunctionId
   }
-
--- Names appear only in diagnostics, never in generated Go.
-describe ∷ Array TypeInfo → Ty → String
-describe types = case _ of
-  TInt → "Int"
-  TBool → "Bool"
-  TData (TypeId index) → maybe "type" typeName (Array.index types index)
-  where
-  typeName info = info.name
 
 exprSpan ∷ Expr → Span
 exprSpan expression = case expression of

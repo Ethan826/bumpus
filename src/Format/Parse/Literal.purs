@@ -6,7 +6,8 @@ import Data.Either (Either(..))
 import Data.Int as Int
 import Data.Maybe (maybe')
 import Data.String.CodeUnits as String
-import Domain.Syntax (ErrorCode(..), Span, problem)
+import Domain.Problem (Problem(..))
+import Domain.Syntax (Span, problemAt)
 import Format.Parse.Core (Parser, failAt, peek, take)
 
 -- Expressions and patterns share one integer syntax: an optional minus
@@ -41,8 +42,7 @@ integer ∷ String → Span → Parser { value ∷ Int, span ∷ Span }
 integer text span rest = maybe' outOfRange parsedInteger
   (Int.fromString text)
   where
-  outOfRange _ = Left
-    (problem IntegerRange span "Integer literal is outside signed 32-bit range")
+  outOfRange _ = Left (problemAt IntegerOutOfRange span)
   parsedInteger value = Right { value: { value, span }, rest }
 
 decimalToken ∷ String → Boolean

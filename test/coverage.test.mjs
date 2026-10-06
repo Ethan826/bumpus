@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compile } from '../output/Program.Compile/index.js';
 import { Left } from '../output/Data.Either/index.js';
-import { codeName } from '../output/Format.Diagnostic/index.js';
+import { wire } from '../output/Format.Diagnostic/index.js';
 import {
   choose, declarations, enumerate, expected, generator, intDomain, matches,
   parseWitness, pattern, print
@@ -28,7 +28,8 @@ const build = (type, patterns) => {
 const outcome = source => {
   const result = compile(source);
   if (!(result instanceof Left)) return { code: null };
-  return { code: codeName(result.value0.code), diagnostic: result.value0 };
+  const diagnostic = wire(result.value0);
+  return { code: diagnostic.code, diagnostic };
 };
 
 test('coverage agrees with a brute-force first-match oracle', () => {

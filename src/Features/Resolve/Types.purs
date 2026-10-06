@@ -6,6 +6,7 @@ import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
 import Data.Maybe (maybe')
 import Data.Traversable (traverse)
+import Domain.Problem (DuplicateKind(..), Problem(..), UnboundKind(..))
 import Domain.Syntax as Syntax
 import Domain.Resolved as Resolved
 
@@ -38,7 +39,7 @@ resolveType types = case _ of
   named name info = info.name == name
   found index = pure (Resolved.TData (Resolved.TypeId index))
   missing span name _ = Left
-    (Syntax.problem Syntax.UnboundName span ("Unbound type " <> name))
+    (Syntax.problemAt (Unbound UnboundType name) span)
 
 ownedCtors ∷ Array Syntax.TypeDecl → Array Owned
 ownedCtors types = Array.mapWithIndex numbered
@@ -80,11 +81,7 @@ uniqueTypes types = for_ types uniqueType
   where
   uniqueType declaration =
     when (Array.length (Array.filter (same declaration) types) > 1)
-      ( Left
-          ( Syntax.problem Syntax.DuplicateName declaration.span
-              ("Duplicate type " <> declaration.name)
-          )
-      )
+      (duplicate DuplicateType declaration.name declaration.span)
   same declaration other = other.name == declaration.name
 
 uniqueCtors
@@ -93,11 +90,7 @@ uniqueCtors functions owned = for_ owned uniqueCtor
   where
   uniqueCtor entry =
     when (clashes entry.decl.name)
-      ( Left
-          ( Syntax.problem Syntax.DuplicateName entry.decl.span
-              ("Duplicate constructor " <> entry.decl.name)
-          )
-      )
+      (duplicate DuplicateConstructor entry.decl.name entry.decl.span)
   clashes name =
     Array.length (Array.filter (ctorNamed name) owned) > 1
       || Array.any (functionNamed name) functions
@@ -110,11 +103,7 @@ uniqueFunctions functions = for_ functions uniqueFunction
   where
   uniqueFunction function = do
     when (Array.length (Array.filter (namedLike function) functions) > 1)
-      ( Left
-          ( Syntax.problem Syntax.DuplicateName function.span
-              ("Duplicate function " <> function.name)
-          )
-      )
+      (duplicate DuplicateFunction function.name function.span)
     traverse_ (uniqueParameter function.parameters) function.parameters
   namedLike function other = other.name == function.name
 
@@ -122,10 +111,11 @@ uniqueParameter
   ∷ Array Syntax.Parameter → Syntax.Parameter → Either Syntax.Diagnostic Unit
 uniqueParameter parameters parameter =
   when (Array.length (Array.filter sameName parameters) > 1)
-    ( Left
-        ( Syntax.problem Syntax.DuplicateName parameter.span
-            ("Duplicate parameter " <> parameter.name)
-        )
-    )
+    (duplicate DuplicateParameter parameter.name parameter.span)
   where
   sameName other = other.name == parameter.name
+
+duplicate
+  ∷ DuplicateKind → String → Syntax.Span → Either Syntax.Diagnostic Unit
+duplicate kind name span = Left
+  (Syntax.problemAt (Duplicate kind name) span)

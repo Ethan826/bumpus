@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { compile } from '../output/Program.Compile/index.js';
 import { Left, Right } from '../output/Data.Either/index.js';
-import { codeName } from '../output/Format.Diagnostic/index.js';
+import { wire } from '../output/Format.Diagnostic/index.js';
 
 export const checked = source => {
   const result = compile(source);
@@ -16,9 +16,10 @@ export const checked = source => {
 export const rejected = (source, code) => {
   const result = compile(source);
   assert.ok(result instanceof Left, 'invalid program compiled');
-  assert.equal(codeName(result.value0.code), code);
-  assert.ok(result.value0.message.length > 0);
-  return result.value0;
+  const diagnostic = wire(result.value0);
+  assert.equal(diagnostic.code, code);
+  assert.ok(diagnostic.message.length > 0);
+  return diagnostic;
 };
 
 export const command = (name, args, options = {}) => {

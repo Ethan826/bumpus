@@ -1,48 +1,25 @@
-module Features.Check.Coverage (coverage, renderWitness) where
+module Features.Check.Coverage (coverage) where
 
 import Prelude
 import Data.Array as Array
-import Data.Either (Either(..))
+import Data.Either (Either(..), either)
 import Data.Foldable (traverse_)
-import Data.Maybe (Maybe(..), maybe)
-import Data.String (joinWith)
-import Features.Check.Usefulness
-  ( Signature
-  , Witness(..)
-  , inhabitation
-  , uncovered
-  , useful
-  )
+import Data.Maybe (Maybe(..), maybe, maybe')
 import Domain.IR.Internal as IR
-import Domain.Syntax (ErrorCode(..), Diagnostic, Span, problem)
-import Domain.Resolved (CtorId(..), CtorInfo, Ty)
+import Domain.Problem (Problem(..))
+import Domain.Resolved (Ty)
+import Domain.Syntax (Diagnostic, Span, problemAt)
+import Features.Check.Signature (Lookup, Signature, buildSignature)
+import Features.Check.Usefulness (uncovered, useful)
 
 -- Functions in declaration order; within each, matches in source pre-order.
 coverage ∷ IR.Program → Either Diagnostic Unit
 coverage (IR.Program program) = traverse_ coverFunction program.functions
   where
-  signature =
-    { types: program.types
-    , ctors: program.ctors
-    , inhabited: inhabitation program.types program.ctors
-    }
-  coverFunction function = covered signature function.body
-
-renderWitness ∷ Array CtorInfo → Witness → String
-renderWitness ctors = case _ of
-  WAny → "_"
-  WInt value → show value
-  WBool value → show value
-  WCtor id fields → renderCtor ctors id fields
-
-renderCtor ∷ Array CtorInfo → CtorId → Array Witness → String
-renderCtor ctors (CtorId index) fields = name <> arguments
-  where
-  name = maybe "_" ctorName (Array.index ctors index)
-  ctorName ctor = ctor.name
-  arguments =
-    if Array.null fields then ""
-    else "(" <> joinWith ", " (map (renderWitness ctors) fields) <> ")"
+  tables = buildSignature program.types program.ctors
+  coverFunction function = do
+    signature ← located function.span tables
+    covered signature function.body
 
 covered ∷ Signature → IR.Expr → Either Diagnostic Unit
 covered signature (IR.Expr expression) = case expression.node of
@@ -62,36 +39,47 @@ covered signature (IR.Expr expression) = case expression.node of
 coverMatch
   ∷ Signature → Span → IR.Expr → Array IR.Arm → Either Diagnostic Unit
 coverMatch signature span scrutinee arms = do
-  redundancy signature arms
+  redundancy signature span arms
   exhaustiveness signature span (IR.typeOf scrutinee) arms
   covered signature scrutinee
   traverse_ armBody arms
   where
   armBody arm = covered signature arm.body
 
--- Only earlier arms can make an arm redundant.
-redundancy ∷ Signature → Array IR.Arm → Either Diagnostic Unit
-redundancy signature arms = maybe (pure unit) report
-  (Array.findMap redundantSpan (Array.mapWithIndex earlier arms))
+-- Only earlier arms can make an arm redundant; the first one is reported.
+redundancy ∷ Signature → Span → Array IR.Arm → Either Diagnostic Unit
+redundancy signature span arms = do
+  found ← located span
+    (Array.foldM firstRedundant Nothing (Array.mapWithIndex earlier arms))
+  maybe (pure unit) report found
   where
   rows = map armRow arms
   earlier index arm = { pattern: arm.pattern, rows: Array.take index rows }
-  redundantSpan candidate =
-    if useful signature candidate.rows [ candidate.pattern ] then Nothing
-    else Just (patternSpan candidate.pattern)
-  report span = Left (problem Redundant span "Redundant match arm")
+  firstRedundant found candidate = maybe' (judge candidate) settled found
+  settled armSpan = Right (Just armSpan)
+  judge candidate _ = verdict candidate <$> useful signature candidate.rows
+    [ candidate.pattern ]
+  verdict candidate isUseful =
+    if isUseful then Nothing else Just (patternSpan candidate.pattern)
+  report armSpan = Left (problemAt RedundantArm armSpan)
 
+-- The witness vector has one entry because the match has one column.
 exhaustiveness
   ∷ Signature → Span → Ty → Array IR.Arm → Either Diagnostic Unit
-exhaustiveness signature span ty arms = maybe (pure unit) report
-  (uncovered signature (map armRow arms) [ ty ])
+exhaustiveness signature span ty arms = do
+  found ← located span (uncovered signature (map armRow arms) [ ty ])
+  maybe (pure unit) report found
   where
-  report witnesses = Left
-    ( problem NonExhaustive span
-        ( "Missing pattern: "
-            <> joinWith ", " (map (renderWitness signature.ctors) witnesses)
-        )
-    )
+  report witnesses = Left (problemAt (single witnesses) span)
+  single = case _ of
+    [ witness ] → NonExhaustive witness
+    _ → Internal "Expected one missing pattern"
+
+-- Places a table failure, which is a compiler bug, at the span being judged.
+located ∷ ∀ a. Span → Lookup a → Either Diagnostic a
+located span = either failure Right
+  where
+  failure problem = Left (problemAt problem span)
 
 armRow ∷ IR.Arm → Array IR.Pattern
 armRow arm = [ arm.pattern ]

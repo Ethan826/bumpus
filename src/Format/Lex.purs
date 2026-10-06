@@ -5,14 +5,8 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe, maybe')
 import Data.String.CodeUnits as String
-import Domain.Syntax
-  ( ErrorCode(..)
-  , Diagnostic
-  , Position
-  , Span
-  , origin
-  , problem
-  )
+import Domain.Problem (Problem(..))
+import Domain.Syntax (Diagnostic, Position, Span, origin, problemAt)
 
 type Token = { text ∷ String, span ∷ Span }
 
@@ -80,8 +74,7 @@ arrow position tail tokens = scan next (Array.drop 1 tail)
   token = { text: "=>", span: { start: position, end: next } }
 
 unexpected ∷ Position → Char → Either Diagnostic (Array Token)
-unexpected position character = Left
-  (problem LexError span "Unexpected character")
+unexpected position character = Left (problemAt Lexical span)
   where
   span = { start: position, end: advance position character }
 

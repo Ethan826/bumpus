@@ -4,6 +4,7 @@ import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe, maybe')
+import Domain.Problem (Problem(..), UnboundKind(..))
 import Domain.Syntax as Syntax
 import Features.Resolve.Pattern (resolvePattern)
 import Domain.Resolved (Global, Numbered)
@@ -82,7 +83,7 @@ bareName scope span name = maybe' otherwise found (findLocal scope name)
   found id = pure (Resolved.Local span id)
   otherwise _ = maybe' unbound constructorOnly (findGlobal scope name)
   unbound _ = Left
-    (Syntax.problem Syntax.UnboundName span ("Unbound local " <> name))
+    (Syntax.problemAt (Unbound UnboundLocal name) span)
   constructorOnly global = case global.ref of
     Resolved.CtorRef id → bareConstructor scope span name id
     Resolved.FunctionRef _ → unbound unit
@@ -93,12 +94,10 @@ bareConstructor
   → String
   → Resolved.CtorId
   → Either Syntax.Diagnostic Resolved.Expr
-bareConstructor scope span name id =
-  if fieldCount scope id == 0 then pure (Resolved.Construct span id [])
-  else Left
-    ( Syntax.problem Syntax.ArityMismatch span
-        ("Constructor " <> name <> " needs arguments")
-    )
+bareConstructor scope span name id = do
+  count ← fieldCount scope span id
+  if count == 0 then pure (Resolved.Construct span id [])
+  else Left (Syntax.problemAt (CtorNeedsArguments name) span)
 
 callName
   ∷ Scope
@@ -110,13 +109,10 @@ callName
 callName scope next span name arguments = maybe' globalCall localCall
   (findLocal scope name)
   where
-  localCall _ = Left
-    ( Syntax.problem Syntax.NotCallable span
-        ("Local is not callable: " <> name)
-    )
+  localCall _ = Left (Syntax.problemAt (NotCallable name) span)
   globalCall _ = maybe' unbound dispatch (findGlobal scope name)
   unbound _ = Left
-    (Syntax.problem Syntax.UnboundName span ("Unbound function " <> name))
+    (Syntax.problemAt (Unbound UnboundFunction name) span)
   dispatch global = case global.ref of
     Resolved.FunctionRef id → withValue (Resolved.Call span id) <$> resolved
     Resolved.CtorRef id → constructorCall scope span name id resolved
@@ -133,11 +129,9 @@ constructorCall
   → Resolved.CtorId
   → Resolution (Array Resolved.Expr)
   → Resolution Resolved.Expr
-constructorCall scope span name id resolved =
-  if fieldCount scope id == 0 then Left
-    ( Syntax.problem Syntax.NotCallable span
-        ("Constructor is not callable: " <> name)
-    )
+constructorCall scope span name id resolved = do
+  count ← fieldCount scope span id
+  if count == 0 then Left (Syntax.problemAt (CtorNotCallable name) span)
   else withValue (Resolved.Construct span id) <$> resolved
 
 withValue ∷ ∀ a b. (a → b) → Numbered a → Numbered b
@@ -156,9 +150,12 @@ findGlobal scope name = Array.find named scope.globals
   where
   named global = global.name == name
 
-fieldCount ∷ Scope → Resolved.CtorId → Int
-fieldCount scope (Resolved.CtorId index) =
-  maybe' noFields count (Array.index scope.ctors index)
+-- A global's CtorId always indexes the table; a miss is a compiler bug.
+fieldCount
+  ∷ Scope → Syntax.Span → Resolved.CtorId → Either Syntax.Diagnostic Int
+fieldCount scope span (Resolved.CtorId index) =
+  maybe' missing count (Array.index scope.ctors index)
   where
-  noFields _ = 0
-  count info = Array.length info.fields
+  missing _ = Left
+    (Syntax.problemAt (Internal "Invalid constructor id") span)
+  count info = Right (Array.length info.fields)

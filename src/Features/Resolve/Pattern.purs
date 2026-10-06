@@ -4,6 +4,7 @@ import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (maybe, maybe')
+import Domain.Problem (DuplicateKind(..), Problem(..), UnboundKind(..))
 import Domain.Syntax as Syntax
 import Domain.Resolved
   ( CtorId(..)
@@ -88,12 +89,10 @@ arity ctors span (CtorId index) fields = maybe' missing counted
   (Array.index ctors index)
   where
   missing _ = Left
-    (Syntax.problem Syntax.InternalError span "Invalid constructor id")
+    (Syntax.problemAt (Internal "Invalid constructor id") span)
   counted info =
     when (Array.length info.fields /= Array.length fields)
-      ( Left
-          (Syntax.problem Syntax.ArityMismatch span "Wrong number of fields")
-      )
+      (Left (Syntax.problemAt FieldArity span))
 
 appendField ∷ Numbered Fields → Numbered Resolution → Numbered Fields
 appendField acc resolved =
@@ -114,7 +113,7 @@ constructor globals span name = maybe' unbound fromGlobal
   where
   named global = global.name == name
   unbound _ = Left
-    (Syntax.problem Syntax.UnboundName span ("Unbound constructor " <> name))
+    (Syntax.problemAt (Unbound UnboundConstructor name) span)
   fromGlobal global = case global.ref of
     CtorRef id → Right id
     FunctionRef _ → unbound unit
@@ -126,9 +125,7 @@ uniqueBinders found = maybe (Right unit) duplicate (Array.find repeated found)
   repeated binder = Array.length (Array.filter (sameName binder) found) > 1
   sameName binder other = other.name == binder.name
   duplicate binder = Left
-    ( Syntax.problem Syntax.DuplicateName binder.span
-        ("Duplicate binder " <> binder.name)
-    )
+    (Syntax.problemAt (Duplicate DuplicateBinder binder.name) binder.span)
 
 binders ∷ Syntax.Pattern → Array Binder
 binders = case _ of

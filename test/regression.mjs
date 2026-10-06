@@ -15,7 +15,7 @@ const goTestTimeoutMs = 120_000;
 const branch = () => {
   const result = compile('fn main(): Int = if true then 1 else false;');
   assert.ok(result instanceof Left, 'branch type mismatch was accepted');
-  assert.equal(result.value0.code.constructor.name, 'TypeMismatch');
+  assert.equal(result.value0.problem.constructor.name, 'TypeMismatch');
   console.log('branch mismatch regression detects the defect');
 };
 
@@ -58,7 +58,7 @@ const nilGuard = () => {
 const exhaustive = () => {
   const result = compile('fn main(): Int = 0; type L = N | K(Int, L); '
     + 'fn f(x: L): Int = match x { N => 0 };');
-  const code = result instanceof Left && result.value0.code.constructor.name;
+  const code = result instanceof Left && result.value0.problem.constructor.name;
   assert.ok(code === 'NonExhaustive', 'non-exhaustive match was accepted');
   console.log('exhaustive regression detects the defect');
 };

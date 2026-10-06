@@ -8,7 +8,8 @@ import Data.Traversable (traverse)
 import Features.Check.Coverage (coverage)
 import Features.Check.Match (Typed, checkMatch, require)
 import Domain.IR.Internal as IR
-import Domain.Syntax (ErrorCode(..), Diagnostic, Span, problem)
+import Domain.Problem (Problem(..))
+import Domain.Syntax (Diagnostic, Span, problemAt)
 import Domain.Resolved (Ty(..))
 import Domain.Resolved as Resolved
 
@@ -123,7 +124,7 @@ checkLocal
 checkLocal env span id = maybe' missing found
   (Array.find named env.locals)
   where
-  missing _ = Left (problem InternalError span "Invalid resolved local")
+  missing _ = Left (problemAt (Internal "Invalid resolved local") span)
   found local = pure (IR.Expr { ty: local.ty, span, node: IR.Local id })
   named local = local.id == id
 
@@ -138,7 +139,7 @@ checkCall env span id@(Resolved.FunctionId index) arguments = maybe'
   found
   (Array.index env.functions index)
   where
-  missing _ = Left (problem InternalError span "Invalid resolved function")
+  missing _ = Left (problemAt (Internal "Invalid resolved function") span)
   found function = do
     checked ← checkArguments env span (map parameterType function.parameters)
       arguments
@@ -157,7 +158,8 @@ checkConstruct env span id@(Resolved.CtorId index) arguments = maybe'
   found
   (Array.index env.ctors index)
   where
-  missing _ = Left (problem InternalError span "Invalid resolved constructor")
+  missing _ = Left
+    (problemAt (Internal "Invalid resolved constructor") span)
   found ctor = do
     checked ← checkArguments env span ctor.fields arguments
     pure
@@ -174,7 +176,7 @@ checkArguments
   → Either Diagnostic (Array IR.Expr)
 checkArguments env span expected arguments = do
   when (Array.length arguments /= Array.length expected)
-    (Left (problem ArityMismatch span "Wrong number of arguments"))
+    (Left (problemAt Arity span))
   checked ← traverse checkExpression arguments
   _ ← traverse checkArgument (Array.zipWith argumentPair expected checked)
   pure checked

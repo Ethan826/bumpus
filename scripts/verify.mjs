@@ -23,6 +23,6 @@ assert.equal((tidy.stdout + tidy.stderr).trim(), 'v0.11.1', 'use the pinned form
 run('purs-tidy', ['check', 'src', 'tools/style/src']);
 run('node', ['scripts/build.mjs']);
 assert.deepEqual(await checkStructure(), [], 'structural gates');
-run('node', ['--test', 'test/compiler.test.mjs', 'test/properties.test.mjs', 'test/structure.test.mjs', 'test/shell.test.mjs', 'test/style.test.mjs', 'test/adt-syntax.test.mjs', 'test/adt-types.test.mjs', 'test/adt-match.test.mjs', 'test/adt-properties.test.mjs', 'test/adt-coverage.test.mjs', 'test/coverage.test.mjs']);
+run('node', ['--test', 'test/compiler.test.mjs', 'test/properties.test.mjs', 'test/structure.test.mjs', 'test/shell.test.mjs', 'test/style.test.mjs', 'test/adt-syntax.test.mjs', 'test/adt-types.test.mjs', 'test/adt-match.test.mjs', 'test/adt-properties.test.mjs', 'test/adt-coverage.test.mjs', 'test/coverage.test.mjs', 'test/diagnostics.test.mjs']);
 run('node', ['scripts/regression.mjs']);
 console.log('Verified compiler, gates, executable programs, rejection diagnostics, properties, and regression proofs.');

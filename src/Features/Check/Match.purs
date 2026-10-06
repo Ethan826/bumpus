@@ -11,15 +11,16 @@ import Data.Either (Either(..))
 import Data.Maybe (maybe')
 import Data.Traversable (traverse)
 import Domain.IR.Internal as IR
-import Domain.Syntax (ErrorCode(..), Diagnostic, Span, problem)
+import Domain.Problem (Problem(..), TypeName(..))
+import Domain.Syntax (Diagnostic, Span, problemAt)
 import Domain.Resolved
   ( CtorId(..)
   , CtorInfo
   , LocalId
   , Tables
   , Ty(..)
+  , TypeId(..)
   , TypeInfo
-  , describe
   )
 import Domain.Resolved as Resolved
 
@@ -51,7 +52,7 @@ checkMatch infer env span scrutinee arms = do
   head ← infer env scrutinee
   maybe' empty (checkArms head) (Array.uncons arms)
   where
-  empty _ = Left (problem InternalError span "Empty resolved match")
+  empty _ = Left (problemAt (Internal "Empty resolved match") span)
   checkArms head split = do
     first ← checkArm infer env (IR.typeOf head) split.head
     rest ← traverse (laterArm head first) split.tail
@@ -106,7 +107,8 @@ checkCtor
 checkCtor tables expected span id@(CtorId index) fields = maybe' missing found
   (Array.index tables.ctors index)
   where
-  missing _ = Left (problem InternalError span "Invalid resolved constructor")
+  missing _ = Left
+    (problemAt (Internal "Invalid resolved constructor") span)
   found ctor = do
     expectType tables.types expected (TData ctor.owner) span
     checked ← traverse checkField (Array.zipWith fieldPair ctor.fields fields)
@@ -123,9 +125,19 @@ checkCtor tables expected span id@(CtorId index) fields = maybe' missing found
 expectType ∷ Array TypeInfo → Ty → Ty → Span → Either Diagnostic Unit
 expectType types expected actual span =
   if expected == actual then Right unit
-  else Left
-    ( problem TypeMismatch span
-        ( "Expected " <> describe types expected <> ", found "
-            <> describe types actual
-        )
-    )
+  else mismatch
+  where
+  mismatch = do
+    wanted ← typeName types span expected
+    found ← typeName types span actual
+    Left (problemAt (TypeMismatch wanted found) span)
+
+-- Names appear only in diagnostics, never in generated Go.
+typeName ∷ Array TypeInfo → Span → Ty → Either Diagnostic TypeName
+typeName types span = case _ of
+  TInt → Right IntName
+  TBool → Right BoolName
+  TData (TypeId index) → maybe' missing named (Array.index types index)
+  where
+  missing _ = Left (problemAt (Internal "Invalid resolved type") span)
+  named info = Right (DataName info.name)

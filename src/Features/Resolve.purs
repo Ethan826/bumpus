@@ -5,6 +5,7 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (maybe')
 import Data.Traversable (traverse)
+import Domain.Problem (EntryKind(..), Problem(..))
 import Domain.Syntax as Syntax
 import Features.Resolve.Expression (expression)
 import Features.Resolve.Types (resolveType, typeTable)
@@ -65,21 +66,19 @@ entryPoint definitions = maybe' absent checkEntry
   where
   isEntry definition = definition.function.name == "main"
   absent _ = Left
-    ( Syntax.problem Syntax.EntryError
+    ( Syntax.problemAt (EntryProblem MissingEntry)
         { start: Syntax.origin, end: Syntax.origin }
-        "Expected fn main(): Int or Bool"
     )
 
 checkEntry ∷ Definition → Either Syntax.Diagnostic Resolved.FunctionId
 checkEntry definition =
   if not (Array.null definition.function.parameters) then invalid
-    "main must have no parameters"
-  else if isData definition.signature.result then invalid
-    "main must return Int or Bool"
+    EntryParameters
+  else if isData definition.signature.result then invalid EntryResult
   else pure (Resolved.FunctionId definition.index)
   where
-  invalid message = Left
-    (Syntax.problem Syntax.EntryError definition.function.span message)
+  invalid kind = Left
+    (Syntax.problemAt (EntryProblem kind) definition.function.span)
   isData = case _ of
     Resolved.TData _ → true
     _ → false

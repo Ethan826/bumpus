@@ -18,7 +18,7 @@ const rows = [
   {
     name: 'exhaustive', file: 'src/Features/Check/Coverage.purs',
     needle: 'uncovered signature',
-    replacement: 'const (const Nothing)',
+    replacement: 'const (const (Right Nothing))',
     probe: 'exhaustive', message: /non-exhaustive match was accepted/
   }
 ];
