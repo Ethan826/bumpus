@@ -6,7 +6,8 @@ import Data.Either (Either(..))
 import Data.Maybe (maybe, maybe')
 import Sprig.Model as Syntax
 import Sprig.Resolved
-  ( CtorId
+  ( CtorId(..)
+  , CtorInfo
   , Global
   , GlobalRef(..)
   , Local
@@ -19,29 +20,32 @@ type Resolution = { pattern ∷ Pattern, binders ∷ Array Local }
 type Fields = { patterns ∷ Array Pattern, binders ∷ Array Local }
 type Binder = { name ∷ String, span ∷ Syntax.Span }
 
--- Binders take the next LocalIds in source pre-order. Constructor arity is
--- checked with the expected type, since only checking has the field types.
+type Tables = { globals ∷ Array Global, ctors ∷ Array CtorInfo }
+
+-- Binders take the next LocalIds in source pre-order. Constructor existence
+-- and arity are checked here, in pattern pre-order.
 resolvePattern
   ∷ Array Global
+  → Array CtorInfo
   → Int
   → Syntax.Pattern
   → Either Syntax.Diagnostic (Numbered Resolution)
-resolvePattern globals next syntax = do
-  resolved ← walk globals next syntax
+resolvePattern globals ctors next syntax = do
+  resolved ← walk { globals, ctors } next syntax
   uniqueBinders (binders syntax)
   pure resolved
 
 walk
-  ∷ Array Global
+  ∷ Tables
   → Int
   → Syntax.Pattern
   → Either Syntax.Diagnostic (Numbered Resolution)
-walk globals next = case _ of
+walk tables next = case _ of
   Syntax.PWildcard span → leaf (Wildcard span)
   Syntax.PBind span name → pure (bound span name)
   Syntax.PInt span value → leaf (IntLit span value)
   Syntax.PBool span value → leaf (BoolLit span value)
-  Syntax.PCtor span name fields → ctorPattern globals next span name fields
+  Syntax.PCtor span name fields → ctorPattern tables next span name fields
   where
   leaf pattern = pure { value: { pattern, binders: [] }, next }
   bound span name =
@@ -53,14 +57,15 @@ walk globals next = case _ of
     }
 
 ctorPattern
-  ∷ Array Global
+  ∷ Tables
   → Int
   → Syntax.Span
   → String
   → Array Syntax.Pattern
   → Either Syntax.Diagnostic (Numbered Resolution)
-ctorPattern globals next span name fields = do
-  id ← constructor globals span name
+ctorPattern tables next span name fields = do
+  id ← constructor tables.globals span name
+  arity tables.ctors span id fields
   resolved ← Array.foldM field start fields
   pure
     { value:
@@ -71,7 +76,24 @@ ctorPattern globals next span name fields = do
     }
   where
   start = { value: { patterns: [], binders: [] }, next }
-  field acc syntax = appendField acc <$> walk globals acc.next syntax
+  field acc syntax = appendField acc <$> walk tables acc.next syntax
+
+arity
+  ∷ Array CtorInfo
+  → Syntax.Span
+  → CtorId
+  → Array Syntax.Pattern
+  → Either Syntax.Diagnostic Unit
+arity ctors span (CtorId index) fields = maybe' missing counted
+  (Array.index ctors index)
+  where
+  missing _ = Left
+    (Syntax.problem Syntax.InternalError span "Invalid constructor id")
+  counted info =
+    when (Array.length info.fields /= Array.length fields)
+      ( Left
+          (Syntax.problem Syntax.ArityMismatch span "Wrong number of fields")
+      )
 
 appendField ∷ Numbered Fields → Numbered Resolution → Numbered Fields
 appendField acc resolved =

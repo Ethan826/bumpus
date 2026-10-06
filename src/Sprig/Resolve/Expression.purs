@@ -63,7 +63,7 @@ resolveArm
   → Syntax.Arm
   → Resolution (Array Resolved.Arm)
 resolveArm scope acc arm = do
-  matched ← resolvePattern scope.globals acc.next arm.pattern
+  matched ← resolvePattern scope.globals scope.ctors acc.next arm.pattern
   body ← expression (inner matched.value.binders) matched.next arm.body
   pure (body { value = Array.snoc acc.value (armOf matched body) })
   where

@@ -195,3 +195,7 @@ and Parse.Pattern, Resolve.Pattern with pre-order LocalIds, Check.Match, Go.Matc
 bootstrap/shapes.go. test/adt-match (12) and test/adt-properties (1) failed before
 the change (match was E_SYNTAX), then passed. Regression proof is a table: `branch`
 and new `nil-guard` both fail on their mutants. `npm run verify` exit 0.
+Fix round 1: pattern-constructor arity moved from Check.Match into
+Resolve.Pattern (E_ARITY in pattern pre-order, before body and later-function
+errors); two new rejection rows failed before (E_UNBOUND) and pass after.
+`npm run verify` exit 0.

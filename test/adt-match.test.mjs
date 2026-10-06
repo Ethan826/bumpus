@@ -83,6 +83,9 @@ test('patterns and matches are rejected precisely', () => {
     [f('match xs { Cons(q, Cons(q, _)) => q, _ => 0 }'), 'E_DUPLICATE', 'q'],
     [f('match xs { X => 0, _ => 1 }'), 'E_UNBOUND', 'X'],
     [f('match xs { Cons(h) => 0, _ => 1 }'), 'E_ARITY', 'Cons(h)'],
+    [f('match xs { Cons(h) => zz, _ => 0 }'), 'E_ARITY', 'Cons(h)'],
+    [`${list} fn f(xs: IntList): Int = match xs { Cons(h) => h, _ => 0 }; `
+      + 'fn g(): Int = zz; fn main(): Int = 0;', 'E_ARITY', 'Cons(h)'],
     [f('match xs { Red => 0, _ => 1 }'), 'E_TYPE', 'Red', 1],
     [f('match b { 1 => 0, _ => 1 }'), 'E_TYPE', '1'],
     [f('match xs { Nil => 0, Cons(_, _) => true }'), 'E_TYPE', 'true'],

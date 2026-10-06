@@ -95,7 +95,7 @@ checkArm infer env ty arm = do
   body ← infer (env { locals = env.locals <> matched.locals }) arm.body
   pure { pattern: matched.pattern, body, span: arm.span }
 
--- Arity is intrinsic to the constructor, so it is checked before ownership.
+-- Resolution has already checked the constructor's arity.
 checkCtor
   ∷ Tables
   → Ty
@@ -108,8 +108,6 @@ checkCtor tables expected span id@(CtorId index) fields = maybe' missing found
   where
   missing _ = Left (problem InternalError span "Invalid resolved constructor")
   found ctor = do
-    when (Array.length fields /= Array.length ctor.fields)
-      (Left (problem ArityMismatch span "Wrong number of fields"))
     expectType tables.types expected (TData ctor.owner) span
     checked ← traverse checkField (Array.zipWith fieldPair ctor.fields fields)
     pure
