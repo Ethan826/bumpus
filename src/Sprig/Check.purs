@@ -5,6 +5,7 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (maybe')
 import Data.Traversable (traverse)
+import Sprig.Check.Coverage (coverage)
 import Sprig.Check.Match (Typed, checkMatch, require)
 import Sprig.IR.Internal as IR
 import Sprig.Model (ErrorCode(..), Diagnostic, Span, problem)
@@ -23,14 +24,16 @@ type Env =
 check ∷ Resolved.Program → Either Diagnostic CheckedProgram
 check program = do
   functions ← traverse checkDefinition program.functions
-  pure
-    ( IR.Program
-        { types: program.types
-        , ctors: program.ctors
-        , functions
-        , entry: program.entry
-        }
-    )
+  let
+    checked = IR.Program
+      { types: program.types
+      , ctors: program.ctors
+      , functions
+      , entry: program.entry
+      }
+  -- Coverage runs only once every function has type-checked.
+  coverage checked
+  pure checked
   where
   checkDefinition definition = checkFunction (environment program) definition
 

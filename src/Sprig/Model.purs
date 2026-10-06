@@ -54,6 +54,8 @@ data ErrorCode
   | TypeMismatch
   | InternalError
   | ArityMismatch
+  | Redundant
+  | NonExhaustive
 
 derive instance eqErrorCode ∷ Eq ErrorCode
 
@@ -98,3 +100,5 @@ codeName = case _ of
   TypeMismatch → "E_TYPE"
   InternalError → "E_INTERNAL"
   ArityMismatch → "E_ARITY"
+  Redundant → "E_REDUNDANT"
+  NonExhaustive → "E_NON_EXHAUSTIVE"

@@ -199,3 +199,5 @@ Fix round 1: pattern-constructor arity moved from Check.Match into
 Resolve.Pattern (E_ARITY in pattern pre-order, before body and later-function
 errors); two new rejection rows failed before (E_UNBOUND) and pass after.
 `npm run verify` exit 0.
+
+2026-10-07: closed-ADT Task 4 (coverage) done. Check.Usefulness (inhabitation fixed point, U(P,q), algorithm I) and Check.Coverage (E_REDUNDANT, E_NON_EXHAUSTIVE with canonical witness) run after checking; test/adt-coverage (6) and test/coverage (300-case oracle) failed before (non-exhaustive programs compiled), then passed; regression row `exhaustive` fails on its mutant. No existing test program changed. `npm run verify` exit 0 (52 tests, three regression proofs).

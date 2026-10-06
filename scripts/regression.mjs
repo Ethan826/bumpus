@@ -14,6 +14,12 @@ const rows = [
     needle: 'nilGuard path = path <> " != nil"',
     replacement: 'nilGuard _ = "true"',
     probe: 'nil-guard', message: /nil guard missing/
+  },
+  {
+    name: 'exhaustive', file: 'src/Sprig/Check/Coverage.purs',
+    needle: 'uncovered signature',
+    replacement: 'const (const Nothing)',
+    probe: 'exhaustive', message: /non-exhaustive match was accepted/
   }
 ];
 const base = '.build/regression';

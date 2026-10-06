@@ -55,6 +55,14 @@ const nilGuard = () => {
   console.log('nil-guard regression detects the defect');
 };
 
-const probes = { branch, 'nil-guard': nilGuard };
+const exhaustive = () => {
+  const result = compile('fn main(): Int = 0; type L = N | K(Int, L); '
+    + 'fn f(x: L): Int = match x { N => 0 };');
+  const code = result instanceof Left && result.value0.code.constructor.name;
+  assert.ok(code === 'NonExhaustive', 'non-exhaustive match was accepted');
+  console.log('exhaustive regression detects the defect');
+};
+
+const probes = { branch, 'nil-guard': nilGuard, exhaustive };
 assert.ok(probe in probes, `unknown probe: ${probe}`);
 probes[probe]();

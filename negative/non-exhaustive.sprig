@@ -1,0 +1,1 @@
+type L = Nil | Cons(Int, L); fn main(): Int = match Nil { Nil => 0 };
