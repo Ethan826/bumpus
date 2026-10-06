@@ -1,45 +1,24 @@
-# Continue after the merged bootstrap audit
+# Continue after milestone A001 (closed ADTs)
 
-Workspace: /Users/ethan/Desktop/gofuncyourself.
-Active checkout: main. The user-authorized audit was fast-forward merged
-through 1f760af, then verified. Its merged branch/worktree were removed after
-preserving raw evidence in .build/merged-audit-evidence. Baseline 9624bec stays
-in history. Do not redo the completed compiler implementation or audit.
+Workspace: /Users/ethan/Desktop/gofuncyourself, branch main. Read AGENTS.md,
+README.md, docs/plans/bootstrap.md, docs/progress.md, docs/findings.md,
+docs/engineering.md, docs/provenance.md, ADRs 001-004 and BACKLOG.md.
 
-Read AGENTS.md, README.md, docs/plans/bootstrap.md, docs/progress.md,
-docs/findings.md, docs/engineering.md, docs/provenance.md, ADRs, BACKLOG.md,
-docs/planning-skills.md and docs/plans/2026-10-07-bootstrap-audit.md from main.
+State: A001 is implemented through Task 8 (documentation). Tasks 1-7 were
+reviewed individually. Clean-output `npm run verify` passes: 64 tests, zero
+skips, three regression proofs (log .build/a001-final.log). bootstrap/answer.go
+and bootstrap/shapes.go are reproduced byte-for-byte by the CLI. Nothing has
+been pushed. The uncommitted .vscode/settings.json change predates this work;
+leave it alone.
 
-User approved checkpoint/worktree/inline execution and a fresh reviewer.
-Task 1 is committed at 4410609 and verified; Task 2 handoff and fresh review
-are complete. Final verification/commit evidence is in docs/progress.md.
-See durable docs/plans/bootstrap-audit-ledger.md and bootstrap-audit-review.md
-for execution/review decisions. Local integration is complete. The merged
-checkout passed npm run verify: 19 tests, zero skips, regression proof and
-strict/style/import gates. Log: .build/merge-verification.log. No push or
-publication occurred. Preserve the existing uncommitted .vscode/settings.json
-change; it was present before the merge and remains outside audit commits.
+Next step: the controller runs the final whole-branch review of the A001
+commit range against docs/plans/2026-10-07-closed-adts-design.md and
+docs/plans/2026-10-07-five-layers-design.md, and every finding is fixed or
+backlogged. Then the user decides the next milestone; candidates are in
+BACKLOG.md (P001 polymorphism, A002 decision trees, A003 ADT printing,
+I001 FFI). Do not start one without that decision.
 
-Superpowers: 15 project-local skills in .agents/skills, pinned by
-skills-lock.json. Use installed executing-plans/support guidance, preserving
-project/user precedence and durable evidence before scratch cleanup.
-
-Compiler: typed first-order functions, Int/Bool, calls, wrapping int32 addition
-and conditionals; deterministic Go, example prints 42. Clean-output baseline
-compiled 269 modules; Task 1 verification passed 19 tests plus isolated branch
-mutation. The accidental IR alias edit failed build, was reproduced in a copy,
-and was corrected; findings/logs retain the evidence. No gate was weakened.
-
-F001 fresh compiler-tool/cross-platform setup remains unverified. F002 external
-MileAhead edit remains unapplied: docs/patches/mileahead-eliminators.patch.
-Earlier automatic approval rejected the outside-workspace write. E001/E002,
-the E003 branch-budget review target, and E004 inaccurate test titles remain
-documented limitations. Fresh review found no blocking issue; E004 is minor.
-
-A001 design: user approved representation A, sequential lowering, recursive
-types, nested Maranget coverage and type/match syntax, then reviewed the
-design; revisions are folded into docs/plans/2026-10-07-closed-adts-design.md.
-The user approved the written spec (commit 1d71f2f). Plan written:
-docs/plans/2026-10-07-closed-adts-plan.md. Next: user reviews the plan and
-chooses subagent-driven or native execution; then run Task 1.
-No A001 code exists yet. Preserve Stage 0.
+Open items to know: F001, F002 (external MileAhead patch unapplied), F003,
+F004 (strict warnings visible only on a compiling build; use a clean output
+directory), F005 (stale sprig-regression-* temp directories), E001, E002,
+E003, E004, A002-A005.

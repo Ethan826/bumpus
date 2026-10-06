@@ -132,3 +132,14 @@ maybe 0, not a computed maybe' fallback; the snapshot test makes one direct
 compile, not repeated CLI invocations. Manual repeated CLI emissions now
 independently agree. These titles are deferred per executor minor-finding
 policy, without weakening the tests or overstating their automated coverage.
+
+## A001 closure observations (2026-10-07)
+
+- F004 reproduced during Task 6: a promoted strict warning appears only on the
+  build that compiles the module. Clean-output verify is the workaround; the
+  fix is open in BACKLOG.md.
+- Four `sprig-regression-*` directories from earlier Task 3-era probe runs
+  remain in $TMPDIR; a clean verify did not add any. Tracked as F005.
+- The nil-guard policy deliberately does not validate fields skipped by
+  wildcards or binders (ADR 003); this is a documented limit, not a defect.
+- `E_USAGE`, `E_IO`, `E_TOOL` are strings in Format.Wire (A005).

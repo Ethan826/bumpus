@@ -2,7 +2,8 @@
 
 Sprig is a provisional small functional language targeting ordinary Go.
 Stage 0 is implemented in PureScript. This repository implements one checked
-vertical slice; ADTs, polymorphism, HKTs, classes, and rows are planned.
+vertical slice plus closed algebraic data types with exhaustive nested
+`match` (A001). Polymorphism, HKTs, classes, and rows are planned.
 
 ## Prerequisites and fresh checkout
 
@@ -57,12 +58,15 @@ not yet a native Go compiler executable.
 
 - [Implementation plan](docs/plans/bootstrap.md) and [progress](docs/progress.md)
 - [Language specification](docs/language.md)
-- [Architecture](docs/architecture.md) and [decisions](docs/adr/001-slice.md)
+- [Architecture](docs/architecture.md) and [decisions](docs/adr/001-slice.md), [ADR 002](docs/adr/002-polymorphic-lowering.md)
 - [Engineering rules and gate coverage](docs/engineering.md)
 - [Reference provenance](docs/provenance.md)
 - [Self-hosting chain](docs/bootstrap.md)
 - [Local backlog](BACKLOG.md)
 
-The next language milestone is closed ADTs with source-located exhaustive
-pattern matching. Its design and plan remain separate from the bootstrap
-audit; [audit evidence](docs/progress.md) records the current delivery status.
+Closed ADTs and exhaustive matching are implemented (see
+[ADR 003](docs/adr/003-closed-adts.md), [ADR 004](docs/adr/004-five-layers.md)
+and examples/shapes.sprig). The compiler is organized in five layers: Domain,
+Features, Format, Runtime, Program ([architecture](docs/architecture.md)).
+The next milestone is chosen by the user after the final A001 review;
+[progress](docs/progress.md) records the evidence.

@@ -1,51 +1,76 @@
 # Compiler architecture
 
-The semantic pipeline is pure:
+Five layers, each named for what would make it change (ADR 004, design in
+docs/plans/2026-10-07-five-layers-design.md). Imports run only to the same or
+an earlier layer; scripts/structure.mjs enforces it from `purs graph`.
+
+| Layer | Modules (src/) | Role |
+|---|---|---|
+| Domain | Syntax, Resolved, Problem, Host, IR.Internal | syntax trees, spans, `Ty`, resolved syntax, checked IR, `Problem` data, capability-port types |
+| Features | Resolve, Resolve.{Expression,Types,Pattern}, Check, Check.{Match,Signature,Usefulness,Coverage} | resolution, checking, coverage; report `Problem` data, never text |
+| Format | Lex, Parse, Parse.*, Go, Go.{Data,Match}, Diagnostic, Wire, Arguments | text in (tokens, parser, reserved words, uppercase rule); Go out; diagnostic text, `E_*` names, wire records, usage text |
+| Runtime | Node (+ Node.js) | port implementations, argv/stdout/stderr/exit, JSON; the only FFI |
+| Program | Compile, Command, Main | pure `compile`, commands over any `Host`, entry point |
+
+Domain, Features and Format are pure (core library allowlist, no Effect).
+
+## Pipeline
 
 ```text
-String -> Parse -> Syntax -> Resolve -> Resolved -> Check -> typed IR -> Go
-                                                    Either Diagnostic
+String -> Lex/Parse -> Syntax -> Resolve -> Resolved -> Check -> IR
+       -> Coverage (Either Diagnostic) -> Go text
 ```
 
-Domain.Syntax owns raw syntax, ground types, spans, and tagged diagnostics.
-Lex and Parse.* consume text/tokens. Resolve builds deterministic function and
-local IDs, checks duplicate definitions, and resolves names. Resolved has its
-own expression representation. Check consumes only resolved syntax, enforces
-language types, and elaborates explicit typed IR. Go consumes CheckedProgram
-and emits deterministic text. Program.Compile composes phases; Runtime.Node
-performs filesystem, process, argv, environment, and logging work through a small FFI.
-Expected source errors use Either. Program.Main maps them to JSON wire diagnostics;
-IO/tool failures are tagged boundary values. The semantic core has no FFI.
+Program.Compile composes the phases; Program.Command runs emit/build/run over
+the `Domain.Host` ports (records over an abstract monad), so
+test/program.test.mjs substitutes fakes. Expected source errors are
+`Either Diagnostic`; the first error in phase/traversal order wins. Host
+failures (`IoFailure`, `ToolFailure`) are separate values rendered by
+Format.Wire.
 
-IR.Internal wraps each expression node with explicit Ty/span annotations. Checking is the
-only producer used by the pipeline. CheckedProgram has no publicly exported
-constructor at the Check facade; the internal representation is exported to
-checking/lowering and protected by a parsed dependency graph allowlist.
-This is an enforced project boundary, not a claim that PureScript has private
-subtrees. The resolver produces IDs indexing known definitions. The checker reports
-E_INTERNAL for invalid local or called-function indices encountered during
-expression checking. Its exported resolved-syntax input is a trusted phase
-interface: it does not independently validate arbitrary forged entry IDs or
-function-table IDs. This is not a general hostile-IR validator.
+## Phases
 
-The present Type grammar contains only two ground constructors of kind Type.
-No separate kind solver is needed yet. There are no patterns or class
-constraints; coverage and instance resolution are not implemented. Their
-future responsibilities remain distinct from expression type inference.
-Future stages will be Syntax -> Resolved -> Kinded -> Checked constraints ->
-coverage/instances -> Elaborated IR -> lowered Go IR -> emitted Go.
-Do not add fake success stages for features absent from the grammar.
+- **Resolve** has two type passes (register names, assign TypeId/CtorId in
+  declaration order; then resolve field and signature types) so mutual
+  recursion works. Functions and constructors share one global table. LocalIds
+  number parameters, then binders in source pre-order.
+- **Type table.** `TypeInfo {name, ctors, span}` and `CtorInfo {name, owner,
+  fields, span}` travel with the program. Names appear only in messages, never
+  in Go.
+- **Check** produces checked IR (`Construct CtorId`, `Match`, `Pattern`) and is
+  the only producer of `CheckedProgram`. It reports E_INTERNAL for invalid
+  local/function/type indices; its resolved-syntax input is a trusted phase
+  interface, not a hostile-IR validator.
+- **Coverage** (Features.Check.Coverage, Usefulness, Signature) runs after the
+  whole program type-checks: inhabitedness least fixed point, Maranget
+  usefulness, canonical witness. Type errors in later functions take
+  precedence over coverage errors.
+- **Go** (Format.Go*) emits one tagged struct per type, constructors, and
+  sequential first-match lowering with nil guards. Go representation decisions
+  live here, not in Features.
 
-Go generation preserves scalar annotations, uses mangled IDs, contains no nil
-or open sum payloads, and returns initialized expressions from all functions.
-There is no mutable source state, uninitialized source variable, or zero-value
-construction. Go's scalar zero values are valid source values. For future ADTs,
-reserve tag zero as invalid, expose constructors only, and validate tag/payload
-consistency at Go FFI boundaries. Arbitrary Go zero values or nil must never
-silently become inhabited closed source sums. Records/boxing must obey the
-same boundary invariant. See ADR 002 for the planned representation strategy.
+Only `Features.Check*` and `Format.Go*` import `Domain.IR.Internal`. This is an
+enforced project boundary, not PureScript privacy.
 
-Generated Go is canonical emitter output; gofmt can format a presentation copy
-but bootstrap comparisons use original bytes. No timestamps, absolute paths,
-or source identifier spellings influence names. Declaration order determines
-IDs; comparisons use the same source and compiler configuration.
+## Verified Go properties
+
+Names are mangled from IDs; no source spelling, timestamp or absolute path
+enters output. Emission is byte-deterministic (`bootstrap/answer.go`,
+`bootstrap/shapes.go` snapshots). Int is int32 with wrapping addition.
+Generated code never dereferences nil unguarded (ADR 003). Generated Go is
+canonical emitter output; gofmt copies are presentation only.
+
+## Future stages (proposed, not implemented)
+
+Syntax -> Resolved -> Kinded -> Checked constraints -> coverage/instances ->
+Elaborated IR -> lowered Go IR -> emitted Go. A target-neutral
+`Features.Lower` is deferred until decision-tree match compilation gives it a
+target-neutral job (BACKLOG A002). Foreign values (FFI) need full-value
+validation of tag and payload consistency before they become closed sums
+(I001). No fake stages for absent features. See ADR 002 for the planned
+polymorphism strategy.
+
+## Known leak
+
+Diagnostic offsets are UTF-16 code units, a hosting artifact of JavaScript
+strings (ADR 004).

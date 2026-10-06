@@ -1,12 +1,12 @@
 # Local backlog
 
-Current delivery: stage 0 ground vertical slice. Plan and verification evidence
+Current delivery: stage 0 plus closed ADTs (A001 done). Plan and verification evidence
 are in docs/plans/bootstrap.md and docs/progress.md. No remote tracking.
 
 | ID | State | Next concrete work and acceptance |
 |---|---|---|
 | V001 | Done | Documentation/style audit closed after fresh review found no blockers; final closure verification is recorded in docs/progress.md. |
-| A001 | Planned for execution | Spec: docs/plans/2026-10-07-closed-adts-design.md (approved). Plan: docs/plans/2026-10-07-closed-adts-plan.md (5 tasks), awaiting user review and execution-method choice. Closed product/sum declarations, constructor resolution and typed construction; match patterns, exhaustiveness/redundancy checks; executable and negative examples, representation tag/payload tests. |
+| A001 | Done | Closed ADTs, nested match with nil-guarded Go, Maranget coverage with inhabitedness, five layers, structured diagnostics, capability ports. ADRs 003 and 004; evidence in docs/progress.md and .build/a001-final.log (clean-output verify: 64 tests, 0 skips, three regression proofs). Final whole-branch review pending with the controller. |
 | P001 | Planned | Rank-1 schemes, substitution and occurs-checked unification; mandatory signatures, no polymorphic recursion; meaningful composition/idempotence/occurs-check properties and reference comparisons. |
 | K001 | Planned | Explicit kind IR/checker, constructor arities, Type/Row/arrow kinds, HKTs restricted to first-order constructor application; reject ill-kinded programs before type solving. |
 | C001 | Planned | Classes and non-overlapping coherent instances, terminating resolution, ambiguity errors, dictionary elaboration; negative overlap/coherence cases. |
@@ -23,3 +23,8 @@ are in docs/plans/bootstrap.md and docs/progress.md. No remote tracking.
 | E003 | Reviewed target exception | src/Format/Diagnostic.purs codeName (twelve ErrorCode arms), code and message (fifteen Problem arms each) exceed the eight-branch review target. They are flat exhaustive table mappings; reassess grouping when diagnostics grow, preserving every tag and text with exact rejection tests (test/diagnostics.test.mjs). |
 | E004 | Minor, deferred | test/compiler.test.mjs:84 title overstates repeated CLI assertions; test/style.test.mjs:21–22 title overstates lazy-fallback fixture. Rename to snapshot agreement and named helpers with constant fallback; preserve assertions. Manual repeated emissions separately verified. |
 | F004 | Open | Spago 1.0.4 `--strict` reports a promoted warning (seen: ShadowedName, A001 T6) only on the build that compiles the module; the next `npm run build` skips the unchanged module and prints success, so `npm run verify` after a failed build can pass over a strict warning. Next: make scripts/build.mjs (or verify) force recompilation of src modules, e.g. remove their output directories first; accept when a strict-warning fixture fails on two consecutive builds. |
+| A002 | Planned | Decision-tree match compilation replacing sequential first-match lowering, with a target-neutral `Features.Lower` that Format.Go prints (ADR 003, ADR 004). Accept when emitted behavior equals the first-match interpreter on the existing oracle and tests, with new snapshots. |
+| A003 | Planned | ADT printing and equality/ordering (currently absent; `main` returns Int or Bool). Decide derived versus explicit, then test through the CLI. |
+| A004 | Planned | Full-value FFI validation of tag/payload consistency, nil and zero values: folded into I001, not a separate milestone. Wildcards and binders deliberately do not validate skipped fields today (ADR 003). |
+| A005 | Planned | `HostCode` ADT for E_USAGE, E_IO and E_TOOL, currently string literals in src/Format/Wire.purs. Accept when wire tests (test/program.test.mjs) pass unchanged and no code string remains outside Format. |
+| F005 | Open | The nil-guard regression probe (test/regression.mjs) removes its `sprig-regression-*` temp directory in a finally block, but four directories from Task 3-era runs remain in $TMPDIR (observed by the controller). A clean `npm run verify` on 2026-10-07 left the count at four, so no current leak is demonstrated; a killed or timed-out probe would skip cleanup. Next: delete the stale directories manually, then add a probe check or verify step asserting no new `sprig-regression-*` directory after a run, or move the work directory under .build. |

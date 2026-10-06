@@ -22,8 +22,17 @@ suppressing a gate, weakening an assertion, or adding a bypass allowlist.
 - separate language-cst-parser style package rejects let-in, anonymous lambdas,
   Maybe/Either constructor cases (including record-building or guarded cases),
   and do-blocks directly in case/if branches; parse recovery fails the gate;
-- structured negative diagnostics, generated-Go snapshot, positive build/run,
-  seeded AST roundtrips/reference execution, and isolated mutation proof.
+- structured negative diagnostics (test/diagnostics.test.mjs, one row per
+  code family with exact code, span and text), generated-Go snapshots
+  (bootstrap/answer.go, bootstrap/shapes.go), positive build/run, seeded AST
+  roundtrips and reference execution, a brute-force coverage oracle
+  (test/coverage.test.mjs), and fake-host command tests (test/program.test.mjs);
+- `npm run verify` runs all 13 test files (64 tests, no skips) and then
+  scripts/regression.mjs, a table of isolated-copy mutations, each of which
+  must pass on the healthy build and fail on its mutant: `branch`
+  (Features.Check branch type), `nil-guard` (Format.Go.Match drops the `!= nil`
+  test; probe requires the unmatched panic, not a runtime error), and
+  `exhaustive` (Features.Check.Coverage always succeeds).
 
 The CST ban on all anonymous lambdas is deliberately stronger than MileAhead's
 manual 'name what you pass' rule. The Maybe/Either rule is stronger than its
@@ -79,8 +88,17 @@ have an explicit export boundary. No language semantics or gate was relaxed.
 Numeric limits in maintained checking/mutation scripts are named constants.
 
 The 30-line/3-decision/8-branch/8-binding budgets are review targets. The
-exhaustive ten-arm ErrorCode-to-wire-tag mapping is retained together for
+flat exhaustive mappings in Format.Diagnostic (codeName: twelve ErrorCode arms;
+code and message: fifteen Problem arms each) are retained together for
 readability; E003 records this specific target exception and its next review.
 All maintained code remains below 250 lines; automatic counts do not prove
 full naming/complexity compliance. No new source behavior or unification is
 claimed. Existing executable/snapshot/diagnostic tests validate this refactor.
+
+## Known gaps in enforcement (A001)
+
+Review conventions only: the layer names describe reasons to change, which no
+gate checks; the gate checks import direction, purity and IR access.
+F004: Spago strict warnings appear only on the build that compiles a module,
+so check from a clean output directory (`rm -rf output && npm run verify`).
+F005: the nil-guard probe's temp-directory cleanup is not asserted.
