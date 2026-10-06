@@ -66,7 +66,8 @@ Do not redo completed compiler implementation; retain local durable evidence.
 ## Next step
 
 User approved a local baseline (9624bec), isolated audit worktree and inline
-execution with one final fresh reviewer. Audit work is on audit/bootstrap-docs
-in .worktrees/bootstrap-audit. See the migrated plan and docs/progress.md.
-Fresh review and audit handoff are complete; agree local integration. Closed ADTs
+execution with one final fresh reviewer. Audit work was completed in the isolated audit/bootstrap-docs worktree.
+User-authorized local merge into main and merged verification are complete;
+the merged branch/worktree were removed after evidence preservation.
+See the migrated plan and docs/progress.md. Closed ADTs
 and exhaustive matching remain a separate future design/plan, not implemented.

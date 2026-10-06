@@ -64,3 +64,10 @@ Task 2: complete (commits 4410609..f27b499, tests: npm run verify → Verified c
 Todo: Task 1 complete; Task 2 complete; fresh review complete.
 Integration: pending user choice; main retains baseline; audit branch/worktree
 remain preserved. No push or publication.
+
+Local integration complete: user authorized merge, main fast-forwarded to
+1f760af and npm run verify passed 19/19,zero skips,regression proof,zero strict
+warnings/errors. Evidence: .build/merge-verification.log. Worktree/branch
+removed after raw artifacts were archived in .build/merged-audit-evidence.
+Prior pending integration entries are historical. Existing editor settings
+remain uncommitted; no push or publication.

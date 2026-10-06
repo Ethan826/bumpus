@@ -42,7 +42,9 @@ Go 1.26.4 (tested), Node >=22.5.0; installed pinned Superpowers skills.
 
 User approved baseline checkpoint, isolated worktree and inline execution
 with a final fresh reviewer. Baseline: 9624bec; branch: audit/bootstrap-docs;
-worktree: .worktrees/bootstrap-audit. Migration evidence stays historical.
+historical worktree: .worktrees/bootstrap-audit. Migration evidence stays
+historical. Completed audit is merged into main after explicit user approval;
+merged verification passed, and the merged branch/worktree were removed.
 Both task implementations are complete; fresh review found no blockers.
 Final verification/commit evidence is in docs/progress.md and the durable ledger.
 

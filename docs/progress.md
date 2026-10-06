@@ -1,8 +1,9 @@
 # Bootstrap evidence and current checkpoint
 
-2026-10-07. The documentation/style audit is complete on audit/bootstrap-docs;
-fresh review found no blockers. Main preserves baseline 9624bec. Worktree:
-.worktrees/bootstrap-audit. Task 1 commit: 4410609. No publishing or push.
+2026-10-07. The completed documentation/style audit is merged into main through 1f760af.
+Fresh review found no blockers; merged verification passed. Baseline 9624bec
+is preserved in history. Audit branch/worktree removed after retaining their
+evidence. Task 1 commit: 4410609. No publishing or push.
 The audit plan is docs/plans/2026-10-07-bootstrap-audit.md.
 
 ## Historical pre-audit checkpoint
@@ -48,7 +49,7 @@ provenance, ADRs, engineering guidance, bootstrap roadmap, and local backlog.
 
 ## Current remaining actions
 
-Choose local integration or preserve the verified audit branch. Closed ADTs/exhaustive
+Local integration is complete; proceed to a separate bounded ADT design/plan. Closed ADTs/exhaustive
 matching require a separate later design and plan. F001 (fresh compiler-tool
 setup), F002 (unapplied external patch), E001/E002 and E003 remain explicit.
 
@@ -122,7 +123,7 @@ Two separate actual CLI emit invocations produced byte-identical output,
 also equal to bootstrap/answer.go (cmp checks succeeded). The preserved
 MileAhead patch again passed git apply --check without being applied. Stage 0,
 locks, tests, example bytes and pure boundaries remain preserved. ADR 001/002
-remain unchanged. No language feature, merge, push or publication occurred.
+remain unchanged. At audit closure no language feature, merge, push or publication had occurred.
 
 Raw failure evidence retained outside executor scratch:
 .build/audit-task-1-failed-alias.log, .build/alias-regression/failure.log,
@@ -134,8 +135,8 @@ Final closure `npm run verify` exited 0 on 2026-10-07: strict/pedantic build
 zero warnings/errors; 19/19 tests, zero skips; format/CST/layer gates and
 isolated branch mutation proof passed. Raw final log: .build/audit-final.log.
 Tasks 1/2 and original bootstrap tasks 7/8 are complete; no blocking review
-finding remains. E004 minor titles are intentionally deferred. Integration
-into main has not been requested or performed.
+finding remains. E004 minor titles are intentionally deferred. Integration into main was still pending at that checkpoint; it is now
+complete as recorded below.
 
 The installed task-done helper also verified Task 2 after commit f27b499:
 19/19 tests, zero skips, strict build/gates/regression proof passed; commit
@@ -143,3 +144,18 @@ range 4410609..f27b499 is recorded in the durable ledger. Raw completion log:
 .build/audit-task-2-completion.log. Executor scratch was copied in full to
 .build/audit-executor-evidence before cleanup; durable ledger/review remain
 committed in docs/plans. Only local branch integration is pending.
+
+## Authorized local integration
+
+User explicitly approved merge. Main fast-forwarded 9624bec..1f760af;
+`npm run verify` on the merged checkout exited 0 on 2026-10-07: zero strict
+warnings/errors, 19/19 tests, zero skips, formatting/CST/import gates and
+isolated regression proof passed. Raw log: .build/merge-verification.log.
+
+Audit raw logs, emitted files, isolated rename-defect copy and executor
+artifacts were preserved under .build/merged-audit-evidence before removing
+the merged audit worktree and branch. Historical worktree .build paths above
+now resolve under that archive. Original checkout logs were not overwritten.
+Durable ledger/review remain in docs/plans and all audit commits stay in main.
+The pre-existing .vscode/settings.json spell-check additions are preserved
+uncommitted. No push or publication occurred.
