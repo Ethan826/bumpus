@@ -1,6 +1,9 @@
 # ADT Printing, Equality and Ordering Implementation Plan (A003)
 
-Status: written 2026-10-07, awaiting user review. Not started.
+Status: approved 2026-10-07 for subagent-driven execution (fresh
+implementer and reviewer per task, then whole-branch review). User additions
+folded in: operand evaluation order tests (Tasks 1, 2), the malformed-value
+visiting boundary (Task 2), helper generation split across modules.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -10,7 +13,10 @@ order, and printing of `main`'s value whatever its type.
 **Architecture:** One new expression form, `Compare Operator Expr Expr`,
 flows through every phase (Syntax → Resolved → IR). Format.Go lowers Int and
 Bool comparisons to Go operators and declared types to generated per-type
-helpers (`sprigCmpN`, `sprigShowN`) in a new module, Format.Go.Helpers.
+helpers (`sprigCmpN`, `sprigShowN`). Helper generation is split by
+responsibility so each file stays well under 250 lines: Format.Go.Compare
+(operator text, Bool helper, comparison helpers), Format.Go.Show (printing
+helpers) and Format.Go.Usage (whether the Bool helper is needed).
 
 **Tech Stack:** PureScript 0.15.16, Spago 1.0.4, purs-tidy 0.11.1, Node test
 runner, Go 1.26.4.
@@ -58,7 +64,7 @@ runner, Go 1.26.4.
   `src/Format/Lex.purs`, `src/Format/Parse/Expression.purs`,
   `src/Features/Resolve/Expression.purs`, `src/Features/Check.purs`,
   `src/Features/Check/Coverage.purs`, `src/Format/Go.purs`
-- Create: `src/Format/Go/Helpers.purs`
+- Create: `src/Format/Go/Compare.purs`, `src/Format/Go/Usage.purs`
 - Test: `test/compare.test.mjs`
 
 **Interfaces:**
@@ -66,9 +72,9 @@ runner, Go 1.26.4.
   LessEqual | Greater | GreaterEqual` (derive Eq); `Syntax.Compare Span
   Operator Expr Expr`; `Resolved.Compare Span Operator Expr Expr`;
   `IR.Compare Operator Expr Expr` (result `ty` is `TBool`).
-- Produces, in Format.Go.Helpers: `goOperator ∷ Operator → String` (`==`,
+- Produces, in Format.Go.Compare: `goOperator ∷ Operator → String` (`==`,
   `!=`, `<`, `<=`, `>`, `>=`); `boolHelper ∷ String` (the
-  `sprigCmpBool(a bool, b bool) int` declaration);
+  `sprigCmpBool(a bool, b bool) int` declaration). In Format.Go.Usage:
   `needsBoolHelper ∷ IR.Program → Boolean` (Task 1: some `IR.Compare` with
   an ordering operator has Bool operands).
 
@@ -88,6 +94,17 @@ runner, Go 1.26.4.
   Bool; the message is the existing TypeMismatch rendering).
 - `fn main(): Bool = 1 < if true then 1 else 2;` → E_SYNTAX at `if`.
 - `fn main(): Int = 1 < 2;` → E_TYPE (body Bool, result Int).
+
+Evaluation order, test `comparison operands evaluate once each, left first`:
+`fn l(): Int = 1; fn r(): Int = 2; fn main(): Bool = l() < r();` and the
+same with Bool results (`false < true` via `fn l(): Bool`, which uses
+`sprigCmpBool`) and with `==`. The test instruments the emitted Go text:
+after each `func sprigFnK(...) T {\n` it inserts
+`sprigTrace = append(sprigTrace, "K")\n`; a `goTest` file declares
+`var sprigTrace []string`, calls the main function, and prints the trace,
+which must be exactly `[0 1]` (l, then r, once each). Put the instrumenting
+helper in test/support.mjs as `traceCalls(goSource) → string` and give
+`goTest` an optional transform of the emitted Go.
 
 Also assert `checked(readFileSync('examples/answer.sprig'))` still equals
 bootstrap/answer.go and that a program without Bool ordering contains no
@@ -126,13 +143,14 @@ bootstrap/answer.go and that a program without Bool ordering contains no
 ### Task 2: Structural order for declared types
 
 **Files:**
-- Modify: `src/Format/Go/Helpers.purs`, `src/Format/Go.purs`,
+- Modify: `src/Format/Go/Compare.purs`, `src/Format/Go/Usage.purs`,
+  `src/Format/Go.purs`,
   `scripts/regression.mjs`, `test/regression.mjs`, `bootstrap/shapes.go`
 - Create: `test/value-oracle.mjs`, `test/adt-order.test.mjs`
 
 **Interfaces:**
 - Consumes: Task 1 IR node and helpers.
-- Produces, in Format.Go.Helpers: `compareName ∷ TypeId → String`
+- Produces, in Format.Go.Compare: `compareName ∷ TypeId → String`
   (`sprigCmp<index>`); `compareHelpers ∷ Array TypeInfo → Array CtorInfo →
   String` (one function per type, TypeId order). `needsBoolHelper` is also
   true when any declared constructor has a Bool field.
@@ -159,7 +177,13 @@ both build `Cons(1, Nil)` separately. A Bool field type
 `type P = P(Bool, Int);` gives `P(false, 9) < P(true, 0)`. Review Focus 4
 and 5. Malformed values via `goTest`: `sprigCmp0(sprigTy0{tag: 2},
 sprigTy0{tag: 2})` (nil field) and `sprigCmp0(sprigTy0{}, sprigTy0{})`
-(unknown tag) each recover `sprig: malformed value`.
+(unknown tag) each recover `sprig: malformed value`. Visiting boundary,
+same `L`: `sprigCmp0(sprigTy0{tag: 2, c1f0: 1}, sprigTy0{tag: 2, c1f0: 2})`
+(both tails nil) returns -1 without panicking, because the first field
+decides; with equal heads (`c1f0: 1` on both) the nil tail is visited and
+panics `sprig: malformed value`. Evaluation order for declared types: the
+Task 1 `traceCalls` test with `fn l(): L` and `fn r(): L` under `<` and `==`
+prints `[0 1]`.
 
 Oracle test `generated pairs agree with the order interpreter` (8 seeds):
 per seed, one system and 8 value pairs of T0 (depth ≤ 3), including at
@@ -201,15 +225,15 @@ interpreter; agreement is the acceptance check).
 **Files:**
 - Modify: `src/Domain/Problem.purs` (drop `EntryResult`),
   `src/Features/Resolve.purs`, `src/Format/Diagnostic.purs`,
-  `src/Format/Go/Helpers.purs`, `src/Format/Go.purs`,
-  `test/diagnostics.test.mjs`, `test/adt-types.test.mjs`,
+  `src/Format/Go.purs`, `test/diagnostics.test.mjs`, `test/adt-types.test.mjs`,
   `scripts/regression.mjs`, `test/regression.mjs`, `bootstrap/shapes.go`
-- Create: `test/adt-print.test.mjs`, `examples/tree.sprig`,
+- Create: `src/Format/Go/Show.purs`, `test/adt-print.test.mjs`,
+  `examples/tree.sprig`,
   `bootstrap/tree.go`
 
 **Interfaces:**
 - Consumes: Task 2 value oracle and helpers.
-- Produces: `showName ∷ TypeId → String` (`sprigShow<index>`),
+- Produces, in Format.Go.Show: `showName ∷ TypeId → String` (`sprigShow<index>`),
   `showHelpers ∷ Array TypeInfo → Array CtorInfo → String`.
 
 - [ ] **Step 1: Write failing tests in test/adt-print.test.mjs**
@@ -261,7 +285,7 @@ Update the existing rows listed in Global Constraints; the adt-types
 **Files:** docs/language.md, docs/adr/005-structural-order.md,
 docs/architecture.md, docs/engineering.md (new regression rows, test
 counts), README.md (if it states the `main` restriction), BACKLOG.md
-(A003 Done), docs/progress.md, docs/findings.md, docs/next-session.md,
+(A003 In review), docs/progress.md, docs/findings.md, docs/next-session.md,
 this plan's status line.
 
 - [ ] **Step 1:** language.md grammar and semantics per spec sections 1-4;
@@ -270,5 +294,8 @@ this plan's status line.
   printing, helpers for every type, Bool helper on demand, malformed rule.
 - [ ] **Step 3:** `rm -rf output && npm run verify` exits 0; record counts and
   the four CLI emits (answer, shapes, tree twice) compared with `cmp`.
-- [ ] **Step 4: Commit** `docs: close A003`. Then a fresh whole-branch
-  review by the controller.
+- [ ] **Step 4: Commit** `docs: close A003` with A003 still In review.
+- [ ] **Step 5:** fresh whole-branch review; fix every finding (each fix with
+  a test seen failing first where behavioral), record them in
+  docs/plans/adt-printing-review.md, rerun `npm run verify`, and only then
+  mark A003 Done in BACKLOG.md and this plan's status.
