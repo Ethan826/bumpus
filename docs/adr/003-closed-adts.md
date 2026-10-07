@@ -46,7 +46,9 @@ proposed, not verified.
    position` (test/adt-match.test.mjs).
 7. **E_DUPLICATE at the first occurrence**, the Stage 0 rule, applied to
    types, global names (functions and constructors share one table),
-   parameters and binders (test/diagnostics.test.mjs).
+   parameters and binders (test/diagnostics.test.mjs). For a
+   function/constructor clash the first occurrence is by source position,
+   whatever its kind (test/adt-types.test.mjs).
 8. **Decision trees deferred.** Lowering is sequential first-match: arm
    conditions in order. This is simple to verify against the first-match
    interpreter (`generated match programs agree with a first-match
@@ -60,8 +62,11 @@ proposed, not verified.
    witness (`uninhabited constructors need no arm` and `a wildcard over only
    uninhabited constructors is redundant`, test/adt-coverage.test.mjs).
    Coverage is also checked independently by test/coverage.test.mjs, a
-   brute-force enumeration oracle that does not use Maranget's algorithm. An invalid TypeId is E_INTERNAL, not a pass
-   (test/diagnostics.test.mjs).
+   brute-force enumeration oracle that does not use Maranget's algorithm,
+   and against brute-forced inhabitedness over generated small type systems
+   (`constructor coverage agrees with brute-forced inhabitedness`). An
+   invalid TypeId, or a constructor field count that disagrees with the
+   tables, is E_INTERNAL, not a pass (test/diagnostics.test.mjs).
 
 ## Consequences
 

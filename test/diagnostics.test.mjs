@@ -132,3 +132,33 @@ test('coverage reports an invalid type id as E_INTERNAL', async () => {
   assert.deepEqual(wire(result.value0),
     { code: 'E_INTERNAL', message: 'Invalid type id', span });
 });
+
+// Review Minor 7: resolution enforces arity, so a field count that disagrees
+// with the constructor table is a compiler bug, never truncated or matched.
+test('a constructor field-count mismatch is E_INTERNAL', async () => {
+  const { coverage } = await load('Features.Check.Coverage');
+  const { checkPattern } = await load('Features.Check.Match');
+  const ir = await load('Domain.IR.Internal');
+  const resolved = await load('Domain.Resolved');
+  const { TData, TInt } = resolved;
+  const span = { start: position(0), end: position(1) };
+  const box = TData.create(0);
+  const types = [{ name: 'Box', ctors: [0], span }];
+  const ctors = [{ name: 'Wrap', owner: 0, fields: [TInt.value], span }];
+  const wild = ir.Pattern.create({ ty: TInt.value, span, shape: ir.Wildcard.value });
+  const wrap = fields => ir.Pattern.create(
+    { ty: box, span, shape: ir.Ctor.create(0)(fields) });
+  const expr = (ty, node) => ir.Expr.create({ ty, span, node });
+  const arm = pattern => ({ pattern, body: expr(TInt.value, ir.Integer.create(0)), span });
+  const body = expr(TInt.value, ir.Match.create(expr(box, ir.Local.create(0)))(
+    [arm(wrap([wild, wild])), arm(wrap([wild]))]));
+  const covered = coverage({ types, ctors, entry: 0,
+    functions: [{ id: 0, parameters: [], result: TInt.value, body, span }] });
+  assert.equal(covered.constructor.name, 'Left', 'over-long row was accepted');
+  assert.deepEqual(covered.value0.problem,
+    (await load('Domain.Problem')).Internal.create('Coverage field count mismatch'));
+  const short = resolved.Ctor.create(span)(0)([]);
+  const pattern = checkPattern({ types, ctors })(box)(short);
+  assert.equal(pattern.constructor.name, 'Left', 'short pattern was truncated');
+  assert.equal(pattern.value0.problem.value0, 'Resolved constructor arity mismatch');
+});

@@ -1,8 +1,12 @@
 # Engineering guidance and actual enforcement
 
 AGENTS.md is normative. CLAUDE.md is a pointer, so rules are not duplicated.
-The verification command is npm run verify. Never obtain green results by
-suppressing a gate, weakening an assertion, or adding a bypass allowlist.
+The verification command is npm run verify. Until BACKLOG F004 is fixed,
+completion evidence is `rm -rf output && npm run verify` (AGENTS.md): the
+build is incremental, and a promoted strict warning shows only on the build
+that compiles its module. This is a review convention; no gate enforces it.
+Never obtain green results by suppressing a gate, weakening an assertion, or
+adding a bypass allowlist.
 
 ## Automated now
 
@@ -25,9 +29,12 @@ suppressing a gate, weakening an assertion, or adding a bypass allowlist.
 - structured negative diagnostics (test/diagnostics.test.mjs, one row per
   code family with exact code, span and text), generated-Go snapshots
   (bootstrap/answer.go, bootstrap/shapes.go), positive build/run, seeded AST
-  roundtrips and reference execution, a brute-force coverage oracle
-  (test/coverage.test.mjs), and fake-host command tests (test/program.test.mjs);
-- `npm run verify` runs all 13 test files (64 tests, no skips) and then
+  roundtrips and reference execution (nested and flat multi-arm matches), a
+  brute-force coverage oracle with brute-forced inhabitedness over generated
+  type systems (test/coverage.test.mjs), and fake-host command tests
+  (test/program.test.mjs);
+- `npm run verify` runs every test/*.test.mjs file (13 files, 68 tests, no
+  skips; the list is read from the directory, never hand-kept) and then
   scripts/regression.mjs, a table of isolated-copy mutations, each of which
   must pass on the healthy build and fail on its mutant: `branch`
   (Features.Check branch type), `nil-guard` (Format.Go.Match drops the `!= nil`
@@ -100,5 +107,7 @@ claimed. Existing executable/snapshot/diagnostic tests validate this refactor.
 Review conventions only: the layer names describe reasons to change, which no
 gate checks; the gate checks import direction, purity and IR access.
 F004: Spago strict warnings appear only on the build that compiles a module,
-so check from a clean output directory (`rm -rf output && npm run verify`).
+so completion evidence comes from a clean output directory
+(`rm -rf output && npm run verify`, required by AGENTS.md until
+scripts/build.mjs forces recompilation, the next milestone's first item).
 F005: the nil-guard probe's temp-directory cleanup is not asserted.

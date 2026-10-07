@@ -96,7 +96,8 @@ checkArm infer env ty arm = do
   body ← infer (env { locals = env.locals <> matched.locals }) arm.body
   pure { pattern: matched.pattern, body, span: arm.span }
 
--- Resolution has already checked the constructor's arity.
+-- Resolution has already checked the constructor's arity, so a field count
+-- that disagrees with the table is a compiler bug, not a truncation.
 checkCtor
   ∷ Tables
   → Ty
@@ -111,12 +112,14 @@ checkCtor tables expected span id@(CtorId index) fields = maybe' missing found
     (problemAt (Internal "Invalid resolved constructor") span)
   found ctor = do
     expectType tables.types expected (TData ctor.owner) span
+    when (Array.length ctor.fields /= Array.length fields) (Left arityBug)
     checked ← traverse checkField (Array.zipWith fieldPair ctor.fields fields)
     pure
       { pattern: IR.Pattern
           { ty: expected, span, shape: IR.Ctor id (map patternOf checked) }
       , locals: Array.concatMap localsOf checked
       }
+  arityBug = problemAt (Internal "Resolved constructor arity mismatch") span
   fieldPair ty pattern = { ty, pattern }
   checkField field = checkPattern tables field.ty field.pattern
   patternOf checked = checked.pattern

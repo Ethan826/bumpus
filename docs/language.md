@@ -36,12 +36,13 @@ lower       = identifier starting with "a".."z" or "_", other than "_" ;
 ```
 
 A constructor field list must be nonempty (`C()` is E_SYNTAX). Type and
-constructor names must be `upper`. `match` and `if` are expression forms at
-the same level, so either must be parenthesized as an addition operand; an
-empty `match x {}` is E_SYNTAX; a trailing comma is accepted (adt-match).
-Minus belongs only to integer literals (may be separated by whitespace);
-leading zeroes are decimal; values must fit int32 (E_INTEGER). Integer
-patterns use the same syntax.
+constructor names must be `upper`; `Int` and `Bool` are reserved, so
+`type Int = A;`, `type Bool = A;` and `type T = Int;` are E_SYNTAX. `match`
+and `if` are expression forms at the same level, so either must be
+parenthesized as an addition operand; an empty `match x {}` is E_SYNTAX; a
+trailing comma is accepted (adt-match). Minus belongs only to integer literals
+(may be separated by whitespace); leading zeroes are decimal; values must fit
+int32 (E_INTEGER). Integer patterns use the same syntax.
 
 ## Semantics
 
@@ -51,17 +52,18 @@ Addition needs Int operands; `if` needs a Bool condition and equal branch
 types; calls need exact arity and types. Every function is checked, including
 unused ones and unreachable arms.
 
-Names. Types, and functions plus constructors (one global table), are
-distinct namespaces; locals are parameters then pattern binders. A bare name
-is a local, else a nullary constructor; a bare function name is E_UNBOUND; a
-bare constructor with fields is E_ARITY. In call position a local is
+Names. Types, and functions plus constructors (one global table), are distinct
+namespaces; locals are parameters then pattern binders. A bare name is a
+local, else a nullary constructor; a bare function name is E_UNBOUND; a bare
+constructor with fields is E_ARITY. In call position a local is
 E_NOT_CALLABLE, a function is a call, a constructor with fields is a
 construction, a nullary constructor is E_NOT_CALLABLE. A binder shadows a
 parameter within its own arm only; outside it is E_UNBOUND; a binder called as
 a function is E_NOT_CALLABLE. Duplicate types, globals, parameters or binders
 (`Pair(a, a)` is never equality) are E_DUPLICATE at the first duplicated
-declaration. `main` takes no parameters and returns Int or Bool; a named
-result type is E_ENTRY. Rejection fixtures: test/diagnostics.test.mjs,
+declaration in source order, whatever its kind (`fn A(): Int = 1; type T = A;`
+reports the function). `main` takes no parameters and returns Int or Bool; a
+named result type is E_ENTRY. Rejection fixtures: test/diagnostics.test.mjs,
 adt-types, adt-match.
 
 Patterns. `_` matches anything; a lowercase name binds; an uppercase name is a

@@ -96,27 +96,50 @@ const interpret = (arms, v) => {
   return 0n;
 };
 
+const armText = arm => `${printPattern(arm.pattern)} => `
+  + [String(arm.constant), ...intBinders(arm.pattern)].join(' + ');
+// Nested two-arm matches never make an arm redundant.
 const printArms = arms => {
   if (!arms.length) return '0';
   const [arm, ...rest] = arms;
-  const body = [String(arm.constant), ...intBinders(arm.pattern)].join(' + ');
-  return `match v { ${printPattern(arm.pattern)} => ${body}, `
-    + `_ => ${printArms(rest)} }`;
+  return `match v { ${armText(arm)}, _ => ${printArms(rest)} }`;
 };
+// One flat match exercises sequential lowering of three or more arms.
+const printFlat = arms => `match v { ${arms.map(armText).join(', ')}, _ => 0 }`;
+
+const draw = (next, count) => {
+  const arms = Array.from({ length: count }, () => ({
+    pattern: ctorPattern(next, 2, { count: 0 }), constant: next()
+  }));
+  const input = choose(next, 4)
+    ? instantiate(next, arms[choose(next, count)].pattern)
+    : value(next, 3);
+  return { arms, input };
+};
+const source = (body, input) => 'type T = A | B(Int) | C(T, T); '
+  + `fn pick(v: T): Int = ${body}; `
+  + `fn main(): Int = pick(${printValue(input)});`;
 
 test('12 generated match programs agree with a first-match interpreter', () => {
   const next = generator(0x487);
   for (let index = 0; index < 12; index++) {
-    const count = 1 + choose(next, 4);
-    const arms = Array.from({ length: count }, () => ({
-      pattern: ctorPattern(next, 2, { count: 0 }), constant: next()
-    }));
-    const input = choose(next, 4)
-      ? instantiate(next, arms[choose(next, count)].pattern)
-      : value(next, 3);
-    const source = 'type T = A | B(Int) | C(T, T); '
-      + `fn pick(v: T): Int = ${printArms(arms)}; `
-      + `fn main(): Int = pick(${printValue(input)});`;
-    assert.equal(runGo(source), `${interpret(arms, input)}\n`, source);
+    const { arms, input } = draw(next, 1 + choose(next, 4));
+    const program = source(printArms(arms), input);
+    assert.equal(runGo(program), `${interpret(arms, input)}\n`, program);
   }
+});
+
+// The seed was chosen so no generated arm is redundant (the compiler would
+// reject it), some inputs reach a third arm, and some reach the `_` tail.
+test('8 generated flat multi-arm matches agree with the interpreter', () => {
+  const next = generator(0x6443);
+  const reached = [];
+  for (let index = 0; index < 8; index++) {
+    const { arms, input } = draw(next, 2 + choose(next, 3));
+    const program = source(printFlat(arms), input);
+    assert.equal(runGo(program), `${interpret(arms, input)}\n`, program);
+    reached.push(arms.findIndex(arm => matches(arm.pattern, input)));
+  }
+  assert.ok(reached.some(arm => arm >= 2), `no third arm: ${reached}`);
+  assert.ok(reached.includes(-1), `no wildcard tail: ${reached}`);
 });

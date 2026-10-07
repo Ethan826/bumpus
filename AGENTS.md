@@ -10,7 +10,8 @@ vertical slice before adding language features. Task tracking is local.
   to obtain green results. Demonstrate regression tests failing with the
   corresponding defect restored, in an isolated copy.
 - Run `npm run verify` before reporting completion. Report what actually ran
-  and distinguish verified behavior from proposed behavior.
+  and distinguish verified behavior from proposed behavior. Until BACKLOG
+  F004 is fixed, completion evidence is `rm -rf output && npm run verify`.
 - Keep Domain.*, Features.* and Format.* pure. Effects and foreign imports
   belong in Runtime.* and Program.*. Imports run only to the same or an
   earlier layer (Domain, Features, Format, Runtime, Program). Expected

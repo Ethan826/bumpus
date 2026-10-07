@@ -19,6 +19,8 @@ const branch = () => {
   console.log('branch mismatch regression detects the defect');
 };
 
+// Duplicates `second` in test/adt-match.test.mjs on purpose: probes import
+// only the compiler under test, so they cannot share the test's helpers.
 const second = 'type IntList = Nil | Cons(Int, IntList); '
   + 'fn second(xs: IntList): Int = match xs '
   + '{ Nil => 0, Cons(_, Nil) => 1, Cons(_, Cons(y, _)) => y }; '

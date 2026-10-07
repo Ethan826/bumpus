@@ -143,3 +143,15 @@ policy, without weakening the tests or overstating their automated coverage.
 - The nil-guard policy deliberately does not validate fields skipped by
   wildcards or binders (ADR 003); this is a documented limit, not a defect.
 - `E_USAGE`, `E_IO`, `E_TOOL` are strings in Format.Wire (A005).
+
+## A001 final review fixes (2026-10-07)
+
+- A function/constructor clash was reported at the constructor even when the
+  function came first, because constructors were checked before functions and
+  the program keeps the two in separate arrays. Source order is now recovered
+  from span offsets. Record: docs/plans/closed-adts-review.md.
+- Random flat multi-arm matches are often redundant (an arm subsumed by an
+  earlier one), so the flat execution property uses a seed whose programs are
+  all accepted, asserted to reach a third arm and the `_` tail.
+- The old coverage oracle passed a mutant that offers uninhabited
+  constructors; only the generated-type-system test catches it.

@@ -121,15 +121,22 @@ complete signature ty heads =
   where
   present head = Array.elem head heads
 
+-- Resolution enforces constructor arity, so a head whose field count
+-- disagrees with the signature is a compiler bug, never a non-match.
 specialize ∷ Signature → Head → Array Vector → Lookup (Array Vector)
-specialize signature head rows = specializeRows <$> arity signature head
+specialize signature head rows = do
+  count ← arity signature head
+  Array.catMaybes <$> traverse (specializeRow count) rows
   where
-  specializeRows count = Array.mapMaybe (specializeRow count) rows
-  specializeRow count row = Array.uncons row >>= specializeSplit count
+  specializeRow count row = maybe (Right Nothing) (specializeSplit count)
+    (Array.uncons row)
   specializeSplit count split = case split.head of
-    Any → Just (wildcards count <> split.tail)
-    Headed found fields →
-      if found == head then Just (fields <> split.tail) else Nothing
+    Any → Right (Just (wildcards count <> split.tail))
+    Headed found fields
+      | found /= head → Right Nothing
+      | Array.length fields /= count → Left
+          (Internal "Coverage field count mismatch")
+      | otherwise → Right (Just (fields <> split.tail))
 
 defaults ∷ Array Vector → Array Vector
 defaults = Array.mapMaybe defaultRow

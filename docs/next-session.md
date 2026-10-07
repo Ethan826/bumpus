@@ -5,18 +5,19 @@ README.md, docs/plans/bootstrap.md, docs/progress.md, docs/findings.md,
 docs/engineering.md, docs/provenance.md, ADRs 001-004 and BACKLOG.md.
 
 State: A001 is implemented through Task 8 (documentation). Tasks 1-7 were
-reviewed individually. Clean-output `npm run verify` passes: 64 tests, zero
-skips, three regression proofs (log .build/a001-final.log). bootstrap/answer.go
+reviewed individually, then the whole branch. bootstrap/answer.go
 and bootstrap/shapes.go are reproduced byte-for-byte by the CLI. Nothing has
 been pushed. The uncommitted .vscode/settings.json change predates this work;
 leave it alone.
 
-Next step: the controller runs the final whole-branch review of the A001
-commit range against docs/plans/2026-10-07-closed-adts-design.md and
-docs/plans/2026-10-07-five-layers-design.md, and every finding is fixed or
-backlogged. Then the user decides the next milestone; candidates are in
-BACKLOG.md (P001 polymorphism, A002 decision trees, A003 ADT printing,
-I001 FFI). Do not start one without that decision.
+The final whole-branch review is complete; its findings are fixed and
+recorded in docs/plans/closed-adts-review.md (68 tests, zero skips, three
+regression proofs, log .build/a001-review-fix.log). Until F004 is fixed,
+completion evidence is `rm -rf output && npm run verify` (AGENTS.md).
+
+Next step: the user decides the next milestone; its first item is the F004
+build.mjs fix. Candidates are in BACKLOG.md (P001 polymorphism, A002 decision
+trees, A003 ADT printing, I001 FFI). Do not start one without that decision.
 
 Open items to know: F001, F002 (external MileAhead patch unapplied), F003,
 F004 (strict warnings visible only on a compiling build; use a clean output

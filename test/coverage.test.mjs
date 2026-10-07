@@ -57,12 +57,87 @@ test('coverage agrees with a brute-force first-match oracle', () => {
       assert.equal(got.diagnostic.span.end.offset, built.end, built.source);
       const text = got.diagnostic.message.replace(/^Missing pattern: /, '');
       const witness = parseWitness(text);
-      const unmatched = domain.some(v => matches(witness, v)
-        && !patterns.some(p => matches(p, v)));
-      assert.ok(unmatched, `${text} is covered: ${built.source}`);
+      // Spec section 8: the witness covers only unmatched enumerated values.
+      const covered = domain.filter(v => matches(witness, v));
+      assert.ok(covered.length > 0, `${text} matches nothing: ${built.source}`);
+      const unmatched = covered.every(v => !patterns.some(p => matches(p, v)));
+      assert.ok(unmatched, `${text} covers a matched value: ${built.source}`);
     }
   }
   for (const [code, count] of Object.entries(seen)) {
     assert.ok(count > 0, `no generated case expected ${code}`);
   }
+});
+
+// Generated small type systems, including uninhabited constructors such as
+// `K0x0(T0)`. Inhabitedness is brute-forced as a least fixed point here,
+// independently of Features.Check.Signature.
+const systems = 120;
+const maximumTypes = 3;
+const maximumCtors = 3;
+const maximumFields = 3;
+
+const typeSystem = next => {
+  const names = Array.from({ length: 1 + choose(next, maximumTypes) },
+    (_, index) => `T${index}`);
+  const fieldTypes = [...names, 'Int', 'Bool'];
+  const field = () => fieldTypes[choose(next, fieldTypes.length)];
+  const ctor = owner => (_, index) => ({ name: `K${owner}x${index}`, owner,
+    fields: Array.from({ length: choose(next, maximumFields) }, field) });
+  return names.map(name => ({ name, ctors: Array.from(
+    { length: 1 + choose(next, maximumCtors) }, ctor(name.slice(1))) }));
+};
+
+const inhabitedCtors = types => {
+  const live = new Set(['Int', 'Bool']);
+  const found = new Set();
+  const ctors = types.flatMap(type => type.ctors);
+  for (let grown = true; grown;) {
+    grown = false;
+    for (const ctor of ctors) {
+      if (found.has(ctor.name) || !ctor.fields.every(f => live.has(f))) continue;
+      found.add(ctor.name);
+      live.add(`T${ctor.owner}`);
+      grown = true;
+    }
+  }
+  return found;
+};
+
+const shape = ctor => ctor.fields.length
+  ? `${ctor.name}(${ctor.fields.map(() => '_').join(', ')})` : ctor.name;
+const declare = type => `type ${type.name} = `
+  + `${type.ctors.map(c => c.fields.length ? `${c.name}(${c.fields.join(', ')})`
+    : c.name).join(' | ')};`;
+const listing = (types, type, ctors) => `${types.map(declare).join(' ')} `
+  + `fn f(v: ${type.name}): Int = match v { `
+  + `${ctors.map(c => `${shape(c)} => 0, `).join('')}}; fn main(): Int = 0;`;
+
+test('constructor coverage agrees with brute-forced inhabitedness', () => {
+  const next = generator(0x1ab17);
+  const seen = { uninhabited: 0, dropped: 0 };
+  for (let index = 0; index < systems; index++) {
+    const types = typeSystem(next);
+    const inhabited = inhabitedCtors(types);
+    for (const type of types) {
+      const all = listing(types, type, type.ctors);
+      assert.equal(outcome(all).code, null, all);
+      for (const ctor of type.ctors) {
+        const rest = type.ctors.filter(other => other !== ctor);
+        if (!rest.length) continue;
+        const source = listing(types, type, rest);
+        const got = outcome(source);
+        if (!inhabited.has(ctor.name)) {
+          seen.uninhabited++;
+          assert.equal(got.code, null, source);
+          continue;
+        }
+        seen.dropped++;
+        assert.equal(got.code, 'E_NON_EXHAUSTIVE', source);
+        assert.equal(got.diagnostic.message, `Missing pattern: ${shape(ctor)}`,
+          source);
+      }
+    }
+  }
+  assert.ok(seen.uninhabited > 0 && seen.dropped > 0, JSON.stringify(seen));
 });

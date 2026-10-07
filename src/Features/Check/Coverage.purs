@@ -13,6 +13,9 @@ import Features.Check.Signature (Lookup, Signature, buildSignature)
 import Features.Check.Usefulness (uncovered, useful)
 
 -- Functions in declaration order; within each, matches in source pre-order.
+-- The signature is program-wide, so its failure (a table miss, which is a
+-- compiler bug) has no span of its own; it surfaces at the first function
+-- judged, since every function sees the same failure and the first stops.
 coverage ∷ IR.Program → Either Diagnostic Unit
 coverage (IR.Program program) = traverse_ coverFunction program.functions
   where

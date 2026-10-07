@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { checkStructure } from './structure.mjs';
 mkdirSync('.build', { recursive: true });
@@ -23,6 +23,10 @@ assert.equal((tidy.stdout + tidy.stderr).trim(), 'v0.11.1', 'use the pinned form
 run('purs-tidy', ['check', 'src', 'tools/style/src']);
 run('node', ['scripts/build.mjs']);
 assert.deepEqual(await checkStructure(), [], 'structural gates');
-run('node', ['--test', 'test/compiler.test.mjs', 'test/properties.test.mjs', 'test/structure.test.mjs', 'test/shell.test.mjs', 'test/style.test.mjs', 'test/adt-syntax.test.mjs', 'test/adt-types.test.mjs', 'test/adt-match.test.mjs', 'test/adt-properties.test.mjs', 'test/adt-coverage.test.mjs', 'test/coverage.test.mjs', 'test/diagnostics.test.mjs', 'test/program.test.mjs']);
+// Every test file runs; a hand-kept list could silently omit a new one.
+const tests = readdirSync('test').filter(name => name.endsWith('.test.mjs'))
+  .sort().map(name => `test/${name}`);
+assert.ok(tests.length > 0, 'no test files found');
+run('node', ['--test', ...tests]);
 run('node', ['scripts/regression.mjs']);
 console.log('Verified compiler, gates, executable programs, rejection diagnostics, properties, and regression proofs.');

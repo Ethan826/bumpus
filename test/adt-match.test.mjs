@@ -100,6 +100,8 @@ test('patterns and matches are rejected precisely', () => {
   }
 });
 
+// The same program is the nil-guard probe in test/regression.mjs; that copy
+// is self-contained because it runs against restored-defect compilers.
 const second = `${list} fn second(xs: IntList): Int = match xs `
   + '{ Nil => 0, Cons(_, Nil) => 1, Cons(_, Cons(y, _)) => y }; '
   + 'fn main(): Int = second(Nil);';

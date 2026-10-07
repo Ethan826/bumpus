@@ -4,7 +4,7 @@ import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
-import Data.Maybe (maybe')
+import Data.Maybe (Maybe(..), maybe, maybe')
 import Data.Traversable (traverse)
 import Domain.Problem (DuplicateKind(..), Problem(..), UnboundKind(..))
 import Domain.Syntax as Syntax
@@ -84,18 +84,27 @@ uniqueTypes types = for_ types uniqueType
       (duplicate DuplicateType declaration.name declaration.span)
   same declaration other = other.name == declaration.name
 
+-- Functions and constructors share one namespace, but the program keeps them
+-- in separate arrays, so source order is recovered from span offsets: a clash
+-- is reported at whichever declaration comes first, whatever its kind.
 uniqueCtors
   ∷ Array Syntax.FunctionDecl → Array Owned → Either Syntax.Diagnostic Unit
 uniqueCtors functions owned = for_ owned uniqueCtor
   where
-  uniqueCtor entry =
-    when (clashes entry.decl.name)
-      (duplicate DuplicateConstructor entry.decl.name entry.decl.span)
-  clashes name =
-    Array.length (Array.filter (ctorNamed name) owned) > 1
-      || Array.any (functionNamed name) functions
-  ctorNamed name entry = entry.decl.name == name
-  functionNamed name function = function.name == name
+  globals = map ctorGlobal owned <> map functionGlobal functions
+  uniqueCtor entry = maybe (pure unit) report
+    (earliest (Array.filter (named entry.decl.name) globals))
+  named name global = global.name == name
+  earliest clashing =
+    if Array.length clashing > 1 then Array.head
+      (Array.sortWith offset clashing)
+    else Nothing
+  offset global = global.span.start.offset
+  report global = duplicate global.kind global.name global.span
+  ctorGlobal entry =
+    { name: entry.decl.name, kind: DuplicateConstructor, span: entry.decl.span }
+  functionGlobal function =
+    { name: function.name, kind: DuplicateFunction, span: function.span }
 
 uniqueFunctions
   ∷ Array Syntax.FunctionDecl → Either Syntax.Diagnostic Unit

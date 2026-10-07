@@ -18,6 +18,15 @@ test('mutually recursive types resolve in any order', () => {
   assert.equal(runGo(source).trim(), '5');
 });
 
+test('ADT-returning functions and ADT-typed if build and run', () => {
+  const source = `${list} fn wrap(flag: Bool): IntList = `
+    + 'if flag then Cons(1, Nil) else Nil; '
+    + 'fn head(xs: IntList): Int = match xs { Nil => 0, Cons(x, _) => x }; '
+    + 'fn main(): Int = head(wrap(true)) + head(wrap(false)) '
+    + '+ head(if false then Nil else Cons(7, Nil));';
+  assert.equal(runGo(source).trim(), '8');
+});
+
 test('a local shadows a nullary constructor', () => {
   const source = 'type T = Nil; fn f(Nil: Int): Int = Nil; '
     + 'fn main(): Int = f(9);';
@@ -43,6 +52,13 @@ test('type and constructor declarations are rejected precisely', () => {
   rejectedAt(source, 'E_DUPLICATE', 'X');
   source = 'type T = F; fn F(): Int = 1; fn main(): Int = 1;';
   rejectedAt(source, 'E_DUPLICATE', 'F');
+  // The first declaration in source order is reported, whatever its kind.
+  source = 'fn A(): Int = 1; type T = A; fn main(): Int = 1;';
+  rejectedAt(source, 'E_DUPLICATE', 'fn A(): Int = 1;');
+  for (const reserved of ['Int', 'Bool']) {
+    rejectedAt(`type ${reserved} = A;${main}`, 'E_SYNTAX', reserved);
+  }
+  rejectedAt(`type T = Int;${main}`, 'E_SYNTAX', 'Int');
   source = `type T = C(Missing);${main}`;
   rejectedAt(source, 'E_UNBOUND', 'Missing');
   source = `${list} fn f(x: Missing): Int = 1;${main}`;
