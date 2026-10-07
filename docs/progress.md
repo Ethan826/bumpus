@@ -349,5 +349,6 @@ and branch were removed. No push. Next: G001 (design first).
 User chose an applicative-only parser (no Monad instance) and a depth limit
 with a structured diagnostic for deep nesting (over a larger Node stack or
 heap-based phases). Written spec:
-docs/plans/2026-10-07-applicative-parser-design.md, awaiting user review.
+docs/plans/2026-10-07-applicative-parser-design.md, approved as written
+with clarifications (section 7).
 Documentation only; no compiler source changed.

@@ -1,6 +1,7 @@
 # Applicative parser and depth limit: design (G001)
 
-Status: written 2026-10-07, awaiting user review. Nothing is implemented.
+Status: approved by the user 2026-10-07 as written, with the clarifications
+in section 7. Nothing is implemented.
 User decisions: the parser abstraction is applicative only (no Monad
 instance); deep nesting gets a depth limit with a structured diagnostic
 instead of a raw stack trace (option 1 of three discussed; heap-based
@@ -113,7 +114,8 @@ named constant in Format.Parse.Core.
 Choosing the limit: measure, after the rewrite, the smallest depth at which
 any phase (parse, resolve, check, coverage, Go emission) overflows in a cold
 `node scripts/bumpus.mjs emit` process, for each nesting form. The limit is a
-power of two at most half of that minimum; 256 is expected. Tests: for each
+power of two at most half of that minimum; 256 is provisional, not a
+commitment, and the boundary is verified through the CLI. Tests: for each
 form, depth = limit compiles, emits and (where executable) runs through the
 CLI; depth = limit + 1 is E_NESTING with exact span; the CLI never prints a
 raw stack trace for these inputs.
@@ -154,3 +156,17 @@ public surface if nothing else needs it.
 - No parser module grows; the CST style gate passes with no new exceptions.
 - E002 narrows to the remaining per-reference name lookups (or closes if
   G001 also fixes them; out of scope here).
+
+## 7. Approval clarifications (2026-10-07)
+
+- Decision 1 stays strict for this slice: `+` and comparison operands count
+  toward the depth limit. Follow-up (new BACKLOG row, Planned): iterative,
+  stack-safe traversal of operator chains in resolution, checking and Go
+  emission, so long flat sums no longer count as nesting; acceptance is a
+  long flat sum (e.g. 10,000 terms) that compiles and runs through the CLI.
+  That follow-up preserves the rule that comparisons do not chain.
+- The limit is chosen from the measured weakest phase and nesting form;
+  256 is provisional.
+- Decision 2 stands: applicative-only applies to `Parser`; `Fresh` has Bind
+  because pattern binders form the arm body's scope. Source pre-order
+  numbering and byte-identical Go output are preserved and verified.
