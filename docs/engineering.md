@@ -43,8 +43,12 @@ adding a bypass allowlist.
   scripts/regression.mjs, a table of isolated-copy mutations, each of which
   must pass on the healthy build and fail on its mutant: `branch`
   (Features.Check branch type), `nil-guard` (Format.Go.Match drops the `!= nil`
-  test; probe requires the unmatched panic, not a runtime error), and
-  `exhaustive` (Features.Check.Coverage always succeeds);
+  test; probe requires the unmatched panic, not a runtime error),
+  `exhaustive` (Features.Check.Coverage always succeeds), `ctor-order`
+  (Format.Go.Compare reverses the tag comparison), `first-field` (compares
+  the last field first) and `show-fields` (Format.Go.Show prints only the
+  first field); the A003 order and print tests also use an independent value
+  oracle (test/value-oracle.mjs);
 - scripts/strict-rebuild.mjs (run by verify after the build) copies the
   workspace to .build/strict-rebuild, checks the unmodified copy builds, adds
   a shadowed name to one module and requires two consecutive builds to fail

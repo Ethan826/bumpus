@@ -1,6 +1,6 @@
 # ADT Printing, Equality and Ordering Implementation Plan (A003)
 
-Status: approved 2026-10-07 for subagent-driven execution (fresh
+Status: in review (Tasks 1, 2, 3, 3a, 3b, 4 done; final whole-branch review pending, Done only after its fixes). Approved 2026-10-07 for subagent-driven execution (fresh
 implementer and reviewer per task, then whole-branch review). User additions
 folded in: operand evaluation order tests (Tasks 1, 2), the malformed-value
 visiting boundary (Task 2), helper generation split across modules.

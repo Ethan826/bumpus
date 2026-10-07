@@ -7,8 +7,8 @@ an earlier layer; scripts/structure.mjs enforces it from `purs graph`.
 | Layer | Modules (src/) | Role |
 |---|---|---|
 | Domain | Syntax, Resolved, Problem, Host, IR.Internal | syntax trees, spans, `Ty`, resolved syntax, checked IR, `Problem` data, capability-port types |
-| Features | Resolve, Resolve.{Expression,Types,Pattern}, Check, Check.{Match,Signature,Usefulness,Coverage} | resolution, checking, coverage; report `Problem` data, never text |
-| Format | Lex, Parse, Parse.*, Go, Go.{Data,Match}, Diagnostic, Wire, Arguments | text in (tokens, parser, reserved words, uppercase rule); Go out; diagnostic text, `E_*` names, wire records, usage text |
+| Features | Resolve, Resolve.{Expression,Types,Pattern,Repeated}, Check, Check.{Match,Signature,Usefulness,Coverage} | resolution, checking, coverage; report `Problem` data, never text |
+| Format | Lex, Parse, Parse.*, Stack, Go, Go.{Data,Match,Compare,Show,Usage}, Diagnostic, Wire, Arguments | text in (tokens, parser, reserved words, uppercase rule); Go out; diagnostic text, `E_*` names, wire records, usage text |
 | Runtime | Node (+ Node.js) | port implementations, argv/stdout/stderr/exit, JSON; the only FFI |
 | Program | Compile, Command, Main | pure `compile`, commands over any `Host`, entry point |
 
@@ -45,8 +45,14 @@ Format.Wire.
   whole program type-checks: inhabitedness least fixed point, Maranget
   usefulness, canonical witness. Type errors in later functions take
   precedence over coverage errors.
+- **Compare** is one expression form, `Compare Operator Expr Expr`, through
+  every phase (Operator is a closed Domain ADT); the checker requires equal
+  operand types and yields Bool. No target detail enters IR.
 - **Go** (Format.Go*) emits one tagged struct per type, constructors, and
-  sequential first-match lowering with nil guards. Go representation decisions
+  sequential first-match lowering with nil guards. Format.Go.Compare emits a
+  `bumpusCmpN` per declared type (and `bumpusCmpBool`, decided by
+  Format.Go.Usage), Format.Go.Show a `bumpusShowN` per type; `main` prints
+  through the latter for declared results (ADR 005). Go representation decisions
   live here, not in Features.
 
 Only `Features.Check*` and `Format.Go*` import `Domain.IR.Internal`. This is an
@@ -56,9 +62,13 @@ enforced project boundary, not PureScript privacy.
 
 Names are mangled from IDs; no source spelling, timestamp or absolute path
 enters output. Emission is byte-deterministic (`bootstrap/answer.go`,
-`bootstrap/shapes.go` snapshots). Int is int32 with wrapping addition.
+`bootstrap/shapes.go`, `bootstrap/tree.go` snapshots). Int is int32 with wrapping addition.
 Generated code never dereferences nil unguarded (ADR 003). Generated Go is
 canonical emitter output; gofmt copies are presentation only.
+
+Lexing and declaration parsing are index-based `tailRecM` loops
+(Control.Monad.Rec.Class is allowlisted), so source length alone does not
+overflow the stack; deep nesting still does (BACKLOG E002).
 
 ## Future stages (proposed, not implemented)
 

@@ -1,4 +1,4 @@
-# Bumpus language specification (stage 0 plus closed ADTs)
+# Bumpus language specification (stage 0, closed ADTs, comparison)
 
 Provisional name. A file is one program: type declarations and functions in
 any order, with required function signatures. Behavioral claims below name
@@ -7,8 +7,10 @@ their verifying test file in test/.
 Identifiers: ASCII letters/underscore then letters/digits/underscore.
 Whitespace: space, tab, CR, LF. Reserved words: `fn if then else true false
 Int Bool type match`, and the lone `_`. `type`, `match` and `_` were
-identifiers in Stage 0 (ADR 003). Punctuation includes `|`, `{`, `}` and the
-single token `=>` (adt-syntax). Comments and strings do not exist.
+identifiers in Stage 0 (ADR 003). Punctuation includes `|`, `{`, `}`, the
+single token `=>` (adt-syntax) and the operators `== != < <= > >=`, matched
+longest first (`==` before `=>` and `=`); a lone `!` is E_LEX (compare).
+Comments and strings do not exist.
 
 ```ebnf
 program     = { declaration } ;
@@ -22,10 +24,12 @@ parameter   = identifier, ":", type ;
 type        = "Int" | "Bool" | upper ;
 expression  = "if", expression, "then", expression, "else", expression
             | "match", expression, "{", arm, { ",", arm }, [ "," ], "}"
-            | addition ;
+            | comparison ;
 arm         = pattern, "=>", expression ;
 pattern     = "_" | lower | upper, [ "(", pattern, { ",", pattern }, ")" ]
             | integer | "true" | "false" ;
+comparison  = addition, [ ( "==" | "!=" | "<" | "<=" | ">" | ">=" ),
+              addition ] ;
 addition    = atom, { "+", atom } ;
 atom        = integer | "true" | "false" | identifier
             | identifier, "(", [ arguments ], ")" | "(", expression, ")" ;
@@ -48,7 +52,9 @@ int32 (E_INTEGER). Integer patterns use the same syntax.
 
 Types: `Int`, `Bool`, and declared types (monomorphic, closed, recursive,
 mutually recursive in any declaration order; adt-types). No coercions.
-Addition needs Int operands; `if` needs a Bool condition and equal branch
+Addition needs Int operands. A comparison infers its left then right operand,
+and the right must have the left's type, else E_TYPE at the right operand;
+its result is Bool. Every type is comparable, including uninhabited ones. `if` needs a Bool condition and equal branch
 types; calls need exact arity and types. Every function is checked, including
 unused ones and unreachable arms.
 
@@ -62,8 +68,9 @@ parameter within its own arm only; outside it is E_UNBOUND; a binder called as
 a function is E_NOT_CALLABLE. Duplicate types, globals, parameters or binders
 (`Pair(a, a)` is never equality) are E_DUPLICATE at the first duplicated
 declaration in source order, whatever its kind (`fn A(): Int = 1; type T = A;`
-reports the function). `main` takes no parameters and returns Int or Bool; a
-named result type is E_ENTRY. Rejection fixtures: test/diagnostics.test.mjs,
+reports the function). A missing `main` is E_ENTRY with message
+`Expected fn main()`, and so is a `main` with parameters; `main` may return
+any type (adt-print). Rejection fixtures: test/diagnostics.test.mjs,
 adt-types, adt-match.
 
 Patterns. `_` matches anything; a lowercase name binds; an uppercase name is a
@@ -82,10 +89,33 @@ coverage.test.mjs compares with a brute-force oracle).
 
 Evaluation is strict, operands and arguments left to right; `if` and `match`
 evaluate the scrutinee/condition and only the selected branch. Arms are tried
-in order. Deep structures work: an 8192-element list built by doubling sums
-correctly (adt-match). Int addition wraps modulo 2^32. The executable prints
-`main`'s value plus LF; printing is a backend wrapper, not a source effect.
-ADT values cannot be printed, compared or returned from `main`.
+in order. Deep structures work: an 8192-element list built by doubling sums,
+prints and compares correctly (adt-match, adt-print, adt-order). Int addition
+wraps modulo 2^32.
+
+Comparison. `==`, `!=`, `<`, `<=`, `>`, `>=` bind looser than `+` and do not
+chain: `a < b < c` and `a == b == c` are E_SYNTAX `Comparisons do not chain`
+at the second operator. `if` and `match` operands need parentheses. The span
+of a comparison runs from its left to its right operand. Both operands are
+evaluated, left then right, before comparing; there is no short circuit
+(compare, adt-order). The order is one structural total order on well-formed
+values: Int by signed int32; Bool `false < true`; a declared type by
+constructor declaration position, then fields left to right, the first
+difference deciding. `==` holds exactly when the order says equal (separately
+built equal values are equal, never by identity); `!=` is its negation
+(adt-order, whose independent interpreter oracle checks every operator, and
+the `ctor-order` and `first-field` regression rows).
+
+Printing. The executable prints `main`'s value plus LF; printing is a backend
+wrapper, not a source effect. Int prints decimal with a leading `-` when
+negative, Bool `true` or `false`, a declared value `Name` or
+`Name(f1, f2)` with `, ` separators: the coverage-witness format without `_`,
+so every printed value is a Bumpus expression that reproduces itself
+(adt-print round trip). Malformed values, possible only from foreign code
+(I001), panic with `bumpus: malformed value` when a comparison or print visits
+a nil field pointer or unknown tag; comparison stops at the first difference,
+so later malformed fields can go unnoticed; total order is claimed only for
+well-formed values.
 Foreign (Go) values are not validated: Proposed, with I001.
 
 Locations are half-open UTF-16 code-unit offsets, zero based; line/column one

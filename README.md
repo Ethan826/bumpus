@@ -9,7 +9,9 @@ The name is for the Bumpus hounds of *A Christmas Story*, chosen because
 "Sprig" collided with Masterminds/sprig in the Go ecosystem.
 Stage 0 is implemented in PureScript. This repository implements one checked
 vertical slice plus closed algebraic data types with exhaustive nested
-`match` (A001). Polymorphism, HKTs, classes, and rows are planned.
+`match` (A001), structural comparison operators `== != < <= > >=` on every
+type, and printing of whatever `main` returns (A003, in final review).
+Polymorphism, HKTs, classes, and rows are planned.
 
 ## Prerequisites and fresh checkout
 
@@ -50,9 +52,15 @@ node scripts/bumpus.mjs emit examples/answer.bumpus .build/answer.go
 node scripts/bumpus.mjs build examples/answer.bumpus .build/answer
 .build/answer
 node scripts/bumpus.mjs run examples/answer.bumpus
+node scripts/bumpus.mjs run examples/tree.bumpus
 ```
 
-Both execution paths print `42`. `emit` writes canonical deterministic Go;
+Both execution paths print `42` for the answer example. `main` may return any
+type: the executable prints the value in the coverage-witness format (`5`,
+`true`, `Node(Leaf, 1, Node(...))`, negative integers with `-`), and
+examples/tree.bumpus prints a binary search tree. Comparisons are built in,
+non-chaining and looser than `+`, with one structural order (constructor
+declaration order, then fields left to right; ADR 005). `emit` writes canonical deterministic Go;
 `build` invokes Go on a temporary source file; `run` builds and executes a
 temporary binary. Destinations are explicit and may be overwritten.
 Diagnostics are JSON on stderr with stable tags and source spans; source
@@ -65,7 +73,7 @@ not yet a native Go compiler executable.
 - [Implementation plan](docs/plans/bootstrap.md)
 - [Progress](docs/progress.md)
 - [Language specification](docs/language.md)
-- [Architecture](docs/architecture.md) and [decisions](docs/adr/001-slice.md), [ADR 002](docs/adr/002-polymorphic-lowering.md)
+- [Architecture](docs/architecture.md) and [decisions](docs/adr/001-slice.md), [ADR 002](docs/adr/002-polymorphic-lowering.md), [ADR 005](docs/adr/005-structural-order.md)
 - [Engineering rules and gate coverage](docs/engineering.md)
 - [Reference provenance](docs/provenance.md)
 - [Self-hosting chain](docs/bootstrap.md)
@@ -75,5 +83,7 @@ Closed ADTs and exhaustive matching are implemented (see
 [ADR 003](docs/adr/003-closed-adts.md), [ADR 004](docs/adr/004-five-layers.md)
 and examples/shapes.bumpus). The compiler is organized in five layers: Domain,
 Features, Format, Runtime, Program ([architecture](docs/architecture.md)).
-The next milestone is chosen by the user after the final A001 review;
-[progress](docs/progress.md) records the evidence.
+Comparison and printing are specified in [language](docs/language.md) and
+[ADR 005](docs/adr/005-structural-order.md). Milestone A003 is in final
+review on branch a003; the next milestone is chosen by the user after merge.
+[Progress](docs/progress.md) records the evidence.

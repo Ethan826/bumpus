@@ -304,3 +304,14 @@ Documentation only; no compiler source changed.
   unchanged. `npm run verify` exit 0, 17 files, 96 tests, 0 skips
   (.build/task3b-verify.log).
 2026-10-07: logo. The README shows assets/branding/bumpus-logo.png (1254 × 1254 PNG with alpha, a bluetick coonhound with the stolen turkey above the wordmark), chosen by the user from image-generator candidates; provenance and final prompt in assets/branding/README.md. The Task 3a SVG icon was removed at the user's request; no earlier image versions are kept. Documentation and assets only.
+- 2026-10-07 Task 4 (documentation and closure): language.md, ADR 005,
+  architecture, engineering, README, BACKLOG (A003 In review, E002 extended
+  with the quadratic `uniqueTypes`/`uniqueCtors`, new T001), findings and
+  next-session updated; each claim was checked against src/ and test/.
+  `rm -rf output && npm run verify` exit 0, 0 warnings, 17 files, 96 tests,
+  0 skips, strict rebuild proof, six regression proofs (branch, nil-guard,
+  exhaustive, ctor-order, first-field, show-fields)
+  (.build/a003-final-verify.log). CLI emits compared with `cmp` (exit 0):
+  examples/answer.bumpus to bootstrap/answer.go, shapes.bumpus to shapes.go,
+  tree.bumpus to tree.go, and tree.bumpus a second time to tree.go. A003 is
+  In review; Done follows the final whole-branch review.

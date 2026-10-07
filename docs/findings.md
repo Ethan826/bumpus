@@ -165,3 +165,16 @@ policy, without weakening the tests or overstating their automated coverage.
   .build/strict-rebuild and shares .build/home by symlink; verify takes
   about 8 s longer. It deletes the copy only on success, leaving it for
   inspection after a failure.
+
+## A003 observations (2026-10-07)
+
+- Test time is dominated by `go build`, one binary per executed program, not
+  by the JavaScript runtime (BACKLOG T001).
+- A second quadratic resolver cost survives Task 3b: `uniqueTypes` and
+  `uniqueCtors` (BACKLOG E002). Only function duplicates were fixed.
+- Go `==` on generated structs would compare field pointers, so comparison
+  always goes through generated helpers (ADR 005).
+- Printed values reproduce themselves: the witness format minus `_` is valid
+  source, which made the print round trip a strong printer test.
+- The coverage-oracle LCG used low bits that alternate, so seeds were
+  reselected in Task 3b with assertions unchanged.
