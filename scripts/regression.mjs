@@ -20,6 +20,18 @@ const rows = [
     needle: 'uncovered signature',
     replacement: 'const (const (Right Nothing))',
     probe: 'exhaustive', message: /non-exhaustive match was accepted/
+  },
+  {
+    name: 'ctor-order', file: 'src/Format/Go/Compare.purs',
+    needle: 'if a.tag < b.tag { return -1 }',
+    replacement: 'if a.tag > b.tag { return -1 }',
+    probe: 'ctor-order', message: /constructor order wrong/
+  },
+  {
+    name: 'first-field', file: 'src/Format/Go/Compare.purs',
+    needle: '(Array.mapWithIndex field ctor.fields)',
+    replacement: '(Array.reverse (Array.mapWithIndex field ctor.fields))',
+    probe: 'first-field', message: /first differing field ignored/
   }
 ];
 const base = '.build/regression';

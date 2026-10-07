@@ -2,7 +2,7 @@
 // Each probe uses only the compiler it is given, never the healthy build.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -65,6 +65,41 @@ const exhaustive = () => {
   console.log('exhaustive regression detects the defect');
 };
 
-const probes = { branch, 'nil-guard': nilGuard, exhaustive };
+// Runs `main` of the probe program and reports whether it printed true. The
+// work directory sits under .build/regression, which scripts/regression.mjs
+// clears before each run, so an interrupted probe leaves nothing in $TMPDIR.
+const list = 'type L = Nil | Cons(Int, L);';
+const printsTrue = body => {
+  const result = compile(`${list} fn main(): Bool = ${body};`);
+  assert.ok(result instanceof Right, 'order probe program was rejected');
+  const work = resolve('.build/regression', probe, 'go-work');
+  rmSync(work, { recursive: true, force: true });
+  mkdirSync(work, { recursive: true });
+  try {
+    writeFileSync(join(work, 'main.go'), result.value0);
+    const run = spawnSync('go', ['run', 'main.go'], {
+      encoding: 'utf8', timeout: goTestTimeoutMs, cwd: work,
+      env: { ...process.env, GOCACHE: resolve('.build/go-cache') }
+    });
+    assert.ifError(run.error);
+    assert.equal(run.status, 0, run.stdout + run.stderr);
+    return run.stdout === 'true\n';
+  } finally { rmSync(work, { recursive: true, force: true }); }
+};
+
+const ordered = (body, message) => () => {
+  if (!printsTrue(body)) {
+    console.error(`${message}: ${body}`);
+    process.exit(1);
+  }
+  console.log(`${probe} regression detects the defect`);
+};
+
+const probes = {
+  branch, 'nil-guard': nilGuard, exhaustive,
+  'ctor-order': ordered('Nil < Cons(0, Nil)', 'constructor order wrong'),
+  'first-field': ordered('Cons(1, Nil) > Cons(0, Cons(5, Nil))',
+    'first differing field ignored')
+};
 assert.ok(probe in probes, `unknown probe: ${probe}`);
 probes[probe]();

@@ -4,13 +4,17 @@ import Prelude
 import Data.Array as Array
 import Domain.IR.Internal as IR
 import Domain.Resolved (Ty(..))
-import Format.Go.Compare (isOrdering)
+import Format.Go.Compare (isBoolOrdering)
 
 -- Helpers are emitted only when some expression needs them, so programs
--- without such comparisons keep their previous output byte for byte.
+-- without such comparisons keep their previous output byte for byte. A Bool
+-- field makes the declared type's compare helper call sprigCmpBool.
 needsBoolHelper ∷ IR.Program → Boolean
-needsBoolHelper (IR.Program program) = Array.any inFunction program.functions
+needsBoolHelper (IR.Program program) =
+  Array.any hasBoolField program.ctors
+    || Array.any inFunction program.functions
   where
+  hasBoolField ctor = Array.elem TBool ctor.fields
   inFunction function = usesBoolOrdering function.body
 
 usesBoolOrdering ∷ IR.Expr → Boolean
@@ -29,5 +33,3 @@ usesBoolOrdering (IR.Expr expression) = case expression.node of
   where
   anyOf = Array.any usesBoolOrdering
   armUses arm = usesBoolOrdering arm.body
-  isBoolOrdering operator left = isOrdering operator
-    && IR.typeOf left == TBool

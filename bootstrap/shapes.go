@@ -18,6 +18,21 @@ func sprigCtor1(f0 int32) sprigTy0 { return sprigTy0{tag: 2, c1f0: f0} }
 
 func sprigCtor2(f0 sprigTy0, f1 sprigTy0) sprigTy0 { return sprigTy0{tag: 3, c2f0: &f0, c2f1: &f1} }
 
+func sprigCmp0(a sprigTy0, b sprigTy0) int {
+if a.tag < 1 || a.tag > 3 || b.tag < 1 || b.tag > 3 { panic("sprig: malformed value") }
+if a.tag != b.tag { if a.tag < b.tag { return -1 }; return 1 }
+if a.tag == 2 {
+if a.c1f0 < b.c1f0 { return -1 }; if a.c1f0 > b.c1f0 { return 1 }
+}
+if a.tag == 3 {
+if a.c2f0 == nil || b.c2f0 == nil { panic("sprig: malformed value") }
+if c := sprigCmp0(*a.c2f0, *b.c2f0); c != 0 { return c }
+if a.c2f1 == nil || b.c2f1 == nil { panic("sprig: malformed value") }
+if c := sprigCmp0(*a.c2f1, *b.c2f1); c != 0 { return c }
+}
+return 0
+}
+
 func sprigFn0(sprigLocal0 sprigTy0) int32 {
 return func(sprigMatch0 sprigTy0) int32 {
 if sprigMatch0.tag == 1 { return int32(1) }

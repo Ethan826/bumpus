@@ -251,3 +251,17 @@ Documentation only; no compiler source changed.
   lone `!`, and the branch regression needle gained context so it stays
   unique. `npm run verify` exit 0; bootstrap/answer.go and shapes.go
   unchanged.
+- 2026-10-07 Task 2 (structural order for declared types): one
+  `sprigCmpN` helper per declared type (tag range check, constructor order,
+  fields left to right, nil check before a declared field), emitted in
+  TypeId order; declared comparisons lower to `(sprigCmpN(L, R) op 0)`;
+  `sprigCmpBool` is also emitted for any Bool constructor field. New
+  test/value-oracle.mjs (reference order, printer, parser, alternate
+  expressions) and test/adt-order.test.mjs (7 tests, all red before the
+  change: hand cases, structural equality, 8192-element lists, uninhabited
+  type, malformed values, evaluation trace, 8-seed oracle agreement with
+  order laws and coverage assertions). Regression rows `ctor-order` and
+  `first-field` fail with their defects restored; their probes run Go under
+  .build/regression. bootstrap/shapes.go gains only `sprigCmp0`; answer.go
+  unchanged. The compiler's ~3500-character stack limit was recorded under
+  E002. `npm run verify` exit 0.

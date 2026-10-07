@@ -5,7 +5,7 @@ import Data.Array as Array
 import Data.String.Common (joinWith)
 import Features.Check (CheckedProgram)
 import Domain.IR.Internal as IR
-import Format.Go.Compare (boolHelper, comparison)
+import Format.Go.Compare (boolHelper, compareHelpers, comparison)
 import Format.Go.Data
   ( boolean
   , ctorName
@@ -25,6 +25,7 @@ emit (IR.Program program) =
     <> "func sprigAdd(a int32, b int32) int32 { return a + b }\n\n"
     <> (if needsBoolHelper (IR.Program program) then boolHelper else "")
     <> declarations program.types program.ctors
+    <> compareHelpers program.types program.ctors
     <> joinWith "\n" (map emitFunction program.functions)
     <> "\nfunc main() { fmt.Println("
     <> functionName program.entry
