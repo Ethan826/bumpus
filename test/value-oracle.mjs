@@ -6,9 +6,11 @@ import { choose, generator } from './coverage-oracle.mjs';
 
 export { generator, choose } from './coverage-oracle.mjs';
 
-// choose() reads an LCG's low bits through `%`, and those cycle with short
-// periods (bit 0 alternates), which made consecutive choices correlated.
-// Folding the high half down first keeps the shared LCG but mixes the bits.
+// choose() once read an LCG's low bits through `%`, and those cycle with
+// short periods (bit 0 alternates), which made consecutive choices
+// correlated; this generator folded the high half down to mix them. choose()
+// now reads the high half itself (A003 Task 3b). The fold no longer changes
+// choices but still mixes the Ints drawn directly from next(), so it stays.
 export const mixedGenerator = seed => {
   const raw = generator(seed);
   return () => {

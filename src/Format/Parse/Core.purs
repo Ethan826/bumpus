@@ -16,25 +16,28 @@ module Format.Parse.Core
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Maybe (maybe, maybe')
+import Data.Maybe (Maybe, maybe, maybe')
 import Format.Lex (Token, isName, isUpper)
 import Domain.Problem (Problem(..))
 import Domain.Syntax (Diagnostic, Position, TypeRef(..), problemAt)
 
-type State = { tokens ∷ Array Token, eof ∷ Position }
+-- The parser reads tokens by index: Array.uncons copied the remaining tokens
+-- on every take, which made parsing quadratic (BACKLOG E002).
+type State = { tokens ∷ Array Token, index ∷ Int, eof ∷ Position }
 type Parsed a = { value ∷ a, rest ∷ State }
 type Parser a = State → Either Diagnostic (Parsed a)
 
 peek ∷ State → String
-peek state = maybe "<end>" tokenText (Array.head state.tokens)
+peek state = maybe "<end>" tokenText (current state)
   where
   tokenText token = token.text
 
 take ∷ Parser Token
-take state = maybe' missing present (Array.uncons state.tokens)
+take state = maybe' missing present (current state)
   where
   missing _ = failAt state "Expected a token"
-  present { head, tail } = Right { value: head, rest: state { tokens = tail } }
+  present token = Right
+    { value: token, rest: state { index = state.index + 1 } }
 
 expect ∷ String → Parser Token
 expect text state =
@@ -70,8 +73,7 @@ typeRef state = do
 failAt ∷ ∀ a. State → String → Either Diagnostic a
 failAt state message = Left (problemAt (Syntax message) span)
   where
-  span = maybe' endSpan tokenSpan
-    (Array.head state.tokens)
+  span = maybe' endSpan tokenSpan (current state)
   endSpan _ = { start: state.eof, end: state.eof }
   tokenSpan token = token.span
 
@@ -100,3 +102,6 @@ afterComma item state = do
   first ← item comma.rest
   remaining ← commaTail item first.rest
   pure { value: Array.cons first.value remaining.value, rest: remaining.rest }
+
+current ∷ State → Maybe Token
+current state = Array.index state.tokens state.index

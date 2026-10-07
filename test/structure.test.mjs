@@ -25,3 +25,13 @@ test('escape gate rejects partiality and test suppression', () => {
   assert.equal(textFindings('src/Bumpus/Foo.purs', 'unsafePartial\n').length, 1);
   assert.equal(textFindings('test/x.mjs', 'test.' + 'skip("x")\n').length, 1);
 });
+
+test('pure layers may loop with tailRecM and nothing else from Control', () => {
+  const pure = dependency => graphFindings(
+    { 'Format.Lex': { path: 'src/Format/Lex.purs', depends: [dependency] } });
+  assert.deepEqual(pure('Control.Monad.Rec.Class'), []);
+  for (const dependency of ['Control.Monad.ST', 'Control.Monad.Rec',
+    'Control.Monad.Rec.ClassX', 'Control.Monad']) {
+    assert.equal(pure(dependency).length, 1, dependency);
+  }
+});

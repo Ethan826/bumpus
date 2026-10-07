@@ -70,7 +70,9 @@ test('printing a malformed value panics', () => {
 
 // Seeds were chosen so the values include a nullary constructor, several
 // fields, nesting three deep, and a T1 inside T0; the assertions keep that.
-const seeds = [2, 8, 11, 17, 22, 34, 39, 40];
+// Reselected (18 and 30 for 39 and 40) when choose() moved to the LCG's high
+// bits in A003 Task 3b, which changed every draw.
+const seeds = [2, 8, 11, 17, 18, 22, 30, 34];
 const sourceBudget = 2000;
 
 test('printed values recompile to the same value', () => {

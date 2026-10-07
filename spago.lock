@@ -12,7 +12,8 @@
             "integers",
             "maybe",
             "prelude",
-            "strings"
+            "strings",
+            "tailrec"
           ]
         },
         "test": {

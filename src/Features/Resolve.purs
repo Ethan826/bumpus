@@ -26,15 +26,15 @@ resolve program = do
     definitions = Array.mapWithIndex indexed
       (Array.zipWith pair functions signatures)
   entry ← entryPoint definitions
-  bodies ← traverse (resolveBody tables.ctors) definitions
+  -- Applied once, so the globals are built once rather than per function.
+  bodies ← traverse (resolveFunction (globals tables.ctors) tables.ctors)
+    definitions
   pure { types: tables.types, ctors: tables.ctors, functions: bodies, entry }
   where
   functions = program.functions
   pair function signature = { function, signature }
   indexed index entry =
     { index, function: entry.function, signature: entry.signature }
-  resolveBody ctors definition = resolveFunction (globals ctors) ctors
-    definition
   globals ctors = Array.mapWithIndex functionGlobal functions
     <> Array.mapWithIndex ctorGlobal ctors
 

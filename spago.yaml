@@ -9,6 +9,7 @@ package:
     - maybe
     - prelude
     - strings
+    - tailrec
   build:
     pedanticPackages: true
 workspace:

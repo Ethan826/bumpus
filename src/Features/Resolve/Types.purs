@@ -9,6 +9,7 @@ import Data.Traversable (traverse)
 import Domain.Problem (DuplicateKind(..), Problem(..), UnboundKind(..))
 import Domain.Syntax as Syntax
 import Domain.Resolved as Resolved
+import Features.Resolve.Repeated (repeated)
 
 type Owned =
   { id ∷ Resolved.CtorId, owner ∷ Resolved.TypeId, decl ∷ Syntax.CtorDecl }
@@ -108,13 +109,14 @@ uniqueCtors functions owned = for_ owned uniqueCtor
 
 uniqueFunctions
   ∷ Array Syntax.FunctionDecl → Either Syntax.Diagnostic Unit
-uniqueFunctions functions = for_ functions uniqueFunction
+uniqueFunctions functions = for_ flagged uniqueFunction
   where
-  uniqueFunction function = do
-    when (Array.length (Array.filter (namedLike function) functions) > 1)
-      (duplicate DuplicateFunction function.name function.span)
+  flagged = Array.zipWith withFlag (repeated (map name functions)) functions
+  name function = function.name
+  withFlag repeats function = { repeats, function }
+  uniqueFunction { repeats, function } = do
+    when repeats (duplicate DuplicateFunction function.name function.span)
     traverse_ (uniqueParameter function.parameters) function.parameters
-  namedLike function other = other.name == function.name
 
 uniqueParameter
   ∷ Array Syntax.Parameter → Syntax.Parameter → Either Syntax.Diagnostic Unit

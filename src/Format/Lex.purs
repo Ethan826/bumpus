@@ -1,14 +1,19 @@
 module Format.Lex (Token, lex, isName, isUpper, endPosition) where
 
 import Prelude
+import Control.Monad.Rec.Class (Step(..), tailRecM)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe, maybe')
 import Data.String.CodeUnits as String
 import Domain.Problem (Problem(..))
 import Domain.Syntax (Diagnostic, Position, Span, origin, problemAt)
+import Format.Stack (Stack)
+import Format.Stack as Stack
 
 type Token = { text ∷ String, span ∷ Span }
+type Scan = { index ∷ Int, position ∷ Position, tokens ∷ Stack Token }
+type Scanned = Either Diagnostic (Step Scan (Array Token))
 
 punctuation ∷ Array Char
 punctuation =
@@ -30,7 +35,9 @@ reserved =
   ]
 
 lex ∷ String → Either Diagnostic (Array Token)
-lex source = scan origin (String.toCharArray source) []
+lex source = tailRecM (scan (String.toCharArray source)) start
+  where
+  start = { index: 0, position: origin, tokens: Stack.empty }
 
 isName ∷ String → Boolean
 isName text = maybe false validName (Array.uncons (String.toCharArray text))
@@ -41,74 +48,73 @@ isName text = maybe false validName (Array.uncons (String.toCharArray text))
 endPosition ∷ String → Position
 endPosition = Array.foldl advance origin <<< String.toCharArray
 
-scan ∷ Position → Array Char → Array Token → Either Diagnostic (Array Token)
-scan position characters tokens = maybe' finished scanHead
-  (Array.uncons characters)
+-- One whitespace character or one token per step. tailRecM runs the steps as
+-- a loop, and indexing replaces Array.uncons, which copied the remaining
+-- input per character (BACKLOG E002).
+scan ∷ Array Char → Scan → Scanned
+scan characters state = maybe' finished (scanAt characters state)
+  (Array.index characters state.index)
   where
-  finished _ = Right tokens
-  scanHead { head, tail }
-    | isSpace head = scan (advance position head) tail tokens
-    | isLetter head = word position characters tokens isNameChar
-    | isDigit head = word position characters tokens isDigit
-    | Just text ← twoCharacter head tail = pair position text tail tokens
-    | Array.elem head punctuation = scanPunctuation position head tail tokens
-    | otherwise = unexpected position head
+  finished _ = Right (Done (Array.fromFoldable state.tokens))
 
-scanPunctuation
-  ∷ Position → Char → Array Char → Array Token → Either Diagnostic (Array Token)
-scanPunctuation position character tail tokens = scan next tail
-  (Array.snoc tokens token)
-  where
-  next = advance position character
-  token =
-    { text: String.singleton character, span: { start: position, end: next } }
+scanAt ∷ Array Char → Scan → Char → Scanned
+scanAt characters state head
+  | isSpace head = continue (skip state head)
+  | isLetter head = continue (word characters state isNameChar)
+  | isDigit head = continue (word characters state isDigit)
+  | Just text ← twoCharacter characters state.index = continue (emit text state)
+  | Array.elem head punctuation = continue (emit (String.singleton head) state)
+  | otherwise = unexpected state.position head
+
+continue ∷ Scan → Scanned
+continue state = Right (Loop state)
+
+skip ∷ Scan → Char → Scan
+skip state character = state
+  { index = state.index + 1, position = advance state.position character }
 
 -- Two-character tokens win over their one-character prefixes.
-twoCharacter ∷ Char → Array Char → Maybe String
-twoCharacter head tail = Array.find matches twoCharacterTokens
+twoCharacter ∷ Array Char → Int → Maybe String
+twoCharacter characters index = Array.find matches twoCharacterTokens
   where
-  matches text = String.toCharArray text == Array.cons head
-    (Array.take 1 tail)
+  matches text = String.toCharArray text == Array.slice index (index + 2)
+    characters
 
 twoCharacterTokens ∷ Array String
 twoCharacterTokens = [ "=>", "==", "!=", "<=", ">=" ]
 
-pair
-  ∷ Position
-  → String
-  → Array Char
-  → Array Token
-  → Either Diagnostic (Array Token)
-pair position text tail tokens = scan next (Array.drop 1 tail)
-  (Array.snoc tokens token)
+-- Tokens never contain a newline, so a token only moves the column.
+emit ∷ String → Scan → Scan
+emit text state = state
+  { index = state.index + width
+  , position = next
+  , tokens = Stack.push token state.tokens
+  }
   where
-  next =
-    { offset: position.offset + 2
-    , line: position.line
-    , column: position.column + 2
+  width = String.length text
+  next = state.position
+    { offset = state.position.offset + width
+    , column = state.position.column + width
     }
-  token = { text, span: { start: position, end: next } }
+  token = { text, span: { start: state.position, end: next } }
 
-unexpected ∷ Position → Char → Either Diagnostic (Array Token)
+unexpected ∷ Position → Char → Scanned
 unexpected position character = Left (problemAt Lexical span)
   where
   span = { start: position, end: advance position character }
 
-word
-  ∷ Position
-  → Array Char
-  → Array Token
-  → (Char → Boolean)
-  → Either Diagnostic (Array Token)
-word position characters tokens predicate = scan next parts.rest
-  (Array.snoc tokens token)
+word ∷ Array Char → Scan → (Char → Boolean) → Scan
+word characters state predicate = emit text state
   where
-  parts = Array.span predicate characters
-  next = Array.foldl advance position parts.init
-  token =
-    { text: String.fromCharArray parts.init
-    , span: { start: position, end: next }
-    }
+  end = wordEnd characters predicate state.index
+  text = String.fromCharArray (Array.slice state.index end characters)
+
+-- A self tail call, which purs compiles to a loop.
+wordEnd ∷ Array Char → (Char → Boolean) → Int → Int
+wordEnd characters predicate index =
+  if maybe false predicate (Array.index characters index) then
+    wordEnd characters predicate (index + 1)
+  else index
 
 advance ∷ Position → Char → Position
 advance position character =

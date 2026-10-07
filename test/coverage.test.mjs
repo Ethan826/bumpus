@@ -32,6 +32,16 @@ const outcome = source => {
   return { code: diagnostic.code, diagnostic };
 };
 
+// A raw LCG's bit 0 alternates, so reading it made every two-way choice
+// a strict alternation and correlated consecutive choices.
+test('two-way choices are not a strict alternation', () => {
+  const draws = 80;
+  const next = generator(0x5eed);
+  const bits = Array.from({ length: draws }, () => choose(next, 2));
+  assert.ok(bits.some((bit, index) => index > 0 && bit === bits[index - 1]),
+    bits.join(''));
+});
+
 test('coverage agrees with a brute-force first-match oracle', () => {
   const next = generator(0x5eed);
   const seen = { E_REDUNDANT: 0, E_NON_EXHAUSTIVE: 0, null: 0 };

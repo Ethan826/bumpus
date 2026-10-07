@@ -10,7 +10,10 @@ export const generator = seed => () => {
   seed = (Math.imul(seed, 1664525) + 1013904223) | 0;
   return seed;
 };
-export const choose = (next, count) => (next() >>> 0) % count;
+// An LCG mod 2^32 has short-period low bits (bit 0 alternates), so choices
+// come from the high half, whose bits have long periods.
+const lowBits = 16;
+export const choose = (next, count) => (next() >>> lowBits) % count;
 
 // Heads appear only at levels 1..maximumDepth; below that, `_` or binders.
 const head = (next, type, level, names) => {

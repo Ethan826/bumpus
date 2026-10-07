@@ -13,7 +13,9 @@ const graphBufferBytes = graphBufferMebibytes * bytesPerKibibyte ** 2;
 
 export const layers = ['Domain', 'Features', 'Format', 'Runtime', 'Program'];
 const pureLayers = ['Domain', 'Features', 'Format'];
-const coreLibraries = /^(Prelude$|Data\.(Array|Either|Maybe|Int|String|Foldable|Traversable)(\.|$))/;
+// Control.Monad.Rec.Class supplies tailRecM, the only stack-safe loop for
+// long inputs (BACKLOG E002); the rest of Control stays out of pure layers.
+const coreLibraries = /^(Prelude$|Control\.Monad\.Rec\.Class$|Data\.(Array|Either|Maybe|Int|String|Foldable|Traversable)(\.|$))/;
 const partialModules = /(^|\.)(Unsafe|Partial)(\.|$)/;
 const irModule = 'Domain.IR.Internal';
 const irImporters = /^(Features\.Check|Format\.Go)(\.|$)/;

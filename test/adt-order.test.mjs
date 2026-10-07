@@ -148,8 +148,9 @@ const lawful = (system, values) => {
 };
 
 // Operands live in their own functions, and pairs are split across
-// programs, because the stage 0 compiler overflows the JavaScript stack on
-// sources of roughly 3500 characters (BACKLOG E002).
+// programs. The budget dates from a lexer stack overflow on sources of
+// roughly 3500 characters, fixed in A003 Task 3b (BACKLOG E002); it stays
+// because the batching it drives is itself exercised and keeps runs small.
 const sourceBudget = 2000;
 const fragment = (system, pair, index) => {
   const terms = operators.map((op, bit) =>
@@ -199,10 +200,11 @@ const decidingField = (a, b) => a.ctor !== b.ctor ? -1
     JSON.stringify(field) !== JSON.stringify(b.fields[index]));
 
 // Seeds were chosen so every T0 has two or more constructors and a declared
-// field (T0 itself in 6, 22, 24, 34, 43; T1 in 29, 39, 47); together they
-// cover each outcome on equal and differing constructors and a decision
-// after the first field. The assertions below keep that true.
-const seeds = [6, 22, 24, 29, 34, 39, 43, 47];
+// field (T0 itself in 0, 10, 19, 34; T1 in 2, 6; both in 17, 47); together
+// they cover each outcome on equal and differing constructors and a decision
+// after the first field. The assertions below keep that true. They were
+// reselected when choose() moved to the LCG's high bits (A003 Task 3b).
+const seeds = [0, 2, 6, 10, 17, 19, 34, 47];
 
 test('generated pairs agree with the order interpreter', () => {
   const seen = new Set();

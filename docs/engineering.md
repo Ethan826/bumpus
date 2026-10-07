@@ -19,7 +19,12 @@ adding a bypass allowlist.
   Runtime, Program; docs/plans/2026-10-07-five-layers-design.md) rejects
   unlayered modules and imports of a later layer, restricts Domain, Features
   and Format to the core library allowlist (no Effect, Unsafe or Partial),
-  and lets only Features.Check* and Format.Go* import Domain.IR.Internal;
+  and lets only Features.Check* and Format.Go* import Domain.IR.Internal.
+  The allowlist (scripts/structure.mjs `coreLibraries`) is Prelude and
+  Data.{Array, Either, Maybe, Int, String, Foldable, Traversable} modules
+  plus, since A003 Task 3b, exactly Control.Monad.Rec.Class, for `tailRecM`
+  loops over long inputs (BACKLOG E002); test/structure.test.mjs pins that
+  Control.Monad.ST, Control.Monad and near-miss names stay rejected;
 - no JS FFI files outside src/Runtime; all runtime capabilities live in
   Runtime and Program; Program.Command runs over the Domain.Host ports and
   may not import Effect or Runtime, so tests drive it with fake hosts;
@@ -33,7 +38,7 @@ adding a bypass allowlist.
   brute-force coverage oracle with brute-forced inhabitedness over generated
   type systems (test/coverage.test.mjs), and fake-host command tests
   (test/program.test.mjs);
-- `npm run verify` runs every test/*.test.mjs file (13 files, 68 tests, no
+- `npm run verify` runs every test/*.test.mjs file (17 files, 96 tests, no
   skips; the list is read from the directory, never hand-kept) and then
   scripts/regression.mjs, a table of isolated-copy mutations, each of which
   must pass on the healthy build and fail on its mutant: `branch`
@@ -59,6 +64,12 @@ should call a named helper when they hold computation. The CST gate currently
 catches branch do blocks, not every complicated operator/record expression.
 Comments explain why. These conventions were inspected in MileAhead and apply
 here; E001 tracks extending automation after the first slice.
+
+Loops whose length grows with the input (characters, tokens, declarations)
+use `tailRecM` or a self tail call, and accumulate with Format.Stack or
+indexing rather than Array.snoc/uncons/drop per item, which copy the array.
+This is a review convention; only test/large-source.test.mjs (megabyte
+padding, 20,000 declarations) checks it, and only for the paths it drives.
 
 No coverage percentage is claimed. Properties use deterministic generators
 and explicit edge cases with no discarded inputs. Parsing tests compare with
