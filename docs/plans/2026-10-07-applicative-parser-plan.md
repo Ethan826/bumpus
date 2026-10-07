@@ -221,6 +221,28 @@ with Functor/Apply/Applicative/Bind/Monad; `fresh ∷ Fresh LocalId`;
 - [ ] **Step 3:** verify; cmp (byte-identical Go); commit
   `refactor: resolver numbering with Fresh (G001)`.
 
+### Task 4b: Coverage breadth and parameter duplicates (inserted)
+
+Added 2026-10-07 (controller ruling, owning defects found in Task 4): a
+match of about 1,930 arms overflows the stack in Features.Check.Usefulness
+(cold full compile), and the duplicate-parameter check in
+Features.Resolve.Types (`uniqueParameter`) is quadratic (20,000 parameters
+2.7 s).
+
+- [ ] **Step 1: Failing tests.** A 5,000-arm integer match (4,999 distinct
+  literals plus `_`) compiles within 5 s through `compile` (RED: RangeError
+  in Usefulness); 20,000 parameters compile within 1 s (RED: time); the
+  10,000-argument test asserts the first binder is `bumpusLocal0` and the
+  last `bumpusLocal9999` in order (or is renamed to what it checks).
+- [ ] **Step 2:** make Usefulness's row/arm iteration stack-safe (tailRecM or
+  balanced traversal; witnesses, E_REDUNDANT and E_NON_EXHAUSTIVE choices
+  unchanged — the coverage oracle and diagnostics rows are the net);
+  `uniqueParameter` via Features.Resolve.Repeated, first-occurrence
+  semantics unchanged.
+- [ ] **Step 3:** correct the thresholds in BACKLOG E002, the test comments
+  and the Task 4 report notes; verify; cmp; commit
+  `fix: stack-safe coverage breadth and linear parameter duplicates (G001)`.
+
 ### Task 5: Regression row, documentation and closure
 
 **Files:** `scripts/regression.mjs`, `test/regression.mjs`,
