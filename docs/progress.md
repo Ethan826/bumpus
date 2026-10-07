@@ -227,3 +227,14 @@ incremental `npm run verify` (.build/f004-verify-incremental.log) both exit 0:
 0 warnings, 68 tests, 0 skips, strict rebuild proof and regression proofs
 branch, nil-guard and exhaustive passed. The main item of the milestone is
 not yet chosen.
+
+## Next milestone, main item: A003 (design, 2026-10-07)
+
+User chose A003 with print, equality and ordering. Design direction approved
+with five clarifications (E_ENTRY keeps missing-main and parameters; round
+trip recompiles with original declarations and checks structural equality via
+the interpreter; ordering mutations must fail an oracle or explicit-order
+assertion, with separately built equal values; nil-field panic rule scoped to
+visited fields; Bool helper only when needed). Written spec:
+docs/plans/2026-10-07-adt-printing-design.md, awaiting user review.
+Documentation only; no compiler source changed.
