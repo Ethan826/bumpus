@@ -236,5 +236,6 @@ trip recompiles with original declarations and checks structural equality via
 the interpreter; ordering mutations must fail an oracle or explicit-order
 assertion, with separately built equal values; nil-field panic rule scoped to
 visited fields; Bool helper only when needed). Written spec:
-docs/plans/2026-10-07-adt-printing-design.md, awaiting user review.
+docs/plans/2026-10-07-adt-printing-design.md, approved by the user.
+Plan: docs/plans/2026-10-07-adt-printing-plan.md (4 tasks), awaiting review.
 Documentation only; no compiler source changed.

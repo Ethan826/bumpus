@@ -1,0 +1,274 @@
+# ADT Printing, Equality and Ordering Implementation Plan (A003)
+
+Status: written 2026-10-07, awaiting user review. Not started.
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Comparison operators on every type with one structural total
+order, and printing of `main`'s value whatever its type.
+
+**Architecture:** One new expression form, `Compare Operator Expr Expr`,
+flows through every phase (Syntax → Resolved → IR). Format.Go lowers Int and
+Bool comparisons to Go operators and declared types to generated per-type
+helpers (`sprigCmpN`, `sprigShowN`) in a new module, Format.Go.Helpers.
+
+**Tech Stack:** PureScript 0.15.16, Spago 1.0.4, purs-tidy 0.11.1, Node test
+runner, Go 1.26.4.
+
+**Spec:** docs/plans/2026-10-07-adt-printing-design.md (approved 2026-10-07).
+
+## Global Constraints
+
+- AGENTS.md governs: `where` not `let … in`, no anonymous lambdas, `maybe'`
+  for computed fallbacks, branch work in named helpers, 250-line files,
+  80 columns, purs-tidy, layer and IR.Internal import rules.
+- `bootstrap/answer.go` stays byte-identical. `bootstrap/shapes.go` changes
+  only by added helpers; review each regenerated diff.
+- Existing test assertions are unchanged except: the two E_ENTRY rows in
+  test/diagnostics.test.mjs (missing-main message becomes
+  `Expected fn main()`; the `main must return Int or Bool` row is removed)
+  and the `fn main(): IntList = Nil;` E_ENTRY row in test/adt-types.test.mjs
+  (becomes a positive test in Task 3), and shapes.go snapshot bytes.
+- Panic text for malformed values is exactly `sprig: malformed value`.
+- Every task: each new behavioral test is seen failing before the code;
+  `npm run verify` exits 0; evidence line in docs/progress.md; commit.
+  Never push.
+
+## Review Focus
+
+1. Comparisons as `if` conditions, `match` scrutinees (`match a < b { true
+   => 1, false => 0 }` is exhaustive) and call arguments run. Task 1.
+2. int32 extremes and wraparound: `-2147483648 < 2147483647` is `true`;
+   `2147483647 + 1 < 0` is `true`. Task 1.
+3. Precedence and parentheses: `1 + 2 == 3` is `true`; `(1 == 1) == true`
+   is accepted; `a < b < c` is rejected. Task 1.
+4. Comparing two separately built 8192-element lists (`==` true, and `<`
+   after changing the last element) runs without stack failure. Task 2;
+   printing such a list ends with `Nil` plus 8192 closing parentheses, Task 3.
+5. A comparison on an uninhabited type (`type V = V(V); fn f(a: V, b: V):
+   Bool = a < b; fn main(): Int = 0;`) compiles and the Go builds. Task 2.
+
+---
+
+### Task 1: Comparison syntax, typing and primitive lowering
+
+**Files:**
+- Modify: `src/Domain/Syntax.purs` (add `Operator`, `Compare`),
+  `src/Domain/Resolved.purs`, `src/Domain/IR/Internal.purs`,
+  `src/Format/Lex.purs`, `src/Format/Parse/Expression.purs`,
+  `src/Features/Resolve/Expression.purs`, `src/Features/Check.purs`,
+  `src/Features/Check/Coverage.purs`, `src/Format/Go.purs`
+- Create: `src/Format/Go/Helpers.purs`
+- Test: `test/compare.test.mjs`
+
+**Interfaces:**
+- Produces, in Domain.Syntax: `data Operator = Equal | NotEqual | Less |
+  LessEqual | Greater | GreaterEqual` (derive Eq); `Syntax.Compare Span
+  Operator Expr Expr`; `Resolved.Compare Span Operator Expr Expr`;
+  `IR.Compare Operator Expr Expr` (result `ty` is `TBool`).
+- Produces, in Format.Go.Helpers: `goOperator ∷ Operator → String` (`==`,
+  `!=`, `<`, `<=`, `>`, `>=`); `boolHelper ∷ String` (the
+  `sprigCmpBool(a bool, b bool) int` declaration);
+  `needsBoolHelper ∷ IR.Program → Boolean` (Task 1: some `IR.Compare` with
+  an ordering operator has Bool operands).
+
+- [ ] **Step 1: Write failing tests in test/compare.test.mjs**
+
+`runGo` results (each `fn main(): Bool = …;` unless shown):
+`1 < 2` → `true\n`; `2 <= 2`, `3 > 2`, `2 >= 3` → `true`, `true`, `false`;
+`1 == 1`, `1 != 1` → `true`, `false`; `false < true`, `true < false`,
+`true == true` → `true`, `false`, `true`; the Review Focus 1-3 programs;
+`fn f(x: Int): Int = if x < 0 then 0 else x; fn main(): Int = f(-5);` → `0`.
+
+`rejectedAt` rows (exact code and span text):
+- `fn main(): Bool = 1 < 2 < 3;` → E_SYNTAX at the second `<`, message
+  `Comparisons do not chain`; same for `1 == 2 == 3` at the second `==`.
+- `fn main(): Bool = 1 ! 2;` → E_LEX at `!`.
+- `fn main(): Bool = 1 == true;` → E_TYPE at `true` (expected Int, actual
+  Bool; the message is the existing TypeMismatch rendering).
+- `fn main(): Bool = 1 < if true then 1 else 2;` → E_SYNTAX at `if`.
+- `fn main(): Int = 1 < 2;` → E_TYPE (body Bool, result Int).
+
+Also assert `checked(readFileSync('examples/answer.sprig'))` still equals
+bootstrap/answer.go and that a program without Bool ordering contains no
+`sprigCmpBool` while `false < true` contains it exactly once.
+
+- [ ] **Step 2: Run `node --test test/compare.test.mjs`; expect failures
+  (E_LEX on `<`).**
+
+- [ ] **Step 3: Lexer.** Two-character tokens `=>`, `==`, `!=`, `<=`, `>=`
+  are matched before single characters (generalize `arrow` to any
+  two-character token); add `<` and `>` to `punctuation`. Lone `!` stays
+  E_LEX.
+
+- [ ] **Step 4: Parser.** `expression` falls through to `comparison`:
+  an additive, then optionally one operator token and a second additive;
+  if another operator follows, `failAt` with `Comparisons do not chain`.
+  Span: left start to right end. Operator text → `Operator` mapping lives
+  in Format.Parse.Expression.
+
+- [ ] **Step 5: Resolve and check.** Resolve left then right, threading
+  `next`. `checkComparison`: infer left, infer right, `require env (IR.typeOf
+  first) second`, node `IR.Compare op first second`, type `TBool`. Coverage
+  traverses both operands like `IR.Add`.
+
+- [ ] **Step 6: Lower.** In Format.Go, Int or Bool `Equal`/`NotEqual` and Int
+  ordering: `(L op R)`. Bool ordering: `(sprigCmpBool(L, R) op 0)`. Emit
+  `boolHelper` after `sprigAdd` iff `needsBoolHelper`.
+  `sprigCmpBool` returns -1, 0, 1 with `false < true`.
+
+- [ ] **Step 7: Run `node --test test/compare.test.mjs`; all pass. Run
+  `npm run verify`; exit 0, answer.go and shapes.go unchanged.**
+
+- [ ] **Step 8: Commit** `feat: comparison operators on Int and Bool (A003)`
+  with a progress evidence line.
+
+### Task 2: Structural order for declared types
+
+**Files:**
+- Modify: `src/Format/Go/Helpers.purs`, `src/Format/Go.purs`,
+  `scripts/regression.mjs`, `test/regression.mjs`, `bootstrap/shapes.go`
+- Create: `test/value-oracle.mjs`, `test/adt-order.test.mjs`
+
+**Interfaces:**
+- Consumes: Task 1 IR node and helpers.
+- Produces, in Format.Go.Helpers: `compareName ∷ TypeId → String`
+  (`sprigCmp<index>`); `compareHelpers ∷ Array TypeInfo → Array CtorInfo →
+  String` (one function per type, TypeId order). `needsBoolHelper` is also
+  true when any declared constructor has a Bool field.
+- Produces, in test/value-oracle.mjs (used again in Task 3):
+  `typeSystem(next)` → `{ declarations: string, types: [{ name, ctors:
+  [{ name, fields: ['Int'|'Bool'|typeIndex] }] }] }`, two types `T0`,
+  `T1`, 1-3 constructors named `K<type>_<ctor>`, 0-2 fields; constructor 0
+  of each type has only Int/Bool fields, so bounded values always exist.
+  `value(next, system, typeIndex, depth)` → `{ ctor, fields }` (Int as
+  number, Bool as boolean); `compare3(system, a, b)` → -1/0/1 per spec
+  section 3; `printValue(system, v)` → spec section 4 text;
+  `expressionOf(next, system, v)` → a different source expression for the
+  same value (Ints written as wrapping sums, subterms wrapped in
+  `if true then … else …`); `parseValue(system, text)` → value.
+  Reuse `generator`/`choose` from test/coverage-oracle.mjs.
+
+- [ ] **Step 1: Write failing tests in test/adt-order.test.mjs**
+
+With `type L = Nil | Cons(Int, L);`, executed in Go, each must print
+`true`: `Nil < Cons(0, Nil)`; `Cons(1, Nil) > Cons(0, Cons(5, Nil))`;
+`Cons(0, Nil) < Cons(0, Cons(0, Nil))`; `a() == b()` and
+`(a() < b()) == false`, where `fn a(): L` and `fn b(): L`
+both build `Cons(1, Nil)` separately. A Bool field type
+`type P = P(Bool, Int);` gives `P(false, 9) < P(true, 0)`. Review Focus 4
+and 5. Malformed values via `goTest`: `sprigCmp0(sprigTy0{tag: 2},
+sprigTy0{tag: 2})` (nil field) and `sprigCmp0(sprigTy0{}, sprigTy0{})`
+(unknown tag) each recover `sprig: malformed value`.
+
+Oracle test `generated pairs agree with the order interpreter` (8 seeds):
+per seed, one system and 8 value pairs of T0 (depth ≤ 3), including at
+least two equal pairs whose right side comes from `expressionOf`. Each pair
+becomes `fn pK(): Int` summing `if L op R then 2^i else 0` over the six
+operators in spec order; `fn main(): Int = 0;`. A `goTest` file prints
+every `sprigFnK()`; the output must equal the masks implied by
+`compare3`. The same test asserts reflexivity, antisymmetry, transitivity
+and totality of `compare3` over the seed's values (a sanity check on the
+interpreter; agreement is the acceptance check).
+
+- [ ] **Step 2: Run `node --test test/adt-order.test.mjs`; expect E_INTERNAL
+  or Go build failures (no helper).**
+
+- [ ] **Step 3: Implement `compareHelpers`.** Each helper first panics on a
+  tag outside 1..count for either argument, returns by tag order when tags
+  differ, then compares fields left to right (Int via `<`/`>`, Bool via
+  `sprigCmpBool`, declared via the field type's helper after a nil check
+  that panics), returning at the first nonzero result, else 0.
+
+- [ ] **Step 4: Lower declared-type comparisons** to
+  `(sprigCmpN(L, R) op 0)`; emit `compareHelpers` after `declarations`.
+
+- [ ] **Step 5: Regression rows** in scripts/regression.mjs and probes in
+  test/regression.mjs: `ctor-order` (needle: the tag comparison in the
+  helper, inverted) and `first-field` (fields compared last to first). The
+  probe compiles the Step 1 `L` program for its assertion, runs it with
+  `go run` in a work directory under .build/regression (not $TMPDIR; see
+  F005) with GOCACHE under .build, and fails with `constructor order
+  wrong` / `first differing field ignored`. Show each row's mutant failing.
+
+- [ ] **Step 6: Regenerate bootstrap/shapes.go** from the CLI, review that
+  the diff only adds `sprigCmp0`; tests pass; `npm run verify` exits 0.
+
+- [ ] **Step 7: Commit** `feat: structural order for declared types (A003)`.
+
+### Task 3: Printing and unrestricted `main`
+
+**Files:**
+- Modify: `src/Domain/Problem.purs` (drop `EntryResult`),
+  `src/Features/Resolve.purs`, `src/Format/Diagnostic.purs`,
+  `src/Format/Go/Helpers.purs`, `src/Format/Go.purs`,
+  `test/diagnostics.test.mjs`, `test/adt-types.test.mjs`,
+  `scripts/regression.mjs`, `test/regression.mjs`, `bootstrap/shapes.go`
+- Create: `test/adt-print.test.mjs`, `examples/tree.sprig`,
+  `bootstrap/tree.go`
+
+**Interfaces:**
+- Consumes: Task 2 value oracle and helpers.
+- Produces: `showName ∷ TypeId → String` (`sprigShow<index>`),
+  `showHelpers ∷ Array TypeInfo → Array CtorInfo → String`.
+
+- [ ] **Step 1: Write failing tests in test/adt-print.test.mjs**
+
+`runGo` output: `type L = Nil | Cons(Int, L); fn main(): L =
+Cons(-3, Cons(2147483647, Nil));` → `Cons(-3, Cons(2147483647, Nil))\n`;
+nullary `N`; `type P = P(Bool, Int)` value `P(false, -1)`; Review Focus 4
+print. `fn main(): Int = 42;` and Bool mains print as before. Missing
+`main` → E_ENTRY `Expected fn main()`; `fn main(x: Int): L = Nil;` →
+E_ENTRY `main must have no parameters`. Malformed: `sprigShow0(nil,
+sprigTy0{tag: 2})` recovers `sprig: malformed value`.
+
+Round trip `printed values recompile to the same value` (8 seeds):
+generate a system and a T0 value; program A is the declarations plus
+`fn main(): T0 = <expressionOf value>;`, printing text T. Assert
+`parseValue(T)` deep-equals the value, and program B, the declarations plus
+`fn main(): T0 = T;`, prints T again.
+
+Update the existing rows listed in Global Constraints; the adt-types
+`fn main(): IntList = Nil;` row becomes a `runGo` assertion printing `Nil`.
+
+- [ ] **Step 2: Run the three test files; expect E_ENTRY failures.**
+
+- [ ] **Step 3: Entry.** Remove `EntryResult` and its check and message;
+  `MissingEntry` message becomes `Expected fn main()`.
+
+- [ ] **Step 4: Printing.** `showHelpers`: nullary appends the name; else
+  name, `(`, fields joined by `, ` (Int/Bool via `fmt.Append`, declared via
+  its helper after a nil check), `)`; unknown tag panics. Declared `main`
+  lowers to `fmt.Println(string(sprigShowN(nil, sprigFnK())))`.
+
+- [ ] **Step 5: Regression row `show-fields`** (printer emits only the first
+  field) with probe printing `Cons(1, Cons(2, Nil))` exactly, failing with
+  `printed value lost fields`; show its mutant failing.
+
+- [ ] **Step 6: Example and snapshots.** examples/tree.sprig: a binary search
+  tree `type Tree = Leaf | Node(Tree, Int, Tree);`, `insert` using `<` and
+  `==` (no duplicates), `main` returns the tree after inserting
+  `5, 3, 8, 3, 1` and prints
+  `Node(Node(Node(Leaf, 1, Leaf), 3, Leaf), 5, Node(Leaf, 8, Leaf))`.
+  Add its snapshot test beside shapes; regenerate shapes.go (adds
+  `sprigShow0` only) and create tree.go from the CLI; two emits equal.
+
+- [ ] **Step 7: `npm run verify` exits 0; commit**
+  `feat: print values of any type from main (A003)`.
+
+### Task 4: Documentation and closure
+
+**Files:** docs/language.md, docs/adr/005-structural-order.md,
+docs/architecture.md, docs/engineering.md (new regression rows, test
+counts), README.md (if it states the `main` restriction), BACKLOG.md
+(A003 Done), docs/progress.md, docs/findings.md, docs/next-session.md,
+this plan's status line.
+
+- [ ] **Step 1:** language.md grammar and semantics per spec sections 1-4;
+  remove "ADT values cannot be printed, compared or returned from `main`".
+- [ ] **Step 2:** ADR 005: structural declaration order, witness-format
+  printing, helpers for every type, Bool helper on demand, malformed rule.
+- [ ] **Step 3:** `rm -rf output && npm run verify` exits 0; record counts and
+  the four CLI emits (answer, shapes, tree twice) compared with `cmp`.
+- [ ] **Step 4: Commit** `docs: close A003`. Then a fresh whole-branch
+  review by the controller.
