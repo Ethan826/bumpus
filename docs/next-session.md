@@ -11,16 +11,17 @@ been pushed. The uncommitted .vscode/settings.json change predates this work;
 leave it alone.
 
 The final whole-branch review is complete; its findings are fixed and
-recorded in docs/plans/closed-adts-review.md (68 tests, zero skips, three
-regression proofs, log .build/a001-review-fix.log). Until F004 is fixed,
-completion evidence is `rm -rf output && npm run verify` (AGENTS.md).
+recorded in docs/plans/closed-adts-review.md.
 
-Next step: the user confirmed (2026-10-07) that the next milestone opens with
-the F004 build.mjs fix, then picks its main item. Candidates are in BACKLOG.md (P001 polymorphism, A002 decision
-trees, A003 ADT printing, I001 FFI). Do not start one without that decision.
+F004 is fixed (docs/progress.md): build.mjs recompiles workspace modules on
+every build and verify proves a strict warning fails twice. `npm run verify`
+alone is completion evidence again.
+
+Next step: pick the milestone's main item with the user. Candidates are in
+BACKLOG.md (P001 polymorphism, A002 decision trees, A003 ADT printing, I001
+FFI). Do not start one without that decision.
 
 Open items to know: F001, F002 (external MileAhead patch unapplied), F003,
-F004 (strict warnings visible only on a compiling build; use a clean output
-directory), F005 (probe work dir should move under .build; the four stale
+F005 (probe work dir should move under .build; the four stale
 directories were deleted with user approval 2026-10-07), E001, E002,
 E003, E004, A002-A005.

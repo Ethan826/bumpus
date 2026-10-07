@@ -1,10 +1,10 @@
 # Engineering guidance and actual enforcement
 
 AGENTS.md is normative. CLAUDE.md is a pointer, so rules are not duplicated.
-The verification command is npm run verify. Until BACKLOG F004 is fixed,
-completion evidence is `rm -rf output && npm run verify` (AGENTS.md): the
-build is incremental, and a promoted strict warning shows only on the build
-that compiles its module. This is a review convention; no gate enforces it.
+The verification command is npm run verify. scripts/build.mjs removes the
+output of every workspace module before building, so each build recompiles
+them and a promoted strict warning fails every build (F004 fixed; dependency
+output stays cached). scripts/strict-rebuild.mjs, run by verify, proves it.
 Never obtain green results by suppressing a gate, weakening an assertion, or
 adding a bypass allowlist.
 
@@ -39,7 +39,11 @@ adding a bypass allowlist.
   must pass on the healthy build and fail on its mutant: `branch`
   (Features.Check branch type), `nil-guard` (Format.Go.Match drops the `!= nil`
   test; probe requires the unmatched panic, not a runtime error), and
-  `exhaustive` (Features.Check.Coverage always succeeds).
+  `exhaustive` (Features.Check.Coverage always succeeds);
+- scripts/strict-rebuild.mjs (run by verify after the build) copies the
+  workspace to .build/strict-rebuild, checks the unmodified copy builds, adds
+  a shadowed name to one module and requires two consecutive builds to fail
+  with ShadowedName (F004).
 
 The CST ban on all anonymous lambdas is deliberately stronger than MileAhead's
 manual 'name what you pass' rule. The Maybe/Either rule is stronger than its
@@ -106,8 +110,4 @@ claimed. Existing executable/snapshot/diagnostic tests validate this refactor.
 
 Review conventions only: the layer names describe reasons to change, which no
 gate checks; the gate checks import direction, purity and IR access.
-F004: Spago strict warnings appear only on the build that compiles a module,
-so completion evidence comes from a clean output directory
-(`rm -rf output && npm run verify`, required by AGENTS.md until
-scripts/build.mjs forces recompilation, the next milestone's first item).
 F005: the nil-guard probe's temp-directory cleanup is not asserted.

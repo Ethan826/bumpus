@@ -155,3 +155,13 @@ policy, without weakening the tests or overstating their automated coverage.
   all accepted, asserted to reach a third arm and the `_` tail.
 - The old coverage oracle passed a mutant that offers uninhabited
   constructors; only the generated-type-system test catches it.
+
+## F004 fix (2026-10-07)
+
+- purs recompiles a workspace module whose output directory is missing, so
+  deleting only workspace module outputs is enough; a full clean is not
+  needed. Each build now recompiles the 32 workspace modules (about 1 s).
+- The strict-rebuild proof copies output and .spago (about 40 MB) into
+  .build/strict-rebuild and shares .build/home by symlink; verify takes
+  about 8 s longer. It deletes the copy only on success, leaving it for
+  inspection after a failure.

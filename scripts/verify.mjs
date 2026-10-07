@@ -22,6 +22,7 @@ assert.equal(tidy.status, 0);
 assert.equal((tidy.stdout + tidy.stderr).trim(), 'v0.11.1', 'use the pinned formatter');
 run('purs-tidy', ['check', 'src', 'tools/style/src']);
 run('node', ['scripts/build.mjs']);
+run('node', ['scripts/strict-rebuild.mjs']);
 assert.deepEqual(await checkStructure(), [], 'structural gates');
 // Every test file runs; a hand-kept list could silently omit a new one.
 const tests = readdirSync('test').filter(name => name.endsWith('.test.mjs'))

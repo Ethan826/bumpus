@@ -211,3 +211,19 @@ errors); two new rejection rows failed before (E_UNBOUND) and pass after.
 2026-10-07: closed-ADT Task 8 (documentation and closure) done, review step excluded by controller ruling R6. Wrote ADRs 003 and 004; rewrote docs/language.md and docs/architecture.md; updated engineering, provenance (Maranget JFP 2007; MileAhead layers, conceptual only), README, BACKLOG (A001 Done; A002-A005, F005 added; E003 and F004 current), plan index and next-session. Clean `rm -rf output && npm run verify` (.build/a001-final.log): exit 0, 64 tests, 0 skips, regression proofs branch, nil-guard and exhaustive all passed. Two CLI emits of examples/shapes.sprig byte-equal each other and bootstrap/shapes.go; examples/answer.sprig emit equals bootstrap/answer.go (cmp). $TMPDIR still holds the same four stale `sprig-regression-*` directories after the run (F005). Final whole-branch review is run by the controller.
 
 2026-10-07: A001 final whole-branch review findings fixed (record docs/plans/closed-adts-review.md). Function/constructor clashes report at the earliest declaration by source offset (new adt-types case failed before the fix at offset 26, passed after; .build/a001-review-minor3-red.log, -green.log). specialize and checkCtor return E_INTERNAL on field-count mismatch; the new diagnostics test fails with either change reverted in an isolated copy (.build/a001-review-isolated-red.log). Coverage oracle now requires witnesses to cover only unmatched values and checks brute-forced inhabitedness over 120 generated type systems (an inhabitedness mutant fails it: .build/a001-review-inhabited-mutation.log); 8 generated flat 3-5-arm matches run in Go (an arm-reordering mutant fails them: .build/a001-review-flat-mutation.log). verify.mjs runs every test/*.test.mjs (an unlisted failing dummy made verify exit 1: .build/a001-review-unlisted-probe.log). Clean `rm -rf output && npm run verify` (.build/a001-review-fix.log): exit 0, 0 warnings, 13 test files, 68 tests, 0 skips, regression proofs branch, nil-guard and exhaustive passed. CLI emits of examples/answer.sprig and examples/shapes.sprig equal bootstrap/answer.go and bootstrap/shapes.go (cmp). $TMPDIR still holds four stale `sprig-regression-*` directories (F005).
+
+## Next milestone, item 1: F004 (2026-10-07)
+
+Reproduced in an isolated copy: with a shadowed name added to Domain.Host, the
+first `node scripts/build.mjs` failed with ShadowedName and the second exited
+0. scripts/build.mjs now removes the output directory of every module declared
+under src and tools/style/src before building (dependencies stay cached); the
+same copy then failed both builds. New scripts/strict-rebuild.mjs, run by
+verify, automates that proof; with HEAD's build.mjs restored in an isolated copy
+it fails with "second build accepted a strict warning" (.build/f004-red.log).
+AGENTS.md no longer requires a clean output directory. Clean
+`rm -rf output && npm run verify` (.build/f004-verify.log) and the following
+incremental `npm run verify` (.build/f004-verify-incremental.log) both exit 0:
+0 warnings, 68 tests, 0 skips, strict rebuild proof and regression proofs
+branch, nil-guard and exhaustive passed. The main item of the milestone is
+not yet chosen.
