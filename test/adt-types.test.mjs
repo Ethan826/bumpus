@@ -65,6 +65,10 @@ test('type and constructor declarations are rejected precisely', () => {
   rejectedAt(source, 'E_UNBOUND', 'Missing');
 });
 
+test('main may return a declared value', () => {
+  assert.equal(runGo(`${list} fn main(): IntList = Nil;`), 'Nil\n');
+});
+
 test('construction expressions are rejected precisely', () => {
   const rows = [
     ['fn main(): Int = Cons;', 'E_ARITY', 'Cons', 1],
@@ -73,9 +77,7 @@ test('construction expressions are rejected precisely', () => {
     ['fn main(): Int = Cons(true, Nil);', 'E_TYPE', 'true'],
     ['fn main(): Int = Foo(1);', 'E_UNBOUND', 'Foo(1)'],
     ['fn helper(): Int = 1; fn main(): Int = helper;', 'E_UNBOUND',
-      'helper', 1],
-    ['fn main(): IntList = Nil;', 'E_ENTRY',
-      'fn main(): IntList = Nil;']
+      'helper', 1]
   ];
   for (const [body, code, text, nth] of rows) {
     rejectedAt(`${list} ${body}`, code, text, nth ?? 0);

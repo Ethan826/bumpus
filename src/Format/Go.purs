@@ -15,6 +15,7 @@ import Format.Go.Data
   , localName
   )
 import Format.Go.Match (lowerMatch)
+import Format.Go.Show (printed, showHelpers)
 import Format.Go.Usage (needsBoolHelper)
 import Domain.Resolved (FunctionId(..), LocalId(..), Tables, Ty)
 
@@ -26,12 +27,20 @@ emit (IR.Program program) =
     <> (if needsBoolHelper (IR.Program program) then boolHelper else "")
     <> declarations program.types program.ctors
     <> compareHelpers program.types program.ctors
+    <> showHelpers program.types program.ctors
     <> joinWith "\n" (map emitFunction program.functions)
-    <> "\nfunc main() { fmt.Println("
-    <> functionName program.entry
-    <> "()) }\n"
+    <> joinWith "" (map (entryMain program.entry) program.functions)
   where
   emitFunction = function { types: program.types, ctors: program.ctors }
+
+-- Exactly one function is the entry (Features.Resolve); scanning the
+-- definitions finds its result type without a lookup that could fail.
+entryMain ∷ FunctionId → IR.FunctionDecl → String
+entryMain entry definition
+  | definition.id /= entry = ""
+  | otherwise = "\nfunc main() { fmt.Println("
+      <> printed definition.result (functionName entry <> "()")
+      <> ") }\n"
 
 function ∷ Tables → IR.FunctionDecl → String
 function tables definition =

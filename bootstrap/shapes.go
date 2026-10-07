@@ -33,6 +33,26 @@ if c := sprigCmp0(*a.c2f1, *b.c2f1); c != 0 { return c }
 return 0
 }
 
+func sprigShow0(out []byte, v sprigTy0) []byte {
+switch v.tag {
+case 1:
+return append(out, "Dot"...)
+case 2:
+out = append(out, "Square("...)
+out = fmt.Append(out, v.c1f0)
+return append(out, ')')
+case 3:
+out = append(out, "Pair("...)
+if v.c2f0 == nil { panic("sprig: malformed value") }
+out = sprigShow0(out, *v.c2f0)
+out = append(out, ", "...)
+if v.c2f1 == nil { panic("sprig: malformed value") }
+out = sprigShow0(out, *v.c2f1)
+return append(out, ')')
+}
+panic("sprig: malformed value")
+}
+
 func sprigFn0(sprigLocal0 sprigTy0) int32 {
 return func(sprigMatch0 sprigTy0) int32 {
 if sprigMatch0.tag == 1 { return int32(1) }

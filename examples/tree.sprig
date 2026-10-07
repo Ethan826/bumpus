@@ -1,0 +1,11 @@
+type Tree = Leaf | Node(Tree, Int, Tree);
+
+fn insert(tree: Tree, key: Int): Tree = match tree {
+  Leaf => Node(Leaf, key, Leaf),
+  Node(left, here, right) =>
+    if key < here then Node(insert(left, key), here, right)
+    else if key == here then tree
+    else Node(left, here, insert(right, key)),
+};
+
+fn main(): Tree = insert(insert(insert(insert(insert(Leaf, 5), 3), 8), 3), 1);

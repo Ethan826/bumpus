@@ -15,7 +15,7 @@ import Data.String.Common (joinWith)
 import Domain.IR.Internal as IR
 import Domain.Resolved (CtorId(..), CtorInfo, Ty(..), TypeId(..), TypeInfo)
 import Domain.Syntax (Operator(..))
-import Format.Go.Data (fieldName, goType, tagOf)
+import Format.Go.Data (fieldName, goType, malformed, tagOf)
 
 goOperator ∷ Operator → String
 goOperator = case _ of
@@ -117,6 +117,3 @@ fieldComparison field = case _ of
   left = "a." <> field
   right = "b." <> field
   decide call = "if c := " <> call <> "; c != 0 { return c }\n"
-
-malformed ∷ String
-malformed = "panic(\"sprig: malformed value\")"

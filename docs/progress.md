@@ -265,3 +265,18 @@ Documentation only; no compiler source changed.
   .build/regression. bootstrap/shapes.go gains only `sprigCmp0`; answer.go
   unchanged. The compiler's ~3500-character stack limit was recorded under
   E002. `npm run verify` exit 0.
+- 2026-10-07 Task 3 (printing and unrestricted `main`): `EntryResult` is
+  gone and a missing entry reads `Expected fn main()`; `main` may return any
+  type. New Format.Go.Show emits one `sprigShowN(out []byte, v sprigTyN)`
+  per declared type in TypeId order (cases built from the constructor
+  table, `fmt.Append` for Int/Bool fields, nil check before declared
+  fields, unknown tag panics `sprig: malformed value`); a declared `main`
+  prints `string(sprigShowN(nil, sprigFnK()))`. The shared panic text moved
+  to Format.Go.Data. New test/adt-print.test.mjs (7 tests, all red before
+  the change: hand prints, Int/Bool unchanged, entry rules, 8192-element
+  list print, malformed panics, 8-seed print round trip, tree snapshot);
+  diagnostics and adt-types E_ENTRY rows updated per Global Constraints.
+  Regression row `show-fields` fails with its defect restored (`printed
+  value lost fields: Cons(1)`). New examples/tree.sprig and
+  bootstrap/tree.go; shapes.go gains only `sprigShow0`; answer.go
+  byte-identical. `npm run verify` exit 0.

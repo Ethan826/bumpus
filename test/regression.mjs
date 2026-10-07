@@ -65,13 +65,13 @@ const exhaustive = () => {
   console.log('exhaustive regression detects the defect');
 };
 
-// Runs `main` of the probe program and reports whether it printed true. The
-// work directory sits under .build/regression, which scripts/regression.mjs
+// Runs the probe program's `main` and returns what it printed. The work
+// directory sits under .build/regression, which scripts/regression.mjs
 // clears before each run, so an interrupted probe leaves nothing in $TMPDIR.
 const list = 'type L = Nil | Cons(Int, L);';
-const printsTrue = body => {
-  const result = compile(`${list} fn main(): Bool = ${body};`);
-  assert.ok(result instanceof Right, 'order probe program was rejected');
+const printed = source => {
+  const result = compile(source);
+  assert.ok(result instanceof Right, 'probe program was rejected');
   const work = resolve('.build/regression', probe, 'go-work');
   rmSync(work, { recursive: true, force: true });
   mkdirSync(work, { recursive: true });
@@ -83,23 +83,29 @@ const printsTrue = body => {
     });
     assert.ifError(run.error);
     assert.equal(run.status, 0, run.stdout + run.stderr);
-    return run.stdout === 'true\n';
+    return run.stdout;
   } finally { rmSync(work, { recursive: true, force: true }); }
 };
 
-const ordered = (body, message) => () => {
-  if (!printsTrue(body)) {
-    console.error(`${message}: ${body}`);
+const prints = (source, expected, message) => () => {
+  const output = printed(source);
+  if (output !== expected) {
+    console.error(`${message}: ${output}`);
     process.exit(1);
   }
   console.log(`${probe} regression detects the defect`);
 };
 
+const ordered = (body, message) =>
+  prints(`${list} fn main(): Bool = ${body};`, 'true\n', `${message}: ${body}`);
+
 const probes = {
   branch, 'nil-guard': nilGuard, exhaustive,
   'ctor-order': ordered('Nil < Cons(0, Nil)', 'constructor order wrong'),
   'first-field': ordered('Cons(1, Nil) > Cons(0, Cons(5, Nil))',
-    'first differing field ignored')
+    'first differing field ignored'),
+  'show-fields': prints(`${list} fn main(): L = Cons(1, Cons(2, Nil));`,
+    'Cons(1, Cons(2, Nil))\n', 'printed value lost fields')
 };
 assert.ok(probe in probes, `unknown probe: ${probe}`);
 probes[probe]();

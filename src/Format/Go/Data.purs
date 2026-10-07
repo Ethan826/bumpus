@@ -7,6 +7,7 @@ module Format.Go.Data
   , localName
   , integer
   , boolean
+  , malformed
   ) where
 
 import Prelude
@@ -46,6 +47,11 @@ integer value = "int32(" <> show value <> ")"
 
 boolean ∷ Boolean → String
 boolean value = if value then "true" else "false"
+
+-- Raised by every helper that meets a value its declarations cannot
+-- produce: an unknown tag or a nil field (only foreign code, I001).
+malformed ∷ String
+malformed = "panic(\"sprig: malformed value\")"
 
 -- Tags are 1-based within the owner so the zero value never names a
 -- constructor. Constructor ids are unique across types.

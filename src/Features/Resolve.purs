@@ -74,14 +74,10 @@ checkEntry ∷ Definition → Either Syntax.Diagnostic Resolved.FunctionId
 checkEntry definition =
   if not (Array.null definition.function.parameters) then invalid
     EntryParameters
-  else if isData definition.signature.result then invalid EntryResult
   else pure (Resolved.FunctionId definition.index)
   where
   invalid kind = Left
     (Syntax.problemAt (EntryProblem kind) definition.function.span)
-  isData = case _ of
-    Resolved.TData _ → true
-    _ → false
 
 resolveFunction
   ∷ Array Global

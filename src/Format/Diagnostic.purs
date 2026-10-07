@@ -84,9 +84,8 @@ wire diagnostic =
 
 entryMessage ∷ EntryKind → String
 entryMessage = case _ of
-  MissingEntry → "Expected fn main(): Int or Bool"
+  MissingEntry → "Expected fn main()"
   EntryParameters → "main must have no parameters"
-  EntryResult → "main must return Int or Bool"
 
 duplicateWord ∷ DuplicateKind → String
 duplicateWord = case _ of

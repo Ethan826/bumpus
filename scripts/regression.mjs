@@ -32,6 +32,13 @@ const rows = [
     needle: '(Array.mapWithIndex field ctor.fields)',
     replacement: '(Array.reverse (Array.mapWithIndex field ctor.fields))',
     probe: 'first-field', message: /first differing field ignored/
+  },
+  {
+    name: 'show-fields', file: 'src/Format/Go/Show.purs',
+    needle: 'fields = Array.mapWithIndex (showField id) ctor.fields',
+    replacement:
+      'fields = Array.take 1 (Array.mapWithIndex (showField id) ctor.fields)',
+    probe: 'show-fields', message: /printed value lost fields/
   }
 ];
 const base = '.build/regression';

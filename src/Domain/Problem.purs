@@ -21,7 +21,7 @@ data DuplicateKind
   | DuplicateParameter
   | DuplicateBinder
 
-data EntryKind = MissingEntry | EntryParameters | EntryResult
+data EntryKind = MissingEntry | EntryParameters
 
 -- The lexer and parser are Format, so their payloads may be text.
 data Problem
