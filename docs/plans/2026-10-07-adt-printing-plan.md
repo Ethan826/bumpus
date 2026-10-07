@@ -280,6 +280,53 @@ Update the existing rows listed in Global Constraints; the adt-types
 - [ ] **Step 7: `npm run verify` exits 0; commit**
   `feat: print values of any type from main (A003)`.
 
+### Task 3b: Stack-safe lexing and declaration parsing (E002 part)
+
+Added 2026-10-07 with user approval: owning the pre-existing RangeError found
+in Task 2 (sources over roughly 2.5-3.5k characters crash `compile`).
+
+**Files:**
+- Modify: `spago.yaml` (add `tailrec` as a direct dependency; already in the
+  lock as a transitive one), `spago.lock` (as Spago rewrites it),
+  `scripts/structure.mjs` (allow `Control.Monad.Rec.Class` in pure layers),
+  `test/structure.test.mjs`, `src/Format/Lex.purs`, `src/Format/Parse.purs`,
+  `test/coverage-oracle.mjs`, `docs/engineering.md`, `BACKLOG.md`
+- Create: `test/large-source.test.mjs`
+
+**Interfaces:** unchanged public signatures (`lex`, `parse`/`compile`); every
+token, span and diagnostic is identical for existing inputs.
+
+- [ ] **Step 1: Failing tests in test/large-source.test.mjs.**
+  (a) `fn main(): Int = 42;` followed by 1,000,000 spaces compiles; its Go
+  equals the Go of the program without the spaces. (b) 20,000 declarations
+  `fn f<i>(): Int = <i>;` plus `fn main(): Int = f19999();` compile and
+  `runGo` prints `19999`. (c) The same 1 MB padding followed by `@` is E_LEX
+  at offset 1,000,020 (the program is 20 characters), line 1, column
+  1,000,021, span length 1. (d) Lexing (a) finishes within 5 seconds (guards against the
+  quadratic `Array.uncons` copying). Each must fail on the current code
+  (RangeError or timeout); record the RED output.
+- [ ] **Step 2: Structure gate.** A structure test case: a pure module
+  importing `Control.Monad.Rec.Class` produces no finding, while
+  `Control.Monad.ST` still does. Seen failing first.
+- [ ] **Step 3: Lexer.** Index-based scan over the character array with
+  `tailRecM` (state: index, position, tokens); each step returns `Loop`
+  or `Done` through `maybe'`/`either` helpers. Linear time: no
+  `Array.uncons` or `Array.drop` per character. Two-character tokens,
+  words, punctuation and E_LEX behave exactly as before.
+- [ ] **Step 4: Declarations.** `Format.Parse.declarations` becomes a
+  `tailRecM` loop accumulating type and function declarations in order.
+- [ ] **Step 5: Coverage-oracle generator.** `choose` in
+  test/coverage-oracle.mjs alternates bit 0 (raw LCG mod 2^32), so
+  `choose(next, 2)` is deterministic alternation. First add a test that
+  80 consecutive `choose(next, 2)` draws are not a strict alternation (fails
+  now); then draw from high bits (e.g. `(next() >>> 16) % count`). Existing
+  coverage assertions are unchanged; if a seed-dependent assertion changes
+  outcome, record it and, if it is a real compiler defect, own it.
+- [ ] **Step 6:** docs/engineering.md records the allowlist change; BACKLOG
+  E002 narrows to deep nesting (structured diagnostic instead of a crash),
+  with corrected stack figures. `npm run verify` exits 0. Commit
+  `fix: stack-safe lexing and declaration parsing (E002)`.
+
 ### Task 4: Documentation and closure
 
 **Files:** docs/language.md, docs/adr/005-structural-order.md,
