@@ -1,6 +1,8 @@
-# Bumpus bootstrap
+<p align="center">
+  <img src="assets/branding/bumpus-logo.png" alt="Bumpus hound logo" width="240">
+</p>
 
-<img src="docs/assets/bumpus.svg" width="96" alt="Bumpus hound">
+# Bumpus bootstrap
 
 Bumpus is a provisional small functional language targeting ordinary Go.
 The name is for the Bumpus hounds of *A Christmas Story*, chosen because

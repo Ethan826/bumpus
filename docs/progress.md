@@ -303,3 +303,4 @@ Documentation only; no compiler source changed.
   and large-source duplicate tests in an isolated copy. bootstrap/*.go
   unchanged. `npm run verify` exit 0, 17 files, 96 tests, 0 skips
   (.build/task3b-verify.log).
+2026-10-07: logo. The README shows assets/branding/bumpus-logo.png (1254 × 1254 PNG with alpha, a bluetick coonhound with the stolen turkey above the wordmark), chosen by the user from image-generator candidates; provenance and final prompt in assets/branding/README.md. The Task 3a SVG icon was removed at the user's request; no earlier image versions are kept. Documentation and assets only.
