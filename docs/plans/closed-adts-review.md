@@ -2,7 +2,7 @@
 
 Range c2a9788..69f6585 on main, reviewed 2026-10-07 against
 docs/plans/2026-10-07-closed-adts-design.md and
-docs/plans/2026-10-07-five-layers-design.md. Findings fixed in COMMIT.
+docs/plans/2026-10-07-five-layers-design.md. Findings fixed in d2fddf9.
 
 ## Verdict
 

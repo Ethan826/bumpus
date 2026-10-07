@@ -1,7 +1,7 @@
 # Closed ADTs and Exhaustive Matching Implementation Plan
 
 Status: Tasks 1-8 executed 2026-10-07 (commit range c2a9788..HEAD on main).
-Final review complete; findings fixed in COMMIT (record:
+Final review complete; findings fixed in d2fddf9 (record:
 docs/plans/closed-adts-review.md).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
