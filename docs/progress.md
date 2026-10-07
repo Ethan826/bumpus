@@ -329,3 +329,7 @@ Documentation only; no compiler source changed.
   added; A003 Done. `rm -rf output && npm run verify` exit 0, 0 warnings,
   17 files, 98 tests, 0 skips, six regression proofs
   (.build/a003-review-fix-verify.log).
+  Follow-up: the final test/large-source.test.mjs run against a b5dde4e
+  build fails both new tests on their 5 s bounds (types 25.9 s, duplicates
+  21.8 s). Remaining per-reference name scans (resolveType, findGlobal)
+  measured at 1.7 s for 20,000 references and recorded in E002 for G001.
