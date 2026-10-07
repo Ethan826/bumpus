@@ -10,8 +10,10 @@ import Domain.Problem (Problem(..))
 import Domain.Resolved (Ty)
 import Domain.Syntax (Diagnostic, Span, problemAt)
 import Features.Check.Search (firstJust)
-import Features.Check.Signature (Lookup, Signature, buildSignature)
-import Features.Check.Usefulness (uncovered, useful)
+import Features.Check.Signature (Signature, buildSignature)
+import Features.Check.Tables (Lookup)
+import Features.Check.Missing (uncovered)
+import Features.Check.Usefulness (useful)
 
 -- Functions in declaration order; within each, matches in source pre-order.
 -- The signature is program-wide, so its failure (a table miss, which is a

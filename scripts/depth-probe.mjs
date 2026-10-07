@@ -1,6 +1,8 @@
 // Measures, per nesting form, the smallest depth at which a cold
 // `node scripts/bumpus.mjs emit` overflows the JavaScript stack (ADR 006).
-// Run with the depth limit disabled: `node scripts/depth-probe.mjs [form…]`.
+// Run with the depth limit disabled: `node scripts/depth-probe.mjs [form…]`
+// after temporarily setting `nestingLimit` in Format.Parse.Grammar to 10⁹
+// and rebuilding; ADR 006 "Measurement" gives the exact, uncommitted steps.
 // Every run is classified; only `overflow` drives the binary search, and any
 // `diagnostic` or `timeout` below the overflow point is reported as an
 // anomaly (a generator bug or a compiler defect), never as the limit.

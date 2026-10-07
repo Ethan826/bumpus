@@ -46,10 +46,16 @@ test('the grammar core, cursor and other modules may sequence monadically', () =
 const parserModules = ['Format.Parse', 'Format.Parse.Literal', 'Format.Parse.Pattern',
   'Format.Parse.Expression', 'Format.Parse.Declaration'];
 
+// Prelude's Monad helpers and Control.Bind's names sequence through Bind too
+// (G001 final review M1).
+const monadicNames = ['ap', 'ifM', 'whenM', 'unlessM', 'liftM1', 'bindFlipped',
+  'composeKleisli', 'composeKleisliFlipped'];
+
 test('parser productions reach Bind by no other name', () => {
   for (const name of parserModules) {
     for (const body of ['f x = bind x g', 'f x = x `bind` g', 'f x = Prelude.bind x g',
-      'f = g >=> h', 'f = g <=< h', 'f = (>=>)', 'f x = join x', 'f x = discard x g']) {
+      'f = g >=> h', 'f = g <=< h', 'f = (>=>)', 'f x = join x', 'f x = discard x g',
+      ...monadicNames.map(text => `f = ${text}`)]) {
       assert.ok(check(inModule(name, body)).some(finding => finding.includes('applicative')), `${name}: ${body}`);
     }
   }

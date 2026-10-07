@@ -7,7 +7,7 @@ an earlier layer; scripts/structure.mjs enforces it from `purs graph`.
 | Layer | Modules (src/) | Role |
 |---|---|---|
 | Domain | Syntax, Resolved, Problem, Host, IR.Internal | syntax trees, spans, `Ty`, resolved syntax, checked IR, `Problem` data, capability-port types |
-| Features | Resolve, Resolve.{Expression,Types,Pattern,Repeated,Fresh}, Check, Check.{Match,Signature,Usefulness,Coverage,Search} | resolution, checking, coverage; report `Problem` data, never text |
+| Features | Resolve, Resolve.{Expression,Types,Pattern,Repeated,Fresh}, Check, Check.{Match,Tables,Inhabited,Signature,Matrix,Usefulness,Missing,Coverage,Search} | resolution, checking, coverage; report `Problem` data, never text |
 | Format | Lex, Parse, Parse.*, Stack, Go, Go.{Layout,Data,Match,Compare,Show,Usage}, Diagnostic, Wire, Arguments | text in (tokens, parser, reserved words, uppercase rule); Go out; diagnostic text, `E_*` names, wire records, usage text |
 | Runtime | Node (+ Node.js) | port implementations, argv/stdout/stderr/exit, JSON; the only FFI |
 | Program | Compile, Command, Main | pure `compile`, commands over any `Host`, entry point |
@@ -60,12 +60,17 @@ Format.Wire.
   the only producer of `CheckedProgram`. It reports E_INTERNAL for invalid
   local/function/type indices; its resolved-syntax input is a trusted phase
   interface, not a hostile-IR validator.
-- **Coverage** (Features.Check.Coverage, Usefulness, Signature) runs after the
-  whole program type-checks: inhabitedness least fixed point, Maranget
-  usefulness, canonical witness. Type errors in later functions take
-  precedence over coverage errors. Its three linear searches (redundancy
-  over arms; exhaustiveness and wildcard usefulness over constructors) use
-  Features.Check.Search `firstJust`, a `tailRecM` loop (G001 Task 4b).
+- **Coverage** (Features.Check.Coverage, Usefulness, Missing, Matrix,
+  Signature, Inhabited) runs after the whole program type-checks:
+  inhabitedness least fixed point (Inhabited, a worklist), Maranget
+  usefulness (Usefulness), canonical witness by algorithm I (Missing), over
+  the shared pattern-matrix operations in Matrix. Type errors in later
+  functions take precedence over coverage errors. Its three linear searches
+  (redundancy over arms; exhaustiveness and wildcard usefulness over
+  constructors) use Features.Check.Search `firstJust`, a `tailRecM` loop
+  (G001 Task 4b); usefulness and algorithm I keep their pending heads and
+  witness continuations on an explicit Search `Stack` in a `tailRecM` loop,
+  so pattern columns cost no JavaScript stack (G001 final review).
 - **Compare** is one expression form, `Compare Operator Expr Expr`, through
   every phase (Operator is a closed Domain ADT); the checker requires equal
   operand types and yields Bool. No target detail enters IR.

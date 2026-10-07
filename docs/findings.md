@@ -206,6 +206,15 @@ policy, without weakening the tests or overstating their automated coverage.
   Usefulness's two constructor searches (about 2,000 constructors).
   Array.foldM over Either nests one bind per item; `traverse` is balanced
   and `tailRecM` loops, so both are safe.
+- The G001 final review found two more that the breadth tests missed,
+  because those tests declared wide types but never matched on them:
+  usefulness and algorithm I recursed once per pattern column (a
+  1,600-field constructor pattern overflowed) and the inhabitation fixed
+  point recursed once per pass, one pass per link of a type chain (3,000
+  chained types overflowed). A per-item recursion hides wherever a test
+  only exercises declaration size; test each phase at width. Also,
+  Array.modifyAtIndices nests one ST bind per index and overflows between
+  6,000 and 8,000 indices, so the new worklist sets flags in chunks.
 - Go's inliner expands nested immediately invoked closures exponentially:
   a match nested 24 deep takes 34.6 s and 7.5 GB to build (BACKLOG E005).
   The compiler accepts these programs; the remedy is pending a user

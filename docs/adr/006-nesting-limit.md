@@ -7,9 +7,11 @@ docs/plans/2026-10-07-applicative-parser-design.md sections 4 and 7.
 
 Every compiler phase (parse, resolve, check, coverage, Go emission) recurses
 over the syntax tree, so deep nesting exhausted the JavaScript stack and the
-CLI died with a raw `RangeError` (BACKLOG E002). G001 made lists and
-operator chains loops (breadth is fixed); depth remains bounded by the
-stack.
+CLI died with a raw `RangeError` (BACKLOG E002). G001 made the parser's
+lists and operator chains loops, and its final review made coverage
+stack-safe in pattern columns and inhabitation in chained types (BACKLOG
+E002 lists the breadth figures and the cliffs that remain); depth remains
+bounded by the stack.
 
 ## Options considered
 
@@ -61,7 +63,17 @@ and Go emission to walk chains iteratively first (BACKLOG O001).
 `node scripts/depth-probe.mjs` (cold `node scripts/bumpus.mjs emit` per run,
 Node 26.6, default stack, macOS arm64) binary-searches the smallest
 overflowing depth per form, with the limit disabled (constant temporarily
-10⁹, not committed). Every run is classified `overflow`, `diagnostic`,
+10⁹, not committed).
+
+The probe cannot be re-run without editing source, by design: the limit is
+a compile-time constant and no override is reachable from the CLI or from
+user programs (G001 final review M4). To re-measure, in a scratch checkout:
+set `nestingLimit = 1000000000` in src/Format/Parse/Grammar.purs (the line
+`nestingLimit = 128`), run `npm run build`, then
+`node scripts/depth-probe.mjs [form…]` (forms from scripts/depth-forms.mjs;
+default all), then restore the line and rebuild. Never commit the edit;
+test/depth.test.mjs fails while it is in place, since depth 129 no longer
+reports E_NESTING. Every run is classified `overflow`, `diagnostic`,
 `timeout` or `ok`; only `overflow` drives the search. Depth d is the
 counted depth defined above (scripts/depth-forms.mjs).
 

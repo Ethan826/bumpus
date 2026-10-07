@@ -5,11 +5,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { forms } from '../scripts/depth-forms.mjs';
+import { nestingLimit } from '../output/Format.Parse.Grammar/index.js';
 
 // E_NESTING (ADR 006), through the CLI: per form, depth = limit compiles,
 // builds and runs; depth = limit + 1 is E_NESTING at the token that would
 // exceed it. No run may print a raw RangeError or JavaScript stack frames.
-const limit = 128;
+const limit = nestingLimit;
 const work = mkdtempSync(join(tmpdir(), 'bumpus-depth-'));
 after(() => rmSync(work, { recursive: true, force: true }));
 

@@ -446,3 +446,26 @@ user review.
   147 tests, 0 failures/skips, seven regression proofs
   (.build/g001-task5-verify.log); answer, shapes, tree emits cmp-identical
   to bootstrap/*.go. Final whole-branch review pending.
+- Final whole-branch review fixes (2026-10-07; record
+  docs/plans/applicative-parser-review.md). I1: usefulness and algorithm I
+  (Features.Check.Usefulness, new Features.Check.Missing, shared
+  Features.Check.Matrix) run on an explicit Search `Stack` in `tailRecM`;
+  I2: inhabitation is a worklist (new Features.Check.Inhabited, lookups in
+  Features.Check.Tables), and Array.modifyAtIndices is chunked after the
+  20,000-type test overflowed in it. RED on the pre-fix compiler: all four
+  test/coverage-scale.test.mjs cases RangeError (5,000-field exhaustive,
+  non-exhaustive witness and redundant arm; 10,000-type chain after 9.9 s)
+  (.build/g001-final-fix-red.log); GREEN 0.27-0.36 s, 0.08 s, 0.05 s,
+  0.64-0.69 s. Remaining cliffs measured and recorded in BACKLOG E002 (4),
+  (5). M1: the Bind gate also rejects ap, ifM, whenM, unlessM, liftM1,
+  bindFlipped, composeKleisli, composeKleisliFlipped (style fixture failed
+  first on `ap`); M2: test/depth.test.mjs imports `nestingLimit`; M4: ADR
+  006 gives the exact uncommitted probe steps; M5: O001 notes. M3: accepted
+  that src/Format/Parse/Literal.purs grew 51 -> 55 lines, all of it the
+  purs-tidy one-per-line Grammar import list (spec section 6 "no parser
+  module grows" is otherwise met). `rm -rf output && npm run verify` exit 0,
+  21 files, 151 tests, 0 failures/skips, seven regression proofs (the
+  `exhaustive` needle still matches once and its mutant fails)
+  (.build/g001-final-fix-verify.log); answer, shapes, tree emits
+  cmp-identical to bootstrap/*.go. G001 Done, pending the controller's
+  scoped re-review.

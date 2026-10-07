@@ -35,8 +35,10 @@ adding a bypass allowlist.
   tools/style/src/Style/Parser.purs): in Format.Parse and
   Format.Parse.{Literal, Pattern, Expression, Declaration} it rejects every
   `do` block, the operators `>>=`, `=<<`, `>=>` and `<=<` (including
-  sections such as `(>>=)`), and the names `bind`, `join` and `discard`,
-  plain, qualified or in backticks. Format.Parse.Grammar, which holds the
+  sections such as `(>>=)`), and the names `bind`, `join`, `discard`,
+  Prelude's `ap`, `ifM`, `whenM`, `unlessM` and `liftM1`, and Control.Bind's
+  `bindFlipped`, `composeKleisli` and `composeKleisliFlipped`, plain,
+  qualified or in backticks. Format.Parse.Grammar, which holds the
   Parser instances, and Format.Parse.Cursor, the token cursor beneath it,
   are exempt; fixtures in test/style.test.mjs pin both the rejected and the
   exempt modules. The gate is syntactic: an aliased or re-exported Bind

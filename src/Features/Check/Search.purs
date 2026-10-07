@@ -1,10 +1,15 @@
-module Features.Check.Search (firstJust) where
+module Features.Check.Search (Stack(..), firstJust) where
 
 import Prelude
 import Control.Monad.Rec.Class (Step(..), tailRecM)
 import Data.Array as Array
 import Data.Either (Either)
 import Data.Maybe (Maybe(..), maybe, maybe')
+
+-- The pending work of an explicit-stack search, innermost first. Coverage
+-- keeps its continuations here rather than on the JavaScript stack, which
+-- one pattern column per frame overflowed (G001 final review I1).
+data Stack a = Bottom | Push a (Stack a)
 
 -- The first item, in order, that `judge` settles, judging none after it.
 -- Array.foldM over Either nests one bind per item, so a match of about 1,930

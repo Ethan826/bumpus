@@ -22,13 +22,26 @@ applicativeMessage ∷ String
 applicativeMessage =
   "parser productions are applicative: no do block, bind, join or Kleisli"
 
--- Every Prelude route to Bind, by operator or by name (backticked names are
--- identifiers in the CST, so `bind` in backticks is caught as a name).
+-- Every Prelude and Control.Bind route to Bind, by operator or by name
+-- (backticked names are identifiers in the CST, so `bind` in backticks is
+-- caught as a name). The Monad helpers joined in the G001 final review (M1).
 bindOperators ∷ Array String
 bindOperators = [ ">>=", "=<<", ">=>", "<=<" ]
 
 bindNames ∷ Array String
-bindNames = [ "bind", "join", "discard" ]
+bindNames =
+  [ "bind"
+  , "join"
+  , "discard"
+  , "ap"
+  , "ifM"
+  , "whenM"
+  , "unlessM"
+  , "liftM1"
+  , "bindFlipped"
+  , "composeKleisli"
+  , "composeKleisliFlipped"
+  ]
 
 -- Running a parser from a state and inspecting the result is sequencing, so
 -- the runner is the parser entry point's alone (and Grammar's, which

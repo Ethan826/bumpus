@@ -90,6 +90,6 @@ Features, Format, Runtime, Program ([architecture](docs/architecture.md)).
 Comparison and printing are specified in [language](docs/language.md) and
 [ADR 005](docs/adr/005-structural-order.md). Milestone A003 is merged. G001
 (applicative parser combinators; nesting deeper than 128 levels is the
-E_NESTING diagnostic, [ADR 006](docs/adr/006-nesting-limit.md)) is in review
-on branch g001 and is not merged.
+E_NESTING diagnostic, [ADR 006](docs/adr/006-nesting-limit.md)) is Done on
+branch g001, pending a scoped re-review, and is not merged.
 [Progress](docs/progress.md) records the evidence.
