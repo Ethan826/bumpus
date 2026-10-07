@@ -59,10 +59,16 @@ export const rejectedAt = (source, code, text, nth = 0) => {
   return diagnostic;
 };
 
-export const goTest = (source, testGo) => {
+// Records each Sprig function's entry in sprigTrace, in call order.
+export const traceCalls = goSource => goSource.replace(
+  /func sprigFn(\d+)\([^\n]*\) [^\n]* \{\n/g,
+  (header, index) => `${header}sprigTrace = append(sprigTrace, "${index}")\n`
+);
+
+export const goTest = (source, testGo, transform = go => go) => {
   const work = mkdtempSync(join(tmpdir(), 'sprig-gotest-'));
   try {
-    writeFileSync(join(work, 'main.go'), checked(source));
+    writeFileSync(join(work, 'main.go'), transform(checked(source)));
     writeFileSync(join(work, 'main_test.go'), testGo);
     const result = spawnSync('go', ['test', 'main.go', 'main_test.go'], {
       encoding: 'utf8', timeout: 120000, cwd: work,

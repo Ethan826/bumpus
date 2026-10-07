@@ -5,8 +5,8 @@ import { spawnSync } from 'node:child_process';
 const rows = [
   {
     name: 'branch', file: 'src/Features/Check.purs',
-    needle: 'require env (IR.typeOf first) second',
-    replacement: 'require env (IR.typeOf second) second',
+    needle: 'second ← infer env no\n  require env (IR.typeOf first) second',
+    replacement: 'second ← infer env no\n  require env (IR.typeOf second) second',
     probe: 'branch', message: /branch type mismatch was accepted/
   },
   {

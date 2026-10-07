@@ -1,6 +1,6 @@
 module Domain.IR.Internal where
 
-import Domain.Syntax (Span)
+import Domain.Syntax (Operator, Span)
 import Domain.Resolved (CtorId, CtorInfo, FunctionId, LocalId, Ty, TypeInfo)
 
 -- Constructors are internal to elaboration and lowering, enforced by the gate.
@@ -28,6 +28,7 @@ data Node
   | Call FunctionId (Array Expr)
   | Construct CtorId (Array Expr)
   | Add Expr Expr
+  | Compare Operator Expr Expr
   | If Expr Expr Expr
   | Match Expr (Array Arm)
 

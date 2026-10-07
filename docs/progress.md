@@ -239,3 +239,15 @@ visited fields; Bool helper only when needed). Written spec:
 docs/plans/2026-10-07-adt-printing-design.md, approved by the user.
 Plan: docs/plans/2026-10-07-adt-printing-plan.md (4 tasks), awaiting review.
 Documentation only; no compiler source changed.
+
+## A003 execution
+
+- 2026-10-07 Task 1 (comparison syntax, typing, primitive lowering): added
+  `Operator`/`Compare` through lexer, parser (non-chaining, looser than `+`),
+  resolver, checker, coverage and Go lowering; Bool ordering lowers through
+  `sprigCmpBool`, emitted only when used. New test/compare.test.mjs (6 tests:
+  runs, positions, rejections, left-to-right evaluation trace, helper
+  presence, answer.go unchanged); the old "lone > is E_LEX" test now pins a
+  lone `!`, and the branch regression needle gained context so it stays
+  unique. `npm run verify` exit 0; bootstrap/answer.go and shapes.go
+  unchanged.

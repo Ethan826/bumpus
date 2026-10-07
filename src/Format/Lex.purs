@@ -11,7 +11,8 @@ import Domain.Syntax (Diagnostic, Position, Span, origin, problemAt)
 type Token = { text ∷ String, span ∷ Span }
 
 punctuation ∷ Array Char
-punctuation = [ '(', ')', ':', ',', '=', ';', '+', '-', '|', '{', '}' ]
+punctuation =
+  [ '(', ')', ':', ',', '=', ';', '+', '-', '|', '{', '}', '<', '>' ]
 
 reserved ∷ Array String
 reserved =
@@ -49,7 +50,7 @@ scan position characters tokens = maybe' finished scanHead
     | isSpace head = scan (advance position head) tail tokens
     | isLetter head = word position characters tokens isNameChar
     | isDigit head = word position characters tokens isDigit
-    | head == '=' && Array.head tail == Just '>' = arrow position tail tokens
+    | Just text ← twoCharacter head tail = pair position text tail tokens
     | Array.elem head punctuation = scanPunctuation position head tail tokens
     | otherwise = unexpected position head
 
@@ -62,8 +63,23 @@ scanPunctuation position character tail tokens = scan next tail
   token =
     { text: String.singleton character, span: { start: position, end: next } }
 
-arrow ∷ Position → Array Char → Array Token → Either Diagnostic (Array Token)
-arrow position tail tokens = scan next (Array.drop 1 tail)
+-- Two-character tokens win over their one-character prefixes.
+twoCharacter ∷ Char → Array Char → Maybe String
+twoCharacter head tail = Array.find matches twoCharacterTokens
+  where
+  matches text = String.toCharArray text == Array.cons head
+    (Array.take 1 tail)
+
+twoCharacterTokens ∷ Array String
+twoCharacterTokens = [ "=>", "==", "!=", "<=", ">=" ]
+
+pair
+  ∷ Position
+  → String
+  → Array Char
+  → Array Token
+  → Either Diagnostic (Array Token)
+pair position text tail tokens = scan next (Array.drop 1 tail)
   (Array.snoc tokens token)
   where
   next =
@@ -71,7 +87,7 @@ arrow position tail tokens = scan next (Array.drop 1 tail)
     , line: position.line
     , column: position.column + 2
     }
-  token = { text: "=>", span: { start: position, end: next } }
+  token = { text, span: { start: position, end: next } }
 
 unexpected ∷ Position → Char → Either Diagnostic (Array Token)
 unexpected position character = Left (problemAt Lexical span)

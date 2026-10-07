@@ -9,7 +9,7 @@ import Features.Check.Coverage (coverage)
 import Features.Check.Match (Typed, checkMatch, require)
 import Domain.IR.Internal as IR
 import Domain.Problem (Problem(..))
-import Domain.Syntax (Diagnostic, Span, problemAt)
+import Domain.Syntax (Diagnostic, Operator, Span, problemAt)
 import Domain.Resolved (Ty(..))
 import Domain.Resolved as Resolved
 
@@ -73,6 +73,10 @@ infer env expression = case expression of
   Resolved.Call span id arguments → checkCall env span id arguments
   Resolved.Construct span id arguments → checkConstruct env span id arguments
   Resolved.Add span left right → checkAddition env span left right
+  Resolved.Compare span operator left right → checkComparison env span
+    operator
+    left
+    right
   Resolved.If span condition yes no → checkConditional env span condition yes
     no
   Resolved.Match span scrutinee arms → checkMatch infer env span scrutinee arms
@@ -97,6 +101,19 @@ checkAddition env span left right = do
   require env TInt first
   require env TInt second
   pure (IR.Expr { ty: TInt, span, node: IR.Add first second })
+
+checkComparison
+  ∷ Env
+  → Span
+  → Operator
+  → Resolved.Expr
+  → Resolved.Expr
+  → Either Diagnostic IR.Expr
+checkComparison env span operator left right = do
+  first ← infer env left
+  second ← infer env right
+  require env (IR.typeOf first) second
+  pure (IR.Expr { ty: TBool, span, node: IR.Compare operator first second })
 
 checkConditional
   ∷ Env

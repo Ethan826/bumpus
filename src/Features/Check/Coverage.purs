@@ -32,6 +32,7 @@ covered signature (IR.Expr expression) = case expression.node of
   IR.Call _ arguments → traverse_ recur arguments
   IR.Construct _ arguments → traverse_ recur arguments
   IR.Add left right → traverse_ recur [ left, right ]
+  IR.Compare _ left right → traverse_ recur [ left, right ]
   IR.If condition yes no → traverse_ recur [ condition, yes, no ]
   IR.Match scrutinee arms → coverMatch signature expression.span scrutinee
     arms

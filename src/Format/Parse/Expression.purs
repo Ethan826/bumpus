@@ -2,11 +2,12 @@ module Format.Parse.Expression (expression) where
 
 import Prelude
 import Data.Either (Either(..))
+import Data.Maybe (Maybe(..), isJust, maybe')
 import Format.Lex (Token)
 import Format.Lex as Lex
 import Domain.Syntax as Model
 import Format.Parse.Core as Core
-import Domain.Syntax (Expr(..), exprSpan)
+import Domain.Syntax (Expr(..), Operator(..), exprSpan)
 import Format.Parse.Core (Parser, commaList, expect, failAt, name, peek, take)
 import Format.Parse.Literal (integerLiteral, integerStart)
 import Format.Parse.Pattern (arms)
@@ -15,7 +16,45 @@ expression ∷ Parser Expr
 expression state = case peek state of
   "if" → conditional state
   "match" → matchExpression state
-  _ → additive state
+  _ → comparison state
+
+-- Comparison is non-associative: one operator between two additions.
+comparison ∷ Parser Expr
+comparison state = additive state >>= operatorAfter
+
+operatorAfter ∷ Core.Parsed Expr → Either Model.Diagnostic (Core.Parsed Expr)
+operatorAfter first = maybe' alone (extendComparison first)
+  (operatorOf (peek first.rest))
+  where
+  alone _ = Right first
+
+extendComparison
+  ∷ Core.Parsed Expr → Operator → Either Model.Diagnostic (Core.Parsed Expr)
+extendComparison first operator = do
+  token ← take first.rest
+  second ← additive token.rest
+  when (isJust (operatorOf (peek second.rest)))
+    (failAt second.rest "Comparisons do not chain")
+  pure
+    { value: Compare (spanBetween first.value second.value) operator
+        first.value
+        second.value
+    , rest: second.rest
+    }
+
+spanBetween ∷ Expr → Expr → Model.Span
+spanBetween first second =
+  { start: (exprSpan first).start, end: (exprSpan second).end }
+
+operatorOf ∷ String → Maybe Operator
+operatorOf = case _ of
+  "==" → Just Equal
+  "!=" → Just NotEqual
+  "<" → Just Less
+  "<=" → Just LessEqual
+  ">" → Just Greater
+  ">=" → Just GreaterEqual
+  _ → Nothing
 
 additive ∷ Parser Expr
 additive state = do
@@ -33,12 +72,11 @@ extendAddition ∷ Core.Parsed Expr → Either Model.Diagnostic (Core.Parsed Exp
 extendAddition first = do
   operator ← expect "+" first.rest
   second ← atom operator.rest
-  let
-    span =
-      { start: (exprSpan first.value).start
-      , end: (exprSpan second.value).end
-      }
-  addition { value: Add span first.value second.value, rest: second.rest }
+  addition
+    { value: Add (spanBetween first.value second.value) first.value
+        second.value
+    , rest: second.rest
+    }
 
 conditional ∷ Parser Expr
 conditional state = do

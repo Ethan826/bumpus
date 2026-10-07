@@ -26,6 +26,9 @@ expression scope next = case _ of
   Syntax.Variable span name → numbered <$> bareName scope span name
   Syntax.Call span name arguments → callName scope next span name arguments
   Syntax.Add span left right → resolveAddition span left right
+  Syntax.Compare span operator left right → resolveComparison span operator
+    left
+    right
   Syntax.If span condition yes no → resolveConditional span condition yes no
   Syntax.Match span scrutinee arms → resolveMatch scope next span scrutinee
     arms
@@ -36,6 +39,13 @@ expression scope next = case _ of
     first ← expression scope next left
     second ← expression scope first.next right
     pure (second { value = Resolved.Add span first.value second.value })
+  resolveComparison span operator left right = do
+    first ← expression scope next left
+    second ← expression scope first.next right
+    pure
+      ( second
+          { value = Resolved.Compare span operator first.value second.value }
+      )
   resolveConditional span condition yes no = do
     predicate ← expression scope next condition
     first ← expression scope predicate.next yes

@@ -7,12 +7,17 @@ type Position = { offset ∷ Int, line ∷ Int, column ∷ Int }
 type Span = { start ∷ Position, end ∷ Position }
 type Diagnostic = { problem ∷ Problem, span ∷ Span }
 
+data Operator = Equal | NotEqual | Less | LessEqual | Greater | GreaterEqual
+
+derive instance eqOperator ∷ Eq Operator
+
 data Expr
   = Integer Span Int
   | Boolean Span Boolean
   | Variable Span String
   | Call Span String (Array Expr)
   | Add Span Expr Expr
+  | Compare Span Operator Expr Expr
   | If Span Expr Expr Expr
   | Match Span Expr (Array Arm)
 
@@ -68,6 +73,7 @@ exprSpan = case _ of
   Variable span _ → span
   Call span _ _ → span
   Add span _ _ → span
+  Compare span _ _ _ → span
   If span _ _ _ → span
   Match span _ _ → span
 

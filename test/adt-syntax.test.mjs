@@ -51,8 +51,8 @@ test('reserved words and bad types are syntax errors', () => {
   ]) rejected(source, 'E_SYNTAX');
 });
 
-test('a lone > is a lexical error', () => {
-  rejected('fn main(): Int = 1 > 2;', 'E_LEX');
+test('a lone ! is a lexical error', () => {
+  rejected('fn main(): Int = 1 ! 2;', 'E_LEX');
 });
 
 test('=> | { } lex as single tokens', () => {
