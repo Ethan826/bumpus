@@ -352,3 +352,5 @@ heap-based phases). Written spec:
 docs/plans/2026-10-07-applicative-parser-design.md, approved as written
 with clarifications (section 7).
 Documentation only; no compiler source changed.
+Plan: docs/plans/2026-10-07-applicative-parser-plan.md (5 tasks), awaiting
+user review.
