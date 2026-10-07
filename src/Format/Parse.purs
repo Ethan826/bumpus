@@ -3,27 +3,29 @@ module Format.Parse (parse) where
 import Prelude
 import Control.Monad.Rec.Class (Step(..), tailRecM)
 import Data.Array as Array
-import Data.Either (Either(..))
-import Format.Lex (lex, endPosition)
+import Data.Either (Either(..), either)
 import Domain.Syntax
   ( Diagnostic
   , FunctionDecl
   , Parameter
+  , Position
   , Program
   , TypeDecl
   )
-import Format.Parse.Core
-  ( Parsed
-  , Parser
+import Format.Lex (Token, endPosition, lex)
+import Format.Parse.Declaration (typeDeclaration, typeRef)
+import Format.Parse.Expression (expression)
+import Format.Parse.Grammar
+  ( Parser
   , State
   , commaList
+  , dispatch
   , expect
+  , initialState
   , name
-  , peek
-  , typeRef
+  , on
+  , run
   )
-import Format.Parse.Declaration (typeDeclaration)
-import Format.Parse.Expression (expression)
 import Format.Stack (Stack)
 import Format.Stack as Stack
 
@@ -32,70 +34,63 @@ type Found =
   { rest ∷ State, types ∷ Stack TypeDecl, functions ∷ Stack FunctionDecl }
 
 parse ∷ String → Either Diagnostic Program
-parse source = do
-  tokens ← lex source
-  tailRecM declarations
-    { rest: { tokens, index: 0, eof: endPosition source }
-    , types: Stack.empty
-    , functions: Stack.empty
-    }
+parse source = either Left (program (endPosition source)) (lex source)
+
+program ∷ Position → Array Token → Either Diagnostic Program
+program eof tokens = tailRecM declarations
+  { rest: initialState tokens eof
+  , types: Stack.empty
+  , functions: Stack.empty
+  }
 
 -- One declaration per step. tailRecM runs the steps as a loop, where direct
 -- recursion overflowed the stack on long programs (BACKLOG E002).
 declarations ∷ Found → Either Diagnostic (Step Found Program)
-declarations found
-  | peek found.rest == "<end>" = Right (Done (finished found))
-  | peek found.rest == "type" = map (addType found) (typeDeclaration found.rest)
-  | otherwise = map (addFunction found) (function found.rest)
+declarations found = map resume (run declaration found.rest)
+  where
+  resume parsed = parsed.value (found { rest = parsed.rest })
 
-finished ∷ Found → Program
-finished found =
+-- What the next declaration adds to those found so far.
+declaration ∷ Parser (Found → Step Found Program)
+declaration = dispatch
+  [ on "<end>" (pure finished), on "type" (addType <$> typeDeclaration) ]
+  (addFunction <$> function)
+
+finished ∷ Found → Step Found Program
+finished found = Done
   { types: Array.fromFoldable found.types
   , functions: Array.fromFoldable found.functions
   }
 
-addType ∷ Found → Parsed TypeDecl → Step Found Program
-addType found parsed = Loop found
-  { rest = parsed.rest, types = Stack.push parsed.value found.types }
+addType ∷ TypeDecl → Found → Step Found Program
+addType parsed found =
+  Loop found { types = Stack.push parsed found.types }
 
-addFunction ∷ Found → Parsed FunctionDecl → Step Found Program
-addFunction found parsed = Loop found
-  { rest = parsed.rest, functions = Stack.push parsed.value found.functions }
+addFunction ∷ FunctionDecl → Found → Step Found Program
+addFunction parsed found =
+  Loop found { functions = Stack.push parsed found.functions }
 
 function ∷ Parser FunctionDecl
-function state = do
-  keyword ← expect "fn" state
-  identifier ← name keyword.rest
-  open ← expect "(" identifier.rest
-  parameters ← commaList parameter open.rest
-  close ← expect ")" parameters.rest
-  colon ← expect ":" close.rest
-  result ← typeRef colon.rest
-  equals ← expect "=" result.rest
-  body ← expression equals.rest
-  semicolon ← expect ";" body.rest
-  pure
-    { value:
-        { name: identifier.value.text
-        , parameters: parameters.value
-        , result: result.value
-        , body: body.value
-        , span:
-            { start: keyword.value.span.start, end: semicolon.value.span.end }
-        }
-    , rest: semicolon.rest
+function = functionOf <$> expect "fn" <*> name <* expect "("
+  <*> commaList parameter
+  <* expect ")"
+  <* expect ":"
+  <*> typeRef
+  <* expect "="
+  <*> expression
+  <*> expect ";"
+  where
+  functionOf keyword identifier parameters result body semicolon =
+    { name: identifier.text
+    , parameters
+    , result
+    , body
+    , span: { start: keyword.span.start, end: semicolon.span.end }
     }
 
+-- A parameter spans its name.
 parameter ∷ Parser Parameter
-parameter state = do
-  identifier ← name state
-  colon ← expect ":" identifier.rest
-  ty ← typeRef colon.rest
-  pure
-    { value:
-        { name: identifier.value.text
-        , ty: ty.value
-        , span: identifier.value.span
-        }
-    , rest: ty.rest
-    }
+parameter = parameterOf <$> name <* expect ":" <*> typeRef
+  where
+  parameterOf identifier ty =
+    { name: identifier.text, ty, span: identifier.span }

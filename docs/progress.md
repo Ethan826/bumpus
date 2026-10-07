@@ -365,3 +365,18 @@ user review.
   arms in 0.23 s. `npm run verify` exit 0, 101 tests, 0 failures/skips
   (.build/g001-task1-verify.log); emits of answer, shapes, tree cmp-identical
   to bootstrap/*.go.
+- Task 2 (2026-10-07): Expression, Declaration and the declaration loop
+  ported to the applicative grammar; Format.Parse.Core and the
+  fromLegacy/toLegacy, legacyState/grammarState adapters deleted; `spanned`
+  is an empty span when nothing is consumed; Functor map is direct. New CST
+  rule: no `do`, `>>=` or `=<<` in Format.Parse and
+  Format.Parse.{Literal, Pattern, Expression, Declaration} (Grammar, Cursor
+  exempt). RED: 1,536 constructors, 1,536 fields and 1,793 arguments
+  RangeError (.build/g001-task2-red.log), style fixture failing
+  (.build/g001-task2-style-red.log), empty `spanned` failing in an isolated
+  copy (.build/g001-task2-spanned-red.log); GREEN 15 ms, 7 ms, 56 ms
+  (.build/g001-task2-green.log). `fn main(): Int = (1` keeps E_SYNTAX
+  "Expected ')'" at 19-19. Parser lines 889 -> 685 (no module grew).
+  `npm run verify` exit 0, 112 tests, 0 failures/skips
+  (.build/g001-task2-verify.log); answer, shapes, tree emits cmp-identical
+  to bootstrap/*.go. Cold-CLI nesting depth moved (BACKLOG E002).

@@ -1,87 +1,61 @@
-module Format.Parse.Declaration (typeDeclaration) where
+module Format.Parse.Declaration (typeDeclaration, typeRef) where
 
 import Prelude
-import Data.Array as Array
 import Data.Either (Either(..))
-import Domain.Syntax (CtorDecl, TypeDecl, TypeRef)
-import Format.Parse.Core (Parser, expect, peek, typeRef, upperName)
+import Data.Maybe (Maybe, fromMaybe)
+import Domain.Problem (Problem(..))
+import Domain.Syntax
+  ( CtorDecl
+  , Diagnostic
+  , Span
+  , TypeDecl
+  , TypeRef(..)
+  , problemAt
+  )
+import Format.Lex (Token, isName, isUpper)
+import Format.Parse.Grammar
+  ( Parser
+  , expect
+  , optionalOn
+  , refine
+  , sepBy1
+  , spanned
+  , token
+  , upperName
+  )
 
 typeDeclaration ∷ Parser TypeDecl
-typeDeclaration state = do
-  keyword ← expect "type" state
-  identifier ← upperName keyword.rest
-  equals ← expect "=" identifier.rest
-  constructors ← constructorList equals.rest
-  semicolon ← expect ";" constructors.rest
-  pure
-    { value:
-        { name: identifier.value.text
-        , ctors: constructors.value
-        , span:
-            { start: keyword.value.span.start, end: semicolon.value.span.end }
-        }
-    , rest: semicolon.rest
-    }
-
-constructorList ∷ Parser (Array CtorDecl)
-constructorList state = do
-  first ← constructor state
-  remaining ← constructorTail first.rest
-  pure { value: Array.cons first.value remaining.value, rest: remaining.rest }
-
-constructorTail ∷ Parser (Array CtorDecl)
-constructorTail state =
-  if peek state /= "|" then Right { value: [], rest: state }
-  else afterBar state
-
-afterBar ∷ Parser (Array CtorDecl)
-afterBar state = do
-  bar ← expect "|" state
-  constructorList bar.rest
-
-constructor ∷ Parser CtorDecl
-constructor state = do
-  identifier ← upperName state
-  if peek identifier.rest == "(" then payload identifier
-  else pure (bare identifier)
+typeDeclaration = typeOf <$> expect "type" <*> upperName <* expect "="
+  <*> sepBy1 "|" constructor
+  <*> expect ";"
   where
-  bare identifier =
-    { value:
-        { name: identifier.value.text
-        , fields: []
-        , span: identifier.value.span
-        }
-    , rest: identifier.rest
+  typeOf keyword identifier ctors semicolon =
+    { name: identifier.text
+    , ctors
+    , span: { start: keyword.span.start, end: semicolon.span.end }
     }
-  payload identifier = do
-    open ← expect "(" identifier.rest
-    fields ← fieldList open.rest
-    close ← expect ")" fields.rest
-    pure
-      { value:
-          { name: identifier.value.text
-          , fields: fields.value
-          , span:
-              { start: identifier.value.span.start
-              , end: close.value.span.end
-              }
-          }
-      , rest: close.rest
-      }
 
--- A payload constructor needs at least one field; `A()` is rejected at `)`.
-fieldList ∷ Parser (Array TypeRef)
-fieldList state = do
-  first ← typeRef state
-  remaining ← fieldTail first.rest
-  pure { value: Array.cons first.value remaining.value, rest: remaining.rest }
+-- Int, Bool or a capitalized name; otherwise E_SYNTAX at that token.
+typeRef ∷ Parser TypeRef
+typeRef = refine known token
 
-fieldTail ∷ Parser (Array TypeRef)
-fieldTail state =
-  if peek state /= "," then Right { value: [], rest: state }
-  else afterComma state
+known ∷ Token → Either Diagnostic TypeRef
+known found
+  | found.text == "Int" = Right (IntRef found.span)
+  | found.text == "Bool" = Right (BoolRef found.span)
+  | isName found.text && isUpper found.text =
+      Right (NamedRef found.span found.text)
+  | otherwise = Left (problemAt (Syntax "Expected a type") found.span)
 
-afterComma ∷ Parser (Array TypeRef)
-afterComma state = do
-  comma ← expect "," state
-  fieldList comma.rest
+-- Spans the name alone, or through the `)` closing its fields. A payload
+-- constructor needs at least one field; `A()` is rejected at `)`.
+constructor ∷ Parser CtorDecl
+constructor = spanned ctorOf (parts <$> upperName <*> optionalOn "(" fields)
+  where
+  parts identifier found = { identifier, fields: found }
+  fields = expect "(" *> sepBy1 "," typeRef <* expect ")"
+
+ctorOf
+  ∷ Span → { identifier ∷ Token, fields ∷ Maybe (Array TypeRef) } → CtorDecl
+ctorOf span found =
+  { name: found.identifier.text, fields: fromMaybe [] found.fields, span }

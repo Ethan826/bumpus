@@ -31,6 +31,12 @@ adding a bypass allowlist.
 - separate language-cst-parser style package rejects let-in, anonymous lambdas,
   Maybe/Either constructor cases (including record-building or guarded cases),
   and do-blocks directly in case/if branches; parse recovery fails the gate;
+- the same CST gate keeps parser productions applicative (G001): in
+  Format.Parse and Format.Parse.{Literal, Pattern, Expression, Declaration}
+  it rejects every `do` block and the `>>=`/`=<<` operators (including
+  `(>>=)` sections). Format.Parse.Grammar, which holds the Parser instances,
+  and Format.Parse.Cursor, the token cursor beneath it, are exempt; fixtures
+  in test/style.test.mjs pin both the rejected and the exempt modules;
 - structured negative diagnostics (test/diagnostics.test.mjs, one row per
   code family with exact code, span and text), generated-Go snapshots
   (bootstrap/answer.go, bootstrap/shapes.go), positive build/run, seeded AST
@@ -38,7 +44,7 @@ adding a bypass allowlist.
   brute-force coverage oracle with brute-forced inhabitedness over generated
   type systems (test/coverage.test.mjs), and fake-host command tests
   (test/program.test.mjs);
-- `npm run verify` runs every test/*.test.mjs file (17 files, 96 tests, no
+- `npm run verify` runs every test/*.test.mjs file (19 files, 112 tests, no
   skips; the list is read from the directory, never hand-kept) and then
   scripts/regression.mjs, a table of isolated-copy mutations, each of which
   must pass on the healthy build and fail on its mutant: `branch`

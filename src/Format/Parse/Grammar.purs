@@ -18,8 +18,7 @@ module Format.Parse.Grammar
   , commaList
   , chainLeft1
   , spanned
-  , fromLegacy
-  , toLegacy
+  , run
   ) where
 
 import Prelude
@@ -27,18 +26,15 @@ import Control.Monad.Rec.Class (Step(..), tailRecM)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe, maybe')
-import Domain.Syntax (Diagnostic, Span, origin)
+import Domain.Syntax (Diagnostic, Span)
 import Format.Lex (Token, isName, isUpper)
-import Format.Parse.Core as Core
-import Format.Parse.Cursor (State) as Exports
+import Format.Parse.Cursor (Parsed, Run, State, initialState) as Exports
 import Format.Parse.Cursor
   ( Run
   , State
   , advance
   , current
   , failAt
-  , grammarState
-  , legacyState
   , nextSpan
   , peekText
   , skip
@@ -55,7 +51,7 @@ type Case a = { accepts ∷ String → Boolean, parser ∷ Parser a }
 type Continue = State → Step State State
 
 instance Functor Parser where
-  map transform parser = pure transform <*> parser
+  map transform (Parser parser) = Parser (mapAt transform parser)
 
 instance Apply Parser where
   apply (Parser function) (Parser argument) =
@@ -124,24 +120,25 @@ chainLeft1 ∷ ∀ a. String → (a → a → a) → Parser a → Parser a
 chainLeft1 operator combine item =
   Parser (foldAt (separated operator) identity combine (run item))
 
--- From the first to the last consumed token; consume at least one token.
+-- From the first to the last consumed token; an empty span at the next
+-- token's start if nothing was consumed.
 spanned ∷ ∀ a b. (Span → a → b) → Parser a → Parser b
 spanned build (Parser parser) = Parser (spannedAt build parser)
 
-fromLegacy ∷ ∀ a. Core.Parser a → Parser a
-fromLegacy legacy = Parser (fromLegacyAt legacy)
-
-toLegacy ∷ ∀ a. Parser a → Core.Parser a
-toLegacy (Parser parser) state =
-  map legacyParsed (parser (grammarState origin state))
-  where
-  legacyParsed parsed = { value: parsed.value, rest: legacyState parsed.rest }
+-- Runs a whole production from a state; the declaration loop steps with it.
+run ∷ ∀ a. Parser a → Run a
+run (Parser parser) = parser
 
 applyAt ∷ ∀ a b. Run (a → b) → Run a → Run b
 applyAt function argument state = do
   applied ← function state
   given ← argument applied.rest
   pure { value: applied.value given.value, rest: given.rest }
+
+mapAt ∷ ∀ a b. (a → b) → Run a → Run b
+mapAt transform parser state = map mapped (parser state)
+  where
+  mapped parsed = parsed { value = transform parsed.value }
 
 pureAt ∷ ∀ a. a → Run a
 pureAt value state = Right { value, rest: state }
@@ -203,15 +200,7 @@ spannedAt build parser state = map withSpan (parser state)
   where
   start = (nextSpan state).start
   withSpan parsed =
-    { value: build { start, end: parsed.rest.lastEnd } parsed.value
+    { value: build { start, end: endOf parsed.rest } parsed.value
     , rest: parsed.rest
     }
-
-fromLegacyAt ∷ ∀ a. Core.Parser a → Run a
-fromLegacyAt legacy state = map resumed (legacy (legacyState state))
-  where
-  resumed parsed =
-    { value: parsed.value, rest: grammarState state.lastEnd parsed.rest }
-
-run ∷ ∀ a. Parser a → Run a
-run (Parser parser) = parser
+  endOf rest = if rest.index == state.index then start else rest.lastEnd

@@ -21,3 +21,24 @@ test('comments and strings cannot hide code or trigger style errors', () => {
 test('named where helpers and lazy Maybe fallback are accepted', () => {
   assert.deepEqual(check(moduleSource('f x = maybe 0 found x\n  where\n  found value = value')), []);
 });
+
+// G001: parser productions are applicative. Only Format.Parse.Grammar (the
+// Parser instances) and Format.Parse.Cursor thread the state monadically.
+const inModule = (name, body) => `module ${name} where\nimport Prelude\n${body}\n`;
+const doBlock = 'f x = do\n  y <- x\n  pure y';
+
+test('parser productions reject do blocks and bind operators', () => {
+  for (const name of ['Format.Parse', 'Format.Parse.Literal', 'Format.Parse.Pattern',
+    'Format.Parse.Expression', 'Format.Parse.Declaration']) {
+    for (const body of [doBlock, 'f x = x >>= g', 'f x = g =<< x', 'f = (>>=)']) {
+      assert.ok(check(inModule(name, body)).some(finding => finding.includes('applicative')), `${name}: ${body}`);
+    }
+  }
+});
+
+test('the grammar core, cursor and other modules may sequence monadically', () => {
+  for (const name of ['Format.Parse.Grammar', 'Format.Parse.Cursor', 'Format.Lex', 'Format.Parse.Expressions']) {
+    for (const body of [doBlock, 'f x = x >>= g']) assert.deepEqual(check(inModule(name, body)), [], `${name}: ${body}`);
+  }
+  assert.deepEqual(check(inModule('Format.Parse.Expression', 'f = g <$> x <*> y <* z')), []);
+});
