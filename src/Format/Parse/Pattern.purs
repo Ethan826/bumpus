@@ -1,26 +1,22 @@
 module Format.Parse.Pattern (pattern, arms) where
 
 import Prelude
-import Data.Array as Array
-import Data.Either (Either(..))
+import Data.Maybe (Maybe, fromMaybe)
 import Format.Lex (Token, isName, isUpper)
-import Domain.Syntax
-  ( Arm
-  , Diagnostic
-  , Expr
-  , Pattern(..)
-  , Span
-  , exprSpan
-  , patternSpan
-  )
-import Format.Parse.Core
-  ( Parsed
-  , Parser
+import Domain.Syntax (Arm, Expr, Pattern(..), Span, exprSpan, patternSpan)
+import Format.Parse.Grammar
+  ( Parser
+  , defer
+  , dispatch
   , expect
-  , failAt
-  , nonEmptyList
-  , peek
-  , take
+  , failWith
+  , on
+  , onWhen
+  , optionalOn
+  , sepBy1
+  , sepByTrailing1
+  , spanned
+  , token
   , upperName
   )
 import Format.Parse.Literal (integerLiteral, integerStart)
@@ -28,88 +24,49 @@ import Format.Parse.Literal (integerLiteral, integerStart)
 -- An upper name is always a constructor and a lower name always a binder,
 -- so a misspelled constructor never becomes a catch-all.
 pattern ∷ Parser Pattern
-pattern state = case peek state of
-  "_" → simple PWildcard state
-  "true" → simple (flip PBool true) state
-  "false" → simple (flip PBool false) state
-  text
-    | integerStart text → intPattern state
-    | isName text && isUpper text → ctorPattern state
-    | isName text → simple (binder text) state
-    | otherwise → failAt state "Expected a pattern"
+pattern = dispatch
+  [ on "_" (PWildcard <$> tokenSpan)
+  , on "true" (flip PBool true <$> tokenSpan)
+  , on "false" (flip PBool false <$> tokenSpan)
+  , onWhen integerStart (intPattern <$> integerLiteral)
+  , onWhen upperText ctorPattern
+  , onWhen isName (binder <$> token)
+  ]
+  (failWith "Expected a pattern")
   where
-  binder text span = PBind span text
+  upperText text = isName text && isUpper text
+  intPattern literal = PInt literal.span literal.value
+  binder found = PBind found.span found.text
 
 -- One or more arms and an optional trailing comma. The closing `}` is left
 -- for the caller, whose match span ends there.
 arms ∷ Parser Expr → Parser (Array Arm)
-arms body state = do
-  first ← arm body state
-  remaining ← armTail body first.rest
-  pure { value: Array.cons first.value remaining.value, rest: remaining.rest }
+arms body = sepByTrailing1 "," "}" (arm body)
 
-simple ∷ (Span → Pattern) → Parser Pattern
-simple build state = do
-  token ← take state
-  pure { value: build token.value.span, rest: token.rest }
+tokenSpan ∷ Parser Span
+tokenSpan = spanOf <$> token
+  where
+  spanOf found = found.span
 
-intPattern ∷ Parser Pattern
-intPattern state = do
-  literal ← integerLiteral state
-  pure
-    { value: PInt literal.value.span literal.value.value
-    , rest: literal.rest
-    }
-
+-- Spans the name alone, or through the `)` closing its fields.
 ctorPattern ∷ Parser Pattern
-ctorPattern state = do
-  identifier ← upperName state
-  if peek identifier.rest == "(" then ctorFields identifier
-  else pure (bareCtor identifier)
+ctorPattern = spanned ctorOf (parts <$> upperName <*> optionalOn "(" fields)
+  where
+  parts identifier found = { identifier, fields: found }
+  fields = expect "(" *> sepBy1 "," (defer nested) <* expect ")"
+  nested _ = pattern
 
-bareCtor ∷ Parsed Token → Parsed Pattern
-bareCtor identifier =
-  { value: PCtor identifier.value.span identifier.value.text []
-  , rest: identifier.rest
-  }
+ctorOf ∷ Span → { identifier ∷ Token, fields ∷ Maybe (Array Pattern) } → Pattern
+ctorOf span found =
+  PCtor span found.identifier.text (fromMaybe [] found.fields)
 
-ctorFields ∷ Parsed Token → Either Diagnostic (Parsed Pattern)
-ctorFields identifier = do
-  open ← expect "(" identifier.rest
-  fields ← nonEmptyList pattern open.rest
-  close ← expect ")" fields.rest
-  pure
-    { value: PCtor
-        { start: identifier.value.span.start, end: close.value.span.end }
-        identifier.value.text
-        fields.value
-    , rest: close.rest
-    }
-
+-- An arm spans its pattern through its body, whose own span may stop
+-- inside closing parentheses.
 arm ∷ Parser Expr → Parser Arm
-arm body state = do
-  matched ← pattern state
-  arrow ← expect "=>" matched.rest
-  result ← body arrow.rest
-  pure
-    { value:
-        { pattern: matched.value
-        , body: result.value
-        , span:
-            { start: (patternSpan matched.value).start
-            , end: (exprSpan result.value).end
-            }
-        }
-    , rest: result.rest
+arm body = armOf <$> pattern <* expect "=>" <*> body
+  where
+  armOf matched result =
+    { pattern: matched
+    , body: result
+    , span: { start: (patternSpan matched).start, end: (exprSpan result).end }
     }
-
-armTail ∷ Parser Expr → Parser (Array Arm)
-armTail body state =
-  if peek state /= "," then Right { value: [], rest: state }
-  else afterComma body state
-
-afterComma ∷ Parser Expr → Parser (Array Arm)
-afterComma body state = do
-  comma ← expect "," state
-  if peek comma.rest == "}" then Right { value: [], rest: comma.rest }
-  else arms body comma.rest

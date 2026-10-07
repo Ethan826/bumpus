@@ -354,3 +354,14 @@ with clarifications (section 7).
 Documentation only; no compiler source changed.
 Plan: docs/plans/2026-10-07-applicative-parser-plan.md (5 tasks), awaiting
 user review.
+
+## G001 execution
+
+- Task 1 (2026-10-07): applicative grammar core (Format.Parse.Grammar, with
+  the token cursor split into Format.Parse.Cursor to stay under 250 lines);
+  Literal and Pattern ported; Expression reaches them through
+  fromLegacy/toLegacy. test/grammar.test.mjs RED: 1,473 arms RangeError
+  (trailing-comma rows recorded from the old compiler, passing); GREEN: 1,473
+  arms in 0.23 s. `npm run verify` exit 0, 101 tests, 0 failures/skips
+  (.build/g001-task1-verify.log); emits of answer, shapes, tree cmp-identical
+  to bootstrap/*.go.

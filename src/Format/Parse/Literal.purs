@@ -7,43 +7,47 @@ import Data.Int as Int
 import Data.Maybe (maybe')
 import Data.String.CodeUnits as String
 import Domain.Problem (Problem(..))
-import Domain.Syntax (Span, problemAt)
-import Format.Parse.Core (Parser, failAt, peek, take)
+import Domain.Syntax (Diagnostic, Span, problemAt)
+import Format.Lex (Token)
+import Format.Parse.Grammar
+  ( Parser
+  , dispatch
+  , expect
+  , on
+  , refine
+  , spanned
+  , token
+  )
 
 -- Expressions and patterns share one integer syntax: an optional minus
 -- token, then digits, range-checked to signed 32 bits.
 integerLiteral ∷ Parser { value ∷ Int, span ∷ Span }
-integerLiteral state =
-  if peek state == "-" then negativeInteger state
-  else unsignedInteger state
+integerLiteral = refine inRange
+  (dispatch [ on "-" negativeDigits ] (digitsOr "Expected an integer"))
 
 integerStart ∷ String → Boolean
 integerStart text = text == "-" || decimalToken text
 
-negativeInteger ∷ Parser { value ∷ Int, span ∷ Span }
-negativeInteger state = do
-  minus ← take state
-  digits ← take minus.rest
-  if decimalToken digits.value.text then
-    integer ("-" <> digits.value.text)
-      { start: minus.value.span.start, end: digits.value.span.end }
-      digits.rest
-  else failAt minus.rest "Expected digits after minus"
-
-unsignedInteger ∷ Parser { value ∷ Int, span ∷ Span }
-unsignedInteger state = do
-  token ← take state
-  if decimalToken token.value.text then
-    integer token.value.text token.value.span token.rest
-  else failAt state "Expected an integer"
-
--- Consumes nothing: it range-checks already-taken text, then continues.
-integer ∷ String → Span → Parser { value ∷ Int, span ∷ Span }
-integer text span rest = maybe' outOfRange parsedInteger
-  (Int.fromString text)
+-- The minus and its digits as one token-like span and text.
+negativeDigits ∷ Parser Token
+negativeDigits = spanned negated
+  (expect "-" *> digitsOr "Expected digits after minus")
   where
-  outOfRange _ = Left (problemAt IntegerOutOfRange span)
-  parsedInteger value = Right { value: { value, span }, rest }
+  negated span digits = { text: "-" <> digits.text, span }
+
+-- The next token, which must be digits; otherwise E_SYNTAX at that token.
+digitsOr ∷ String → Parser Token
+digitsOr message = refine digitsOnly token
+  where
+  digitsOnly found =
+    if decimalToken found.text then Right found
+    else Left (problemAt (Syntax message) found.span)
+
+inRange ∷ Token → Either Diagnostic { value ∷ Int, span ∷ Span }
+inRange digits = maybe' outOfRange parsedInteger (Int.fromString digits.text)
+  where
+  outOfRange _ = Left (problemAt IntegerOutOfRange digits.span)
+  parsedInteger value = Right { value, span: digits.span }
 
 decimalToken ∷ String → Boolean
 decimalToken text = Array.all isDigit (String.toCharArray text)

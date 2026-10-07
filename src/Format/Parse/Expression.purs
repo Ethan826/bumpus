@@ -7,6 +7,7 @@ import Format.Lex (Token)
 import Format.Lex as Lex
 import Domain.Syntax as Model
 import Format.Parse.Core as Core
+import Format.Parse.Grammar as Grammar
 import Domain.Syntax (Expr(..), Operator(..), exprSpan)
 import Format.Parse.Core (Parser, commaList, expect, failAt, name, peek, take)
 import Format.Parse.Literal (integerLiteral, integerStart)
@@ -101,7 +102,7 @@ matchExpression state = do
   keyword ← expect "match" state
   scrutinee ← expression keyword.rest
   open ← expect "{" scrutinee.rest
-  matched ← arms expression open.rest
+  matched ← armsOf open.rest
   close ← expect "}" matched.rest
   pure
     { value: Match
@@ -110,6 +111,8 @@ matchExpression state = do
         matched.value
     , rest: close.rest
     }
+  where
+  armsOf = Grammar.toLegacy (arms (Grammar.fromLegacy expression))
 
 atom ∷ Parser Expr
 atom state = case peek state of
@@ -129,7 +132,7 @@ parenthesized state = do
 
 integer ∷ Parser Expr
 integer state = do
-  literal ← integerLiteral state
+  literal ← Grammar.toLegacy integerLiteral state
   pure
     { value: Integer literal.value.span literal.value.value
     , rest: literal.rest
