@@ -280,6 +280,51 @@ Update the existing rows listed in Global Constraints; the adt-types
 - [ ] **Step 7: `npm run verify` exits 0; commit**
   `feat: print values of any type from main (A003)`.
 
+### Task 3a: Rename the language to Bumpus
+
+Added 2026-10-07 at the user's request. "Sprig" collides with
+Masterminds/sprig (the Go template library in Helm) and Hack Club Sprig;
+"Bumpus" (the neighbors' hounds in *A Christmas Story*) was vetted clean.
+
+**Rule:** every reference to the language name changes: `Sprig` → `Bumpus`,
+`sprig` → `bumpus`, `.sprig` → `.bumpus`, including generated Go identifiers
+(`sprigFn0` → `bumpusFn0`, `sprigTy`, `sprigLocal`, `sprigMatch`,
+`sprigCtor`, `sprigAdd`, `sprigCmp*`, `sprigShow*`, test-side `sprigTrace`),
+panic texts (`bumpus: malformed value`, `bumpus: unmatched value`), the Go
+header comment, temp-dir prefixes, package names (`bumpus-bootstrap`,
+spago `bumpus` and `bumpus-style`, regenerating spago.lock through Spago),
+the npm script (`bumpus`), `scripts/sprig.mjs` → `scripts/bumpus.mjs`, and
+`examples/*.sprig`, `negative/*.sprig` → `*.bumpus` (use `git mv`).
+Exception: literal historical identifiers inside dated evidence (old module
+names such as `Sprig.Check`, old command lines and log paths in
+docs/progress.md, findings, completed plans, ledgers and reviews) stay
+verbatim, because they name artifacts that existed; the prose language name
+in those files still changes. Add one dated line at the top of
+docs/progress.md recording the rename and this exception.
+
+**Files:** everything listed by
+`grep -rIl -i sprig --exclude-dir={.git,output,.spago,.build,.superpowers,.agents} .`
+plus the file renames above. New: `docs/assets/bumpus.svg`.
+
+- [ ] **Step 1: Mechanical rename** per the rule. Regenerate
+  bootstrap/answer.go, shapes.go and tree.go with the CLI; each new file
+  must equal the old one with `sprig` → `bumpus` and `Sprig` → `Bumpus`
+  substituted (check with sed + cmp and record it). Regression needles in
+  scripts/regression.mjs are renamed consistently and still match once.
+- [ ] **Step 2: Icon.** `docs/assets/bumpus.svg`: a simple, original
+  flat-style hound dog head (long droopy ears), 128×128 viewBox, two or
+  three fixed colors on a transparent background that read on both light
+  and dark GitHub themes, under 4 KB, no external references or fonts.
+- [ ] **Step 3: README.** Rename throughout; show the icon at the top
+  (`<img src="docs/assets/bumpus.svg" width="96" alt="Bumpus hound">`);
+  one sentence on the name (the Bumpus hounds, chosen because "Sprig"
+  collided with Masterminds/sprig in the Go ecosystem). Commands use
+  `npm run bumpus` / `scripts/bumpus.mjs` and `.bumpus` files.
+- [ ] **Step 4: Check.** `grep -rIn -i sprig` over the same scope lists only
+  the permitted historical identifiers; record the remaining list in the
+  report. BACKLOG gets a Done row R002 "Rename to Bumpus". `npm run verify`
+  exits 0. Commit `chore: rename the language to Bumpus`.
+
 ### Task 3b: Stack-safe lexing and declaration parsing (E002 part)
 
 Added 2026-10-07 with user approval: owning the pre-existing RangeError found
