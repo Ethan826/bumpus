@@ -333,3 +333,13 @@ Documentation only; no compiler source changed.
   build fails both new tests on their 5 s bounds (types 25.9 s, duplicates
   21.8 s). Remaining per-reference name scans (resolveType, findGlobal)
   measured at 1.7 s for 20,000 references and recorded in E002 for G001.
+
+## A003 merged (2026-10-07)
+
+User approved the merge. main fast-forwarded 74e5c2a..4b5ce2e. Clean
+`rm -rf output && npm run verify` on main exited 0: zero warnings, 98 tests,
+zero failures/skips, strict rebuild proof and six regression proofs
+(branch, nil-guard, exhaustive, ctor-order, first-field, show-fields). Raw
+log: .build/a003-merge-verify.log. Worktree .build logs and the SDD ledger
+were archived under .build/merged-a003-evidence before the a003 worktree
+and branch were removed. No push. Next: G001 (design first).
