@@ -1,6 +1,9 @@
 # Applicative Parser and Depth Limit Implementation Plan (G001)
 
-Status: written 2026-10-07, awaiting user review. Not started.
+Status: approved 2026-10-07 for subagent-driven execution in
+.worktrees/g001 (branch g001), with two user corrections folded in (Task 1's
+long-arm test; Task 3's comparison accounting, mixed-nesting tests and probe
+outcome classification). Not started.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -91,8 +94,10 @@ runner, Go 1.26.4.
 
 - [ ] **Step 1: Failing tests.** test/grammar.test.mjs, through `compile`
   (`rejectedAt`/`checked` from test/support.mjs): (a) a `match` with 1,473
-  arms over `type B = T | F;` alternating `T => 1, F => 2` — must compile
-  within 5 s (RED: RangeError); (b) `match b { T => 1, }` accepted;
+  valid arms — `fn f(n: Int): Int = match n { 0 => 0, 1 => 1, …, 1471 =>
+  1471, _ => -1 };` (1,472 distinct integer-literal arms plus a final
+  wildcard, so no arm is redundant and no constructor-list parsing is
+  involved) — must compile within 5 s (RED: RangeError); (b) `match b { T => 1, }` accepted;
   `match b { T => 1,, }` keeps today's E_SYNTAX code, span and message
   (record them from the current compiler first and assert them); (c) the
   pattern/literal rows already in test/diagnostics.test.mjs stay as they are.
@@ -153,17 +158,25 @@ fails with `NestingTooDeep limit` at the current token when it would exceed
 `nestingLimit ∷ Int` (named constant in Grammar), restores depth on exit.
 Wrapped around: parenthesized inner expression, `if` condition and both
 branches, `match` scrutinee and each arm body, each call/constructor
-argument, each constructor-pattern field. `chainLeft1` counts each
-additional operand as one level (the k-th `+` raises depth by one for the
-rest of the chain); the failure span is that `+` token.
+argument, each constructor-pattern field, and each comparison operand (a
+comparison raises depth by one for its right operand, as the spec counts
+comparison operands). `chainLeft1` counts each additional operand as one
+level (the k-th `+` raises depth by one for the rest of the chain); the
+failure span is that `+` (or comparison operator) token.
 
 - [ ] **Step 1: Probe.** scripts/depth-probe.mjs (≤100 lines): for each form
   {parens, if-condition, if-branch, match-scrutinee, match-arm,
   call-argument, constructor-argument, constructor-pattern, plus-chain},
-  generate programs of depth d and binary-search, in a fresh
-  `node scripts/bumpus.mjs emit` process per run, the smallest d that does
-  not exit with a diagnostic (raw RangeError output); print a table per
-  form. Run it with the limit disabled (temporarily huge constant, not
+  generate well-typed, exhaustive programs of depth d and binary-search,
+  in a fresh `node scripts/bumpus.mjs emit` process per run (emit runs every
+  compiler phase including Go generation, and never invokes the Go tool),
+  the smallest d that overflows. Classify every run's outcome: `overflow`
+  (stderr contains `RangeError` / `Maximum call stack size exceeded`),
+  `diagnostic` (a structured Bumpus diagnostic: semantic rejection),
+  `timeout`, or `ok`. Only `overflow` drives the search; any `diagnostic` or
+  `timeout` at a depth below the overflow point is printed as an anomaly and
+  investigated (a generator bug or a real defect to own), never counted as
+  the limit. Also probe mixed forms (below). Print a table per form. Run it with the limit disabled (temporarily huge constant, not
   committed) and record the table in ADR 006.
 - [ ] **Step 2:** choose `nestingLimit`: the largest power of two ≤ half the
   minimum measured depth (spec: 256 provisional). Record the decision.
@@ -172,6 +185,13 @@ rest of the chain); the failure span is that `+` token.
   and its Go builds (runs, where `main` can return it); depth = limit + 1
   exits 1 with E_NESTING, message `Nesting exceeds <limit> levels`, exact
   span; stdout/stderr never contain `RangeError` or `at ` stack frames.
+  Mixed nesting (combined trees, since per-form measurements do not
+  establish that combinations are safe): an `if` nested limit − k deep used
+  as the left operand of a k-term sum; parentheses inside call arguments
+  inside constructor arguments; a comparison whose operands are deep
+  matches; each at total depth = limit compiles and builds, and at
+  limit + 1 is E_NESTING. The probe measures these mixes too, and the limit
+  is ≤ half the minimum over single and mixed forms.
   Review Focus 1: a syntax error at depth limit − 1 still reports its
   E_SYNTAX. RED: raw RangeError / no E_NESTING.
 - [ ] **Step 4:** implement; diagnostics characterization gains the
