@@ -4,6 +4,7 @@ import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (maybe, maybe')
+import Data.Traversable (traverse)
 import Domain.Problem (DuplicateKind(..), Problem(..), UnboundKind(..))
 import Domain.Syntax as Syntax
 import Domain.Resolved
@@ -12,13 +13,12 @@ import Domain.Resolved
   , Global
   , GlobalRef(..)
   , Local
-  , LocalId(..)
-  , Numbered
+  , LocalId
   , Pattern(..)
   )
+import Features.Resolve.Fresh (Fresh, fresh, liftEither)
 
 type Resolution = { pattern ∷ Pattern, binders ∷ Array Local }
-type Fields = { patterns ∷ Array Pattern, binders ∷ Array Local }
 type Binder = { name ∷ String, span ∷ Syntax.Span }
 
 type Tables = { globals ∷ Array Global, ctors ∷ Array CtorInfo }
@@ -28,56 +28,43 @@ type Tables = { globals ∷ Array Global, ctors ∷ Array CtorInfo }
 resolvePattern
   ∷ Array Global
   → Array CtorInfo
-  → Int
   → Syntax.Pattern
-  → Either Syntax.Diagnostic (Numbered Resolution)
-resolvePattern globals ctors next syntax = do
-  resolved ← walk { globals, ctors } next syntax
-  uniqueBinders (binders syntax)
+  → Fresh Resolution
+resolvePattern globals ctors syntax = do
+  resolved ← walk { globals, ctors } syntax
+  liftEither (uniqueBinders (binders syntax))
   pure resolved
 
-walk
-  ∷ Tables
-  → Int
-  → Syntax.Pattern
-  → Either Syntax.Diagnostic (Numbered Resolution)
-walk tables next = case _ of
+walk ∷ Tables → Syntax.Pattern → Fresh Resolution
+walk tables = case _ of
   Syntax.PWildcard span → leaf (Wildcard span)
-  Syntax.PBind span name → pure (bound span name)
+  Syntax.PBind span name → bound span name <$> fresh
   Syntax.PInt span value → leaf (IntLit span value)
   Syntax.PBool span value → leaf (BoolLit span value)
-  Syntax.PCtor span name fields → ctorPattern tables next span name fields
+  Syntax.PCtor span name fields → ctorPattern tables span name fields
   where
-  leaf pattern = pure { value: { pattern, binders: [] }, next }
-  bound span name =
-    { value:
-        { pattern: Bind span (LocalId next)
-        , binders: [ { name, id: LocalId next } ]
-        }
-    , next: next + 1
-    }
+  leaf pattern = pure { pattern, binders: [] }
+
+bound ∷ Syntax.Span → String → LocalId → Resolution
+bound span name id = { pattern: Bind span id, binders: [ { name, id } ] }
 
 ctorPattern
   ∷ Tables
-  → Int
   → Syntax.Span
   → String
   → Array Syntax.Pattern
-  → Either Syntax.Diagnostic (Numbered Resolution)
-ctorPattern tables next span name fields = do
-  id ← constructor tables.globals span name
-  arity tables.ctors span id fields
-  resolved ← Array.foldM field start fields
+  → Fresh Resolution
+ctorPattern tables span name fields = do
+  id ← liftEither (constructor tables.globals span name)
+  liftEither (arity tables.ctors span id fields)
+  resolved ← traverse (walk tables) fields
   pure
-    { value:
-        { pattern: Ctor span id resolved.value.patterns
-        , binders: resolved.value.binders
-        }
-    , next: resolved.next
+    { pattern: Ctor span id (map patternOf resolved)
+    , binders: Array.concatMap bindersOf resolved
     }
   where
-  start = { value: { patterns: [], binders: [] }, next }
-  field acc syntax = appendField acc <$> walk tables acc.next syntax
+  patternOf resolution = resolution.pattern
+  bindersOf resolution = resolution.binders
 
 arity
   ∷ Array CtorInfo
@@ -93,15 +80,6 @@ arity ctors span (CtorId index) fields = maybe' missing counted
   counted info =
     when (Array.length info.fields /= Array.length fields)
       (Left (Syntax.problemAt FieldArity span))
-
-appendField ∷ Numbered Fields → Numbered Resolution → Numbered Fields
-appendField acc resolved =
-  { value:
-      { patterns: Array.snoc acc.value.patterns resolved.value.pattern
-      , binders: acc.value.binders <> resolved.value.binders
-      }
-  , next: resolved.next
-  }
 
 constructor
   ∷ Array Global

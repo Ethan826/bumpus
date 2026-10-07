@@ -393,3 +393,16 @@ user review.
   limit disabled; GREEN 26/26 (.build/g001-task3-green.log). `npm run
   verify` exit 0, 138 tests, 0 failures/skips (.build/g001-task3-verify.log);
   answer, shapes, tree emits cmp-identical to bootstrap/*.go.
+- Task 4 (2026-10-07): resolver numbering through Features.Resolve.Fresh
+  (state-and-error, Functor/Apply/Applicative/Bind/Monad; `fresh`,
+  `failure`, `liftEither`, `runFresh`); arms, arguments and pattern fields
+  via balanced `traverse`; `Numbered` dropped from Domain.Resolved.
+  Characterization (test/adt-match.test.mjs LocalIds row) recorded from and
+  passing on the old compiler, failing when arms are numbered before the
+  scrutinee in an isolated mutant. New: 10,000 binding arguments compile in
+  about 1 s (test/large-source.test.mjs; RED RangeError on the old resolver,
+  .build/g001-task4-red.log). Differential over 1,327 distinct sources
+  compiled by the suite: all identical Go or diagnostics except that row.
+  `npm run verify` exit 0, 140 tests, 0 failures/skips
+  (.build/g001-task4-verify.log); answer, shapes, tree emits cmp-identical
+  to bootstrap/*.go.

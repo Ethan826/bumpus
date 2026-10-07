@@ -32,9 +32,6 @@ data GlobalRef = FunctionRef FunctionId | CtorRef CtorId
 -- Functions and constructors share one global namespace.
 type Global = { name ∷ String, ref ∷ GlobalRef }
 
--- A result plus the next free LocalId, threaded in source pre-order.
-type Numbered a = { value ∷ a, next ∷ Int }
-
 data Pattern
   = Wildcard Span
   | Bind Span LocalId

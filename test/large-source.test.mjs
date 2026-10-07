@@ -88,3 +88,23 @@ test('lexing a megabyte takes linear, not quadratic, time', () => {
   assert.ok(result instanceof Right, 'padded program did not lex');
   assert.ok(seconds < lexSecondsLimit, `lexing took ${seconds}s`);
 });
+
+// Resolution numbers binders through Fresh and a balanced `traverse` (G001
+// Task 4); its earlier Array.foldM over Either overflowed the stack near
+// 5,000 arguments or arms.
+const wideCount = 10000;
+
+test('ten thousand binding arguments resolve in source order', () => {
+  const parameters = Array.from({ length: wideCount },
+    (_, index) => `p${index}: Int`);
+  const bindings = Array.from({ length: wideCount },
+    (_, index) => `match ${index} { y => y }`);
+  const source = `fn f(${parameters.join(', ')}): Int = 0; `
+    + `fn main(): Int = f(${bindings.join(', ')});`;
+  let go = '';
+  const seconds = secondsFor(() => { go = checked(source); });
+  assert.ok(seconds < compileSecondsLimit, `compiling took ${seconds}s`);
+  const last = wideCount - 1;
+  assert.ok(go.includes(`bumpusLocal${last} := `), 'last binder numbered');
+  assert.ok(!go.includes(`bumpusLocal${wideCount} `), 'no extra binder');
+});

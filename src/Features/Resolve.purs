@@ -8,6 +8,7 @@ import Data.Traversable (traverse)
 import Domain.Problem (EntryKind(..), Problem(..))
 import Domain.Syntax as Syntax
 import Features.Resolve.Expression (expression)
+import Features.Resolve.Fresh (runFresh)
 import Features.Resolve.Types (resolveType, typeTable)
 import Domain.Resolved (Global)
 import Domain.Resolved as Resolved
@@ -84,9 +85,9 @@ resolveFunction
   → Array Resolved.CtorInfo
   → Definition
   → Either Syntax.Diagnostic Resolved.FunctionDecl
-resolveFunction globals ctors definition = withBody <$> expression scope
+resolveFunction globals ctors definition = withBody <$> runFresh
   (Array.length locals)
-  definition.function.body
+  (expression scope definition.function.body)
   where
   scope = { globals, ctors, locals }
   locals = Array.mapWithIndex parameterLocal definition.signature.parameters
@@ -96,6 +97,6 @@ resolveFunction globals ctors definition = withBody <$> expression scope
     { id: Resolved.FunctionId definition.index
     , parameters: definition.signature.parameters
     , result: definition.signature.result
-    , body: body.value
+    , body
     , span: definition.function.span
     }
