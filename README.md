@@ -60,20 +60,23 @@ type: the executable prints the value in the coverage-witness format (`5`,
 `true`, `Node(Leaf, 1, Node(...))`, negative integers with `-`), and
 examples/tree.bumpus prints a binary search tree. Comparisons are built in,
 non-chaining and looser than `+`, with one structural order (constructor
-declaration order, then fields left to right; ADR 005). `emit` writes canonical deterministic Go;
-`build` invokes Go on a temporary source file; `run` builds and executes a
-temporary binary. Destinations are explicit and may be overwritten.
-Diagnostics are JSON on stderr with stable tags and source spans; source
-rejection exits 1, incorrect CLI usage exits 2. Boundary errors use E_IO or
-E_TOOL. The compiler is a Node executable using compiled PureScript modules,
-not yet a native Go compiler executable.
+declaration order, then fields left to right; ADR 005). `emit` writes
+canonical deterministic Go; `build` invokes Go on a temporary source file;
+`run` builds and executes a temporary binary. Destinations are explicit and
+may be overwritten. Diagnostics are JSON on stderr with stable tags and
+source spans; source rejection exits 1, incorrect CLI usage exits 2. Boundary
+errors use E_IO or E_TOOL. The compiler is a Node executable using compiled
+PureScript modules, not yet a native Go compiler executable.
 
 ## Where to continue
 
 - [Implementation plan](docs/plans/bootstrap.md)
 - [Progress](docs/progress.md)
 - [Language specification](docs/language.md)
-- [Architecture](docs/architecture.md) and [decisions](docs/adr/001-slice.md), [ADR 002](docs/adr/002-polymorphic-lowering.md), [ADR 005](docs/adr/005-structural-order.md)
+- [Architecture](docs/architecture.md) and decisions:
+  [ADR 001](docs/adr/001-slice.md),
+  [ADR 002](docs/adr/002-polymorphic-lowering.md),
+  [ADR 005](docs/adr/005-structural-order.md)
 - [Engineering rules and gate coverage](docs/engineering.md)
 - [Reference provenance](docs/provenance.md)
 - [Self-hosting chain](docs/bootstrap.md)
@@ -84,6 +87,7 @@ Closed ADTs and exhaustive matching are implemented (see
 and examples/shapes.bumpus). The compiler is organized in five layers: Domain,
 Features, Format, Runtime, Program ([architecture](docs/architecture.md)).
 Comparison and printing are specified in [language](docs/language.md) and
-[ADR 005](docs/adr/005-structural-order.md). Milestone A003 is in final
-review on branch a003; the next milestone is chosen by the user after merge.
+[ADR 005](docs/adr/005-structural-order.md). Milestone A003 is done on
+branch a003 and awaits merge approval; G001 (applicative parser combinators)
+is next after the merge.
 [Progress](docs/progress.md) records the evidence.

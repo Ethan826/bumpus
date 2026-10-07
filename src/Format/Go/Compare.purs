@@ -10,12 +10,12 @@ module Format.Go.Compare
 
 import Prelude
 import Data.Array as Array
-import Data.Maybe (maybe)
 import Data.String.Common (joinWith)
 import Domain.IR.Internal as IR
-import Domain.Resolved (CtorId(..), CtorInfo, Ty(..), TypeId(..), TypeInfo)
+import Domain.Resolved (Ty(..), TypeId(..))
 import Domain.Syntax (Operator(..))
-import Format.Go.Data (fieldName, goType, malformed, tagOf)
+import Format.Go.Data (fieldName, goType, malformed)
+import Format.Go.Layout (Declared, Layout, Member)
 
 goOperator ∷ Operator → String
 goOperator = case _ of
@@ -47,10 +47,8 @@ compareName ∷ TypeId → String
 compareName (TypeId index) = "bumpusCmp" <> show index
 
 -- One helper per declared type, in TypeId order, whether or not used.
-compareHelpers ∷ Array TypeInfo → Array CtorInfo → String
-compareHelpers types ctors = joinWith "" (Array.mapWithIndex helper types)
-  where
-  helper index info = compareHelper types ctors (TypeId index) info
+compareHelpers ∷ Layout → String
+compareHelpers program = joinWith "" (map compareHelper program.types)
 
 -- Go evaluates call operands left to right, so every form keeps that order.
 -- Go == on the structs would compare field pointers, so declared types
@@ -70,9 +68,8 @@ comparison lower operator left right = case IR.typeOf left of
 
 -- Tags are 1-based declaration positions, so comparing tags orders
 -- constructors. An out-of-range tag is malformed (I001 foreign values).
-compareHelper
-  ∷ Array TypeInfo → Array CtorInfo → TypeId → TypeInfo → String
-compareHelper types ctors owner info =
+compareHelper ∷ Declared → String
+compareHelper declared =
   "func " <> compareName owner <> "(a " <> name <> ", b " <> name
     <> ") int {\n"
     <> "if "
@@ -83,24 +80,23 @@ compareHelper types ctors owner info =
     <> malformed
     <> " }\n"
     <> "if a.tag != b.tag { if a.tag < b.tag { return -1 }; return 1 }\n"
-    <> joinWith "" (map (ctorFields types ctors) info.ctors)
+    <> joinWith "" (map ctorFields declared.members)
     <> "return 0\n}\n\n"
   where
+  owner = declared.id
   name = goType (TData owner)
-  count = show (Array.length info.ctors)
+  count = show (Array.length declared.members)
   badTag value = value <> ".tag < 1 || " <> value <> ".tag > " <> count
 
 -- Fields compare left to right; the first nonzero result decides.
-ctorFields ∷ Array TypeInfo → Array CtorInfo → CtorId → String
-ctorFields types ctors id@(CtorId index) =
-  maybe "" declared (Array.index ctors index)
+ctorFields ∷ Member → String
+ctorFields member = guarded
+  (joinWith "" (Array.mapWithIndex field member.ctor.fields))
   where
-  declared ctor = guarded (fieldsOf ctor)
-  fieldsOf ctor = joinWith "" (Array.mapWithIndex field ctor.fields)
-  field position ty = fieldComparison (fieldName id position) ty
+  field position ty = fieldComparison (fieldName member.id position) ty
   guarded body =
     if body == "" then ""
-    else "if a.tag == " <> show (tagOf types id) <> " {\n" <> body <> "}\n"
+    else "if a.tag == " <> show member.tag <> " {\n" <> body <> "}\n"
 
 fieldComparison ∷ String → Ty → String
 fieldComparison field = case _ of

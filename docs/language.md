@@ -54,9 +54,10 @@ Types: `Int`, `Bool`, and declared types (monomorphic, closed, recursive,
 mutually recursive in any declaration order; adt-types). No coercions.
 Addition needs Int operands. A comparison infers its left then right operand,
 and the right must have the left's type, else E_TYPE at the right operand;
-its result is Bool. Every type is comparable, including uninhabited ones. `if` needs a Bool condition and equal branch
-types; calls need exact arity and types. Every function is checked, including
-unused ones and unreachable arms.
+its result is Bool. Every type is comparable, including uninhabited ones.
+`if` needs a Bool condition and equal branch types; calls need exact arity
+and types. Every function is checked, including unused ones and unreachable
+arms.
 
 Names. Types, and functions plus constructors (one global table), are distinct
 namespaces; locals are parameters then pattern binders. A bare name is a
@@ -110,12 +111,14 @@ Printing. The executable prints `main`'s value plus LF; printing is a backend
 wrapper, not a source effect. Int prints decimal with a leading `-` when
 negative, Bool `true` or `false`, a declared value `Name` or
 `Name(f1, f2)` with `, ` separators: the coverage-witness format without `_`,
-so every printed value is a Bumpus expression that reproduces itself
-(adt-print round trip). Malformed values, possible only from foreign code
-(I001), panic with `bumpus: malformed value` when a comparison or print visits
-a nil field pointer or unknown tag; comparison stops at the first difference,
-so later malformed fields can go unnoticed; total order is claimed only for
-well-formed values.
+so every printed value is valid Bumpus source that reproduces the value
+under the same declarations (adt-print round trip). Re-reading is bounded by
+BACKLOG E002: constructor nesting deeper than about 420 levels overflows the
+parser's stack, so long printed lists cannot yet be recompiled. Malformed
+values, possible only from foreign code (I001), panic with `bumpus: malformed
+value` when a comparison or print visits a nil field pointer or unknown tag;
+comparison stops at the first difference, so later malformed fields can go
+unnoticed; total order is claimed only for well-formed values.
 Foreign (Go) values are not validated: Proposed, with I001.
 
 Locations are half-open UTF-16 code-unit offsets, zero based; line/column one

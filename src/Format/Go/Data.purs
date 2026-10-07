@@ -3,7 +3,6 @@ module Format.Go.Data
   , goType
   , ctorName
   , fieldName
-  , tagOf
   , localName
   , integer
   , boolean
@@ -12,23 +11,16 @@ module Format.Go.Data
 
 import Prelude
 import Data.Array as Array
-import Data.Maybe (Maybe, maybe)
 import Data.String.Common (joinWith)
-import Domain.Resolved
-  ( CtorId(..)
-  , CtorInfo
-  , LocalId(..)
-  , Ty(..)
-  , TypeId(..)
-  , TypeInfo
-  )
+import Domain.Resolved (CtorId(..), LocalId(..), Ty(..), TypeId(..))
+import Format.Go.Layout (Declared, Layout, Member)
 
 -- Each type becomes one tagged struct and its constructor functions.
-declarations ∷ Array TypeInfo → Array CtorInfo → String
-declarations types ctors = joinWith "" (Array.mapWithIndex typeBlock types)
+declarations ∷ Layout → String
+declarations program = joinWith "" (map typeBlock program.types)
   where
-  typeBlock index info = structDeclaration (TypeId index) ctors info
-    <> joinWith "" (map (constructor types ctors) info.ctors)
+  typeBlock declared = structDeclaration declared
+    <> joinWith "" (map constructor declared.members)
 
 goType ∷ Ty → String
 goType = case _ of
@@ -53,13 +45,6 @@ boolean value = if value then "true" else "false"
 malformed ∷ String
 malformed = "panic(\"bumpus: malformed value\")"
 
--- Tags are 1-based within the owner so the zero value never names a
--- constructor. Constructor ids are unique across types.
-tagOf ∷ Array TypeInfo → CtorId → Int
-tagOf types id = maybe 0 (add 1) (Array.findMap position types)
-  where
-  position info = Array.elemIndex id info.ctors
-
 typeName ∷ TypeId → String
 typeName (TypeId index) = "bumpusTy" <> show index
 
@@ -72,38 +57,36 @@ fieldType = case _ of
   TData (TypeId index) → "*bumpusTy" <> show index
   other → goType other
 
-structDeclaration ∷ TypeId → Array CtorInfo → TypeInfo → String
-structDeclaration owner ctors info =
-  "type " <> typeName owner <> " struct {\ntag uint32\n"
-    <> joinWith "" (Array.concatMap fieldLines info.ctors)
+structDeclaration ∷ Declared → String
+structDeclaration declared =
+  "type " <> typeName declared.id <> " struct {\ntag uint32\n"
+    <> joinWith "" (Array.concatMap fieldLines declared.members)
     <> "}\n\n"
   where
-  fieldLines id = maybe [] (lines id) (ctorAt ctors id)
-  lines id ctor = Array.mapWithIndex (fieldLine id) ctor.fields
+  fieldLines member = Array.mapWithIndex (fieldLine member.id)
+    member.ctor.fields
   fieldLine id index ty = fieldName id index <> " " <> fieldType ty <> "\n"
 
-constructor ∷ Array TypeInfo → Array CtorInfo → CtorId → String
-constructor types ctors id = maybe "" declared (ctorAt ctors id)
+-- Tags are 1-based within the owner so the zero value never names a
+-- constructor (Format.Go.Layout). Constructor ids are unique across types.
+constructor ∷ Member → String
+constructor member =
+  "func " <> ctorName member.id <> "(" <> joinWith ", " parameters
+    <> ") "
+    <> typeName member.ctor.owner
+    <> " { return "
+    <> typeName member.ctor.owner
+    <> "{"
+    <> joinWith ", " ([ "tag: " <> show member.tag ] <> stores)
+    <> "} }\n\n"
   where
-  declared ctor =
-    "func " <> ctorName id <> "(" <> joinWith ", " (parameters ctor)
-      <> ") "
-      <> typeName ctor.owner
-      <> " { return "
-      <> typeName ctor.owner
-      <> "{"
-      <> joinWith ", " ([ "tag: " <> show (tagOf types id) ] <> stores ctor)
-      <> "} }\n\n"
-  parameters ctor = Array.mapWithIndex parameter ctor.fields
+  parameters = Array.mapWithIndex parameter member.ctor.fields
   parameter index ty = "f" <> show index <> " " <> goType ty
-  stores ctor = Array.mapWithIndex store ctor.fields
+  stores = Array.mapWithIndex store member.ctor.fields
   store index ty =
-    fieldName id index <> ": " <> storedValue ty ("f" <> show index)
+    fieldName member.id index <> ": " <> storedValue ty ("f" <> show index)
 
 storedValue ∷ Ty → String → String
 storedValue ty name = case ty of
   TData _ → "&" <> name
   _ → name
-
-ctorAt ∷ Array CtorInfo → CtorId → Maybe CtorInfo
-ctorAt ctors (CtorId index) = Array.index ctors index

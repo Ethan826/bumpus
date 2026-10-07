@@ -29,8 +29,9 @@ const rows = [
   },
   {
     name: 'first-field', file: 'src/Format/Go/Compare.purs',
-    needle: '(Array.mapWithIndex field ctor.fields)',
-    replacement: '(Array.reverse (Array.mapWithIndex field ctor.fields))',
+    needle: '(Array.mapWithIndex field member.ctor.fields)',
+    replacement:
+      '(Array.reverse (Array.mapWithIndex field member.ctor.fields))',
     probe: 'first-field', message: /first differing field ignored/
   },
   {

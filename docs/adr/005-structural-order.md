@@ -32,7 +32,10 @@ decision; everything not named is proposed, not verified.
 4. **Witness-format printing.** `main` may return any type; the executable
    prints it with LF. Int decimal with `-`, Bool `true`/`false`, declared
    values `Name` or `Name(f1, f2)`: the coverage-witness format without `_`.
-   Every printed value is a valid Bumpus expression. Checked by the round
+   Every printed value is a valid Bumpus expression under the same
+   declarations; re-reading it is bounded by BACKLOG E002 (constructor
+   nesting deeper than about 420 levels overflows the parser's stack, so
+   long printed lists cannot yet be recompiled). Checked by the round
    trip in test/adt-print.test.mjs (recompile the text under the original
    declarations and print the same text; and the interpreter-parsed text
    equals the interpreter's original value), the `show-fields` regression

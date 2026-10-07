@@ -12,7 +12,17 @@ const paddingLength = 1000000;
 const padded = program + ' '.repeat(paddingLength);
 const declarationCount = 20000;
 const lexSecondsLimit = 5;
+// About 0.3 s after the E002/I3 fixes on a 2026 laptop and 25.7 s before
+// (quadratic resolver tables and Go emission); 5 s leaves room for a cold,
+// loaded machine while still failing a quadratic regression by far.
+const compileSecondsLimit = 5;
 const millisecondsPerSecond = 1000;
+
+const secondsFor = work => {
+  const started = performance.now();
+  work();
+  return (performance.now() - started) / millisecondsPerSecond;
+};
 
 test('a megabyte of trailing whitespace compiles like none', () => {
   assert.equal(checked(padded), checked(program));
@@ -24,7 +34,35 @@ const declarationsFrom = separator => Array.from({ length: declarationCount },
 test('twenty thousand declarations compile and run', () => {
   const last = declarationCount - 1;
   const source = `${declarationsFrom('\n')}\nfn main(): Int = f${last}();`;
+  const seconds = secondsFor(() => checked(source));
+  assert.ok(seconds < compileSecondsLimit, `compiling took ${seconds}s`);
   assert.equal(runGo(source), `${last}\n`);
+});
+
+const typesFrom = count => Array.from({ length: count },
+  (_, index) => `type T${index} = C${index};`).join(' ');
+const manyTypes = typesFrom(declarationCount);
+
+// Resolver tables and Go emission once scanned every type per type or per
+// constructor, so 20,000 types took 25.7 s (A003 final review I3).
+test('twenty thousand one-constructor types compile in linear time', () => {
+  const source = `${manyTypes} fn main(): Int = 0;`;
+  const seconds = secondsFor(() => checked(source));
+  assert.ok(seconds < compileSecondsLimit, `compiling took ${seconds}s`);
+});
+
+// Type and constructor duplicate checks sort names like functions do; the
+// first declaration in source order is still the one reported.
+test('duplicates among many types are reported where they first occur', () => {
+  const main = ' fn main(): Int = 0;';
+  const seconds = secondsFor(() => {
+    rejectedAt(`${manyTypes} type T7 = X;${main}`, 'E_DUPLICATE',
+      'type T7 = C7;');
+    rejectedAt(`${manyTypes} type X = C7;${main}`, 'E_DUPLICATE', 'C7');
+    rejectedAt(`fn C7(): Int = 0; ${manyTypes}${main}`, 'E_DUPLICATE',
+      'fn C7(): Int = 0;');
+  });
+  assert.ok(seconds < compileSecondsLimit, `rejecting took ${seconds}s`);
 });
 
 // Duplicate detection sorts names instead of comparing every pair; the

@@ -14,10 +14,11 @@ import Format.Go.Data
   , integer
   , localName
   )
+import Format.Go.Layout (Layout, layout)
 import Format.Go.Match (lowerMatch)
 import Format.Go.Show (printed, showHelpers)
 import Format.Go.Usage (needsBoolHelper)
-import Domain.Resolved (FunctionId(..), LocalId(..), Tables, Ty)
+import Domain.Resolved (FunctionId(..), LocalId(..), Ty)
 
 emit ∷ CheckedProgram → String
 emit (IR.Program program) =
@@ -25,13 +26,14 @@ emit (IR.Program program) =
     <> "package main\n\nimport \"fmt\"\n\n"
     <> "func bumpusAdd(a int32, b int32) int32 { return a + b }\n\n"
     <> (if needsBoolHelper (IR.Program program) then boolHelper else "")
-    <> declarations program.types program.ctors
-    <> compareHelpers program.types program.ctors
-    <> showHelpers program.types program.ctors
-    <> joinWith "\n" (map emitFunction program.functions)
+    <> declarations tables
+    <> compareHelpers tables
+    <> showHelpers tables
+    <> joinWith "\n" (map (function tables) program.functions)
     <> joinWith "" (map (entryMain program.entry) program.functions)
   where
-  emitFunction = function { types: program.types, ctors: program.ctors }
+  -- Computed once; every emitter reads it instead of searching (I3).
+  tables = layout { types: program.types, ctors: program.ctors }
 
 -- Exactly one function is the entry (Features.Resolve); scanning the
 -- definitions finds its result type without a lookup that could fail.
@@ -42,7 +44,7 @@ entryMain entry definition
       <> printed definition.result (functionName entry <> "()")
       <> ") }\n"
 
-function ∷ Tables → IR.FunctionDecl → String
+function ∷ Layout → IR.FunctionDecl → String
 function tables definition =
   "func " <> functionName definition.id <> "(" <> joinWith ", " parameters
     <> ") "
@@ -55,7 +57,7 @@ function tables definition =
   parameter index ty = localName (LocalId index) <> " " <> goType ty
 
 -- The depth counts enclosing match arm bodies; it names match parameters.
-expression ∷ Tables → Int → IR.Expr → String
+expression ∷ Layout → Int → IR.Expr → String
 expression tables depth (IR.Expr term) = case term.node of
   IR.Integer value → integer value
   IR.Boolean value → boolean value

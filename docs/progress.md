@@ -315,3 +315,17 @@ Documentation only; no compiler source changed.
   examples/answer.bumpus to bootstrap/answer.go, shapes.bumpus to shapes.go,
   tree.bumpus to tree.go, and tree.bumpus a second time to tree.go. A003 is
   In review; Done follows the final whole-branch review.
+- 2026-10-07 final-review fixes (docs/plans/adt-printing-review.md): I3
+  Go emission and resolver tables made non-quadratic (Format.Go.Layout,
+  Repeated-based type and constructor duplicate checks, linear typeInfo).
+  New 20,000 one-constructor-types test failed first at 25.9-26.3 s against
+  its 5 s bound, now 0.23-0.28 s; duplicates among 20,000 types 21.8 s to
+  0.43 s; reporting at the later constructor fails it in an isolated copy.
+  Emitted Go byte-identical: `cmp` of the CLI emits of examples/answer,
+  shapes and tree against bootstrap/*.go (exit 0) and 504 programs emitted
+  identically by b5dde4e and the fix. Tag-3 compare case fails under an
+  emitted `.tag > count+1` mutant. adt-order runs one Go program per seed.
+  E002, language.md, ADR 005 and architecture.md corrected (I1, I2); G001
+  added; A003 Done. `rm -rf output && npm run verify` exit 0, 0 warnings,
+  17 files, 98 tests, 0 skips, six regression proofs
+  (.build/a003-review-fix-verify.log).

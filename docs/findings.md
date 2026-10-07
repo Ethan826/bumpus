@@ -170,11 +170,19 @@ policy, without weakening the tests or overstating their automated coverage.
 
 - Test time is dominated by `go build`, one binary per executed program, not
   by the JavaScript runtime (BACKLOG T001).
-- A second quadratic resolver cost survives Task 3b: `uniqueTypes` and
-  `uniqueCtors` (BACKLOG E002). Only function duplicates were fixed.
+- A second quadratic resolver cost survived Task 3b: `uniqueTypes`,
+  `uniqueCtors` and `typeInfo` (which filtered every constructor per type).
+  The final-review fix wave made them Repeated-based or linear.
+- Go emission searched the type table per constructor (`tagOf`) and every
+  constructor per type (Show), so 20,000 one-constructor types took 25.7 s
+  to compile; one constructor layout per program (Format.Go.Layout) brought
+  it to 0.2 s with byte-identical output. Many-declaration tests should cover
+  every declaration kind, not just functions.
 - Go `==` on generated structs would compare field pointers, so comparison
   always goes through generated helpers (ADR 005).
-- Printed values reproduce themselves: the witness format minus `_` is valid
-  source, which made the print round trip a strong printer test.
+- Printed values reproduce themselves under the same declarations: the
+  witness format minus `_` is valid source, which made the print round trip
+  a strong printer test. Re-reading is bounded by E002 (constructor nesting
+  overflows the parser at about 420 levels in a cold process).
 - The coverage-oracle LCG used low bits that alternate, so seeds were
   reselected in Task 3b with assertions unchanged.

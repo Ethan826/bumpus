@@ -73,7 +73,6 @@ test('printing a malformed value panics', () => {
 // Reselected (18 and 30 for 39 and 40) when choose() moved to the LCG's high
 // bits in A003 Task 3b, which changed every draw.
 const seeds = [2, 8, 11, 17, 18, 22, 30, 34];
-const sourceBudget = 2000;
 
 test('printed values recompile to the same value', () => {
   const printed = [];
@@ -83,7 +82,6 @@ test('printed values recompile to the same value', () => {
     const v = value(next, system, 0, 3);
     const main = text => `${system.declarations} fn main(): T0 = ${text};`;
     const original = main(expressionOf(next, system, v));
-    assert.ok(original.length < sourceBudget, `seed ${seed}: source size`);
     const output = runGo(original);
     assert.ok(output.endsWith('\n'), `seed ${seed}: ${output}`);
     const text = output.slice(0, -1);

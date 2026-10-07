@@ -3,17 +3,16 @@ module Format.Go.Show (showName, showHelpers, printed) where
 import Prelude
 import Data.Array as Array
 import Data.String.Common (joinWith)
-import Domain.Resolved (CtorId(..), CtorInfo, Ty(..), TypeId(..), TypeInfo)
-import Format.Go.Data (fieldName, goType, malformed, tagOf)
+import Domain.Resolved (CtorId, CtorInfo, Ty(..), TypeId(..))
+import Format.Go.Data (fieldName, goType, malformed)
+import Format.Go.Layout (Declared, Layout, Member)
 
 showName ∷ TypeId → String
 showName (TypeId index) = "bumpusShow" <> show index
 
 -- One printer per declared type, in TypeId order, whether or not used.
-showHelpers ∷ Array TypeInfo → Array CtorInfo → String
-showHelpers types ctors = joinWith "" (Array.mapWithIndex helper types)
-  where
-  helper index _ = showHelper types ctors (TypeId index)
+showHelpers ∷ Layout → String
+showHelpers program = joinWith "" (map showHelper program.types)
 
 -- What `main` passes to fmt.Println: Int and Bool print natively, so their
 -- output is unchanged; a declared value is rendered by its printer.
@@ -22,23 +21,23 @@ printed ty call = case ty of
   TData owner → "string(" <> showName owner <> "(nil, " <> call <> "))"
   _ → call
 
--- Cases come from the constructor table itself, so every constructor of
--- the type is printed with all its fields and no lookup can come up empty.
--- Any tag without a case is malformed (I001 foreign values).
-showHelper ∷ Array TypeInfo → Array CtorInfo → TypeId → String
-showHelper types ctors owner =
-  "func " <> showName owner <> "(out []byte, v " <> goType (TData owner)
+-- Cases come from the type's members, which Format.Go.Layout joins with
+-- the constructor table itself, so every constructor of the type is printed
+-- with all its fields and no lookup can come up empty. Any tag without a
+-- case is malformed (I001 foreign values).
+showHelper ∷ Declared → String
+showHelper declared =
+  "func " <> showName declared.id <> "(out []byte, v "
+    <> goType (TData declared.id)
     <> ") []byte {\nswitch v.tag {\n"
-    <> joinWith "" (Array.mapWithIndex (showCase types owner) ctors)
+    <> joinWith "" (map showCase declared.members)
     <> "}\n"
     <> malformed
     <> "\n}\n\n"
 
-showCase ∷ Array TypeInfo → TypeId → Int → CtorInfo → String
-showCase types owner index ctor
-  | ctor.owner /= owner = ""
-  | otherwise = "case " <> show (tagOf types (CtorId index)) <> ":\n"
-      <> ctorBody (CtorId index) ctor
+showCase ∷ Member → String
+showCase member = "case " <> show member.tag <> ":\n"
+  <> ctorBody member.id member.ctor
 
 -- Printed values are Bumpus expressions: `Name` or `Name(f1, f2)`.
 ctorBody ∷ CtorId → CtorInfo → String

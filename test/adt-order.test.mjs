@@ -70,6 +70,8 @@ const passes = (
 test('malformed values panic only when visited', () => {
   passes(recovering('bumpusCmp0(bumpusTy0{tag: 2}, bumpusTy0{tag: 2})'));
   passes(recovering('bumpusCmp0(bumpusTy0{}, bumpusTy0{})'));
+  // One past the last tag: an off-by-one range check would return 0 here.
+  passes(recovering('bumpusCmp0(bumpusTy0{tag: 3}, bumpusTy0{tag: 3})'));
   passes(returning(
     'bumpusCmp0(bumpusTy0{tag: 2, c1f0: 1}, bumpusTy0{tag: 2, c1f0: 2})', -1
   ));
@@ -147,11 +149,7 @@ const lawful = (system, values) => {
   }
 };
 
-// Operands live in their own functions, and pairs are split across
-// programs. The budget dates from a lexer stack overflow on sources of
-// roughly 3500 characters, fixed in A003 Task 3b (BACKLOG E002); it stays
-// because the batching it drives is itself exercised and keeps runs small.
-const sourceBudget = 2000;
+// Operands live in their own functions so each pair is checked separately.
 const fragment = (system, pair, index) => {
   const terms = operators.map((op, bit) =>
     `(if l${index}() ${op} r${index}() then ${2 ** bit} else 0)`);
@@ -159,28 +157,12 @@ const fragment = (system, pair, index) => {
     + `fn r${index}(): T0 = ${pair.text}; `
     + `fn p${index}(): Int = ${terms.join(' + ')};`;
 };
-// Groups of consecutive pair indices whose fragments fit the budget.
-const batches = (system, pairs) => {
-  const groups = [[]];
-  let size = system.declarations.length;
-  pairs.forEach((pair, index) => {
-    const length = fragment(system, pair, index).length;
-    if (groups.at(-1).length > 0 && size + length > sourceBudget) {
-      groups.push([]);
-      size = system.declarations.length;
-    }
-    groups.at(-1).push(index);
-    size += length;
-  });
-  return groups;
-};
 
-// Within a program, pair k declares l, r, then p: p is function 3k + 2.
-const agrees = (system, pairs, orders, group) => {
-  const fragments = group.map((pairIndex, local) =>
-    fragment(system, pairs[pairIndex], local));
-  const calls = group.map((_, local) => `bumpusFn${3 * local + 2}()`);
-  const masks = group.map(pairIndex => implied(orders[pairIndex]));
+// One program per seed; pair k declares l, r, then p: p is function 3k + 2.
+const agrees = (system, pairs, orders) => {
+  const fragments = pairs.map((pair, index) => fragment(system, pair, index));
+  const calls = pairs.map((_, index) => `bumpusFn${3 * index + 2}()`);
+  const masks = orders.map(implied);
   const source = `${system.declarations} ${fragments.join(' ')} `
     + 'fn main(): Int = 0;';
   const result = goTest(source, `package main
@@ -224,9 +206,7 @@ test('generated pairs agree with the order interpreter', () => {
       seen.add(`${orders[index]} ${same}`);
       if (decidingField(pair.left, pair.right) > 0) seen.add('later field');
     });
-    for (const group of batches(system, pairs)) {
-      agrees(system, pairs, orders, group);
-    }
+    agrees(system, pairs, orders);
   }
   assert.deepEqual([...seen].sort(), [
     '-1 other', '-1 same', '0 same', '1 other', '1 same', 'later field'

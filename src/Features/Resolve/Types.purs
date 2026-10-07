@@ -4,7 +4,7 @@ import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
-import Data.Maybe (Maybe(..), maybe, maybe')
+import Data.Maybe (maybe')
 import Data.Traversable (traverse)
 import Domain.Problem (DuplicateKind(..), Problem(..), UnboundKind(..))
 import Domain.Syntax as Syntax
@@ -13,6 +13,9 @@ import Features.Resolve.Repeated (repeated)
 
 type Owned =
   { id ∷ Resolved.CtorId, owner ∷ Resolved.TypeId, decl ∷ Syntax.CtorDecl }
+
+-- A function or constructor name, for the shared-namespace duplicate check.
+type Global = { name ∷ String, kind ∷ DuplicateKind, span ∷ Syntax.Span }
 
 -- Declarations are checked in the order the spec fixes: types, constructors,
 -- functions and parameters, then constructor fields.
@@ -25,7 +28,7 @@ typeTable program = do
   pure { types, ctors }
   where
   owned = ownedCtors program.types
-  types = Array.mapWithIndex (typeInfo owned) program.types
+  types = Array.zipWith typeInfo (firstCtors program.types) program.types
 
 resolveType
   ∷ Array Resolved.TypeInfo
@@ -53,15 +56,23 @@ ownedCtors types = Array.mapWithIndex numbered
   numbered index entry =
     { id: Resolved.CtorId index, owner: entry.owner, decl: entry.decl }
 
-typeInfo ∷ Array Owned → Int → Syntax.TypeDecl → Resolved.TypeInfo
-typeInfo owned index declaration =
+-- Constructors are numbered in declaration order (ownedCtors), so each type
+-- owns the run of ids after all earlier types' constructors. Filtering every
+-- constructor per type was O(types × constructors) (A003 final review I3).
+firstCtors ∷ Array Syntax.TypeDecl → Array Int
+firstCtors types = Array.zipWith sub (Array.scanl add 0 counts) counts
+  where
+  counts = map ctorCount types
+  ctorCount declaration = Array.length declaration.ctors
+
+typeInfo ∷ Int → Syntax.TypeDecl → Resolved.TypeInfo
+typeInfo first declaration =
   { name: declaration.name
-  , ctors: map ctorId (Array.filter ownedHere owned)
+  , ctors: Array.mapWithIndex ctorId declaration.ctors
   , span: declaration.span
   }
   where
-  ownedHere entry = entry.owner == Resolved.TypeId index
-  ctorId entry = entry.id
+  ctorId position _ = Resolved.CtorId (first + position)
 
 resolveCtor
   ∷ Array Resolved.TypeInfo
@@ -77,31 +88,46 @@ resolveCtor types entry = withFields <$> traverse field entry.decl.fields
     , span: entry.decl.span
     }
 
+-- Like functions, names are sorted once (Repeated) rather than filtered per
+-- declaration, which was quadratic (BACKLOG E002, A003 final review I3).
 uniqueTypes ∷ Array Syntax.TypeDecl → Either Syntax.Diagnostic Unit
-uniqueTypes types = for_ types uniqueType
+uniqueTypes types = for_ flagged uniqueType
   where
-  uniqueType declaration =
-    when (Array.length (Array.filter (same declaration) types) > 1)
-      (duplicate DuplicateType declaration.name declaration.span)
-  same declaration other = other.name == declaration.name
+  flagged = Array.zipWith withFlag (repeated (map name types)) types
+  name declaration = declaration.name
+  withFlag repeats declaration = { repeats, declaration }
+  uniqueType { repeats, declaration } =
+    when repeats (duplicate DuplicateType declaration.name declaration.span)
 
 -- Functions and constructors share one namespace, but the program keeps them
 -- in separate arrays, so source order is recovered from span offsets: a clash
--- is reported at whichever declaration comes first, whatever its kind.
+-- is reported at whichever declaration comes first, whatever its kind. Only
+-- the first repeated constructor searches for that declaration.
 uniqueCtors
   ∷ Array Syntax.FunctionDecl → Array Owned → Either Syntax.Diagnostic Unit
-uniqueCtors functions owned = for_ owned uniqueCtor
+uniqueCtors functions owned = for_ flagged uniqueCtor
   where
-  globals = map ctorGlobal owned <> map functionGlobal functions
-  uniqueCtor entry = maybe (pure unit) report
-    (earliest (Array.filter (named entry.decl.name) globals))
-  named name global = global.name == name
-  earliest clashing =
-    if Array.length clashing > 1 then Array.head
-      (Array.sortWith offset clashing)
-    else Nothing
+  globals = globalNames functions owned
+  flagged = Array.zipWith withFlag (repeated (map name globals)) owned
+  name global = global.name
+  withFlag repeats entry = { repeats, entry }
+  uniqueCtor { repeats, entry }
+    | repeats = reportEarliest globals entry.decl.name
+    | otherwise = pure unit
+
+reportEarliest ∷ Array Global → String → Either Syntax.Diagnostic Unit
+reportEarliest globals clashing = traverse_ report
+  (Array.head (Array.sortWith offset (Array.filter named globals)))
+  where
+  named global = global.name == clashing
   offset global = global.span.start.offset
   report global = duplicate global.kind global.name global.span
+
+-- Constructors first, in id order, then functions.
+globalNames ∷ Array Syntax.FunctionDecl → Array Owned → Array Global
+globalNames functions owned =
+  map ctorGlobal owned <> map functionGlobal functions
+  where
   ctorGlobal entry =
     { name: entry.decl.name, kind: DuplicateConstructor, span: entry.decl.span }
   functionGlobal function =
