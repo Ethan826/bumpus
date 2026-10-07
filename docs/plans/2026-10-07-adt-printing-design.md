@@ -2,7 +2,7 @@
 
 Status: design direction approved by the user 2026-10-07 with five
 clarifications (entry errors, round trip, ordering tests, malformed values,
-snapshot preservation), folded in below. This written spec awaits review.
+snapshot preservation), folded in below. The written spec was approved 2026-10-07.
 Nothing here is implemented yet. Milestone item 1 (F004) is done.
 
 ## Goal and non-goals
