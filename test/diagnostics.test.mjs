@@ -22,6 +22,8 @@ const rows = [
   ['fn main(): Int = ;', 'E_SYNTAX', 17, 18, 'Expected an expression'],
   ['fn main(): Int = 2147483648;', 'E_INTEGER', 17, 27,
     'Integer literal is outside signed 32-bit range'],
+  [`fn main(): Int = ${'('.repeat(129)}1${')'.repeat(129)};`, 'E_NESTING',
+    146, 147, 'Nesting exceeds 128 levels'],
   ['fn x(): Int = 1;', 'E_ENTRY', 0, 0, 'Expected fn main()'],
   ['fn main(x: Int): Int = x;', 'E_ENTRY', 0, 25,
     'main must have no parameters'],

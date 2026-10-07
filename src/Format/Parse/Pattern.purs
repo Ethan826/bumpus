@@ -10,6 +10,7 @@ import Format.Parse.Grammar
   , dispatch
   , expect
   , failWith
+  , nested
   , on
   , onWhen
   , optionalOn
@@ -53,8 +54,8 @@ ctorPattern ∷ Parser Pattern
 ctorPattern = spanned ctorOf (parts <$> upperName <*> optionalOn "(" fields)
   where
   parts identifier found = { identifier, fields: found }
-  fields = expect "(" *> sepBy1 "," (defer nested) <* expect ")"
-  nested _ = pattern
+  fields = expect "(" *> sepBy1 "," (nested (defer later)) <* expect ")"
+  later _ = pattern
 
 ctorOf ∷ Span → { identifier ∷ Token, fields ∷ Maybe (Array Pattern) } → Pattern
 ctorOf span found =

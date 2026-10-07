@@ -2,6 +2,7 @@ module Format.Parse.Grammar
   ( module Exports
   , Parser
   , Case
+  , nestingLimit
   , token
   , expect
   , name
@@ -18,6 +19,9 @@ module Format.Parse.Grammar
   , commaList
   , chainLeft1
   , spanned
+  , nested
+  , rooted
+  , infixed
   , run
   ) where
 
@@ -30,14 +34,19 @@ import Domain.Syntax (Diagnostic, Span)
 import Format.Lex (Token, isName, isUpper)
 import Format.Parse.Cursor (Parsed, Run, State, initialState) as Exports
 import Format.Parse.Cursor
-  ( Run
-  , State
+  ( Continue
+  , Run
   , advance
   , current
   , failAt
+  , infixedAt
+  , nestedAt
   , nextSpan
   , peekText
-  , skip
+  , separated
+  , shifting
+  , rootedAt
+  , trailing
   )
 import Format.Stack as Stack
 
@@ -46,9 +55,6 @@ import Format.Stack as Stack
 newtype Parser a = Parser (Run a)
 
 type Case a = { accepts ∷ String → Boolean, parser ∷ Parser a }
-
--- After a list item: resume (Loop) at the next item or end (Done).
-type Continue = State → Step State State
 
 instance Functor Parser where
   map transform (Parser parser) = Parser (mapAt transform parser)
@@ -59,6 +65,10 @@ instance Apply Parser where
 
 instance Applicative Parser where
   pure value = Parser (pureAt value)
+
+-- Deeper nesting is E_NESTING; ADR 006 derives it from the measured stack.
+nestingLimit ∷ Int
+nestingLimit = 128
 
 token ∷ Parser Token
 token = Parser takeAt
@@ -115,15 +125,33 @@ sepByTrailing1 separator close item =
 commaList ∷ ∀ a. Parser a → Parser (Array a)
 commaList item = dispatch [ on ")" (pure []) ] (sepBy1 "," item)
 
--- Folds left in a loop: a `op` b `op` c is (a `op` b) `op` c.
+-- Folds left in a loop: a `op` b `op` c is (a `op` b) `op` c. Each operator
+-- pushes the operands before it one level deeper, and each later operand
+-- is nested, so the counted depth is the depth of the left-nested tree.
 chainLeft1 ∷ ∀ a. String → (a → a → a) → Parser a → Parser a
-chainLeft1 operator combine item =
-  Parser (foldAt (separated operator) identity combine (run item))
+chainLeft1 operator combine item = Parser
+  ( foldAt (shifting nestingLimit operator) identity combine (run item)
+      (run (nested item))
+  )
 
 -- From the first to the last consumed token; an empty span at the next
 -- token's start if nothing was consumed.
 spanned ∷ ∀ a b. (Span → a → b) → Parser a → Parser b
 spanned build (Parser parser) = Parser (spannedAt build parser)
+
+-- One nesting level deeper (ADR 006): E_NESTING at the next token past
+-- `nestingLimit`. The depth is restored afterwards.
+nested ∷ ∀ a. Parser a → Parser a
+nested parser = Parser (nestedAt nestingLimit (run parser))
+
+-- A declaration body: depth 0, unaffected by earlier declarations.
+rooted ∷ ∀ a. Parser a → Parser a
+rooted parser = Parser (rootedAt (run parser))
+
+-- An infix operator (`parser` reads it): what was parsed since the enclosing
+-- nested position becomes its left operand, one level deeper.
+infixed ∷ ∀ a. Parser a → Parser a
+infixed parser = Parser (infixedAt nestingLimit (run parser))
 
 -- Runs a whole production from a state; the declaration loop steps with it.
 run ∷ ∀ a. Parser a → Run a
@@ -170,30 +198,23 @@ dispatchAt cases fallback state =
 collect ∷ ∀ a. Continue → Parser a → Parser (Array a)
 collect next item =
   Array.fromFoldable <$> Parser
-    (foldAt next single (flip Stack.push) (run item))
+    (foldAt next single (flip Stack.push) (run item) (run item))
   where
   single first = Stack.push first Stack.empty
 
--- One item per step: tailRecM runs the steps as a loop, so lists of any
--- length run in constant stack (BACKLOG E002).
-foldAt ∷ ∀ a b. Continue → (a → b) → (b → a → b) → Run a → Run b
-foldAt next first combine item state =
-  tailRecM step { add: first, rest: state }
+-- The first item runs directly; then one item per step: tailRecM runs the
+-- steps as a loop, so lists of any length run in constant stack (BACKLOG
+-- E002), and a one-item list never enters it (fewer frames per nesting).
+foldAt ∷ ∀ a b. Continue → (a → b) → (b → a → b) → Run a → Run a → Run b
+foldAt next first combine head item state = head state >>= begin
   where
-  step pending = map (decide pending.add) (item pending.rest)
-  decide add parsed = after (add parsed.value) (next parsed.rest)
+  begin parsed = next parsed.rest >>= resume (first parsed.value)
+  resume value (Loop rest) = tailRecM step { add: combine value, rest }
+  resume value (Done rest) = Right { value, rest }
+  step pending = item pending.rest >>= decide pending.add
+  decide add parsed = map (after (add parsed.value)) (next parsed.rest)
   after value (Loop rest) = Loop { add: combine value, rest }
   after value (Done rest) = Done { value, rest }
-
-separated ∷ String → Continue
-separated separator state =
-  if peekText state == separator then Loop (skip state) else Done state
-
-trailing ∷ String → String → Continue
-trailing separator close state
-  | peekText state /= separator = Done state
-  | peekText (skip state) == close = Done (skip state)
-  | otherwise = Loop (skip state)
 
 spannedAt ∷ ∀ a b. (Span → a → b) → Run a → Run b
 spannedAt build parser state = map withSpan (parser state)

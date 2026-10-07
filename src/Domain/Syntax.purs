@@ -51,6 +51,7 @@ data ErrorCode
   = LexError
   | SyntaxError
   | IntegerRange
+  | NestingLimit
   | EntryError
   | DuplicateName
   | UnboundName

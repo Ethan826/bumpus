@@ -27,6 +27,7 @@ code = case _ of
   Lexical → Code.LexError
   Syntax _ → Code.SyntaxError
   IntegerOutOfRange → Code.IntegerRange
+  NestingTooDeep _ → Code.NestingLimit
   EntryProblem _ → Code.EntryError
   Duplicate _ _ → Code.DuplicateName
   Unbound _ _ → Code.UnboundName
@@ -45,6 +46,7 @@ codeName = case _ of
   Code.LexError → "E_LEX"
   Code.SyntaxError → "E_SYNTAX"
   Code.IntegerRange → "E_INTEGER"
+  Code.NestingLimit → "E_NESTING"
   Code.EntryError → "E_ENTRY"
   Code.DuplicateName → "E_DUPLICATE"
   Code.UnboundName → "E_UNBOUND"
@@ -60,6 +62,7 @@ message = case _ of
   Lexical → "Unexpected character"
   Syntax text → text
   IntegerOutOfRange → "Integer literal is outside signed 32-bit range"
+  NestingTooDeep limit → "Nesting exceeds " <> show limit <> " levels"
   EntryProblem kind → entryMessage kind
   Duplicate kind name → "Duplicate " <> duplicateWord kind <> " " <> name
   Unbound kind name → "Unbound " <> unboundWord kind <> " " <> name

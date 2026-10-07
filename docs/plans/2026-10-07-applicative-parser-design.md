@@ -109,7 +109,7 @@ over the left-nested `Add` tree.
 Past the limit, compilation fails with a new error code `E_NESTING`
 (ErrorCode `NestingLimit`, Problem `NestingTooDeep Int`) at the token that
 would exceed it, message `Nesting exceeds <limit> levels`. The limit is a
-named constant in Format.Parse.Core.
+named constant in Format.Parse.Grammar.
 
 Choosing the limit: measure, after the rewrite, the smallest depth at which
 any phase (parse, resolve, check, coverage, Go emission) overflows in a cold

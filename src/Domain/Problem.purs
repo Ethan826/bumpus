@@ -28,6 +28,7 @@ data Problem
   = Lexical
   | Syntax String
   | IntegerOutOfRange
+  | NestingTooDeep Int
   | EntryProblem EntryKind
   | Duplicate DuplicateKind String
   | Unbound UnboundKind String

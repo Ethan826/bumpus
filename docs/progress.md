@@ -380,3 +380,16 @@ user review.
   `npm run verify` exit 0, 112 tests, 0 failures/skips
   (.build/g001-task2-verify.log); answer, shapes, tree emits cmp-identical
   to bootstrap/*.go. Cold-CLI nesting depth moved (BACKLOG E002).
+- Task 3 (2026-10-07): E_NESTING at 128 levels (ADR 006): `nested`,
+  `infixed`, `rooted` and `nestingLimit` in Format.Parse.Grammar, `depth` and
+  `peak` in the Cursor state; operators count the depth of the tree they
+  build, so a deep left operand counts in full; Grammar `foldAt` runs the
+  first item directly. Probe (scripts/depth-probe.mjs, limit disabled):
+  smallest overflow 304 (`Cons(1, `), no anomalies after classifying V8's
+  regex `Stack overflow` SyntaxError as an overflow; limit = largest power
+  of two ≤ 152. RED: test/depth.test.mjs 14 of 26 failing, no E_NESTING
+  (and `go build` killed on 128 nested match arms, BACKLOG E005)
+  (.build/g001-task3-red.log); diagnostics E_NESTING row failing with the
+  limit disabled; GREEN 26/26 (.build/g001-task3-green.log). `npm run
+  verify` exit 0, 138 tests, 0 failures/skips (.build/g001-task3-verify.log);
+  answer, shapes, tree emits cmp-identical to bootstrap/*.go.

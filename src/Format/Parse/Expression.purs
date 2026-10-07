@@ -22,7 +22,9 @@ import Format.Parse.Grammar
   , dispatch
   , expect
   , failWith
+  , infixed
   , name
+  , nested
   , on
   , onWhen
   , optionalOn
@@ -45,25 +47,28 @@ comparisons =
   , { text: ">=", operator: GreaterEqual }
   ]
 
--- PureScript is strict, so the productions below receive `nested`, which
+-- PureScript is strict, so the productions below receive `inner`, which
 -- reaches `expression` lazily, rather than naming `expression` themselves.
+-- Every use of `inner` is a nested position (ADR 006): a parenthesized
+-- expression, an `if` condition or branch, a `match` scrutinee or arm body,
+-- or a call or constructor argument.
 expression ∷ Parser Expr
 expression = dispatch
-  [ on "if" (conditional nested), on "match" (matchExpression nested) ]
-  (comparison nested)
+  [ on "if" (conditional inner), on "match" (matchExpression inner) ]
+  (comparison inner)
   where
-  nested = defer later
+  inner = nested (defer later)
   later _ = expression
 
 -- Comparison is non-associative: one operator between two additions, and
--- E_SYNTAX at a second operator.
+-- E_SYNTAX at a second operator. Both operands are one level deeper.
 comparison ∷ Parser Expr → Parser Expr
-comparison nested = (#) <$> additive nested
-  <*> dispatch (map (rightOperand nested) comparisons) (pure identity)
+comparison inner = (#) <$> additive inner
+  <*> dispatch (map (rightOperand inner) comparisons) (pure identity)
 
 rightOperand ∷ Parser Expr → Comparison → Case (Expr → Expr)
-rightOperand nested comparing = on comparing.text
-  (compareTo <$ token <*> additive nested <* unchained)
+rightOperand inner comparing = on comparing.text
+  (compareTo <$ infixed token <*> nested (additive inner) <* unchained)
   where
   compareTo right left =
     Compare (spanBetween left right) comparing.operator left right
@@ -80,22 +85,22 @@ spanBetween first second =
   { start: (exprSpan first).start, end: (exprSpan second).end }
 
 additive ∷ Parser Expr → Parser Expr
-additive nested = chainLeft1 "+" add (atom nested)
+additive inner = chainLeft1 "+" add (atom inner)
   where
   add left right = Add (spanBetween left right) left right
 
 conditional ∷ Parser Expr → Parser Expr
-conditional nested = ifOf <$> expect "if" <*> nested <* expect "then" <*> nested
+conditional inner = ifOf <$> expect "if" <*> inner <* expect "then" <*> inner
   <* expect "else"
-  <*> nested
+  <*> inner
   where
   ifOf keyword condition yes no =
     If { start: keyword.span.start, end: (exprSpan no).end } condition yes no
 
 -- `match` is not an atom, so as an addition operand it needs parentheses.
 matchExpression ∷ Parser Expr → Parser Expr
-matchExpression nested = matchOf <$> expect "match" <*> nested <* expect "{"
-  <*> arms nested
+matchExpression inner = matchOf <$> expect "match" <*> inner <* expect "{"
+  <*> arms inner
   <*> expect "}"
   where
   matchOf keyword scrutinee matched close =
@@ -103,12 +108,12 @@ matchExpression nested = matchOf <$> expect "match" <*> nested <* expect "{"
 
 -- Parentheses return the inner expression with its own span.
 atom ∷ Parser Expr → Parser Expr
-atom nested = dispatch
-  [ on "(" (expect "(" *> nested <* expect ")")
+atom inner = dispatch
+  [ on "(" (expect "(" *> inner <* expect ")")
   , on "true" (boolean true <$> token)
   , on "false" (boolean false <$> token)
   , onWhen integerStart (integer <$> integerLiteral)
-  , onWhen isName (named nested)
+  , onWhen isName (named inner)
   ]
   (refine notAnExpression token)
   where
@@ -122,10 +127,10 @@ notAnExpression found =
 
 -- A variable spans its name; a call runs through its `)`.
 named ∷ Parser Expr → Parser Expr
-named nested = spanned namedOf (parts <$> name <*> optionalOn "(" arguments)
+named inner = spanned namedOf (parts <$> name <*> optionalOn "(" arguments)
   where
   parts identifier found = { identifier, arguments: found }
-  arguments = expect "(" *> commaList nested <* expect ")"
+  arguments = expect "(" *> commaList inner <* expect ")"
 
 namedOf
   ∷ Span → { identifier ∷ Token, arguments ∷ Maybe (Array Expr) } → Expr

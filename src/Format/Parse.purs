@@ -24,6 +24,7 @@ import Format.Parse.Grammar
   , initialState
   , name
   , on
+  , rooted
   , run
   )
 import Format.Stack (Stack)
@@ -77,7 +78,7 @@ function = functionOf <$> expect "fn" <*> name <* expect "("
   <* expect ":"
   <*> typeRef
   <* expect "="
-  <*> expression
+  <*> rooted expression
   <*> expect ";"
   where
   functionOf keyword identifier parameters result body semicolon =
