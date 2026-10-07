@@ -406,3 +406,20 @@ user review.
   `npm run verify` exit 0, 140 tests, 0 failures/skips
   (.build/g001-task4-verify.log); answer, shapes, tree emits cmp-identical
   to bootstrap/*.go.
+- Task 4b (2026-10-07): coverage breadth and parameter duplicates.
+  Coverage's Array.foldM searches over Either (redundancy over arms;
+  exhaustiveness and wildcard usefulness over constructors) became
+  Features.Check.Search.firstJust (`tailRecM`); `specialize` checks arity
+  once, then mapMaybe; parameter duplicates use Repeated. Corrected
+  thresholds: the coverage overflow was about 1,929 arms (not 3,000), the
+  pre-G001 resolver overflowed near 1,700 arms or arguments (not 5,000).
+  RED on the pre-fix compiler (.build/g001-task4b-red.log): 5,000 integer
+  arms and 3,000 constructors RangeError, 20,000 parameters 3.07 s;
+  per-site mutants (each foldM restored alone, quadratic uniqueParameter,
+  reversed Fresh `apply` for the strengthened 10,000-argument order test)
+  each fail. GREEN (.build/g001-task4b-green.log): 5,000 arms 1.3 s,
+  3,000 constructors 1.3 s, 20,000 parameters 0.17 s; still quadratic in
+  arms (10,000 arms 5.2 s, BACKLOG E002). `npm run verify` exit 0, 144
+  tests, 0 failures/skips (.build/g001-task4b-verify.log); `exhaustive`
+  regression row holds; answer, shapes, tree emits cmp-identical to
+  bootstrap/*.go.

@@ -91,7 +91,7 @@ test('lexing a megabyte takes linear, not quadratic, time', () => {
 
 // Resolution numbers binders through Fresh and a balanced `traverse` (G001
 // Task 4); its earlier Array.foldM over Either overflowed the stack near
-// 5,000 arguments or arms.
+// 1,700 arguments or arms.
 const wideCount = 10000;
 
 test('ten thousand binding arguments resolve in source order', () => {
@@ -104,7 +104,69 @@ test('ten thousand binding arguments resolve in source order', () => {
   let go = '';
   const seconds = secondsFor(() => { go = checked(source); });
   assert.ok(seconds < compileSecondsLimit, `compiling took ${seconds}s`);
-  const last = wideCount - 1;
-  assert.ok(go.includes(`bumpusLocal${last} := `), 'last binder numbered');
+  const binders = Array.from(go.matchAll(/bumpusLocal(\d+) := /g),
+    found => Number(found[1]));
+  const inOrder = Array.from({ length: wideCount }, (_, index) => index);
+  assert.deepEqual(binders, inOrder, 'one binder per argument, in order');
   assert.ok(!go.includes(`bumpusLocal${wideCount} `), 'no extra binder');
+});
+
+// The redundancy search was an Array.foldM over Either, one stack frame
+// chain per arm, so a match of about 1,930 arms overflowed in Usefulness on
+// a cold compile (G001 Task 4b). Each arm is still judged against the
+// earlier ones; 5,000 arms take about 1.3 s.
+const armCount = 5000;
+
+test('a five-thousand-arm integer match compiles', () => {
+  const arms = Array.from({ length: armCount - 1 },
+    (_, index) => `${index} => ${index}`);
+  const source = `fn main(): Int = match 7 { ${arms.join(', ')}, _ => 0 };`;
+  const seconds = secondsFor(() => checked(source));
+  assert.ok(seconds < compileSecondsLimit, `compiling took ${seconds}s`);
+  assert.equal(runGo(source), '7\n');
+});
+
+test('a five-thousand-arm match reports its redundant arm', () => {
+  const arms = Array.from({ length: armCount - 1 },
+    (_, index) => `${index} => ${index}`);
+  const source = `fn main(): Int = match 7 { ${arms.join(', ')}, _ => 0, `
+    + '3 => 3 };';
+  const diagnostic = rejected(source, 'E_REDUNDANT');
+  const offset = source.lastIndexOf('3 => 3');
+  assert.deepEqual(diagnostic.span, {
+    start: { offset, line: 1, column: offset + 1 },
+    end: { offset: offset + 1, line: 1, column: offset + 2 }
+  });
+});
+
+// Every constructor is an arm, and exhaustiveness tries each constructor
+// in turn; both searches overflowed near 2,000 constructors (G001 Task 4b).
+const ctorCount = 3000;
+
+test('a three-thousand-constructor match is judged in full', () => {
+  const ctors = Array.from({ length: ctorCount }, (_, index) => `C${index}`);
+  const matching = (count, extra = '') => `type T = ${ctors.join(' | ')}; `
+    + `fn main(): Int = match C3 { ${ctors.slice(0, count)
+      .map((ctor, index) => `${ctor} => ${index}`).join(', ')}${extra} };`;
+  const seconds = secondsFor(() => checked(matching(ctorCount)));
+  assert.ok(seconds < compileSecondsLimit, `compiling took ${seconds}s`);
+  const diagnostic = rejected(matching(ctorCount - 1), 'E_NON_EXHAUSTIVE');
+  assert.equal(diagnostic.message, `Missing pattern: C${ctorCount - 1}`);
+  const redundant = matching(ctorCount, ', _ => 0');
+  rejectedAt(redundant, 'E_REDUNDANT', '_');
+});
+
+// Parameter duplicates sort names (Repeated) rather than filtering the
+// parameter list per parameter, which took 2.7 s at 20,000 (G001 Task 4b).
+const parameterCount = 20000;
+const parameterSecondsLimit = 1;
+
+test('twenty thousand parameters are checked in linear time', () => {
+  const parameters = Array.from({ length: parameterCount },
+    (_, index) => `p${index}: Int`);
+  const source = `fn f(${parameters.join(', ')}): Int = 0; `
+    + 'fn main(): Int = 0;';
+  const seconds = secondsFor(() => checked(source));
+  assert.ok(seconds < parameterSecondsLimit, `checking took ${seconds}s`);
+  rejectedAt(source.replace('p19999: Int', 'p7: Int'), 'E_DUPLICATE', 'p7');
 });

@@ -3,11 +3,12 @@ module Features.Check.Usefulness (uncovered, useful) where
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), maybe, maybe')
+import Data.Maybe (Maybe(..), isJust, maybe, maybe')
 import Data.Traversable (traverse)
 import Domain.IR.Internal as IR
 import Domain.Problem (Problem(..), Witness(..))
 import Domain.Resolved (Ty(..))
+import Features.Check.Search (firstJust)
 import Features.Check.Signature
   ( Head(..)
   , Lookup
@@ -53,17 +54,16 @@ usefulColumn signature rows split = case split.pat of
   Any → complete signature split.ty (headsOf rows) >>= splitWildcard
   where
   splitWildcard whole =
-    if whole then candidates signature split.ty >>= Array.foldM anyUseful
-      false
+    if whole then isJust <$> (candidates signature split.ty >>= anyUseful)
     else usefulRows signature split.tys (defaults rows) split.rest
   specialized head fields = do
     types ← fieldTypes signature head
     specializedRows ← specialize signature head rows
     usefulRows signature (types <> split.tys) specializedRows
       (fields <> split.rest)
-  anyUseful found head =
-    if found then Right true else arity signature head >>= expanded head
-  expanded head count = specialized head (wildcards count)
+  anyUseful = firstJust (usefulHead <=< expanded)
+  expanded head = arity signature head >>= specialized head <<< wildcards
+  usefulHead isUseful = Right (if isUseful then Just unit else Nothing)
 
 missing
   ∷ Signature → Array Ty → Array Vector → Lookup (Maybe (Array Witness))
@@ -80,14 +80,11 @@ missingColumn
   → Lookup (Maybe (Array Witness))
 missingColumn signature rows split = do
   whole ← complete signature split.head heads
-  if whole then candidates signature split.head >>= Array.foldM firstMissing
-    Nothing
+  if whole then candidates signature split.head >>= firstJust expanded
   else missing signature split.tail (defaults rows) >>= traverse prepend
   where
   heads = headsOf rows
-  firstMissing found head = maybe' (expanded head) settled found
-  settled witnesses = Right (Just witnesses)
-  expanded head _ = do
+  expanded head = do
     types ← fieldTypes signature head
     specializedRows ← specialize signature head rows
     witnesses ← missing signature (types <> split.tail) specializedRows
@@ -122,21 +119,26 @@ complete signature ty heads =
   present head = Array.elem head heads
 
 -- Resolution enforces constructor arity, so a head whose field count
--- disagrees with the signature is a compiler bug, never a non-match.
+-- disagrees with the signature is a compiler bug, never a non-match. The
+-- check precedes a plain mapMaybe: a per-row `traverse` over Either was most
+-- of a wide match's time (G001 Task 4b).
 specialize ∷ Signature → Head → Array Vector → Lookup (Array Vector)
 specialize signature head rows = do
   count ← arity signature head
-  Array.catMaybes <$> traverse (specializeRow count) rows
+  when (Array.any (malformed count) rows)
+    (Left (Internal "Coverage field count mismatch"))
+  pure (Array.mapMaybe (specializeRow count) rows)
   where
-  specializeRow count row = maybe (Right Nothing) (specializeSplit count)
-    (Array.uncons row)
+  malformed count row = maybe false (mismatched count) (Array.head row)
+  mismatched count = case _ of
+    Any → false
+    Headed found fields → found == head && Array.length fields /= count
+  specializeRow count row = Array.uncons row >>= specializeSplit count
   specializeSplit count split = case split.head of
-    Any → Right (Just (wildcards count <> split.tail))
+    Any → Just (wildcards count <> split.tail)
     Headed found fields
-      | found /= head → Right Nothing
-      | Array.length fields /= count → Left
-          (Internal "Coverage field count mismatch")
-      | otherwise → Right (Just (fields <> split.tail))
+      | found == head → Just (fields <> split.tail)
+      | otherwise → Nothing
 
 defaults ∷ Array Vector → Array Vector
 defaults = Array.mapMaybe defaultRow

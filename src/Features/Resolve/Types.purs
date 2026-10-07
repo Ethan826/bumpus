@@ -142,15 +142,18 @@ uniqueFunctions functions = for_ flagged uniqueFunction
   withFlag repeats function = { repeats, function }
   uniqueFunction { repeats, function } = do
     when repeats (duplicate DuplicateFunction function.name function.span)
-    traverse_ (uniqueParameter function.parameters) function.parameters
+    uniqueParameters function.parameters
 
-uniqueParameter
-  ∷ Array Syntax.Parameter → Syntax.Parameter → Either Syntax.Diagnostic Unit
-uniqueParameter parameters parameter =
-  when (Array.length (Array.filter sameName parameters) > 1)
-    (duplicate DuplicateParameter parameter.name parameter.span)
+-- The first parameter, in source order, whose name repeats is reported.
+-- Filtering the list per parameter was quadratic (20,000 took 2.7 s).
+uniqueParameters ∷ Array Syntax.Parameter → Either Syntax.Diagnostic Unit
+uniqueParameters parameters = for_ flagged uniqueParameter
   where
-  sameName other = other.name == parameter.name
+  flagged = Array.zipWith withFlag (repeated (map name parameters)) parameters
+  name parameter = parameter.name
+  withFlag repeats parameter = { repeats, parameter }
+  uniqueParameter { repeats, parameter } =
+    when repeats (duplicate DuplicateParameter parameter.name parameter.span)
 
 duplicate
   ∷ DuplicateKind → String → Syntax.Span → Either Syntax.Diagnostic Unit

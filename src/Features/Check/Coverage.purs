@@ -4,11 +4,12 @@ import Prelude
 import Data.Array as Array
 import Data.Either (Either(..), either)
 import Data.Foldable (traverse_)
-import Data.Maybe (Maybe(..), maybe, maybe')
+import Data.Maybe (Maybe(..), maybe)
 import Domain.IR.Internal as IR
 import Domain.Problem (Problem(..))
 import Domain.Resolved (Ty)
 import Domain.Syntax (Diagnostic, Span, problemAt)
+import Features.Check.Search (firstJust)
 import Features.Check.Signature (Lookup, Signature, buildSignature)
 import Features.Check.Usefulness (uncovered, useful)
 
@@ -53,15 +54,12 @@ coverMatch signature span scrutinee arms = do
 -- Only earlier arms can make an arm redundant; the first one is reported.
 redundancy ∷ Signature → Span → Array IR.Arm → Either Diagnostic Unit
 redundancy signature span arms = do
-  found ← located span
-    (Array.foldM firstRedundant Nothing (Array.mapWithIndex earlier arms))
+  found ← located span (firstJust judge (Array.mapWithIndex earlier arms))
   maybe (pure unit) report found
   where
   rows = map armRow arms
   earlier index arm = { pattern: arm.pattern, rows: Array.take index rows }
-  firstRedundant found candidate = maybe' (judge candidate) settled found
-  settled armSpan = Right (Just armSpan)
-  judge candidate _ = verdict candidate <$> useful signature candidate.rows
+  judge candidate = verdict candidate <$> useful signature candidate.rows
     [ candidate.pattern ]
   verdict candidate isUseful =
     if isUseful then Nothing else Just (patternSpan candidate.pattern)
