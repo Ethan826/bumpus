@@ -40,6 +40,12 @@ const rows = [
     replacement:
       'fields = Array.take 1 (Array.mapWithIndex (showField id) ctor.fields)',
     probe: 'show-fields', message: /printed value lost fields/
+  },
+  {
+    name: 'state-thread', file: 'src/Format/Parse/Grammar.purs',
+    needle: 'given ← argument applied.rest',
+    replacement: 'given ← argument state',
+    probe: 'state-thread', message: /parser state not threaded/
   }
 ];
 const base = '.build/regression';

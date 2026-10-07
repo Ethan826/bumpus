@@ -2,7 +2,7 @@
 // Each probe uses only the compiler it is given, never the healthy build.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -99,13 +99,26 @@ const prints = (source, expected, message) => () => {
 const ordered = (body, message) =>
   prints(`${list} fn main(): Bool = ${body};`, 'true\n', `${message}: ${body}`);
 
+// Grammar's apply is the only place the remaining input is threaded; if the
+// second parser restarts from the first's state, no program parses as written.
+const stateThread = () => {
+  const result = compile(readFileSync('examples/answer.bumpus', 'utf8'));
+  const expected = readFileSync('bootstrap/answer.go', 'utf8');
+  if (!(result instanceof Right) || result.value0 !== expected) {
+    console.error(`parser state not threaded: ${JSON.stringify(result.value0)}`);
+    process.exit(1);
+  }
+  console.log('state-thread regression detects the defect');
+};
+
 const probes = {
   branch, 'nil-guard': nilGuard, exhaustive,
   'ctor-order': ordered('Nil < Cons(0, Nil)', 'constructor order wrong'),
   'first-field': ordered('Cons(1, Nil) > Cons(0, Cons(5, Nil))',
     'first differing field ignored'),
   'show-fields': prints(`${list} fn main(): L = Cons(1, Cons(2, Nil));`,
-    'Cons(1, Cons(2, Nil))\n', 'printed value lost fields')
+    'Cons(1, Cons(2, Nil))\n', 'printed value lost fields'),
+  'state-thread': stateThread
 };
 assert.ok(probe in probes, `unknown probe: ${probe}`);
 probes[probe]();

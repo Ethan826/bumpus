@@ -3,7 +3,10 @@
 Status: approved 2026-10-07 for subagent-driven execution in
 .worktrees/g001 (branch g001), with two user corrections folded in (Task 1's
 long-arm test; Task 3's comparison accounting, mixed-nesting tests and probe
-outcome classification). Not started.
+outcome classification). In review: Tasks 1-5 (with inserted Task 4b)
+are implemented on g001 (evidence in docs/progress.md `G001 execution`);
+the controller's final whole-branch review is pending, and merging into
+main needs user approval.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

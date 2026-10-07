@@ -26,7 +26,9 @@ stack.
 3. **Heap-based phases** (explicit work stacks or trampolined traversal in
    every phase). Removes the bound entirely; a large rewrite of resolve,
    check, coverage and Go emission. Planned as follow-up work (spec
-   section 4), together with the stack-safe operator chains of section 7.
+   section 4): BACKLOG H001, if a real program needs nesting beyond the
+   limit. The narrower stack-safe operator chains of spec section 7 are
+   BACKLOG O001.
 
 ## Decision
 
@@ -49,7 +51,10 @@ chain" would accept it, and repeated parenthesized left operands would
 then grow the tree without bound while every counted depth stayed small.
 The state carries `depth` (the level being parsed) and `peak` (the deepest
 level since the enclosing nested position), and the operator check is
-`peak + 1 ≤ limit`. A flat chain of n operands counts n − 1, as before.
+`peak + 1 ≤ limit`. A flat chain of n operands counts n − 1, as before:
+at the CLI a flat sum of 129 operands compiles and 130 is E_NESTING
+(re-measured in Task 5). Lifting that for flat chains needs resolve, check
+and Go emission to walk chains iteratively first (BACKLOG O001).
 
 ## Measurement
 

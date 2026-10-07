@@ -1,7 +1,9 @@
 # Applicative parser and depth limit: design (G001)
 
 Status: approved by the user 2026-10-07 as written, with the clarifications
-in section 7. Nothing is implemented.
+in section 7. Implemented on branch g001 (plan
+docs/plans/2026-10-07-applicative-parser-plan.md), in review; heap-based
+phases and iterative operator chains are BACKLOG H001 and O001.
 User decisions: the parser abstraction is applicative only (no Monad
 instance); deep nesting gets a depth limit with a structured diagnostic
 instead of a raw stack trace (option 1 of three discussed; heap-based

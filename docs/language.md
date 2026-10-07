@@ -113,18 +113,32 @@ negative, Bool `true` or `false`, a declared value `Name` or
 `Name(f1, f2)` with `, ` separators: the coverage-witness format without `_`,
 so every printed value is valid Bumpus source that reproduces the value
 under the same declarations (adt-print round trip). Re-reading is bounded by
-BACKLOG E002: constructor nesting deeper than about 420 levels overflows the
-parser's stack, so long printed lists cannot yet be recompiled. Malformed
+the nesting limit below: a printed list `Cons(1, Cons(2, … Nil))` of more
+than 128 elements nests deeper than 128 levels, so it is rejected with
+E_NESTING rather than recompiled (heap-based phases, BACKLOG H001, would lift this). Malformed
 values, possible only from foreign code (I001), panic with `bumpus: malformed
 value` when a comparison or print visits a nil field pointer or unknown tag;
 comparison stops at the first difference, so later malformed fields can go
 unnoticed; total order is claimed only for well-formed values.
 Foreign (Go) values are not validated: Proposed, with I001.
 
+Nesting. One declaration body may nest at most 128 levels (ADR 006,
+Format.Parse.Grammar `nestingLimit`). A level is a parenthesized expression,
+an `if` condition or branch, a `match` scrutinee or arm body, a call or
+constructor argument, a constructor-pattern field, or a `+` or comparison
+operand. Only one root-to-leaf path counts; siblings and later declarations
+do not add up, and every function body starts at 0. Operators count the
+depth of the tree they build: `a + b + c` is `(a + b) + c`, so a flat sum
+of n operands counts n - 1 levels (129 operands compile, 130 do not), and
+a deep left operand counts in full. Deeper input is E_NESTING `Nesting
+exceeds 128 levels` at the token that would exceed the limit, never a stack
+overflow (test/depth.test.mjs, through the CLI, for each form at 128 and
+129). A flat sum without that bound is Proposed (BACKLOG O001).
+
 Locations are half-open UTF-16 code-unit offsets, zero based; line/column one
 based; LF increments line and resets column. Parenthesized expressions keep
 the inner span. A diagnostic reports the first error in phase/traversal order.
 E_INTERNAL is a compiler invariant failure. Codes are a closed ADT: E_LEX,
 E_SYNTAX, E_INTEGER, E_ENTRY, E_DUPLICATE, E_UNBOUND, E_NOT_CALLABLE, E_TYPE,
-E_ARITY, E_REDUNDANT, E_NON_EXHAUSTIVE, E_INTERNAL. The CLI adds E_USAGE,
-E_IO and E_TOOL.
+E_ARITY, E_REDUNDANT, E_NON_EXHAUSTIVE, E_NESTING, E_INTERNAL. The CLI adds
+E_USAGE, E_IO and E_TOOL.

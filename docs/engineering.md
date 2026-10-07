@@ -31,12 +31,24 @@ adding a bypass allowlist.
 - separate language-cst-parser style package rejects let-in, anonymous lambdas,
   Maybe/Either constructor cases (including record-building or guarded cases),
   and do-blocks directly in case/if branches; parse recovery fails the gate;
-- the same CST gate keeps parser productions applicative (G001): in
-  Format.Parse and Format.Parse.{Literal, Pattern, Expression, Declaration}
-  it rejects every `do` block and the `>>=`/`=<<` operators (including
-  `(>>=)` sections). Format.Parse.Grammar, which holds the Parser instances,
-  and Format.Parse.Cursor, the token cursor beneath it, are exempt; fixtures
-  in test/style.test.mjs pin both the rejected and the exempt modules;
+- the same CST gate keeps parser productions applicative (G001;
+  tools/style/src/Style/Parser.purs): in Format.Parse and
+  Format.Parse.{Literal, Pattern, Expression, Declaration} it rejects every
+  `do` block, the operators `>>=`, `=<<`, `>=>` and `<=<` (including
+  sections such as `(>>=)`), and the names `bind`, `join` and `discard`,
+  plain, qualified or in backticks. Format.Parse.Grammar, which holds the
+  Parser instances, and Format.Parse.Cursor, the token cursor beneath it,
+  are exempt; fixtures in test/style.test.mjs pin both the rejected and the
+  exempt modules. The gate is syntactic: an aliased or re-exported Bind
+  under another name would pass it, which review must catch;
+- only Format.Parse may run a parser (G001 Task 5, same CST gate): every
+  other module that imports Format.Parse.Grammar or Format.Parse.Cursor
+  must name its imports, without `run` or `initialState`; an open, `as`-only
+  or `hiding` import of either module is rejected. Format.Parse.Grammar,
+  which defines `run` and re-exports `initialState`, is exempt. Without
+  this, a production could run a sub-parser and inspect its result, which
+  is Bind by another route. Fixtures in test/style.test.mjs cover the
+  rejected forms, the exempt modules and an ordinary named import;
 - structured negative diagnostics (test/diagnostics.test.mjs, one row per
   code family with exact code, span and text), generated-Go snapshots
   (bootstrap/answer.go, bootstrap/shapes.go), positive build/run, seeded AST
@@ -44,7 +56,7 @@ adding a bypass allowlist.
   brute-force coverage oracle with brute-forced inhabitedness over generated
   type systems (test/coverage.test.mjs), and fake-host command tests
   (test/program.test.mjs);
-- `npm run verify` runs every test/*.test.mjs file (19 files, 112 tests, no
+- `npm run verify` runs every test/*.test.mjs file (20 files, 147 tests, no
   skips; the list is read from the directory, never hand-kept) and then
   scripts/regression.mjs, a table of isolated-copy mutations, each of which
   must pass on the healthy build and fail on its mutant: `branch`
@@ -52,8 +64,10 @@ adding a bypass allowlist.
   test; probe requires the unmatched panic, not a runtime error),
   `exhaustive` (Features.Check.Coverage always succeeds), `ctor-order`
   (Format.Go.Compare reverses the tag comparison), `first-field` (compares
-  the last field first) and `show-fields` (Format.Go.Show prints only the
-  first field); the A003 order and print tests also use an independent value
+  the last field first), `show-fields` (Format.Go.Show prints only the
+  first field) and `state-thread` (Format.Parse.Grammar's `apply` runs the
+  second parser from the original state; examples/answer.bumpus must still
+  compile to bootstrap/answer.go); the A003 order and print tests also use an independent value
   oracle (test/value-oracle.mjs);
 - scripts/strict-rebuild.mjs (run by verify after the build) copies the
   workspace to .build/strict-rebuild, checks the unmodified copy builds, adds

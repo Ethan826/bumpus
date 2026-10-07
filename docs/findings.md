@@ -186,3 +186,30 @@ policy, without weakening the tests or overstating their automated coverage.
   overflows the parser at about 420 levels in a cold process).
 - The coverage-oracle LCG used low bits that alternate, so seeds were
   reselected in Task 3b with assertions unchanged.
+
+## G001 observations (2026-10-07)
+
+- An applicative-only `Parser` was enough for the whole grammar because
+  every choice is LL(1) on the next token (`dispatch`); the only sequencing
+  on parsed values is `refine`, which checks a value without consuming.
+  The style gate is syntactic, so it also bans `run`/`initialState`
+  imports outside Format.Parse: running a sub-parser and inspecting its
+  result would be Bind by another route.
+- The combinator layers cost more stack per nesting level than the
+  hand-written parser (cold `Cons(1, ` capacity fell from about 419 to 313
+  levels in Task 2), so the limit was derived from a measured minimum
+  (304, ADR 006) rather than chosen first; 128 also bounds printed lists,
+  replacing the A003 note above about 420 levels.
+- Breadth overflows hid in three more places once the parser stopped
+  crashing first: the resolver's Array.foldM (about 1,700 arms or
+  arguments), Coverage.redundancy's Array.foldM (about 1,929 arms) and
+  Usefulness's two constructor searches (about 2,000 constructors).
+  Array.foldM over Either nests one bind per item; `traverse` is balanced
+  and `tailRecM` loops, so both are safe.
+- Go's inliner expands nested immediately invoked closures exponentially:
+  a match nested 24 deep takes 34.6 s and 7.5 GB to build (BACKLOG E005).
+  The compiler accepts these programs; the remedy is pending a user
+  decision.
+- A flat sum counts one level per operator, so 130 operands are E_NESTING
+  although the phases overflow only near 2,928 operands (ADR 006 table);
+  lifting it needs iterative chains in every later phase (BACKLOG O001).

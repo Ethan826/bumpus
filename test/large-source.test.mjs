@@ -111,9 +111,9 @@ test('ten thousand binding arguments resolve in source order', () => {
   assert.ok(!go.includes(`bumpusLocal${wideCount} `), 'no extra binder');
 });
 
-// The redundancy search was an Array.foldM over Either, one stack frame
-// chain per arm, so a match of about 1,930 arms overflowed in Usefulness on
-// a cold compile (G001 Task 4b). Each arm is still judged against the
+// Coverage.redundancy searched the arms with an Array.foldM over Either, one
+// stack frame chain per arm, so a match of about 1,929 arms overflowed on a
+// cold compile (G001 Task 4b). Each arm is still judged against the
 // earlier ones; 5,000 arms take about 1.3 s.
 const armCount = 5000;
 
@@ -139,8 +139,10 @@ test('a five-thousand-arm match reports its redundant arm', () => {
   });
 });
 
-// Every constructor is an arm, and exhaustiveness tries each constructor
-// in turn; both searches overflowed near 2,000 constructors (G001 Task 4b).
+// Three searches were Array.foldM over Either and overflowed near 2,000
+// constructors (G001 Task 4b): redundancy over the arms (one per
+// constructor), exhaustiveness trying each constructor in turn, and the
+// wildcard's usefulness against the complete constructor column.
 const ctorCount = 3000;
 
 test('a three-thousand-constructor match is judged in full', () => {

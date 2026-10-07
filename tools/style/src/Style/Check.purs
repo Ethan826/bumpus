@@ -7,22 +7,7 @@ import Data.Tuple (Tuple(..))
 import PureScript.CST (RecoveredParserResult(..), parseModule)
 import PureScript.CST.Traversal (defaultMonoidalVisitor, foldMapModule)
 import PureScript.CST.Types as CST
-
--- G001: parser productions are applicative. Format.Parse.Grammar (the Parser
--- instances) and Format.Parse.Cursor are the only parser modules that thread
--- the token state, so they are not listed.
-applicativeModules ∷ Array String
-applicativeModules =
-  [ "Format.Parse"
-  , "Format.Parse.Literal"
-  , "Format.Parse.Pattern"
-  , "Format.Parse.Expression"
-  , "Format.Parse.Declaration"
-  ]
-
-applicativeMessage ∷ String
-applicativeMessage =
-  "parser productions are applicative: no do block, >>= or =<<"
+import Style.Parser (runnerFindings, sequencingFindings)
 
 -- Fail closed on damaged syntax; never lint a recovered partial tree.
 check ∷ String → Array String
@@ -33,32 +18,20 @@ check source = case parseModule source of
 
 inspect ∷ CST.Module Void → Array String
 inspect parsed = foldMapModule visitor parsed
+  <> foldMap (runnerFindings name) (moduleImports parsed)
   where
+  name = moduleName parsed
   visitor = defaultMonoidalVisitor
-    { onExpr = expressionFindings <> sequencingFindings (moduleName parsed) }
+    { onExpr = expressionFindings <> sequencingFindings name }
+
+moduleImports ∷ CST.Module Void → Array (CST.ImportDecl Void)
+moduleImports (CST.Module { header: CST.ModuleHeader header }) =
+  header.imports
 
 moduleName ∷ CST.Module Void → String
 moduleName (CST.Module { header: CST.ModuleHeader header }) = text header.name
   where
   text (CST.Name { name: CST.ModuleName name }) = name
-
-sequencingFindings ∷ String → CST.Expr Void → Array String
-sequencingFindings name expression
-  | Array.elem name applicativeModules = bindFindings expression
-  | otherwise = []
-
-bindFindings ∷ CST.Expr Void → Array String
-bindFindings expression = case expression of
-  CST.ExprDo _ → [ applicativeMessage ]
-  CST.ExprOp _ operators → foldMap operatorFindings operators
-  CST.ExprOpName operator → bindOperatorFindings operator
-  _ → []
-  where
-  operatorFindings (Tuple operator _) = bindOperatorFindings operator
-
-bindOperatorFindings ∷ CST.QualifiedName CST.Operator → Array String
-bindOperatorFindings (CST.QualifiedName { name: CST.Operator text }) =
-  if Array.elem text [ ">>=", "=<<" ] then [ applicativeMessage ] else []
 
 expressionFindings ∷ CST.Expr Void → Array String
 expressionFindings expression = case expression of

@@ -42,3 +42,38 @@ test('the grammar core, cursor and other modules may sequence monadically', () =
   }
   assert.deepEqual(check(inModule('Format.Parse.Expression', 'f = g <$> x <*> y <* z')), []);
 });
+
+const parserModules = ['Format.Parse', 'Format.Parse.Literal', 'Format.Parse.Pattern',
+  'Format.Parse.Expression', 'Format.Parse.Declaration'];
+
+test('parser productions reach Bind by no other name', () => {
+  for (const name of parserModules) {
+    for (const body of ['f x = bind x g', 'f x = x `bind` g', 'f x = Prelude.bind x g',
+      'f = g >=> h', 'f = g <=< h', 'f = (>=>)', 'f x = join x', 'f x = discard x g']) {
+      assert.ok(check(inModule(name, body)).some(finding => finding.includes('applicative')), `${name}: ${body}`);
+    }
+  }
+});
+
+// Running a parser from a state is the one way to sequence on its result,
+// so only the parser entry point (and Grammar, which defines it) may.
+const runFinding = 'only Format.Parse runs a parser';
+const importing = (name, line) => inModule(name, `${line}\nf = 1`);
+
+test('only Format.Parse imports run or initialState', () => {
+  for (const name of ['Format.Parse.Expression', 'Format.Parse.Declaration', 'Program.Compile']) {
+    for (const line of ['import Format.Parse.Grammar (run)',
+      'import Format.Parse.Grammar (Parser, initialState)', 'import Format.Parse.Cursor (initialState)',
+      'import Format.Parse.Grammar', 'import Format.Parse.Grammar as Grammar',
+      'import Format.Parse.Grammar hiding (token)', 'import Format.Parse.Cursor']) {
+      assert.ok(check(importing(name, line)).some(finding => finding.includes(runFinding)), `${name}: ${line}`);
+    }
+  }
+});
+
+test('the parser entry point and Grammar may import the runner', () => {
+  assert.deepEqual(check(importing('Format.Parse', 'import Format.Parse.Grammar (Parser, initialState, run)')), []);
+  assert.deepEqual(check(importing('Format.Parse.Grammar', 'import Format.Parse.Cursor (Run, initialState)')), []);
+  assert.deepEqual(check(importing('Format.Parse.Expression', 'import Format.Parse.Grammar (Parser, token)')), []);
+  assert.deepEqual(check(importing('Format.Lex', 'import Data.Array (run)')), []);
+});

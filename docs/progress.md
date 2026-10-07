@@ -423,3 +423,26 @@ user review.
   tests, 0 failures/skips (.build/g001-task4b-verify.log); `exhaustive`
   regression row holds; answer, shapes, tree emits cmp-identical to
   bootstrap/*.go.
+- Task 5 (2026-10-07): closure. Regression row `state-thread`
+  (scripts/regression.mjs, probe in test/regression.mjs): Grammar's `apply`
+  running the second parser from the original state makes
+  examples/answer.bumpus fail with `parser state not threaded` (E_SYNTAX
+  "Expected an identifier" at 1:1; .build/g001-t5-state-thread-mutant.log);
+  the healthy compiler emits bootstrap/answer.go. CST gate closed
+  (tools/style/src/Style/Parser.purs): productions also reject `bind`,
+  `join`, `discard` (plain, qualified, backticked), `>=>` and `<=<`, and
+  only Format.Parse (and Grammar) may import `run`/`initialState`; open,
+  `as`-only and `hiding` imports of Grammar or Cursor are rejected. RED: 2 of
+  8 style tests failing (.build/g001-t5-style-red.log); the positive
+  fixture fails with the importer exemption removed, in an isolated copy
+  (.build/g001-t5-style-positive-mutant.log); GREEN 8/8
+  (.build/g001-t5-style-green.log). Measured at the CLI: a 129-operand flat
+  sum compiles and 130 is E_NESTING; a 128-element printed list compiles
+  and 129 is E_NESTING. Docs: language.md (nesting rule, E_NESTING), ADR
+  005 and 006, architecture.md, engineering.md, findings, README,
+  next-session; BACKLOG G001 In review, E002 restated, E005 options left to
+  the user, new O001, H001, F006 (stale output of deleted modules,
+  recorded, not fixed). `rm -rf output && npm run verify` exit 0, 20 files,
+  147 tests, 0 failures/skips, seven regression proofs
+  (.build/g001-task5-verify.log); answer, shapes, tree emits cmp-identical
+  to bootstrap/*.go. Final whole-branch review pending.
