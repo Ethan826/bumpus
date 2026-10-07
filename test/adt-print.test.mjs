@@ -47,7 +47,7 @@ const recovering = call => `package main
 import ("fmt"; "testing")
 func TestMalformed(t *testing.T) {
   defer func() {
-    if got := fmt.Sprint(recover()); got != "sprig: malformed value" {
+    if got := fmt.Sprint(recover()); got != "bumpus: malformed value" {
       t.Fatalf("recovered %q", got)
     }
   }()
@@ -59,9 +59,9 @@ func TestMalformed(t *testing.T) {
 test('printing a malformed value panics', () => {
   const source = `${list} fn main(): L = Nil;`;
   for (const call of [
-    'sprigShow0(nil, sprigTy0{tag: 2})',
-    'sprigShow0(nil, sprigTy0{tag: 3})',
-    'sprigShow0(nil, sprigTy0{})'
+    'bumpusShow0(nil, bumpusTy0{tag: 2})',
+    'bumpusShow0(nil, bumpusTy0{tag: 3})',
+    'bumpusShow0(nil, bumpusTy0{})'
   ]) {
     const result = goTest(source, recovering(call));
     assert.equal(result.status, 0, `${call}\n${result.output}`);
@@ -97,9 +97,9 @@ test('printed values recompile to the same value', () => {
 });
 
 test('tree example matches its snapshot and runs', () => {
-  const source = readFileSync('examples/tree.sprig', 'utf8');
+  const source = readFileSync('examples/tree.bumpus', 'utf8');
   assert.equal(checked(source), readFileSync('bootstrap/tree.go', 'utf8'));
-  assert.equal(command('node', ['scripts/sprig.mjs', 'run',
-    'examples/tree.sprig']),
+  assert.equal(command('node', ['scripts/bumpus.mjs', 'run',
+    'examples/tree.bumpus']),
     'Node(Node(Node(Leaf, 1, Leaf), 3, Leaf), 5, Node(Leaf, 8, Leaf))\n');
 });

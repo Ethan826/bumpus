@@ -1,6 +1,10 @@
-# Sprig bootstrap
+# Bumpus bootstrap
 
-Sprig is a provisional small functional language targeting ordinary Go.
+<img src="docs/assets/bumpus.svg" width="96" alt="Bumpus hound">
+
+Bumpus is a provisional small functional language targeting ordinary Go.
+The name is for the Bumpus hounds of *A Christmas Story*, chosen because
+"Sprig" collided with Masterminds/sprig in the Go ecosystem.
 Stage 0 is implemented in PureScript. This repository implements one checked
 vertical slice plus closed algebraic data types with exhaustive nested
 `match` (A001). Polymorphism, HKTs, classes, and rows are planned.
@@ -40,10 +44,10 @@ That environment limit is recorded as F001 in BACKLOG.md.
 
 ```sh
 npm run build
-node scripts/sprig.mjs emit examples/answer.sprig .build/answer.go
-node scripts/sprig.mjs build examples/answer.sprig .build/answer
+node scripts/bumpus.mjs emit examples/answer.bumpus .build/answer.go
+node scripts/bumpus.mjs build examples/answer.bumpus .build/answer
 .build/answer
-node scripts/sprig.mjs run examples/answer.sprig
+node scripts/bumpus.mjs run examples/answer.bumpus
 ```
 
 Both execution paths print `42`. `emit` writes canonical deterministic Go;
@@ -67,7 +71,7 @@ not yet a native Go compiler executable.
 
 Closed ADTs and exhaustive matching are implemented (see
 [ADR 003](docs/adr/003-closed-adts.md), [ADR 004](docs/adr/004-five-layers.md)
-and examples/shapes.sprig). The compiler is organized in five layers: Domain,
+and examples/shapes.bumpus). The compiler is organized in five layers: Domain,
 Features, Format, Runtime, Program ([architecture](docs/architecture.md)).
 The next milestone is chosen by the user after the final A001 review;
 [progress](docs/progress.md) records the evidence.

@@ -37,52 +37,52 @@ const execute = (host, args) => {
 const keysOf = value => Object.keys(value);
 
 test('bad arguments are E_USAGE with status 2 and touch no port', () => {
-  for (const args of [[], ['emit', 'a.sprig'], ['run', 'a', 'b'],
-    ['build', '', 'out'], ['fly', 'a.sprig'], ['run', 'a', 'b', 'c']]) {
+  for (const args of [[], ['emit', 'a.bumpus'], ['run', 'a', 'b'],
+    ['build', '', 'out'], ['fly', 'a.bumpus'], ['run', 'a', 'b', 'c']]) {
     const { host, calls } = fakeHost();
     const outcome = execute(host, args);
     assert.deepEqual(outcome, { status: 2, stdout: '', stderr: {
       code: 'E_USAGE',
-      message: 'sprig emit|build INPUT OUTPUT; sprig run INPUT' } });
+      message: 'bumpus emit|build INPUT OUTPUT; bumpus run INPUT' } });
     assert.deepEqual(calls, []);
   }
 });
 
 test('an empty run destination is accepted as the original CLI did', () => {
   const { host } = fakeHost({ readSource: new Right(answer) });
-  assert.equal(execute(host, ['run', 'a.sprig', '']).status, 0);
+  assert.equal(execute(host, ['run', 'a.bumpus', '']).status, 0);
 });
 
 test('a failed read is E_IO with status 1 and calls nothing else', () => {
   const { host, calls } = fakeHost({
     readSource: new Left(IoFailure.create('ENOENT: missing')) });
-  const outcome = execute(host, ['emit', 'in.sprig', 'out.go']);
+  const outcome = execute(host, ['emit', 'in.bumpus', 'out.go']);
   assert.deepEqual(outcome, { status: 1, stdout: '',
     stderr: { code: 'E_IO', message: 'ENOENT: missing' } });
-  assert.deepEqual(calls, [['readSource', 'in.sprig']]);
+  assert.deepEqual(calls, [['readSource', 'in.bumpus']]);
 });
 
 test('a source diagnostic is status 1 with the wire fields and file', () => {
   const { host, calls } = fakeHost({ readSource: new Right(mistyped) });
-  const outcome = execute(host, ['build', 'bad.sprig', 'program']);
-  const expected = { ...rejected(mistyped, 'E_TYPE'), file: 'bad.sprig' };
+  const outcome = execute(host, ['build', 'bad.bumpus', 'program']);
+  const expected = { ...rejected(mistyped, 'E_TYPE'), file: 'bad.bumpus' };
   assert.deepEqual(outcome, { status: 1, stdout: '', stderr: expected });
   assert.deepEqual(keysOf(outcome.stderr), ['code', 'message', 'span', 'file']);
-  assert.deepEqual(calls, [['readSource', 'bad.sprig']]);
+  assert.deepEqual(calls, [['readSource', 'bad.bumpus']]);
 });
 
 test('emit writes exactly the checked Go text at the destination', () => {
   const { host, calls } = fakeHost({ readSource: new Right(answer) });
-  const outcome = execute(host, ['emit', 'answer.sprig', 'answer.go']);
+  const outcome = execute(host, ['emit', 'answer.bumpus', 'answer.go']);
   assert.deepEqual(outcome, { status: 0, stdout: '', stderr: null });
-  assert.deepEqual(calls, [['readSource', 'answer.sprig'],
+  assert.deepEqual(calls, [['readSource', 'answer.bumpus'],
     ['writeText', 'answer.go', checked(answer)]]);
 });
 
 test('a write failure during emit is E_IO with status 1', () => {
   const { host } = fakeHost({ readSource: new Right(answer),
     writeText: new Left(IoFailure.create('EACCES: denied')) });
-  assert.deepEqual(execute(host, ['emit', 'a.sprig', 'a.go']), { status: 1,
+  assert.deepEqual(execute(host, ['emit', 'a.bumpus', 'a.go']), { status: 1,
     stdout: '', stderr: { code: 'E_IO', message: 'EACCES: denied' } });
 });
 
@@ -90,20 +90,20 @@ test('a build tool failure is E_TOOL with ok false and the command', () => {
   const failure = new ToolFailure({ message: 'spawnSync go ENOENT', command: 'go' });
   const { host, calls } = fakeHost({ readSource: new Right(answer),
     buildExecutable: new Left(failure) });
-  const outcome = execute(host, ['build', 'answer.sprig', 'answer']);
+  const outcome = execute(host, ['build', 'answer.bumpus', 'answer']);
   assert.deepEqual(outcome, { status: 1, stdout: '', stderr: { ok: false,
     code: 'E_TOOL', message: 'spawnSync go ENOENT', command: 'go' } });
   assert.deepEqual(keysOf(outcome.stderr), ['ok', 'code', 'message', 'command']);
-  assert.deepEqual(calls, [['readSource', 'answer.sprig'],
+  assert.deepEqual(calls, [['readSource', 'answer.bumpus'],
     ['buildExecutable', checked(answer), 'answer']]);
 });
 
 test('run prints the program output and never writes text', () => {
   const { host, calls } = fakeHost({ readSource: new Right(answer),
     runProgram: new Right('42\n') });
-  const outcome = execute(host, ['run', 'answer.sprig']);
+  const outcome = execute(host, ['run', 'answer.bumpus']);
   assert.deepEqual(outcome, { status: 0, stdout: '42\n', stderr: null });
-  assert.deepEqual(calls, [['readSource', 'answer.sprig'],
+  assert.deepEqual(calls, [['readSource', 'answer.bumpus'],
     ['runProgram', checked(answer)]]);
 });
 
@@ -111,7 +111,7 @@ test('a run tool failure is E_TOOL with status 1 and no stdout', () => {
   const failure = new ToolFailure({ message: 'exit 2', command: '/tmp/program' });
   const { host } = fakeHost({ readSource: new Right(answer),
     runProgram: new Left(failure) });
-  assert.deepEqual(execute(host, ['run', 'answer.sprig']), { status: 1,
+  assert.deepEqual(execute(host, ['run', 'answer.bumpus']), { status: 1,
     stdout: '', stderr: { ok: false, code: 'E_TOOL', message: 'exit 2',
       command: '/tmp/program' } });
 });

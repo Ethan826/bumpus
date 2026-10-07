@@ -108,7 +108,7 @@ typeName = case _ of
   BoolName → "Bool"
   DataName name → name
 
--- Witnesses print as Sprig patterns: `_`, literals, `Name(field, …)`.
+-- Witnesses print as Bumpus patterns: `_`, literals, `Name(field, …)`.
 pattern ∷ Witness → String
 pattern = case _ of
   WAny → "_"

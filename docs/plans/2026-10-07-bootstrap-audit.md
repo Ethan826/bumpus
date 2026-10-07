@@ -22,11 +22,11 @@ Go 1.26.4 (tested), Node >=22.5.0; installed pinned Superpowers skills.
 - Never disable checks, suppress warnings, skip tests, or weaken assertions.
 - Demonstrate regression tests failing with the corresponding defect restored,
   in an isolated copy.
-- Keep Sprig.* pure. Effects and foreign imports belong in Shell.*.
+- Keep Bumpus.* pure. Effects and foreign imports belong in Shell.*.
 - Preserve Stage 0 sources, locks, grammar, tests and build instructions.
 - Follow every AGENTS.md style rule; 250 physical lines maximum applies to
   maintained source/tests/tooling. Installed third-party skills are upstream
-  material, not independently maintained Sprig code; keep them unmodified.
+  material, not independently maintained Bumpus code; keep them unmodified.
 - Keep tracking local; no external publication, remote issues, or pushing.
 - Reference projects stay read-only; preserve the unapplied MileAhead patch.
 

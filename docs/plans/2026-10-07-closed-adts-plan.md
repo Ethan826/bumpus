@@ -30,11 +30,11 @@ its plan-time amendments in section 10).
   `maybe'` for computed fallbacks. Put branch work in named helpers.
 - Each maintained file is at most 250 physical lines. PureScript is 80
   columns with Unicode punctuation and is purs-tidy formatted.
-- `Sprig.*` stays pure. The core library allowlist in `scripts/structure.mjs`
+- `Bumpus.*` stays pure. The core library allowlist in `scripts/structure.mjs`
   stays unchanged (no `Data.Map`; use arrays).
 - Only Check/*, Go/* and `Sprig.Check`/`Sprig.Go` import `Sprig.IR.Internal`.
 - From Task 5 on, module names and the import rules are those of the
-  five-layers design: `Sprig.*` becomes Domain/Features/Format, `Shell.*`
+  five-layers design: `Bumpus.*` becomes Domain/Features/Format, `Shell.*`
   becomes Runtime/Program, and the IR boundary is `Features.Check*` plus
   `Format.Go*` importing `Domain.IR.Internal`.
 - `bootstrap/answer.go` stays byte-identical, and all 19 existing tests keep
@@ -286,7 +286,7 @@ its plan-time amendments in section 10).
     mutation targets this line.
   - Each arm's condition and binders follow spec section 6. An irrefutable
     arm's condition is `true`. The function ends with
-    `panic("sprig: unmatched value")`.
+    `panic("bumpus: unmatched value")`.
 
 - [ ] **Step 1: Write failing tests in `test/adt-match.test.mjs`**
   - Executables:
@@ -319,7 +319,7 @@ its plan-time amendments in section 10).
     `fn second(xs: IntList): Int = match xs { Nil => 0, Cons(_, Nil) => 1,
     Cons(_, Cons(y, _)) => y }`. The test calls `sprigFn0` with
     `sprigTy0{}` and with `sprigTy0{tag: 2}`.
-    - Both must recover exactly `"sprig: unmatched value"`.
+    - Both must recover exactly `"bumpus: unmatched value"`.
     - `Cons(h, _) => h` with `sprigTy0{tag: 2, c1f0: 5}` returns `5` without
       a panic, which documents that wildcards skip validation.
   - Snapshot: `checked(examples/shapes.sprig)` equals `bootstrap/shapes.go`.
@@ -348,7 +348,7 @@ its plan-time amendments in section 10).
   - New row `nil-guard`: replace `nilGuard path = path <> " != nil"` with
     `nilGuard _ = "true"`. The probe compiles the `second` program with the
     given compiler, runs `goTest` for the `{tag: 2}` value, and exits 1 with
-    "nil guard missing" unless the output contains `sprig: unmatched value`.
+    "nil guard missing" unless the output contains `bumpus: unmatched value`.
 - [ ] **Step 6: Run** `npm run verify`. Expected: exit 0, and the regression
   output reports both rows failing as required on their mutants.
 - [ ] **Step 7: Commit** `feat: parse, check and lower nested match (A001 T3)`.
@@ -460,7 +460,7 @@ no behavior, bytes, diagnostic text, spans or exit statuses change.
 - Modify: `scripts/structure.mjs`, `test/structure.test.mjs` (fixture module
   names only), `scripts/regression.mjs` and `test/regression.mjs` (paths and
   module names), every `test/*.mjs` import of `output/<Module>`,
-  `scripts/sprig.mjs`, `AGENTS.md` (the two lines naming `Sprig.*`, `Shell.*`
+  `scripts/sprig.mjs`, `AGENTS.md` (the two lines naming `Bumpus.*`, `Shell.*`
   and `Sprig.IR.Internal`), `docs/engineering.md` (the gate description).
 
 **Interfaces:**
@@ -497,8 +497,8 @@ no behavior, bytes, diagnostic text, spans or exit statuses change.
 - [ ] **Step 4: Run** `npm run verify`. Expected: exit 0, test count
   unchanged plus the new structure cases, all three regression rows proven.
   `cmp` shows `bootstrap/answer.go` and `bootstrap/shapes.go` unchanged.
-  `git grep -n "Sprig\.\|Shell\." src scripts test` shows no stale module
-  names (prose mentioning the language name Sprig is fine).
+  `git grep -n "Bumpus\.\|Shell\." src scripts test` shows no stale module
+  names (prose mentioning the language name Bumpus is fine).
 - [ ] **Step 5: Commit** `refactor: adopt five named layers (A001 T5)`.
 
 ### Task 6: Structured diagnostics rendered by Format

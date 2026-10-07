@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <title>Bumpus hound</title>
+  <path d="M22 30c-14 4-20 30-14 62 3 14 16 14 20 2 4-16 4-40-2-60z" fill="#7a4a24"/>
+  <path d="M106 30c14 4 20 30 14 62-3 14-16 14-20 2-4-16-4-40 2-60z" fill="#7a4a24"/>
+  <path d="M64 12c-24 0-38 14-38 38 0 14 4 24 10 32l-2 14c0 12 14 20 30 20s30-8 30-20l-2-14c6-8 10-18 10-32 0-24-14-38-38-38z" fill="#c98b4e"/>
+  <ellipse cx="64" cy="94" rx="22" ry="16" fill="#f1d9b5"/>
+  <ellipse cx="64" cy="84" rx="9" ry="6" fill="#2b2118"/>
+  <circle cx="48" cy="56" r="5" fill="#2b2118"/>
+  <circle cx="80" cy="56" r="5" fill="#2b2118"/>
+  <circle cx="49.5" cy="54.5" r="1.6" fill="#ffffff"/>
+  <circle cx="81.5" cy="54.5" r="1.6" fill="#ffffff"/>
+  <path d="M64 90v8m-8 2c4 4 12 4 16 0" fill="none" stroke="#2b2118" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

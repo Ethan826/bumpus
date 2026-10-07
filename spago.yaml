@@ -1,5 +1,5 @@
 package:
-  name: sprig
+  name: bumpus
   dependencies:
     - arrays
     - effect

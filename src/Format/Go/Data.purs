@@ -34,13 +34,13 @@ goType ∷ Ty → String
 goType = case _ of
   TInt → "int32"
   TBool → "bool"
-  TData (TypeId index) → "sprigTy" <> show index
+  TData (TypeId index) → "bumpusTy" <> show index
 
 ctorName ∷ CtorId → String
-ctorName (CtorId index) = "sprigCtor" <> show index
+ctorName (CtorId index) = "bumpusCtor" <> show index
 
 localName ∷ LocalId → String
-localName (LocalId index) = "sprigLocal" <> show index
+localName (LocalId index) = "bumpusLocal" <> show index
 
 integer ∷ Int → String
 integer value = "int32(" <> show value <> ")"
@@ -51,7 +51,7 @@ boolean value = if value then "true" else "false"
 -- Raised by every helper that meets a value its declarations cannot
 -- produce: an unknown tag or a nil field (only foreign code, I001).
 malformed ∷ String
-malformed = "panic(\"sprig: malformed value\")"
+malformed = "panic(\"bumpus: malformed value\")"
 
 -- Tags are 1-based within the owner so the zero value never names a
 -- constructor. Constructor ids are unique across types.
@@ -61,7 +61,7 @@ tagOf types id = maybe 0 (add 1) (Array.findMap position types)
   position info = Array.elemIndex id info.ctors
 
 typeName ∷ TypeId → String
-typeName (TypeId index) = "sprigTy" <> show index
+typeName (TypeId index) = "bumpusTy" <> show index
 
 fieldName ∷ CtorId → Int → String
 fieldName (CtorId ctor) index = "c" <> show ctor <> "f" <> show index
@@ -69,7 +69,7 @@ fieldName (CtorId ctor) index = "c" <> show ctor <> "f" <> show index
 -- ADT fields are pointers so a type may contain itself.
 fieldType ∷ Ty → String
 fieldType = case _ of
-  TData (TypeId index) → "*sprigTy" <> show index
+  TData (TypeId index) → "*bumpusTy" <> show index
   other → goType other
 
 structDeclaration ∷ TypeId → Array CtorInfo → TypeInfo → String

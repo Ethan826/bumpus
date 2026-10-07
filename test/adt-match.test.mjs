@@ -114,10 +114,10 @@ ${call}
 `;
 
 test('malformed values reach the unmatched panic, never a nil error', () => {
-  const check = 'if r != "sprig: unmatched value" '
+  const check = 'if r != "bumpus: unmatched value" '
     + '{ t.Fatalf("recovered %v", r) }';
-  for (const value of ['sprigTy0{}', 'sprigTy0{tag: 2}']) {
-    const go = recovering('TestUnmatched', `sprigFn0(${value})`, check);
+  for (const value of ['bumpusTy0{}', 'bumpusTy0{tag: 2}']) {
+    const go = recovering('TestUnmatched', `bumpusFn0(${value})`, check);
     const result = goTest(second, go);
     assert.equal(result.status, 0, result.output);
   }
@@ -127,7 +127,7 @@ test('wildcards skip validation of a nil field', () => {
   const source = `${list} fn head(xs: IntList): Int = `
     + 'match xs { Cons(h, _) => h, Nil => 0 }; fn main(): Int = head(Nil);';
   const go = recovering('TestHead',
-    'if v := sprigFn0(sprigTy0{tag: 2, c1f0: 5}); v != 5 '
+    'if v := bumpusFn0(bumpusTy0{tag: 2, c1f0: 5}); v != 5 '
     + '{ t.Fatalf("got %v", v) }',
     'if r != nil { t.Fatalf("panicked %v", r) }');
   const result = goTest(source, go);
@@ -135,8 +135,8 @@ test('wildcards skip validation of a nil field', () => {
 });
 
 test('shapes example matches its snapshot and runs', () => {
-  const source = readFileSync('examples/shapes.sprig', 'utf8');
+  const source = readFileSync('examples/shapes.bumpus', 'utf8');
   assert.equal(checked(source), readFileSync('bootstrap/shapes.go', 'utf8'));
-  assert.equal(command('node', ['scripts/sprig.mjs', 'run',
-    'examples/shapes.sprig']), '120\n');
+  assert.equal(command('node', ['scripts/bumpus.mjs', 'run',
+    'examples/shapes.bumpus']), '120\n');
 });

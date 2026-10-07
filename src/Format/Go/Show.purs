@@ -7,7 +7,7 @@ import Domain.Resolved (CtorId(..), CtorInfo, Ty(..), TypeId(..), TypeInfo)
 import Format.Go.Data (fieldName, goType, malformed, tagOf)
 
 showName ∷ TypeId → String
-showName (TypeId index) = "sprigShow" <> show index
+showName (TypeId index) = "bumpusShow" <> show index
 
 -- One printer per declared type, in TypeId order, whether or not used.
 showHelpers ∷ Array TypeInfo → Array CtorInfo → String
@@ -40,7 +40,7 @@ showCase types owner index ctor
   | otherwise = "case " <> show (tagOf types (CtorId index)) <> ":\n"
       <> ctorBody (CtorId index) ctor
 
--- Printed values are Sprig expressions: `Name` or `Name(f1, f2)`.
+-- Printed values are Bumpus expressions: `Name` or `Name(f1, f2)`.
 ctorBody ∷ CtorId → CtorInfo → String
 ctorBody id ctor
   | Array.null ctor.fields = "return " <> appendText ctor.name

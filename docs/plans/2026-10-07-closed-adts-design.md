@@ -225,7 +225,7 @@ _ = sprigLocal1
 return …
 }
 if true { return … }
-panic("sprig: unmatched value")
+panic("bumpus: unmatched value")
 }(<scrutinee>)
 ```
 
@@ -292,7 +292,7 @@ keeps its own exact rejection fixture.
 - **Representation:** a new emitted-bytes snapshot, `bootstrap/shapes.go`. An
   injected Go test calls lowered matches with `sprigTy0{}` and with a tag-2
   value whose recursive field is nil. Each must panic with exactly
-  `sprig: unmatched value`, not a runtime error.
+  `bumpus: unmatched value`, not a runtime error.
 - **Regression mutation:** in an isolated copy, making exhaustiveness always
   succeed must fail the suite, and the healthy compiler must pass it. A
   second mutation that drops the nil guard must fail the representation test.

@@ -13,7 +13,7 @@ test('layer gate rejects effects, reverse dependencies, and unchecked IR access'
   assert.deepEqual(graphFindings({ 'Features.Check': { path: 'src/check.purs', depends: ['Domain.Syntax', 'Domain.IR.Internal', 'Data.Array'] } }), []);
   assert.deepEqual(graphFindings({ 'Program.Main': { path: 'src/main.purs', depends: ['Effect'] } }), []);
   assert.equal(graphFindings({ 'Unknown': { path: 'src/unknown.purs', depends: [] } }).length, 1);
-  assert.equal(graphFindings({ 'Sprig.Old': { path: 'src/Sprig/Old.purs', depends: [] } }).length, 1);
+  assert.equal(graphFindings({ 'Bumpus.Old': { path: 'src/Bumpus/Old.purs', depends: [] } }).length, 1);
 });
 
 test('length gate counts blank lines and includes tooling and tests', () => {
@@ -22,6 +22,6 @@ test('length gate counts blank lines and includes tooling and tests', () => {
 });
 
 test('escape gate rejects partiality and test suppression', () => {
-  assert.equal(textFindings('src/Sprig/Foo.purs', 'unsafePartial\n').length, 1);
+  assert.equal(textFindings('src/Bumpus/Foo.purs', 'unsafePartial\n').length, 1);
   assert.equal(textFindings('test/x.mjs', 'test.' + 'skip("x")\n').length, 1);
 });

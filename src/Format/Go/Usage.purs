@@ -8,7 +8,7 @@ import Format.Go.Compare (isBoolOrdering)
 
 -- Helpers are emitted only when some expression needs them, so programs
 -- without such comparisons keep their previous output byte for byte. A Bool
--- field makes the declared type's compare helper call sprigCmpBool.
+-- field makes the declared type's compare helper call bumpusCmpBool.
 needsBoolHelper ∷ IR.Program → Boolean
 needsBoolHelper (IR.Program program) =
   Array.any hasBoolField program.ctors

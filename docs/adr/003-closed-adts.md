@@ -19,7 +19,7 @@ proposed, not verified.
 2. **Nil-guard safety policy.** Every pointer projection is preceded by a
    `!= nil` test earlier in the same `&&` chain, so generated code never makes
    an unguarded nil dereference. A malformed value (tag 0, tag past the owner,
-   nil field under a valid tag) reaches `panic("sprig: unmatched value")` only
+   nil field under a valid tag) reaches `panic("bumpus: unmatched value")` only
    if a match inspects the malformed part. **Limit:** wildcards and binders do
    not validate what they skip; `malformed values reach the unmatched panic,
    never a nil error` and `wildcards skip validation of a nil field`
@@ -40,7 +40,7 @@ proposed, not verified.
 5. **CtorId versus tag.** The checked IR names a constructor by `CtorId`
    (global, declaration order). The Go tag (1-based index within the owner)
    exists only in lowering, so the IR says nothing about representation.
-6. **Depth naming.** A match's Go parameter is `sprigMatch<d>` where d counts
+6. **Depth naming.** A match's Go parameter is `bumpusMatch<d>` where d counts
    enclosing arm bodies; a scrutinee lowers at its enclosing depth. No counter
    is threaded. Checked by `matches nest in arm bodies and in scrutinee
    position` (test/adt-match.test.mjs).

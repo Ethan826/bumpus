@@ -36,12 +36,12 @@ test('a local shadows a nullary constructor', () => {
 test('Go declarations use the pinned bytes', () => {
   const go = checked(`${list} fn main(): Int = 1;`);
   assert.ok(go.includes(
-    'type sprigTy0 struct {\ntag uint32\nc1f0 int32\nc1f1 *sprigTy0\n}\n'));
+    'type bumpusTy0 struct {\ntag uint32\nc1f0 int32\nc1f1 *bumpusTy0\n}\n'));
   assert.ok(go.includes(
-    'func sprigCtor0() sprigTy0 { return sprigTy0{tag: 1} }\n'));
+    'func bumpusCtor0() bumpusTy0 { return bumpusTy0{tag: 1} }\n'));
   assert.ok(go.includes(
-    'func sprigCtor1(f0 int32, f1 sprigTy0) sprigTy0 '
-    + '{ return sprigTy0{tag: 2, c1f0: f0, c1f1: &f1} }\n'));
+    'func bumpusCtor1(f0 int32, f1 bumpusTy0) bumpusTy0 '
+    + '{ return bumpusTy0{tag: 2, c1f0: f0, c1f1: &f1} }\n'));
 });
 
 test('type and constructor declarations are rejected precisely', () => {

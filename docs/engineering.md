@@ -76,7 +76,7 @@ are scope decisions, not hidden failures. No external issue/commit/push rule
 from a reference project is inherited.
 
 Generated output/output caches and lockfiles are excluded from line limits.
-Sprig fixture files and generated Go are data; maintained source or test code
+Bumpus fixture files and generated Go are data; maintained source or test code
 cannot be moved into those trees to evade checks. The checker tests test the
 checker itself. Structural guarantees are bounded by direct imports and known
 library APIs, not a proof of arbitrary dependency purity.
@@ -85,7 +85,7 @@ library APIs, not a proof of arbitrary dependency purity.
 
 Superpowers is project-local, revision-pinned third-party guidance, preserved
 unmodified under .agents/skills with its MIT notice. It is distinct from
-maintained Sprig source/tests/tooling; project gates still cover their existing
+maintained Bumpus source/tests/tooling; project gates still cover their existing
 roots without weakened checks. docs/planning-skills.md records instruction
 precedence and adoption. Migrated plans preserve historical evidence without
 asserting retroactive TDD/commit records. Execution uses the installed plan/task/review helpers and real commit ranges.

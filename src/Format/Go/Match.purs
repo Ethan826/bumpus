@@ -27,11 +27,11 @@ lowerMatch tables lower depth ty scrutinee arms =
     <> goType ty
     <> " {\n"
     <> joinWith "" (map lowerArm arms)
-    <> "panic(\"sprig: unmatched value\")\n}("
+    <> "panic(\"bumpus: unmatched value\")\n}("
     <> lower depth scrutinee
     <> ")"
   where
-  parameter = "sprigMatch" <> show depth
+  parameter = "bumpusMatch" <> show depth
   lowerArm arm = armCode tables (lower (depth + 1)) parameter arm
 
 armCode ∷ Tables → (IR.Expr → String) → String → IR.Arm → String

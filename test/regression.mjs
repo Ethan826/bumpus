@@ -29,14 +29,14 @@ const recovering = `package main
 import ("fmt"; "testing")
 func TestNilField(t *testing.T) {
 defer func() { fmt.Println("recovered:", recover()) }()
-sprigFn0(sprigTy0{tag: 2})
+bumpusFn0(bumpusTy0{tag: 2})
 }
 `;
 
 const nilGuard = () => {
   const result = compile(second);
   assert.ok(result instanceof Right, 'nil-guard probe program was rejected');
-  const work = mkdtempSync(join(tmpdir(), 'sprig-regression-'));
+  const work = mkdtempSync(join(tmpdir(), 'bumpus-regression-'));
   let output;
   let status;
   try {
@@ -50,7 +50,7 @@ const nilGuard = () => {
     output = run.stdout + run.stderr;
     status = run.status;
   } finally { rmSync(work, { recursive: true, force: true }); }
-  if (status !== 0 || !output.includes('recovered: sprig: unmatched value')) {
+  if (status !== 0 || !output.includes('recovered: bumpus: unmatched value')) {
     console.error(`nil guard missing\n${output}`);
     process.exit(1);
   }

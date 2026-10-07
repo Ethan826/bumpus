@@ -1,4 +1,4 @@
-# Sprig language specification (stage 0 plus closed ADTs)
+# Bumpus language specification (stage 0 plus closed ADTs)
 
 Provisional name. A file is one program: type declarations and functions in
 any order, with required function signatures. Behavioral claims below name

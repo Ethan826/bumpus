@@ -13,7 +13,7 @@ order, and printing of `main`'s value whatever its type.
 **Architecture:** One new expression form, `Compare Operator Expr Expr`,
 flows through every phase (Syntax → Resolved → IR). Format.Go lowers Int and
 Bool comparisons to Go operators and declared types to generated per-type
-helpers (`sprigCmpN`, `sprigShowN`). Helper generation is split by
+helpers (`bumpusCmpN`, `bumpusShowN`). Helper generation is split by
 responsibility so each file stays well under 250 lines: Format.Go.Compare
 (operator text, Bool helper, comparison helpers), Format.Go.Show (printing
 helpers) and Format.Go.Usage (whether the Bool helper is needed).
@@ -35,7 +35,7 @@ runner, Go 1.26.4.
   `Expected fn main()`; the `main must return Int or Bool` row is removed)
   and the `fn main(): IntList = Nil;` E_ENTRY row in test/adt-types.test.mjs
   (becomes a positive test in Task 3), and shapes.go snapshot bytes.
-- Panic text for malformed values is exactly `sprig: malformed value`.
+- Panic text for malformed values is exactly `bumpus: malformed value`.
 - Every task: each new behavioral test is seen failing before the code;
   `npm run verify` exits 0; evidence line in docs/progress.md; commit.
   Never push.
@@ -74,7 +74,7 @@ runner, Go 1.26.4.
   `IR.Compare Operator Expr Expr` (result `ty` is `TBool`).
 - Produces, in Format.Go.Compare: `goOperator ∷ Operator → String` (`==`,
   `!=`, `<`, `<=`, `>`, `>=`); `boolHelper ∷ String` (the
-  `sprigCmpBool(a bool, b bool) int` declaration). In Format.Go.Usage:
+  `bumpusCmpBool(a bool, b bool) int` declaration). In Format.Go.Usage:
   `needsBoolHelper ∷ IR.Program → Boolean` (Task 1: some `IR.Compare` with
   an ordering operator has Bool operands).
 
@@ -98,17 +98,17 @@ runner, Go 1.26.4.
 Evaluation order, test `comparison operands evaluate once each, left first`:
 `fn l(): Int = 1; fn r(): Int = 2; fn main(): Bool = l() < r();` and the
 same with Bool results (`false < true` via `fn l(): Bool`, which uses
-`sprigCmpBool`) and with `==`. The test instruments the emitted Go text:
-after each `func sprigFnK(...) T {\n` it inserts
-`sprigTrace = append(sprigTrace, "K")\n`; a `goTest` file declares
-`var sprigTrace []string`, calls the main function, and prints the trace,
+`bumpusCmpBool`) and with `==`. The test instruments the emitted Go text:
+after each `func bumpusFnK(...) T {\n` it inserts
+`bumpusTrace = append(bumpusTrace, "K")\n`; a `goTest` file declares
+`var bumpusTrace []string`, calls the main function, and prints the trace,
 which must be exactly `[0 1]` (l, then r, once each). Put the instrumenting
 helper in test/support.mjs as `traceCalls(goSource) → string` and give
 `goTest` an optional transform of the emitted Go.
 
-Also assert `checked(readFileSync('examples/answer.sprig'))` still equals
+Also assert `checked(readFileSync('examples/answer.bumpus'))` still equals
 bootstrap/answer.go and that a program without Bool ordering contains no
-`sprigCmpBool` while `false < true` contains it exactly once.
+`bumpusCmpBool` while `false < true` contains it exactly once.
 
 - [ ] **Step 2: Run `node --test test/compare.test.mjs`; expect failures
   (E_LEX on `<`).**
@@ -130,9 +130,9 @@ bootstrap/answer.go and that a program without Bool ordering contains no
   traverses both operands like `IR.Add`.
 
 - [ ] **Step 6: Lower.** In Format.Go, Int or Bool `Equal`/`NotEqual` and Int
-  ordering: `(L op R)`. Bool ordering: `(sprigCmpBool(L, R) op 0)`. Emit
-  `boolHelper` after `sprigAdd` iff `needsBoolHelper`.
-  `sprigCmpBool` returns -1, 0, 1 with `false < true`.
+  ordering: `(L op R)`. Bool ordering: `(bumpusCmpBool(L, R) op 0)`. Emit
+  `boolHelper` after `bumpusAdd` iff `needsBoolHelper`.
+  `bumpusCmpBool` returns -1, 0, 1 with `false < true`.
 
 - [ ] **Step 7: Run `node --test test/compare.test.mjs`; all pass. Run
   `npm run verify`; exit 0, answer.go and shapes.go unchanged.**
@@ -151,7 +151,7 @@ bootstrap/answer.go and that a program without Bool ordering contains no
 **Interfaces:**
 - Consumes: Task 1 IR node and helpers.
 - Produces, in Format.Go.Compare: `compareName ∷ TypeId → String`
-  (`sprigCmp<index>`); `compareHelpers ∷ Array TypeInfo → Array CtorInfo →
+  (`bumpusCmp<index>`); `compareHelpers ∷ Array TypeInfo → Array CtorInfo →
   String` (one function per type, TypeId order). `needsBoolHelper` is also
   true when any declared constructor has a Bool field.
 - Produces, in test/value-oracle.mjs (used again in Task 3):
@@ -175,13 +175,13 @@ With `type L = Nil | Cons(Int, L);`, executed in Go, each must print
 `(a() < b()) == false`, where `fn a(): L` and `fn b(): L`
 both build `Cons(1, Nil)` separately. A Bool field type
 `type P = P(Bool, Int);` gives `P(false, 9) < P(true, 0)`. Review Focus 4
-and 5. Malformed values via `goTest`: `sprigCmp0(sprigTy0{tag: 2},
-sprigTy0{tag: 2})` (nil field) and `sprigCmp0(sprigTy0{}, sprigTy0{})`
-(unknown tag) each recover `sprig: malformed value`. Visiting boundary,
-same `L`: `sprigCmp0(sprigTy0{tag: 2, c1f0: 1}, sprigTy0{tag: 2, c1f0: 2})`
+and 5. Malformed values via `goTest`: `bumpusCmp0(bumpusTy0{tag: 2},
+bumpusTy0{tag: 2})` (nil field) and `bumpusCmp0(bumpusTy0{}, bumpusTy0{})`
+(unknown tag) each recover `bumpus: malformed value`. Visiting boundary,
+same `L`: `bumpusCmp0(bumpusTy0{tag: 2, c1f0: 1}, bumpusTy0{tag: 2, c1f0: 2})`
 (both tails nil) returns -1 without panicking, because the first field
 decides; with equal heads (`c1f0: 1` on both) the nil tail is visited and
-panics `sprig: malformed value`. Evaluation order for declared types: the
+panics `bumpus: malformed value`. Evaluation order for declared types: the
 Task 1 `traceCalls` test with `fn l(): L` and `fn r(): L` under `<` and `==`
 prints `[0 1]`.
 
@@ -190,7 +190,7 @@ per seed, one system and 8 value pairs of T0 (depth ≤ 3), including at
 least two equal pairs whose right side comes from `expressionOf`. Each pair
 becomes `fn pK(): Int` summing `if L op R then 2^i else 0` over the six
 operators in spec order; `fn main(): Int = 0;`. A `goTest` file prints
-every `sprigFnK()`; the output must equal the masks implied by
+every `bumpusFnK()`; the output must equal the masks implied by
 `compare3`. The same test asserts reflexivity, antisymmetry, transitivity
 and totality of `compare3` over the seed's values (a sanity check on the
 interpreter; agreement is the acceptance check).
@@ -201,11 +201,11 @@ interpreter; agreement is the acceptance check).
 - [ ] **Step 3: Implement `compareHelpers`.** Each helper first panics on a
   tag outside 1..count for either argument, returns by tag order when tags
   differ, then compares fields left to right (Int via `<`/`>`, Bool via
-  `sprigCmpBool`, declared via the field type's helper after a nil check
+  `bumpusCmpBool`, declared via the field type's helper after a nil check
   that panics), returning at the first nonzero result, else 0.
 
 - [ ] **Step 4: Lower declared-type comparisons** to
-  `(sprigCmpN(L, R) op 0)`; emit `compareHelpers` after `declarations`.
+  `(bumpusCmpN(L, R) op 0)`; emit `compareHelpers` after `declarations`.
 
 - [ ] **Step 5: Regression rows** in scripts/regression.mjs and probes in
   test/regression.mjs: `ctor-order` (needle: the tag comparison in the
@@ -216,7 +216,7 @@ interpreter; agreement is the acceptance check).
   wrong` / `first differing field ignored`. Show each row's mutant failing.
 
 - [ ] **Step 6: Regenerate bootstrap/shapes.go** from the CLI, review that
-  the diff only adds `sprigCmp0`; tests pass; `npm run verify` exits 0.
+  the diff only adds `bumpusCmp0`; tests pass; `npm run verify` exits 0.
 
 - [ ] **Step 7: Commit** `feat: structural order for declared types (A003)`.
 
@@ -228,12 +228,12 @@ interpreter; agreement is the acceptance check).
   `src/Format/Go.purs`, `test/diagnostics.test.mjs`, `test/adt-types.test.mjs`,
   `scripts/regression.mjs`, `test/regression.mjs`, `bootstrap/shapes.go`
 - Create: `src/Format/Go/Show.purs`, `test/adt-print.test.mjs`,
-  `examples/tree.sprig`,
+  `examples/tree.bumpus`,
   `bootstrap/tree.go`
 
 **Interfaces:**
 - Consumes: Task 2 value oracle and helpers.
-- Produces, in Format.Go.Show: `showName ∷ TypeId → String` (`sprigShow<index>`),
+- Produces, in Format.Go.Show: `showName ∷ TypeId → String` (`bumpusShow<index>`),
   `showHelpers ∷ Array TypeInfo → Array CtorInfo → String`.
 
 - [ ] **Step 1: Write failing tests in test/adt-print.test.mjs**
@@ -243,8 +243,8 @@ Cons(-3, Cons(2147483647, Nil));` → `Cons(-3, Cons(2147483647, Nil))\n`;
 nullary `N`; `type P = P(Bool, Int)` value `P(false, -1)`; Review Focus 4
 print. `fn main(): Int = 42;` and Bool mains print as before. Missing
 `main` → E_ENTRY `Expected fn main()`; `fn main(x: Int): L = Nil;` →
-E_ENTRY `main must have no parameters`. Malformed: `sprigShow0(nil,
-sprigTy0{tag: 2})` recovers `sprig: malformed value`.
+E_ENTRY `main must have no parameters`. Malformed: `bumpusShow0(nil,
+bumpusTy0{tag: 2})` recovers `bumpus: malformed value`.
 
 Round trip `printed values recompile to the same value` (8 seeds):
 generate a system and a T0 value; program A is the declarations plus
@@ -263,19 +263,19 @@ Update the existing rows listed in Global Constraints; the adt-types
 - [ ] **Step 4: Printing.** `showHelpers`: nullary appends the name; else
   name, `(`, fields joined by `, ` (Int/Bool via `fmt.Append`, declared via
   its helper after a nil check), `)`; unknown tag panics. Declared `main`
-  lowers to `fmt.Println(string(sprigShowN(nil, sprigFnK())))`.
+  lowers to `fmt.Println(string(bumpusShowN(nil, bumpusFnK())))`.
 
 - [ ] **Step 5: Regression row `show-fields`** (printer emits only the first
   field) with probe printing `Cons(1, Cons(2, Nil))` exactly, failing with
   `printed value lost fields`; show its mutant failing.
 
-- [ ] **Step 6: Example and snapshots.** examples/tree.sprig: a binary search
+- [ ] **Step 6: Example and snapshots.** examples/tree.bumpus: a binary search
   tree `type Tree = Leaf | Node(Tree, Int, Tree);`, `insert` using `<` and
   `==` (no duplicates), `main` returns the tree after inserting
   `5, 3, 8, 3, 1` and prints
   `Node(Node(Node(Leaf, 1, Leaf), 3, Leaf), 5, Node(Leaf, 8, Leaf))`.
   Add its snapshot test beside shapes; regenerate shapes.go (adds
-  `sprigShow0` only) and create tree.go from the CLI; two emits equal.
+  `bumpusShow0` only) and create tree.go from the CLI; two emits equal.
 
 - [ ] **Step 7: `npm run verify` exits 0; commit**
   `feat: print values of any type from main (A003)`.

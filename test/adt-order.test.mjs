@@ -46,7 +46,7 @@ const recovering = call => `package main
 import ("fmt"; "testing")
 func TestMalformed(t *testing.T) {
   defer func() {
-    if got := fmt.Sprint(recover()); got != "sprig: malformed value" {
+    if got := fmt.Sprint(recover()); got != "bumpus: malformed value" {
       t.Fatalf("recovered %q", got)
     }
   }()
@@ -68,13 +68,13 @@ const passes = (
 };
 
 test('malformed values panic only when visited', () => {
-  passes(recovering('sprigCmp0(sprigTy0{tag: 2}, sprigTy0{tag: 2})'));
-  passes(recovering('sprigCmp0(sprigTy0{}, sprigTy0{})'));
+  passes(recovering('bumpusCmp0(bumpusTy0{tag: 2}, bumpusTy0{tag: 2})'));
+  passes(recovering('bumpusCmp0(bumpusTy0{}, bumpusTy0{})'));
   passes(returning(
-    'sprigCmp0(sprigTy0{tag: 2, c1f0: 1}, sprigTy0{tag: 2, c1f0: 2})', -1
+    'bumpusCmp0(bumpusTy0{tag: 2, c1f0: 1}, bumpusTy0{tag: 2, c1f0: 2})', -1
   ));
   passes(recovering(
-    'sprigCmp0(sprigTy0{tag: 2, c1f0: 1}, sprigTy0{tag: 2, c1f0: 1})'
+    'bumpusCmp0(bumpusTy0{tag: 2, c1f0: 1}, bumpusTy0{tag: 2, c1f0: 1})'
   ));
 });
 
@@ -85,10 +85,10 @@ test('declared operands evaluate once each, left first', () => {
     // Function 2 is main; its operands l and r follow, once each.
     passes(`package main
 import ("fmt"; "testing")
-var sprigTrace []string
+var bumpusTrace []string
 func TestTrace(t *testing.T) {
-  sprigFn2()
-  if got := fmt.Sprint(sprigTrace); got != "[2 0 1]" {
+  bumpusFn2()
+  if got := fmt.Sprint(bumpusTrace); got != "[2 0 1]" {
     t.Fatalf("trace %s", got)
   }
 }
@@ -178,7 +178,7 @@ const batches = (system, pairs) => {
 const agrees = (system, pairs, orders, group) => {
   const fragments = group.map((pairIndex, local) =>
     fragment(system, pairs[pairIndex], local));
-  const calls = group.map((_, local) => `sprigFn${3 * local + 2}()`);
+  const calls = group.map((_, local) => `bumpusFn${3 * local + 2}()`);
   const masks = group.map(pairIndex => implied(orders[pairIndex]));
   const source = `${system.declarations} ${fragments.join(' ')} `
     + 'fn main(): Int = 0;';

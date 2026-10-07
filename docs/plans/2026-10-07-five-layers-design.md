@@ -34,7 +34,7 @@ effects. Two existing private-subtree rules continue:
 
 ## Evaluation against four changes (why the layers look like this)
 
-1. **Sprig syntax changes.** Only Format changes. This requires structured
+1. **Bumpus syntax changes.** Only Format changes. This requires structured
    diagnostics: Features reports `TypeMismatch { expected, found }` with
    type names as data, and `NonExhaustive witness` with the witness as a
    value. Format renders the text (`Expected Int, found Bool`,

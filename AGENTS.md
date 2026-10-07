@@ -1,4 +1,4 @@
-# Working in Sprig
+# Working in Bumpus
 
 Read README.md, docs/plans/bootstrap.md, docs/progress.md, and docs/findings.md
 before changing code. The language name is provisional. Finish the current

@@ -7,7 +7,7 @@ import Data.String as String
 data Invocation = Emit String String | Build String String | Run String
 
 usage ∷ String
-usage = "sprig emit|build INPUT OUTPUT; sprig run INPUT"
+usage = "bumpus emit|build INPUT OUTPUT; bumpus run INPUT"
 
 -- An empty input or output counts as missing, as in the original Node CLI,
 -- so `run INPUT ""` is a run and `emit INPUT ""` is a usage error.

@@ -1,12 +1,12 @@
 {
-  "name": "sprig-bootstrap",
+  "name": "bumpus-bootstrap",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
     "verify": "node scripts/verify.mjs",
-    "sprig": "node scripts/sprig.mjs"
+    "bumpus": "node scripts/bumpus.mjs"
   },
   "engines": {
     "node": ">=22.5.0"

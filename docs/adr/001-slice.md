@@ -1,6 +1,6 @@
 # ADR 001: a ground, first-order checked slice
 
-Accepted 2026-10-07. Provisional language name Sprig; workspace directory does
+Accepted 2026-10-07. Provisional language name Bumpus; workspace directory does
 not define the final language name. Initial syntax uses fn with inline typed
 parameters and a required result type, making a full top-level signature.
 

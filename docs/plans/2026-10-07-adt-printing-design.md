@@ -56,7 +56,7 @@ prints `N`.
 ## 3. Semantics
 
 Operands are evaluated strictly, left then right, before comparing; there is
-no short-circuit. The order, on finite well-formed Sprig values, is total:
+no short-circuit. The order, on finite well-formed Bumpus values, is total:
 
 - Int: signed int32 order. Bool: `false < true`.
 - Declared types: constructors order by declaration position in their type;
@@ -68,7 +68,7 @@ no short-circuit. The order, on finite well-formed Sprig values, is total:
   separately constructed equal values are equal (never pointer identity).
 
 Malformed values (only possible from future foreign code, I001): comparing
-or printing panics with `sprig: malformed value` when it visits a nil field
+or printing panics with `bumpus: malformed value` when it visits a nil field
 pointer or an unknown tag. Comparison visits fields only until the first
 difference, so later malformed fields may go unnoticed; printing visits
 every field. Total ordering is claimed only for well-formed values.
@@ -78,26 +78,26 @@ every field. Total ordering is claimed only for well-formed values.
 The executable prints `main`'s value plus LF. Int prints decimal with a
 leading `-` when negative; Bool prints `true` or `false`; a declared value
 prints `Name` when nullary, else `Name(f1, f2)` with `, ` separators. This is
-the coverage-witness format without `_`. Each printed value is a valid Sprig
+the coverage-witness format without `_`. Each printed value is a valid Bumpus
 expression whose constructors resolve against the program's own type
 declarations, since minus belongs to integer literals.
 
 ## 5. Go lowering
 
 - Int and Bool equality use Go `==`/`!=`; Int ordering uses Go operators on
-  int32. Bool ordering calls `sprigCmpBool(a bool, b bool) int`.
-- Each declared type N gets `sprigCmpN(a sprigTyN, b sprigTyN) int`
+  int32. Bool ordering calls `bumpusCmpBool(a bool, b bool) int`.
+- Each declared type N gets `bumpusCmpN(a bumpusTyN, b bumpusTyN) int`
   (returns -1, 0 or 1; compares tags as declaration positions, then fields)
-  and `sprigShowN(out []byte, v sprigTyN) []byte` (uses `fmt.Append` and
+  and `bumpusShowN(out []byte, v bumpusTyN) []byte` (uses `fmt.Append` and
   `append`, so the import list is unchanged). A comparison on N lowers to
-  `sprigCmpN(left, right) OP 0`. Go `==` is never used on the structs: it
+  `bumpusCmpN(left, right) OP 0`. Go `==` is never used on the structs: it
   would compare field pointers.
 - Helpers for every declared type are emitted in TypeId order, whether or
   not used: simple and deterministic, and Go allows unused functions.
-- `sprigCmpBool` is emitted only when the program uses a Bool ordering
+- `bumpusCmpBool` is emitted only when the program uses a Bool ordering
   operator or a declared type has a Bool field, so `answer.go` is unchanged.
-- `main` for Int or Bool stays `fmt.Println(sprigFnK())`; for type N it is
-  `fmt.Println(string(sprigShowN(nil, sprigFnK())))`.
+- `main` for Int or Bool stays `fmt.Println(bumpusFnK())`; for type N it is
+  `fmt.Println(string(bumpusShowN(nil, bumpusFnK())))`.
 - Helpers recurse; Go stacks grow, and the existing 8192-element list test
   is extended to print and compare such a list.
 
@@ -137,7 +137,7 @@ family keeps its exact code, span and text.
   original expression, so a printer that drops or reorders fields fails
   even when (a) holds.
 - Regression rows (scripts/regression.mjs, isolated copies): `ctor-order`
-  reverses tag comparison in sprigCmpN and must fail the expected-order
+  reverses tag comparison in bumpusCmpN and must fail the expected-order
   assertion; `first-field` compares the last field first and must fail
   it; `show-fields` drops all but the first field when printing and must
   fail the round-trip probe.

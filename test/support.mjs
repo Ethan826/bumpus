@@ -33,7 +33,7 @@ export const command = (name, args, options = {}) => {
 };
 
 export const runGo = source => {
-  const work = mkdtempSync(join(tmpdir(), 'sprig-test-'));
+  const work = mkdtempSync(join(tmpdir(), 'bumpus-test-'));
   try {
     const go = join(work, 'main.go');
     const binary = join(work, 'program');
@@ -59,14 +59,14 @@ export const rejectedAt = (source, code, text, nth = 0) => {
   return diagnostic;
 };
 
-// Records each Sprig function's entry in sprigTrace, in call order.
+// Records each Bumpus function's entry in bumpusTrace, in call order.
 export const traceCalls = goSource => goSource.replace(
-  /func sprigFn(\d+)\([^\n]*\) [^\n]* \{\n/g,
-  (header, index) => `${header}sprigTrace = append(sprigTrace, "${index}")\n`
+  /func bumpusFn(\d+)\([^\n]*\) [^\n]* \{\n/g,
+  (header, index) => `${header}bumpusTrace = append(bumpusTrace, "${index}")\n`
 );
 
 export const goTest = (source, testGo, transform = go => go) => {
-  const work = mkdtempSync(join(tmpdir(), 'sprig-gotest-'));
+  const work = mkdtempSync(join(tmpdir(), 'bumpus-gotest-'));
   try {
     writeFileSync(join(work, 'main.go'), transform(checked(source)));
     writeFileSync(join(work, 'main_test.go'), testGo);

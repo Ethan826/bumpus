@@ -40,11 +40,11 @@ isBoolOrdering operator left = isOrdering operator
 -- Go has no ordering on bool; false < true is expressed through -1, 0, 1.
 boolHelper ∷ String
 boolHelper =
-  "func sprigCmpBool(a bool, b bool) int { "
+  "func bumpusCmpBool(a bool, b bool) int { "
     <> "if a == b { return 0 }; if b { return -1 }; return 1 }\n\n"
 
 compareName ∷ TypeId → String
-compareName (TypeId index) = "sprigCmp" <> show index
+compareName (TypeId index) = "bumpusCmp" <> show index
 
 -- One helper per declared type, in TypeId order, whether or not used.
 compareHelpers ∷ Array TypeInfo → Array CtorInfo → String
@@ -59,7 +59,7 @@ comparison
   ∷ (IR.Expr → String) → Operator → IR.Expr → IR.Expr → String
 comparison lower operator left right = case IR.typeOf left of
   TData owner → viaHelper (compareName owner)
-  _ | isBoolOrdering operator left → viaHelper "sprigCmpBool"
+  _ | isBoolOrdering operator left → viaHelper "bumpusCmpBool"
   _ → "(" <> lower left <> " " <> symbol <> " " <> lower right <> ")"
   where
   symbol = goOperator operator
@@ -108,7 +108,7 @@ fieldComparison field = case _ of
     <> " > "
     <> right
     <> " { return 1 }\n"
-  TBool → decide ("sprigCmpBool(" <> left <> ", " <> right <> ")")
+  TBool → decide ("bumpusCmpBool(" <> left <> ", " <> right <> ")")
   TData owner → "if " <> left <> " == nil || " <> right <> " == nil { "
     <> malformed
     <> " }\n"
