@@ -28,6 +28,7 @@ code = case _ of
   Syntax _ → Code.SyntaxError
   IntegerOutOfRange → Code.IntegerRange
   NestingTooDeep _ → Code.NestingLimit
+  TypeTooDeep _ → Code.NestingLimit
   EntryProblem _ → Code.EntryError
   Duplicate _ _ → Code.DuplicateName
   Unbound _ _ → Code.UnboundName
@@ -67,6 +68,8 @@ message = case _ of
   Syntax text → text
   IntegerOutOfRange → "Integer literal is outside signed 32-bit range"
   NestingTooDeep limit → "Nesting exceeds " <> show limit <> " levels"
+  TypeTooDeep limit → "Inferred type nesting exceeds " <> show limit
+    <> " levels"
   EntryProblem kind → entryMessage kind
   Duplicate kind name → "Duplicate " <> duplicateWord kind <> " " <> name
   Unbound kind name → "Unbound " <> unboundWord kind <> " " <> name

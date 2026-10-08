@@ -897,10 +897,45 @@ Status: done.
   depth-forms at 128 and 20,000 declarations: deepest checked type 1;
   `id` nested 128: 1; `wrap(x: a): L(a)` nested 127: 128; `deep(x: a):
   L^127(a)` nested k: checks at k = 40 (5,081 deep), RangeError in
-  Unify `resolve` from k = 44 — within every source limit (BACKLOG E006,
+  Unify `resolve` from k = 44 — within every source limit (now E_NESTING
+  after fix round 1, below; BACKLOG E006,
   .build/p001-task4-measure-depth.log). `dup(x: a): Pair(a, a)` nested
   12/16/20: 21 ms / 208 ms / 3.2 s, doubling per level (BACKLOG E007,
   .build/p001-task4-measure-dup.log).
+- Fix round 1 (review approved; ruling R7, the compiler must not crash on
+  a legal program): `inferredTypeLimit = 1000` in Features.Check.Unify. A
+  type deeper than that is E_NESTING `Inferred type nesting exceeds 1000
+  levels` (Problem `TypeTooDeep Int`). The decision is `exceedsLimit`, a
+  stack-safe explicit-stack walk that stops past the limit. It runs on each
+  expression's type when it is built (Infer `infer`, at that expression),
+  on both operands before each unification and on each binding before the
+  occurs check (Unify `Failure` `TooDeep`), and on every type of a finished
+  body before it is resolved (Scheme `firstTooDeep`, at the holder's span).
+  Also two tests: one constructor at two types in one function, and the
+  left-to-right first error `g(1, true)`. `matchCtor` and `checkMatch` are
+  split to stay within the declaration budget (`fieldsAgainst`,
+  `checkArms`, `laterArm`). Comments now explain the two `Infer` rows and
+  mark the `checkPattern` test seam. Walk's `foldTypes` passes spans.
+- Fix tests: test/poly-depth.test.mjs, 6 tests: the limit constant; a type
+  exactly 1,000 deep checks; 1,001 deep is E_NESTING at the eighth `deep`
+  from the inside; `deep(x: a): L^127(a)` nested 44 and 127 deep are
+  E_NESTING at the same call (each under 5 s, about 2 ms); a type that
+  deepens after it is built is caught by the final bound at `sink`'s call.
+  test/poly-check.test.mjs gains 2 tests (18).
+- Fix RED: the 6 depth tests fail on HEAD 19ac4a9 in an isolated copy: 5
+  fail (RangeError at 44 and 127; no diagnostic at 1,001 or for the late
+  deepening; the limit is undefined). The exact-1,000 row passes there,
+  because the old code had no bound to trip
+  (.build/p001-task4-fix1-red.log, .build/p001-task4-fix1-red-head.log).
+  With the final bound disabled in an isolated copy, the late-deepening
+  test fails (.build/p001-task4-fix1-mutant-final-pass.log). The two
+  poly-check additions pass on the Task 4 code too. They pin behavior
+  already correct, so they have no RED.
+- Fix GREEN: `rm -rf output && npm run verify` exit 0, 77.2 s wall, 219
+  tests (211 + 8), zero failures/skips, eight regression proofs
+  (.build/p001-task4-fix1-verify.log). Re-measured: `deep` nested 8 to 127
+  is E_NESTING in 2–3 ms. `dup` nested 12/16/20 now takes 42 ms / 441 ms /
+  6.8 s (BACKLOG E006, E007 updated).
 - Known gap: coverage of a constructor's fields at an applied type (for
   example `match m { Just(n) => n, Nothing => 0 }` over `Maybe(Int)`)
   is E_INTERNAL `Coverage of a type variable` until Task 6.

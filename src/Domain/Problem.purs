@@ -38,6 +38,7 @@ data Problem
   | Syntax String
   | IntegerOutOfRange
   | NestingTooDeep Int
+  | TypeTooDeep Int
   | EntryProblem EntryKind
   | Duplicate DuplicateKind String
   | Unbound UnboundKind String

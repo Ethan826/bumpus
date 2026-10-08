@@ -2,23 +2,26 @@ module Features.Check.Unify
   ( Flex(..)
   , Subst(..)
   , Failure(..)
+  , inferredTypeLimit
   , empty
   , substitute
   , compose
   , resolve
   , unify
+  , exceedsLimit
   ) where
 
 import Prelude
 import Control.Monad.Rec.Class (Step(..), tailRec)
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Foldable (foldM)
+import Data.Foldable (foldM, foldl)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (maybe)
 import Data.Tuple (Tuple(..))
 import Domain.Type (Ty(..), VarId)
+import Features.Check.Search (Stack(..))
 
 -- A checker type variable: a signature's own variable, which is fixed inside
 -- its function and unifies only with itself, or a meta, which stands for
@@ -35,7 +38,16 @@ newtype Subst = Subst (Map Int (Ty Flex))
 -- Both carry types resolved under the substitution reached at the failure:
 -- a mismatch names the first pair of subterms that differ, left to right;
 -- an occurs failure names the meta and the type that properly contains it.
-data Failure = Mismatch (Ty Flex) (Ty Flex) | Occurs Int (Ty Flex)
+-- `TooDeep`: the binding, resolved, would be deeper than the limit.
+data Failure = Mismatch (Ty Flex) (Ty Flex) | Occurs Int (Ty Flex) | TooDeep
+
+-- The deepest type checking may build (ruling R7, in the spirit of ADR 006).
+-- Resolution and the occurs check recurse over a type's structure and
+-- overflowed the default stack near 5,000 levels (BACKLOG E006); a program
+-- within the source nesting limit can compose deeper types, so checking
+-- rejects them first.
+inferredTypeLimit ∷ Int
+inferredTypeLimit = 1000
 
 empty ∷ Subst
 empty = Subst Map.empty
@@ -98,11 +110,29 @@ unifyHeads subst left right = case left, right of
   unifyPair reached (Tuple leftArgument rightArgument) =
     unify reached leftArgument rightArgument
 
+-- Whether `ty`, resolved, is deeper than `inferredTypeLimit`, decided
+-- without resolving it: an explicit-stack walk that stops past the limit,
+-- so it is itself stack-safe on a type of any depth.
+exceedsLimit ∷ Subst → Ty Flex → Boolean
+exceedsLimit subst ty = tailRec step (Push { ty, level: 1 } Bottom)
+  where
+  step = case _ of
+    Bottom → Done false
+    Push item rest
+      | item.level > inferredTypeLimit → Done true
+      | otherwise → Loop (pushArguments item rest)
+  pushArguments item rest = case walk subst item.ty of
+    TData _ arguments → foldl (pushAt (item.level + 1)) rest arguments
+    _ → rest
+  pushAt level rest argument = Push { ty: argument, level } rest
+
 -- The occurs check runs on the resolved type, so it sees through bindings;
 -- the stored binding stays unresolved, keeping the substitution triangular.
+-- The depth bound is checked first, since resolving recurses.
 bindMeta ∷ Subst → Int → Ty Flex → Either Failure Subst
 bindMeta subst@(Subst bindings) meta ty =
   if ty == TVar (Meta meta) then Right subst
+  else if exceedsLimit subst ty then Left TooDeep
   else if mentions meta resolved then Left (Occurs meta resolved)
   else Right (Subst (Map.insert meta ty bindings))
   where

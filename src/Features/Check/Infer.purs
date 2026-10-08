@@ -13,7 +13,7 @@ import Domain.Syntax (Diagnostic, Operator, Span, problemAt)
 import Features.Check.Arms (checkMatch)
 import Features.Check.Call (checkCall, checkConstruct)
 import Features.Check.Match (Typed)
-import Features.Check.Require (require)
+import Features.Check.Require (bounded, require)
 import Features.Check.Scheme (State, Threaded)
 
 type Env =
@@ -26,10 +26,20 @@ type Env =
 
 type Inferred = Either Diagnostic (Threaded Checked.Expr)
 
+-- Every expression's type is bounded once built (ruling R7), so the
+-- expression reported is the first, in checking order, whose type would
+-- exceed the limit.
+infer ∷ Env → State → Resolved.Expr → Inferred
+infer env state expression = do
+  inferred ← inferNode env state expression
+  bounded inferred.state (Checked.typeOf inferred.value)
+    (Checked.spanOf inferred.value)
+  pure inferred
+
 -- Every type equality is a unification, in the order monomorphic checking
 -- compared types, so a monomorphic program's first error is unchanged.
-infer ∷ Env → State → Resolved.Expr → Inferred
-infer env state expression = case expression of
+inferNode ∷ Env → State → Resolved.Expr → Inferred
+inferNode env state expression = case expression of
   Resolved.Integer span value → typed state span TInt (Checked.Integer value)
   Resolved.Boolean span value → typed state span TBool
     (Checked.Boolean value)

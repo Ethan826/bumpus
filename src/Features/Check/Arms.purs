@@ -17,6 +17,10 @@ import Features.Check.Scheme (State, Threaded, threadAll)
 -- Open rows let Features.Check pass its own environment through unchanged.
 type MatchEnv r = PatternEnv (locals ∷ Array Typed | r)
 
+-- Arms' own row: Features.Check.Infer's `infer` reaches here through
+-- checkMatch with its whole Env, of which matching needs the pattern
+-- tables, the variables' names and the locals. (Call.Infer has its own row
+-- for the same reason; neither module may import Infer, which imports both.)
 type Infer r =
   MatchEnv r → State → Resolved.Expr → Either Diagnostic (Threaded Checked.Expr)
 
@@ -32,26 +36,47 @@ checkMatch
   → Either Diagnostic (Threaded Checked.Expr)
 checkMatch infer env state span scrutinee arms = do
   head ← infer env state scrutinee
-  maybe' empty (checkArms head) (Array.uncons arms)
+  maybe' empty (checkArms infer env span head) (Array.uncons arms)
   where
   empty _ = Left (problemAt (Internal "Empty resolved match") span)
-  checkArms head split = do
-    first ← checkArm infer env head.state (Checked.typeOf head.value)
-      split.head
-    rest ← threadAll (laterArm head.value first.value) first.state split.tail
-    pure
-      { value: Checked.Expr
-          { ty: Checked.typeOf first.value.body
-          , span
-          , node: Checked.Match head.value (Array.cons first.value rest.value)
-          }
-      , state: rest.state
-      }
-  laterArm head first reached arm = do
-    checked ← checkArm infer env reached (Checked.typeOf head) arm
-    unified ← require env checked.state (Checked.typeOf first.body)
-      checked.value.body
-    pure { value: checked.value, state: unified }
+
+checkArms
+  ∷ ∀ r
+  . Infer r
+  → MatchEnv r
+  → Span
+  → Threaded Checked.Expr
+  → { head ∷ Resolved.Arm, tail ∷ Array Resolved.Arm }
+  → Either Diagnostic (Threaded Checked.Expr)
+checkArms infer env span head split = do
+  first ← checkArm infer env head.state scrutineeType split.head
+  rest ← threadAll (laterArm infer env scrutineeType first.value) first.state
+    split.tail
+  pure
+    { value: Checked.Expr
+        { ty: Checked.typeOf first.value.body
+        , span
+        , node: Checked.Match head.value (Array.cons first.value rest.value)
+        }
+    , state: rest.state
+    }
+  where
+  scrutineeType = Checked.typeOf head.value
+
+laterArm
+  ∷ ∀ r
+  . Infer r
+  → MatchEnv r
+  → Ty Open
+  → Checked.Arm
+  → State
+  → Resolved.Arm
+  → Either Diagnostic (Threaded Checked.Arm)
+laterArm infer env scrutineeType first state arm = do
+  checked ← checkArm infer env state scrutineeType arm
+  unified ← require env checked.state (Checked.typeOf first.body)
+    checked.value.body
+  pure { value: checked.value, state: unified }
 
 checkArm
   ∷ ∀ r

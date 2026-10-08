@@ -46,7 +46,9 @@ type PatternEnv r =
   | r
   }
 
--- One pattern from a fresh state, outside any function's variables.
+-- Test seam: test/diagnostics.test.mjs calls this with bare tables to pin
+-- the constructor-arity guard. One pattern from a fresh state, outside any
+-- function's variables; checking itself uses `patternAgainst`.
 checkPattern
   ∷ Tables → Ty Open → Resolved.Pattern → Either Diagnostic Matched
 checkPattern tables expected pattern = valueOf <$> patternAgainst env start
@@ -119,8 +121,9 @@ matchCtor env scheme expected span id use = do
   reached ← expectType env scheme.state expected
     (TData use.ctor.owner scheme.value.arguments)
     span
-  checked ← threadAll checkField reached
-    (Array.zipWith fieldPair (map (at scheme.value) use.ctor.fields) use.fields)
+  checked ← fieldsAgainst env reached
+    (map (at scheme.value) use.ctor.fields)
+    use.fields
   pure
     { value:
         { pattern: Checked.Pattern
@@ -133,10 +136,22 @@ matchCtor env scheme expected span id use = do
     , state: checked.state
     }
   where
-  fieldPair ty pattern = { ty, pattern }
-  checkField reached field = patternAgainst env reached field.ty field.pattern
   patternOf matched = matched.pattern
   localsOf matched = matched.locals
+
+-- Each field pattern against its instantiated field type, left to right.
+fieldsAgainst
+  ∷ ∀ r
+  . PatternEnv r
+  → State
+  → Array (Ty Open)
+  → Array Resolved.Pattern
+  → Either Diagnostic (Threaded (Array Matched))
+fieldsAgainst env state types patterns = threadAll checkField state
+  (Array.zipWith fieldPair types patterns)
+  where
+  fieldPair ty pattern = { ty, pattern }
+  checkField reached field = patternAgainst env reached field.ty field.pattern
 
 ownerOf
   ∷ ∀ r. PatternEnv r → Span → TypeId → Either Diagnostic TypeInfo

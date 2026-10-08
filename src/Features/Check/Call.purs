@@ -29,6 +29,10 @@ type CallEnv r =
   | r
   }
 
+-- Call's own row: Features.Check.Infer's `infer` reaches here with its
+-- whole Env, of which calls need the declarations and the variables' names
+-- (Arms.Infer has its own row for the same reason; neither module may
+-- import Infer, which imports both).
 type Infer r =
   CallEnv r
   → State

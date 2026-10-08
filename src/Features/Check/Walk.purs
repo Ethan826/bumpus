@@ -4,12 +4,14 @@ import Prelude
 import Data.Foldable (foldl)
 import Domain.Checked.Internal (Open)
 import Domain.Checked.Internal as Checked
+import Domain.Syntax (Span)
 import Domain.Type (Ty)
 
 -- Every type a checked body carries, in pre-order: an expression's type,
 -- then its instantiation, then its parts left to right; an arm's pattern
--- before its body; a pattern's type before its fields.
-foldTypes ∷ ∀ b. (b → Ty Open → b) → b → Checked.Expr → b
+-- before its body; a pattern's type before its fields. Each type comes with
+-- the span of the expression or pattern holding it.
+foldTypes ∷ ∀ b. (b → Span → Ty Open → b) → b → Checked.Expr → b
 foldTypes step found (Checked.Expr expression) = case expression.node of
   Checked.Call _ instantiation arguments → applied instantiation arguments
   Checked.Construct _ instantiation arguments → applied instantiation
@@ -20,10 +22,11 @@ foldTypes step found (Checked.Expr expression) = case expression.node of
   Checked.Match scrutinee arms → foldl arm (recur own scrutinee) arms
   _ → own
   where
-  own = step found expression.ty
+  own = step found expression.span expression.ty
   recur = foldTypes step
   applied instantiation arguments =
-    foldl recur (foldl step own instantiation) arguments
+    foldl recur (foldl (flip step expression.span) own instantiation)
+      arguments
   arm reached checked = recur (foldPattern step reached checked.pattern)
     checked.body
 
@@ -54,12 +57,12 @@ retype change (Checked.Expr expression) = Checked.Expr
     , body = recur checked.body
     }
 
-foldPattern ∷ ∀ b. (b → Ty Open → b) → b → Checked.Pattern → b
+foldPattern ∷ ∀ b. (b → Span → Ty Open → b) → b → Checked.Pattern → b
 foldPattern step found (Checked.Pattern pattern) = case pattern.shape of
   Checked.Ctor _ fields → foldl (foldPattern step) own fields
   _ → own
   where
-  own = step found pattern.ty
+  own = step found pattern.span pattern.ty
 
 retypePattern ∷ (Ty Open → Ty Open) → Checked.Pattern → Checked.Pattern
 retypePattern change (Checked.Pattern pattern) = Checked.Pattern

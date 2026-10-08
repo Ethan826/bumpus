@@ -9,6 +9,8 @@ module Features.Check.Scheme
   , flexible
   , opened
   , resolved
+  , tooDeep
+  , firstTooDeep
   , holes
   ) where
 
@@ -18,13 +20,13 @@ import Data.Either (Either(..))
 import Data.Foldable (foldl)
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (maybe)
+import Data.Maybe (Maybe(..), maybe, maybe')
 import Data.Traversable (traverse)
 import Domain.Checked.Internal (Open(..))
 import Domain.Checked.Internal as Checked
-import Domain.Syntax (Diagnostic)
+import Domain.Syntax (Diagnostic, Span)
 import Domain.Type (Ty(..), VarId(..))
-import Features.Check.Unify (Flex, Subst, resolve)
+import Features.Check.Unify (Flex, Subst, exceedsLimit, resolve)
 import Features.Check.Unify as Unify
 import Features.Check.Walk (foldTypes, retype)
 
@@ -106,13 +108,25 @@ opened = map toOpen
 resolved ∷ Subst → Ty Open → Ty Open
 resolved subst ty = opened (resolve subst (flexible ty))
 
+tooDeep ∷ Subst → Ty Open → Boolean
+tooDeep subst ty = exceedsLimit subst (flexible ty)
+
+-- The span of the first type, in `foldTypes` order, that is too deep once
+-- resolved. A type checked when built can deepen as metas in it are bound
+-- later, so a finished body is bounded again before it is resolved.
+firstTooDeep ∷ Subst → Checked.Expr → Maybe Span
+firstTooDeep subst = foldTypes judged Nothing
+  where
+  judged found span ty = maybe' (fresh span ty) Just found
+  fresh span ty _ = if tooDeep subst ty then Just span else Nothing
+
 -- Renumbers a finished body's unsolved metas as holes 0, 1, …, in the
 -- order `foldTypes` first meets them.
 holes ∷ Checked.Expr → Checked.Expr
 holes body = retype renamed body
   where
   numbering = (foldTypes number { next: 0, seen: Map.empty } body).seen
-  number found ty = foldHoles numberHole found ty
+  number found _ ty = foldHoles numberHole found ty
   renamed ty = map renumber ty
   renumber = case _ of
     Hole meta → Hole (maybe meta identity (Map.lookup meta numbering))

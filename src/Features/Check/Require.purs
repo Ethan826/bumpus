@@ -3,6 +3,8 @@ module Features.Check.Require
   , typeName
   , require
   , expectType
+  , bounded
+  , tooDeepAt
   ) where
 
 import Prelude
@@ -16,8 +18,8 @@ import Domain.Problem (Problem(..), TypeName(..))
 import Domain.Resolved (TypeInfo)
 import Domain.Syntax (Diagnostic, Span, problemAt)
 import Domain.Type (Ty(..), TypeId(..), VarId(..))
-import Features.Check.Scheme (State, flexible, opened, resolved)
-import Features.Check.Unify (Failure(..), unify)
+import Features.Check.Scheme (State, flexible, opened, resolved, tooDeep)
+import Features.Check.Unify (Failure(..), inferredTypeLimit, unify)
 
 -- What a diagnostic needs to name a type: the declared types, and the
 -- enclosing function's variables (`VarId i` is the i-th).
@@ -46,18 +48,31 @@ expectType
   → Ty Open
   → Span
   → Either Diagnostic State
-expectType env state expected actual span = either failed bound
-  (unify state.subst (flexible expected) (flexible actual))
+-- Both operands are bounded first, since unifying recurses over them.
+expectType env state expected actual span = do
+  bounded state expected span
+  bounded state actual span
+  either failed bound (unify state.subst (flexible expected) (flexible actual))
   where
   bound subst = Right (state { subst = subst })
   failed = case _ of
     Mismatch _ _ → reported TypeMismatch (resolved state.subst expected)
       (resolved state.subst actual)
     Occurs meta whole → reported InfiniteType (TVar (Hole meta)) (opened whole)
+    TooDeep → tooDeepAt span
   reported problem one other = do
     first ← typeName env span one
     second ← typeName env span other
     Left (problemAt (problem first second) span)
+
+-- A type, resolved under the state, may be at most `inferredTypeLimit`
+-- deep; past it is E_NESTING at `span`, before anything recurses on it.
+bounded ∷ State → Ty Open → Span → Either Diagnostic Unit
+bounded state ty span =
+  if tooDeep state.subst ty then tooDeepAt span else Right unit
+
+tooDeepAt ∷ ∀ a. Span → Either Diagnostic a
+tooDeepAt span = Left (problemAt (TypeTooDeep inferredTypeLimit) span)
 
 -- Names appear only in diagnostics, never in generated Go.
 typeName ∷ ∀ r. Names r → Span → Ty Open → Either Diagnostic TypeName
