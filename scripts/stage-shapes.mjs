@@ -14,11 +14,10 @@
 // per round, timing only those rounds, and prints the elapsed nanoseconds
 // and a checksum that `checksum` below recomputes independently.
 
-const range = (from, to) =>
-  Array.from({ length: Math.max(0, to - from) }, (_, index) => from + index);
+import { blockDriver, blockSize, range } from './stage-blocks.mjs';
 
 // T1 takes one more argument and returns the result; Tm takes m more.
-const functionTypes = n => [
+export const functionTypes = n => [
   'type T1 func(int32) int32',
   ...range(2, n + 1).map(m => `type T${m} func(int32) T${m - 1}`)
 ];
@@ -27,7 +26,7 @@ const parameters = n => range(0, n).map(index => `p${index}`);
 
 // A composite literal and a loop, not an n-term expression, so `f` itself
 // costs linear text and no deep expression tree.
-const sum = n => [
+export const sum = n => [
   `func f(${parameters(n).map(name => `${name} int32`).join(', ')}) int32 {`,
   `values := [${n}]int32{${parameters(n).join(', ')}}`,
   'var total int32',
@@ -103,7 +102,7 @@ const nested = n => {
 // cost from the driver's.
 const direct = () => [];
 
-const directDriver = (n, rounds) => [
+export const directDriver = (n, rounds) => [
   'func main() {',
   'start := time.Now()',
   'var checksum int32',
@@ -185,14 +184,22 @@ const bareDriver = () => [
 const drivers = { full: driver, direct: directDriver, idle: idleDriver,
   chain: chainDriver, bare: bareDriver };
 
+const homogeneousArgument = p => `round*31 + ${p}`;
+
+const driverFor = (shape, n, rounds, mode) => blockSize(mode)
+  ? blockDriver({ n, rounds, block: blockSize(mode),
+    typeAt: p => p < n ? `T${n - p}` : 'int32',
+    argAt: homogeneousArgument })
+  : drivers[shape === 'direct' && mode === 'full' ? 'direct' : mode](n,
+    rounds);
+
 export const program = (shape, n, rounds, mode = 'full') => [
   'package main',
   'import (\n"fmt"\n"time"\n)',
   ...functionTypes(n),
   ...sum(n),
   ...shapes[shape](n),
-  ...drivers[shape === 'direct' && mode === 'full' ? 'direct' : mode](n,
-    rounds)
+  ...driverFor(shape, n, rounds, mode)
 ].join('\n') + '\n';
 
 // The driver's checksum, computed without Go: int32 wrapping throughout.
