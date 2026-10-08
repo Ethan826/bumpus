@@ -61,6 +61,10 @@ turn the audit into an unbounded bibliography.
    first-class doctests, property testing, possible literate capabilities,
    and versioned LLM skills/discovery (IDE001/DOC001/PBT001/LIT001/AI001).
    Distinguish compiler features from libraries and ecosystem tools.
+   Include PKG001: portable compiled libraries, host-callable exports,
+   typed FFI, dependency-inverted service adapters and package management
+   spanning Bumpus and host dependencies. Review Effect Platform as a
+   versioned precedent, separating targets from runtime capabilities.
 
 Use these axes for comparable briefs; mark absent/not applicable topics
 explicitly. Bibliography size and matching feature names are not sufficient
@@ -121,6 +125,10 @@ evidence of coverage or semantic compatibility.
   doctest located in its document, a shrunk/replayed property failure, and
   discovery of a version-correct API/example by a coding agent. Evaluate
   literate authoring as an explicit optional decision, not a requirement.
+- [ ] Walk through a Bumpus library, a typed host SDK binding and a service
+  adapter/fake; review host-facing exports, provider conformance, package
+  identity, locked transitive host dependencies, conflicts and fresh/offline
+  builds. State portability limits and source-versus-binary linking choices.
 
 ## Task 5: Review and durable handoff
 

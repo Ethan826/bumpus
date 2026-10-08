@@ -1565,3 +1565,21 @@ or skips, and all twelve isolated regression proofs passing; evidence:
 `.build/tooling-direction-verify.log`. This checks the existing compiler,
 not the proposed tooling. T004's earlier timing failures remain recorded
 and unresolved; this successful run does not establish their cause.
+
+## Libraries, platform services and packages direction (2026-10-08)
+
+The user requested distinguishing Bumpus libraries compiled to the host
+target, FFI bindings and dependency-inverted services implemented through
+host-language libraries, then added package management. Recorded PKG001
+in the tooling brief and backlog; updated LA001, language direction and
+handoff. Planning includes source packages/host-callable export assessment,
+service contract/provider substitution, combined host/Bumpus dependency
+resolution, manifests/locks, identity, compatibility and target/runtime
+availability. Effect Platform's primary introduction was checked as a
+conceptual precedent; its mechanisms are not adopted. No compiler code,
+package manager, binary ABI or provider mechanism is implemented/selected,
+and FN001 scope is unchanged.
+Verification: `npm run verify` exited 0 with 318 tests passing, no failures
+or skips, and twelve isolated regression proofs passing; evidence:
+`.build/pkg001-direction-verify.log`. This validates existing behavior,
+not the proposed package/interop features. T003/T004 remain open.

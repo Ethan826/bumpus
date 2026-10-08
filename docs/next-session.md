@@ -76,6 +76,12 @@ LLM skills/discovery, and exploratory LIT001 literate capabilities. Feed
 these into LA001 and focused subsystem designs; no tooling implementation
 is authorized or added to FN001. Existing compiler properties do not
 complete PBT001. Preserve the tentative status of literate capabilities.
+PKG001 extends that direction with portable Bumpus libraries, host FFI,
+service implementations/fakes and package management over both Bumpus and
+host dependencies. Review exports, source/type identity, target/runtime
+support, manifests/locks and host resolver integration with M001/I001/FX001.
+Effect Platform is conceptual influence; no package manager, ABI or provider
+mechanism is selected and no publication is authorized.
 
 Open items: E002 remainder, E006-E011 (P001 follow-ups: stack margin,
 exponential type size, Expand keys, lowercase-type hint, mismatch `_`,

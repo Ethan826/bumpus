@@ -27,6 +27,11 @@ testing for Bumpus programs (PBT001), and LLM skills/discoverability (AI001).
 Literate capabilities (LIT001) remain exploratory. See
 [tooling direction](2026-10-08-tooling-direction.md) for intended outcomes,
 dependencies and proposed acceptance; no tooling implementation is selected.
+PKG001 adds library/package integration: Bumpus source libraries compiled
+to the selected host target, typed FFI bindings, and dependency-inverted
+services fulfilled by host-library adapters or fakes. Review package/host
+dependency resolution, locks and compiled exports with M001/I001/FX001;
+Effect Platform is a precedent, not a selected implementation mechanism.
 
 ## Early-release priorities
 
