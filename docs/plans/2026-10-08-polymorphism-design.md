@@ -2,9 +2,11 @@
 
 Status: direction approved by the user in conversation 2026-10-08:
 parameterized types are in scope; type variables are opaque (no built-in
-comparison constraint); specialization is a separate pure phase (approach A)
-with the five defaults of section 9. The written spec awaits the user's
-review. Nothing here is implemented yet.
+comparison constraint); specialization is a separate pure phase (approach A).
+The user's first written review (2026-10-08) gave conditional approval and
+required revisions to the termination rule, the handling of unsolved
+variables, and several precision points; section 12 maps each finding to
+its resolution. The revised spec awaits re-review. Nothing is implemented.
 
 ## Goal and non-goals
 
@@ -15,14 +17,20 @@ rank-1 schemes from mandatory signatures and occurs-checked unification,
 and lowered by whole-program specialization (ADR 002) to ordinary
 monomorphic Go.
 
-Non-goals: classes, constraints, `derive`, a Prelude (C001; section 10);
-comparing or printing a value whose type contains a signature type variable;
-kinds, unapplied constructors and HKTs (K001); polymorphic recursion and
-non-regular data types (section 4); first-class functions or lambdas;
-type annotations inside expressions; explicit `forall`; modules (M001).
+Non-goals: classes, constraints, `derive`, a Prelude (C001; section 11);
+comparing a value whose type contains a type variable; kinds, unapplied
+constructors and HKTs (K001); polymorphic recursion and nested data types
+(section 4); first-class functions or lambdas; type annotations inside
+expressions; explicit `forall`; modules and separate compilation (M001).
+
+Assumption: whole-program compilation. Every program is one file and Go is
+generated only for what `main` and the monomorphic functions reach. When
+separate compilation, exported functions or library artifacts arrive (M001),
+reachability from `main` no longer determines what must be generated; that
+is M001's design problem, not P001's.
 
 Preserved: phase boundaries and the internal-IR allowlist discipline (now
-two internal IRs, section 6); strict left-to-right evaluation; the
+two internal IRs, section 7); strict left-to-right evaluation; the
 structural order and print format of ADR 005; every existing diagnostic's
 code, span and text. A program that declares no type parameters and
 mentions no type variable emits byte-identical Go: bootstrap/answer.go,
@@ -40,9 +48,7 @@ type      = "Int" | "Bool" | lower
 - A lowercase name in a type is a type variable. No new reserved words.
 - `type T() = …`, `List()`, `Int(a)`, `Bool(a)` and `a(Int)` are E_SYNTAX.
 - Type arguments nest under the existing E_NESTING bound (ADR 006).
-- Spans: a type application spans its head through its closing parenthesis.
-
-Examples:
+- A type application spans its head through its closing parenthesis.
 
 ```
 type List(a) = Nil | Cons(a, List(a));
@@ -59,217 +65,333 @@ fn zip(xs: List(a), ys: List(b)): List(Pair(a, b)) = …;
   (new DuplicateKind `DuplicateTypeParameter`).
 - A declared type used with the wrong number of arguments, including none
   where it has parameters (`List`), is E_ARITY (new Problem
-  `TypeArguments String`), reported at the type reference. Unused
-  (phantom) parameters are allowed.
+  `TypeArguments String`) at the type reference. Phantom parameters are
+  allowed.
 - Function type variables are implicitly quantified over the whole
   signature: every lowercase name in the parameter and result types. A
   variable may appear only in the result (`fn loop(): a = loop();`).
 - Constructors become polymorphic: `Nil : List(a)`, `Cons : (a, List(a)) →
-  List(a)`. The global namespace rules are unchanged.
-- `main` must have no type variable in its result: E_ENTRY with new
-  EntryKind `EntryPolymorphic`, message `Expected fn main() with a concrete
-  result type`.
+  List(a)`. Global namespace rules are unchanged.
+- `main` must have a ground result type (no type variable): E_ENTRY with
+  new EntryKind `EntryPolymorphic`, message `Expected fn main() with a
+  concrete result type`.
 
-## 3. Typing
+## 3. Types, rigid and flexible variables
 
-Representation (Domain.Resolved): `data Ty = TInt | TBool | TData TypeId
-(Array Ty) | TVar VarId`, where `VarId` indexes the enclosing declaration's
-variables (names kept beside it for diagnostics). Unification variables
-(metas) never leave Features.Check.
+Four representations, each with only the variables its phase may hold:
 
-- Each signature variable is rigid inside its function: it unifies only with
-  itself. `fn f(x: a): Int = x;` is E_TYPE (expected Int, found a).
-- Each use of a polymorphic function or constructor instantiates its
-  scheme with fresh metas; `pair(id(1), id(true))` type-checks.
-- Every place the checker now compares types (`require`, `if` branches,
-  arm bodies, comparison operands, pattern types) unifies instead, in the
-  current left-to-right order, so the first error and its span are those
-  of today's checker for monomorphic programs.
-- Occurs check: binding a meta to a type that contains it is E_TYPE with
-  new Problem `InfiniteType TypeName TypeName`. Example: in
+| Representation | Module | Variables it can hold |
+|---|---|---|
+| Source type | Domain.Resolved `Ty` | `TRigid VarId` (signature or declaration variable) |
+| Checker type | Features.Check.Unify (private) | `TRigid VarId` and `TMeta MetaId` |
+| Checked IR type | Domain.Checked.Internal `Ty` | `TRigid VarId` and `THole HoleId` |
+| Monomorphic IR type | Domain.IR.Internal `Ty` | none: `TInt \| TBool \| TData TypeId` |
+
+All four share `TInt`, `TBool` and `TData TypeId (Array Ty)` (the last
+without arguments in the monomorphic IR, where each ground application has
+its own TypeId).
+
+- Rigid variables are the signature's variables inside their own function.
+  A rigid variable unifies only with itself: `fn f(x: a): Int = x;` is
+  E_TYPE (expected Int, found a); `fn g(x: a, y: b): a = y;` is E_TYPE.
+- Flexible variables (metas) come from instantiating a scheme at a use:
+  each use of a polymorphic function or constructor gets fresh metas, so
+  `pair(id(1), id(true))` type-checks. A meta unifies with any type that
+  does not contain it, including a rigid variable.
+- Unification replaces every type equality the checker uses today
+  (`require`, `if` branches, arm bodies, comparison operands, pattern
+  types), in the current left-to-right order, so the first error and its
+  span are today's for every monomorphic program.
+- Occurs check: binding a meta to a type that properly contains it is
+  E_TYPE with new Problem `InfiniteType TypeName TypeName`. Example: in
   `match Nil { Cons(h, t) => same(h, t), Nil => 0 }` with
   `fn same(x: a, y: a): Int`, `h : m` and `t : List(m)`.
-- Comparison: both operands unify as today; then if the operand type
-  contains a rigid variable, E_TYPE with new Problem `NotComparable
-  TypeName` at the left operand. `List(a) == List(a)` is rejected; this
-  is what keeps variables opaque (the ground for C001's constraints).
-- Patterns on a rigid-variable scrutinee: only `_` and binders fit; a
-  constructor or literal pattern is E_TYPE as today.
-- Defaulting: after a function is checked, every unsolved meta in it is
-  set to Int. Metas cannot escape a function (signatures are mandatory),
-  and no value of an unsolved meta's type is ever produced at run time
-  (only a call that never returns, or an unreachable binder, has that
-  type), so the choice is unobservable: `length(Nil)` is 0 and `Nil ==
-  Nil` holds whatever the element type. With C001, an unsolved meta under a constraint becomes an
-  ambiguity error instead.
 - `TypeName` (Domain.Problem) gains `AppliedName String (Array TypeName)`,
-  `VariableName String` and `HoleName` (an unsolved meta in a message,
-  rendered `_`). Format renders `List(Pair(Int, a))`.
+  `VariableName String` and `HoleName` (a meta in a message, rendered `_`).
+  Format renders `List(Pair(Int, a))`.
 
-## 4. Termination: the SCC instantiation rule
+Unsolved metas. After a function's body is checked, each meta still unbound
+becomes a hole in the checked IR (`THole`, numbered per function). Checking
+does not choose a type for it; there is no language-level default.
+Specialization later substitutes a representative (section 6).
 
-ADR 002 requires finite specialization. One rule covers functions and data
-types. Take the strongly connected components of the call graph (functions)
-and of the reference graph (type declarations' field types). Within a
-component, every type argument at a reference to a member of the same
-component must be either a type variable of the referring declaration or a
-closed type (no variables).
+Comparison. Both operands unify as today. After the function is checked,
+each comparison's operand type, fully substituted, must be ground: a rigid
+variable in it is E_TYPE with new Problem `NotComparable TypeName`
+(`fn same(x: a, y: a): Bool = x == y;`, and `List(a) == List(a)`); a hole
+in it is E_TYPE with new Problem `AmbiguousType TypeName` (`Nil == Nil`).
+Both at the left operand. The second rejection is deliberate: under C001,
+comparison becomes an Ord use, and an Ord use at an undetermined type is an
+ambiguity error, so rejecting it now keeps C001 additive.
 
-- Allowed: `length(t)` in `length`; mutual `even`/`odd` over `List(a)`;
-  `type Rose(a) = Node(a, Forest(a)); type Forest(a) = Empty | More(Rose(a),
-  Forest(a));`; `type T(a, b) = C(T(b, a))` (a permutation); a recursive call
-  at `List(Int)`.
-- Rejected: `fn f(x: a): Int = f(Cons(x, Nil));` (polymorphic recursion)
-  and `type Nest(a) = Nil | Cons(a, Nest(List(a)));` (non-regular). New
-  ErrorCode `E_SPECIALIZATION`, Problem `ExpandingInstantiation String`
-  naming the reference's target, at the reference's span.
-- Why finite: inside a component, the instantiations reachable from one
-  entry key are built from that key's arguments and the component's closed
-  types, so a component contributes finitely many keys per entering key, and
-  components form a DAG.
-- Backstop: specialization stops with E_SPECIALIZATION (Problem
-  `SpecializationLimit Int`) at `main`'s span when it would create more
-  than a named limit of 10,000 specialized functions plus types. The rule
-  above makes this a size budget, not a termination guard; the limit is
-  measured against the large-source tests before being fixed.
+Patterns. On a scrutinee whose type is a rigid variable or a hole, only `_`
+and binders fit; a constructor or literal pattern is E_TYPE as today.
 
-The rule is checked in Features.Check after typing (call instantiations are
-known then) and before coverage.
+## 4. Finite specialization
+
+Specialization creates one copy per key `(declaration, ground type
+arguments)`. This section gives the rule that makes the set of keys finite
+and its proof; the 10,000 limit (section 6) is a resource guard, never the
+termination argument.
+
+### 4.1 The rule (checked in Features.Check, after typing)
+
+Build two graphs: the call graph over functions (an edge for each call)
+and the reference graph over type declarations (an edge for each occurrence
+of a declared type anywhere inside a constructor field type, including
+inside another type's arguments). Take strongly connected components of
+each separately.
+
+Instantiation rule. The rule is applied after the referring function is
+checked, when each of its metas is either solved or a hole. At every
+reference from a member of a component to a member of the same component,
+each type argument, fully substituted, must be one of:
+
+1. a bare rigid variable of the referring declaration, or
+2. a ground type: no rigid variable; a hole counts as ground, because
+   specialization replaces it with a fixed ground type.
+
+A type that applies a constructor to an argument containing a variable,
+such as `List(a)` or `Pair(Int, a)`, is neither, and is rejected.
+
+Diagnostics, both new ErrorCode `E_SPECIALIZATION`, at the reference's
+span, naming the referenced declaration:
+- functions: Problem `PolymorphicRecursion String`;
+  `fn f(x: a): Int = f(Cons(x, Nil));`;
+- types: Problem `NestedDatatype String`;
+  `type Nest(a) = Nil | Cons(a, Nest(List(a)));`.
+
+### 4.2 Proof of finiteness
+
+Functions. Fix a component C and an entering key `(d0, τ̄0)` with τ̄0
+ground. Let `G_C` be the finite set of ground types written as type
+arguments at intra-component references in C (holes included, as their
+representative), and `T = components(τ̄0) ∪ G_C`. Claim: every key reached
+from `(d0, τ̄0)` through intra-component references has all its arguments
+in T. Induction on the path length: the entry satisfies it; at a key
+`(d, σ̄)` with σ̄ in T, a reference from d to d' in C has each argument
+either a rigid variable v_i of d, instantiated to σ_i ∈ T, or a ground
+type in G_C ⊆ T. So C contributes at most `Σ_{d ∈ C} |T|^{arity(d)}` keys
+per entering key. Components form a DAG; each key's body has finitely many
+references, so each component receives finitely many entering keys from
+the components above it (induction in topological order, starting from the
+finite seeds: the monomorphic functions). Hence finitely many keys.
+
+Types. The same argument, over the reference graph, bounds the ground type
+applications reachable by unfolding constructor fields from any ground
+application; specialization of types and inhabitedness (section 5) both
+rely on it. Each key's function body mentions finitely many types, so the
+type applications needed by finitely many function keys are finite too.
+
+Swapping (`f(a, b)` calls `g(b, a)`), dropping (`f(a, b)` calls `g(a)`),
+concrete substitution (`f(a, b)` calls `g(a, Int)` and `g(a, b)` calls
+`f(b, a)`) and ordinary `List(a)` recursion (`length(t)`; the field
+`List(a)`) are all accepted. `f(a)` calls `g(List(a))` with `g(a)` calling
+`f(a)` is rejected at the first call.
+
+### 4.3 Conservatism
+
+The rule rejects some finite programs: `f(a)` calls `g(List(a))` and
+`g(b)` calls `f(Int)` is finite but rejected. The exact criterion is the
+absence of an expanding cycle in the component's instantiation graph (the
+check C# and the CLI apply to generic type definitions). P001 takes the
+simpler rule; relaxing it later rejects nothing that is accepted today.
 
 ## 5. Coverage and inhabitedness
 
-Coverage runs on the polymorphic checked IR, once per source match, so
+Coverage runs on the checked polymorphic IR, once per source match, so
 each E_NON_EXHAUSTIVE or E_REDUNDANT is reported once, at its source span,
-not once per specialization.
+and source correctness does not depend on which specializations are
+reachable.
 
 - Column types are applied types: a constructor's field types are its
   declared field types with the type's arguments substituted.
-- A rigid variable column has no complete head set (like Int): only a
-  wildcard or binder covers it.
-- Inhabitedness becomes per type application, not per constructor:
-  a variable is inhabited (a caller may choose Int); `Maybe(Void)` has
-  only `Nothing` inhabited, so a `Just(_)` arm on a `Maybe(Void)` scrutinee
-  follows the existing uninhabited-arm policy (ADR 003). The fixpoint is
-  memoized over the finite set of applications reachable from a type,
-  finite by section 4.
+- Rigid variables and holes are abstract types: no complete head set (like
+  Int), so only `_` or a binder covers such a column; they are assumed
+  inhabited, since a caller may choose an inhabited type. A match over
+  `List(a)` with `Nil` and `Cons(_, _)` is exhaustive whatever `a` is.
+- Inhabitedness is computed per type application, memoized over the finite
+  set of applications reachable from it (section 4.2). `Maybe(Void)` has
+  only `Nothing` inhabited, so a `Just(_)` arm on it follows the existing
+  uninhabited-arm policy (ADR 003).
 - Witnesses keep their format (constructor names only).
 
-## 6. Phases, IR and module boundaries
+## 6. Specialization
 
-Pipeline: Parse → Resolve → Check (types, section 4 rule, coverage) →
-**Specialize** → Go.
+Features.Specialize (new, pure) consumes the checked IR and produces the
+monomorphic IR.
+
+- Keys are `(declaration id, Array GroundTy)` for functions and types,
+  compared structurally (an `Eq`/`Ord` instance on the ground type ADT),
+  never by printed names. Every key is generated at most once (memo table).
+- Worklist: seeds are every monomorphic function, in id order (all are
+  emitted today, used or not). Each copied body is walked in pre-order,
+  left to right; each new key is appended first-in first-out. Output ids are
+  dense: monomorphic types and functions keep their relative order and come
+  first, then specialized types and functions in discovery order.
+- A polymorphic declaration that is never instantiated is checked but not
+  emitted (whole-program assumption above).
+- Identity: on a program with no type parameters or variables, Specialize
+  returns its input unchanged, so the Go bytes are unchanged.
+- Holes: each hole is replaced by one fixed representative, Int. This is a
+  specialization detail, not a typing rule. It is valid in P001 because:
+  1. no constraint can mention a hole (P001 has no constraints; C001 must
+     report a constrained hole as ambiguous, never pick a representative);
+  2. no comparison is made at a type containing a hole (section 3);
+  3. `main`'s result is ground (section 2);
+  4. no P001 operation depends on a type argument: there are no classes,
+     no type case and no FFI, and lowering of every construct is uniform in
+     the element type. So a program's output is the same for any ground
+     representative. Section 8 tests this directly rather than relying on
+     the argument alone.
+  `length(Nil)` thus specializes to the same key as `length` at Int.
+- Limit: Specialize fails with E_SPECIALIZATION, Problem
+  `SpecializationLimit Int`, when the total number of specialized
+  functions plus specialized types in the program would exceed 10,000 (a
+  named constant, global, measured against the large-source tests before
+  it is fixed). The span is the reference (call, construction or type
+  reference) that would create the first key over the limit.
+- Go names stay numeric (`bumpusTy7`, `bumpusFn12`, `bumpusFn12Match1`).
+  Printed values use source constructor names, so `Cons(1, Nil)` prints and
+  re-reads as today.
+
+## 7. Phases, IR and module boundaries
+
+Pipeline: Parse → Resolve → Check (types, section 4 rule, comparison
+groundness, coverage) → Specialize → Go.
 
 - Domain.Checked.Internal (new): the checked polymorphic IR. Each call and
-  construction records its instantiation (closed after defaulting, except
-  for the caller's own rigid variables). Constructors visible only to
-  Features.Check* and Features.Specialize.
-- Domain.IR.Internal (existing): stays the monomorphic IR that Format.Go
-  consumes. It gets its own `Ty = TInt | TBool | TData TypeId`, so a type
-  variable cannot reach Go generation by construction. Constructors
-  visible only to Features.Specialize and Format.Go*. Format.Go changes
-  only its imports.
-- Features.Specialize (new, pure): a worklist over keys `(declaration id,
-  closed type arguments)`. Seeds: every monomorphic function, in id order
-  (all are emitted today, used or not). Keys are discovered by a pre-order,
-  left-to-right walk of each body, appended first-in first-out, memoized.
-  Output ids are dense: monomorphic types and functions keep their relative
-  order and come first, then specializations in discovery order. A
-  polymorphic declaration that is never instantiated is checked but not
-  emitted.
-- Identity: on a program with no type parameters or variables, Specialize
-  returns the same program, which gives byte-identical Go.
-- Go names stay numeric (`bumpusTy7`, `bumpusFn12`, `bumpusFn12Match1`);
-  printed values use source constructor names, so `Cons(1, Nil)` prints
-  and re-reads as today.
+  construction records its instantiation (types over the caller's rigid
+  variables and holes). Constructors visible only to Features.Check* and
+  Features.Specialize.
+- Domain.IR.Internal (existing): the monomorphic IR Format.Go consumes, with
+  the variable-free `Ty` of section 3, so a type variable cannot reach Go
+  generation by construction rather than by assertion. Constructors visible
+  only to Features.Specialize and Format.Go*. Format.Go changes only its
+  imports.
 - scripts/structure.mjs, AGENTS.md and docs/engineering.md change the IR
-  gate from one allowlist to two (above). Program.Compile calls Specialize
-  between Check and Go.
+  gate from one allowlist to two. Program.Compile calls Specialize between
+  Check and Go.
 
-## 7. Testing and proofs
+## 8. Testing and proofs
 
-Every rejection row asserts exact code, span and text (test/poly-*.test.mjs).
+Every rejection row asserts exact code, span and text.
 
-- Syntax and declaration rows: each E_SYNTAX form of section 1; unbound and
+- Syntax and declarations: each E_SYNTAX form of section 1; unbound and
   duplicate type parameters; wrong argument counts, including bare `List`;
   polymorphic `main`.
-- Typing rows: rigid mismatch; two instantiations in one expression; occurs
-  check; `NotComparable` on `a` and on `List(a)`; constructor pattern on a
-  variable scrutinee; error order and spans unchanged on monomorphic
-  programs (the existing diagnostics characterization still passes).
-- SCC rule rows: each allowed and rejected example of section 4, plus the
-  budget at a generated program over and under the limit.
-- Unification properties (on the compiled PureScript unifier, loaded from
-  output/ as other tests do), over generated types with a generated
-  constructor signature: a successful unifier `s` makes both sides equal;
-  `s` is idempotent; applying a composition equals applying in sequence;
-  a meta against a proper type containing it fails; most-general: for
+- Rigid and flexible variables, tested on the unifier directly: rigid `a`
+  against Int fails; rigid `a` against rigid `b` fails; rigid `a` against
+  itself succeeds; a meta against Int, against rigid `a`, and against
+  `List(a)` succeeds; a meta against a type properly containing it fails.
+  Source rows for each through the CLI.
+- Typing rows: two instantiations in one expression; occurs check;
+  `NotComparable` on `a` and `List(a)`; `AmbiguousType` on `Nil == Nil`;
+  constructor pattern on a variable scrutinee; the existing diagnostics
+  characterization unchanged.
+- Unification properties over generated types and constructor signatures:
+  a successful unifier `s` makes both sides equal; `s` is idempotent;
+  applying a composition equals applying in sequence; most-general: for
   pairs made unifiable by applying a generated substitution σ, unification
-  succeeds and `σ(s(t)) = σ(t)` on both sides.
-- Reference comparison: an independent JavaScript unifier
-  (test/unify-oracle.mjs, union-find, written separately) agrees on success
-  and, up to renaming of metas, on the unified type.
+  succeeds and `σ(s(t)) = σ(t)` on both sides. Reference comparison: an
+  independent JavaScript unifier (test/unify-oracle.mjs, union-find,
+  written separately) agrees on success and, up to renaming, on the result.
+- Instantiation rule rows: each accepted and rejected example of section
+  4, for functions and for types separately.
+- Finite-component termination, generated: programs whose components mix
+  variable permutation, argument dropping, ground substitution and mutual
+  recursion, at random entry keys. Each specializes, and its key count per
+  component is at most the section 4.2 bound computed independently by the
+  test. Generated programs that add one wrapping argument (`List(v)`) at an
+  intra-component reference are rejected with E_SPECIALIZATION.
+- Specialization uniqueness: no two output declarations share a key
+  (Specialize exposes its key table to tests).
+- Specialization determinism: compiling twice gives equal bytes; permuting
+  declaration order gives the same output and the same key set up to
+  renumbering.
+- Representative independence: generated programs with holes, specialized
+  once with Int and once with Bool as representative (a test-only argument
+  to the pure function), print the same output.
 - Execution oracle: generated polymorphic programs (generic functions over
-  generated parameterized types, instantiated at generated closed types,
+  generated parameterized types, instantiated at generated ground types,
   including nested applications) run in Go and match the independent
   reference interpreter (extended to parse the new type syntax; it
-  evaluates without types); this is the
-  check that specialization preserves meaning.
+  evaluates without types). This checks that specialization preserves
+  meaning.
 - Identity: every existing test program and generated monomorphic program
-  specializes to itself (structural equality on the IR), and the three
+  specializes to itself (structural equality on the IR); the three
   bootstrap snapshots stay byte-identical.
-- Determinism and snapshot: a new examples/lists.bumpus (List, Maybe,
-  Pair, Tree, the functions of section 8) compiles twice to equal bytes and
-  is snapshotted as bootstrap/lists.go.
-- Coverage rows: `Maybe(Void)` arms; generic matches; witnesses through
-  type arguments; one diagnostic per source match even when instantiated
-  twice.
+- Coverage rows: `Maybe(Void)` arms; generic matches over `List(a)`;
+  matches over a bare `a`; witnesses through type arguments; one diagnostic
+  per source match even when instantiated twice.
+- Limit: a generated program just under the limit compiles; one key over
+  fails with E_SPECIALIZATION at the stated span.
+- Snapshot: examples/lists.bumpus (section 9) as bootstrap/lists.go.
 - Regression rows (scripts/regression.mjs, isolated copies), each with a
-  probe that passes healthy and fails on the mutant: `occurs` (occurs check
-  removed), `rigid` (a rigid variable unifies with Int), `instantiate`
-  (metas shared across uses of one scheme), `spec-key` (the key ignores
-  type arguments, so `List(Int)` and `List(Bool)` share a Go type).
+  probe that passes healthy and fails on its mutant: `occurs` (occurs check
+  removed); `rigid` (a rigid variable unifies with Int); `instantiate`
+  (metas shared across uses of one scheme); `spec-key` (key compares only
+  each argument's outermost constructor; the probe uses
+  `List(List(Int))` and `List(List(Bool))` together, so the two share a Go
+  type and the probe fails).
 - Scale: large-source gains a program with thousands of distinct
   instantiations, with a time bound that fails a quadratic worklist.
 
-## 8. Usefulness without classes
+## 9. Usefulness without classes
 
 examples/lists.bumpus doubles as documentation and as the seed of a future
-Prelude: `length`, `append`, `reverse`, `zip`, `headOr(xs, d)`, `last`,
-`take`/`drop` by Int, `fromMaybe`, `fst`/`snd`, `swap`, tree `size`,
-`depth` and `flatten`, `Either(a, b)` with `either`-style selection by
-match. With no first-class functions, `map` and folds are written per use;
-that limit belongs to a later functions milestone, not P001.
+Prelude: `length`, `append`, `reverse`, `zip`, `headOr(xs, d)`, `last` as
+`Maybe(a)`, `take`/`drop` by Int, `fromMaybe`, `fst`/`snd`, `swap`, tree
+`size`, `depth` and `flatten`, `Either(a, b)` selection by match. A total
+`head(xs: List(a)): a` cannot be written (no value of `a` exists for
+`Nil`); `headOr` and `Maybe(a)` are the total forms. With no first-class
+functions, `map` and folds are written per use; that limit belongs to a
+later functions milestone, not P001.
 
-## 9. Decisions approved in conversation
+## 10. Decisions
 
 1. Parameterized types are part of P001.
-2. Type variables are opaque; no built-in `Ord`; comparing a type that
-   contains a signature variable is E_TYPE.
+2. Type variables are opaque; no built-in `Ord`; comparison requires a
+   ground operand type (no rigid variable, no hole).
 3. Approach A: a separate pure Specialize phase; Format.Go stays
    monomorphic. Rejected: specializing inside Format.Go (breaks phase
    separation) and Go generics (ADR 002; cannot express future
    constructor variables).
-4. Defaults: lowercase implicit variables and parenthesized application;
-   the SCC rule; unsolved metas default to Int; coverage on polymorphic IR
-   with variables inhabited; byte-identical output for monomorphic programs.
+4. Lowercase implicit variables and parenthesized application.
+5. The instantiation rule of section 4, separately for functions and
+   types, with its proof; the limit is a resource guard only.
+6. Unsolved metas become holes; Specialize picks a representative under
+   the conditions of section 6. No typing-level default.
+7. Coverage on the polymorphic IR; rigid variables and holes abstract and
+   inhabited.
+8. Byte-identical output for monomorphic programs; whole-program
+   compilation assumed.
 
-## 10. Relation to C001 (recorded, not built here)
+## 11. Relation to C001 (direction, not a settled design)
 
-The user's direction 2026-10-08: C001 brings a Bumpus Prelude in which
-Eq and Ord are ordinary classes (no compiler special case); `derive`
-exists; default Ord instances come from the Prelude and can be opted out
-of by hiding imports or similar; a type may have several instances, in the
-fp-ts style, without Haskell newtypes. The one-instance-per-type
-(global coherence) requirement in ADR 002 is dropped; C001's ADR replaces
-that clause and must say how a value built under one instance is kept from
-use under another. P001 prepares for this only by keeping variables opaque
-and by recording instantiations in the checked IR, where C001's evidence
-will attach.
+The user's direction 2026-10-08: C001 brings a Bumpus Prelude in which Eq
+and Ord are ordinary classes (no compiler special case); `derive` exists;
+default Ord instances come from the Prelude and can be opted out of by
+hiding imports or similar; a type may have several instances, in the fp-ts
+style, without Haskell newtypes. ADR 002's one-instance-per-type clause is
+dropped. This makes instance identity, not only type identity, part of the
+semantics: two Ord instances for one type can order it differently, and a
+collection built under one must not be used as if built under the other.
+Dictionary selection and instance identity are open questions for C001's
+own design; nothing here settles them. P001 prepares only by keeping
+variables opaque, rejecting comparison at undetermined types, recording
+instantiations in the checked IR (where evidence will attach), and keeping
+holes out of any constrained position.
 
-## 11. Documentation
+## 12. Review resolutions (2026-10-08)
 
-docs/language.md (grammar, scoping, typing, the SCC rule, defaulting);
-new ADR 007 (specialization phase, SCC rule, defaulting, opaque variables);
-ADR 002 dated note on the dropped coherence clause; architecture.md (two
-IRs, Specialize); engineering.md and AGENTS.md (IR gate); BACKLOG (P001,
-C001 direction); progress, findings, next-session.
+| Finding | Resolution |
+|---|---|
+| 1. Termination rule needs a proof; separate functions from types | Section 4: rule stated over substituted arguments; ground means no variable at all; separate graphs, components and diagnostics for functions and types; proof in 4.2; conservatism and the exact criterion in 4.3; generated termination tests with the computed bound (section 8). |
+| 2. Int default not generally semantics-preserving | No typing default. Unsolved metas become holes in the checked IR; Specialize picks a representative under four stated conditions (section 6); comparison at a hole type is rejected now so C001 stays additive; a representative-independence property test. |
+| 3. Distinguish rigid and flexible variables explicitly | Section 3 table: each phase's type admits only its variables; unifier tests for every rigid/flexible pair. |
+| 4. Variable-free monomorphic IR; structural keys | Monomorphic `Ty` has no variable constructor; keys are structural over the full argument vector (section 6). |
+| 5. Rigid variables abstract in coverage | Section 5, holes included. |
+| 6. Whole-program assumption | Stated under Goal and non-goals. |
+| 7. Determinism, uniqueness, termination tests; limit scope; spec-key probe | Section 8; limit global with code and span (section 6); spec-key probe on nested arguments. |
+| 8. C001 not settled | Section 11 retitled and reworded; instance identity named as C001's open question. |
