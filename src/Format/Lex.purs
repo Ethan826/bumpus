@@ -114,11 +114,17 @@ spaces source state = state
 -- A self tail call, which purs compiles to a loop.
 spaceEnd
   ∷ String → Int → Position → { index ∷ Int, position ∷ Position }
-spaceEnd source index position =
-  if maybe false isSpace (String.charAt index source) then
-    spaceEnd source (index + 1)
-      (maybe position (advance position) (String.charAt index source))
-  else { index, position }
+spaceEnd source index position
+  | Just next ← spaceStep position (String.charAt index source) =
+      spaceEnd source (index + 1) next
+  | otherwise = { index, position }
+
+-- The position after `found` if it is whitespace.
+spaceStep ∷ Position → Maybe Char → Maybe Position
+spaceStep position found = found >>= stepped
+  where
+  stepped character =
+    if isSpace character then Just (advance position character) else Nothing
 
 -- Two-character tokens win over their one-character prefixes: `->` over
 -- the minus of a negative literal, `|>` over `|`. The pair is built once

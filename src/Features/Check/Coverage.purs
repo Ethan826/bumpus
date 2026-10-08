@@ -11,11 +11,11 @@ import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
 import Domain.Resolved (Ty(..))
 import Domain.Syntax (Diagnostic, Span, problemAt)
+import Features.Check.Matrix (simplifyRow)
+import Features.Check.Missing (uncovered)
 import Features.Check.Search (firstJust)
 import Features.Check.Signature (Signature, buildSignature)
 import Features.Check.Tables (Lookup)
-import Features.Check.Matrix (simplifyRow)
-import Features.Check.Missing (uncovered)
 import Features.Check.Usefulness (useful)
 import Features.Check.Walk (foldTypes)
 

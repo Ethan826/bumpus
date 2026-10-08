@@ -2030,6 +2030,23 @@ emit 46 → 26 ms. `npm run verify` with the script committed: exit 0,
 486 tests, twelve regression proofs, ladder 748 ms (load average 6.05
 before, 19.82 after; .build/t003-script-verify.log).
 
+Review follow-up (2026-10-08): the independent review approved 7c6c0f5
+(50,453 differential cases, 0 differences). Minors fixed: Usefulness's
+comment (once per arm, against all earlier arms); Lex `spaceEnd` reads
+each character once (`spaceStep`); Check's `settle` uses a new
+`Unify.isEmpty` (test `isEmpty holds exactly until a meta is bound`)
+instead of `Subst(..)`; Coverage's import order. The reviewer's harness
+is now scripts/differential.mjs (+ differential-corpus.mjs,
+differential-hook.mjs; docs/engineering.md). Against the c120d48 copy,
+seed 7, count 1000, harvest regenerated (3,419 parses → 2,355 distinct
+sources; load average 11.6 at 18:49): harvested 2,355, fuzz 1,029 plus
+1,085 isName probes, matches 1,000, mutations 1,000, 0 differences
+(.build/t003-differential.log). Against a copy whose lexer no longer
+treats tab as whitespace: 148 of 329 fuzz sources differ at lex, exit 1
+(.build/t003-differential-broken.log). `npm run verify`: exit 0, 487
+tests, twelve regression proofs, ladder 811 ms (load average 6.95
+before, 12.03 after; .build/t003-review-verify.log).
+
 
 ## T003 decision (2026-10-08)
 

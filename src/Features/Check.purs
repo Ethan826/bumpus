@@ -3,7 +3,6 @@ module Features.Check (check) where
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Map as Map
 import Data.Maybe (maybe, maybe')
 import Data.Traversable (traverse)
 import Domain.Checked.Internal (rigid)
@@ -18,7 +17,7 @@ import Features.Check.Infer (Env, infer)
 import Features.Check.Instantiation (instantiationRule)
 import Features.Check.Require (require, tooDeepAt)
 import Features.Check.Scheme (firstTooDeep, holes, resolved, start)
-import Features.Check.Unify (Subst(..))
+import Features.Check.Unify (Subst, isEmpty)
 import Features.Check.Walk (retype)
 
 check ∷ Resolved.Program → Either Diagnostic Checked.Program
@@ -100,5 +99,5 @@ checkFunction holders env function = do
 -- type to itself, so a body that bound no meta (every monomorphic one) is
 -- kept rather than rebuilt (T003).
 settle ∷ Subst → Checked.Expr → Checked.Expr
-settle subst@(Subst bindings) body =
-  if Map.isEmpty bindings then body else retype (resolved subst) body
+settle subst body =
+  if isEmpty subst then body else retype (resolved subst) body

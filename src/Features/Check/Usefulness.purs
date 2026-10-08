@@ -47,8 +47,8 @@ type State = { next ∷ Next, pending ∷ Stack Branch }
 -- columns (G001 final review I1). Heads are tried in declaration order and
 -- the first useful one ends the search, as before.
 -- The rows come simplified (Matrix `simplifyRow`): a match's redundancy
--- check asks this once per arm of every earlier arm, so the caller
--- simplifies each arm once rather than once per later arm (T003).
+-- check runs this once per arm, against all the earlier arms, so the
+-- caller simplifies each arm once rather than once per later arm (T003).
 useful
   ∷ Signature
   → Array Vector

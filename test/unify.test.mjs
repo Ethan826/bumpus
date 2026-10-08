@@ -7,7 +7,7 @@ import { choose, generator } from './coverage-oracle.mjs';
 import { canonical, oracleUnify } from './unify-oracle.mjs';
 import {
   bindingsOf, bool, fromTy, fun, int, list, meta, pair, resolve, rigid,
-  substOf, substitute, unify
+  substOf, substitute, toTy, unify
 } from './unify-support.mjs';
 
 const cases = 500;
@@ -66,6 +66,14 @@ test('rigid variables unify only with themselves', () => {
   assert.equal(unify(new Map(), rigid(0), int).constructor.name, 'Mismatch');
   assert.equal(unify(new Map(), rigid(0), rigid(1)).constructor.name, 'Mismatch');
   assert.deepEqual(unify(new Map(), rigid(0), rigid(0)), new Map());
+});
+
+test('isEmpty holds exactly until a meta is bound', () => {
+  assert.equal(unifier.isEmpty(unifier.empty), true);
+  const bound = unifier.unify(unifier.empty)(toTy(meta(0)))(toTy(int));
+  assert.equal(unifier.isEmpty(bound.value0), false);
+  const same = unifier.unify(unifier.empty)(toTy(int))(toTy(int));
+  assert.equal(unifier.isEmpty(same.value0), true);
 });
 
 test('a meta binds to any type that does not contain it', () => {

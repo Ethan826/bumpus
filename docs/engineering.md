@@ -161,6 +161,17 @@ The unifier (Features.Check.Unify, P001 Task 3) is compared with an
 independent union-find oracle (test/unify-oracle.mjs) and checked for
 soundness, acyclicity and most-generality over generated pairs.
 
+Measurement and checking tools are committed, not ad hoc (T003); neither
+runs in verify. scripts/differential.mjs compares two built compilers
+phase by phase (lex, parse, resolve, check, specialize, Go emission, full
+compile) over the sources the test suite parses (harvested by
+scripts/differential-hook.mjs into .build), token soups, generated
+nested-match programs and mutations, and exits 1 on any difference: run
+it against an isolated build of the previous commit for every
+behavior-preserving refactor or performance change.
+scripts/ladder-profile.mjs times the match-lift ladder cold and per phase,
+alternating with a baseline build. Both are review conventions.
+
 ## Definition of done and handoff
 
 Acceptance criteria must run through the actual CLI/backend, with typed

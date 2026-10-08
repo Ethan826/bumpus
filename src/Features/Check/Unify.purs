@@ -4,6 +4,7 @@ module Features.Check.Unify
   , Failure(..)
   , inferredTypeLimit
   , empty
+  , isEmpty
   , substitute
   , compose
   , resolve
@@ -53,6 +54,10 @@ inferredTypeLimit = 1000
 
 empty ∷ Subst
 empty = Subst Map.empty
+
+-- No meta is bound, so resolving under it changes no type.
+isEmpty ∷ Subst → Boolean
+isEmpty (Subst bindings) = Map.isEmpty bindings
 
 -- One pass: each bound meta becomes its binding, which is not revisited.
 -- Ty's bind is exactly this, and is defined even on cyclic substitutions.
