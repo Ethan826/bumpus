@@ -540,3 +540,16 @@ worktree and branch are removed.
   `rm -rf output && npm run verify` exit 0: zero warnings, 22 files, 156
   tests, zero failures/skips, eight regression proofs
   (.build/e005-fix1-verify.log).
+
+## E005 merged (2026-10-08)
+
+User approved. main fast-forwarded to 09f3071 (E005 c928d93 plus review fix
+round 09f3071). Clean `rm -rf output && npm run verify` on main exited 0:
+zero warnings, 156 tests, zero failures/skips, eight regression proofs. Raw
+log: .build/e005-merge-verify.log. Review: 430-program base/head
+differential identical (values and call traces) and malformed-value panics
+identical; fix round re-review addressed all three findings. Parked: one
+82-column JS test line (rule binds PureScript only), the stale
+Format.Go.Capture header comment (fixed with T001), wall-clock budgets with
+~5x headroom. Evidence archived under .build/merged-e005-evidence; worktree
+and branch removed. Next: T001, then P001 (user order 2026-10-07).
