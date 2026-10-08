@@ -10,16 +10,18 @@ docs/engineering.md, ADRs 001-007 and BACKLOG.md. The uncommitted
 
 State: A003, G001, E005 and T001 are Done and merged. P001 (rank-1
 polymorphism) is implemented on branch p001 in .worktrees/p001, Tasks 1-9
-complete with per-task reviews; it is not merged. On p001,
-`rm -rf output && npm run verify` exits 0 with 302 tests and twelve
-regression proofs (docs/progress.md, Task 9; .build/p001-task9-verify.log).
+complete with per-task reviews, and the final whole-branch review's
+findings are fixed; it is not merged. On p001,
+`rm -rf output && npm run verify` exits 0 with 318 tests and twelve
+regression proofs (docs/progress.md, `P001 final review fixes`;
+.build/p001-final-fix-verify.log).
 Decisions: docs/adr/007-specialization.md; execution ledger with rulings
-R1-R19: .worktrees/p001/.superpowers/sdd/2026-10-08-polymorphism-plan/
+R1-R20: .worktrees/p001/.superpowers/sdd/2026-10-08-polymorphism-plan/
 progress.md.
 
 Next steps, in order:
-1. P001 final whole-branch review on p001, then ask the user for approval
-   to merge into main. Do not merge or push without it.
+1. Ask the user for approval to merge p001 into main (final review
+   fixes done). Do not merge or push without it.
 2. FN001 (first-class functions, lambdas, closures). Before any design
    decision, discuss the proposed currying direction with the user (its
    BACKLOG entry records it as not settled). FN001 precedes C001, R001 and

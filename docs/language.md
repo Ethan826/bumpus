@@ -155,9 +155,10 @@ Polymorphism (P001; ADR 007; spec docs/plans/2026-10-08-polymorphism-design.md).
   or constructor instantiates its variables afresh, so
   `pair(id(1), id(true))` is `Pair(Int, Bool)`. Unification never makes a
   type contain itself: in `match Nil { Cons(h, t) => same(h, t), Nil => 0 }`
-  with `fn same(x: a, y: a): Int` the call is E_TYPE `Infinite type: _
-  occurs in List(_)`. Messages name whole types, `_` for an undetermined
-  part (`Expected Pair(Int, Int), found Pair(Int, Bool)`) (poly-check,
+  with `fn same(x: a, y: a): Int` it is E_TYPE `Infinite type: _ occurs
+  in List(_)` at the argument `t`, whose unification fails. Messages name
+  whole types, `_` for an undetermined part (`Expected Pair(Int, Int),
+  found Pair(Int, Bool)`) (poly-check,
   unify; regression rows `occurs`, `rigid`, `instantiate`).
 - Holes. A type argument nothing determines (the element type in
   `length(Nil)`) stays undetermined; there is no typing default.

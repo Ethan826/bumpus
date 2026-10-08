@@ -3,9 +3,13 @@ import assert from 'node:assert/strict';
 import { TBool, TData, TInt, TVar } from '../output/Domain.Type/index.js';
 import { Hole, Rigid } from '../output/Domain.Checked.Internal/index.js';
 import { checkRejectedAt, checkedPoly } from './phases.mjs';
+import { rejectedAt } from './support.mjs';
 
-// P001 Task 4: rank-1 polymorphic checking, through Parse, Resolve and
-// Check only; the CLI does not compile polymorphic programs until Task 7.
+// P001 Task 4: rank-1 polymorphic checking. Each rejection row runs twice:
+// through Parse, Resolve and Check, as Task 4 wrote it, and through the
+// whole `compile` the CLI runs, which since Task 7 also specializes and
+// emits polymorphic programs (design §8 asks typing rows of the CLI). Both
+// must report the same code, span and text.
 const prelude = 'type List(a) = Nil | Cons(a, List(a));'
   + ' type Pair(a, b) = Pair(a, b); type Maybe(a) = Nothing | Just(a);'
   + ' type Proxy(a) = Proxy; ';
@@ -51,10 +55,14 @@ const rows = [
 ];
 
 for (const [program, marker, text, expected] of rows) {
+  const source = prelude + program;
+  const nth = after(source, marker, text);
   test(`E_TYPE ${expected}: ${program}`, () => {
-    const source = prelude + program;
-    const diagnostic = checkRejectedAt(source, 'E_TYPE', text,
-      after(source, marker, text));
+    const diagnostic = checkRejectedAt(source, 'E_TYPE', text, nth);
+    assert.equal(diagnostic.message, expected);
+  });
+  test(`compile: E_TYPE ${expected}: ${program}`, () => {
+    const diagnostic = rejectedAt(source, 'E_TYPE', text, nth);
     assert.equal(diagnostic.message, expected);
   });
 }

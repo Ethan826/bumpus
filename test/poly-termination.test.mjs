@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Left, Right } from '../output/Data.Either/index.js';
 import { check } from '../output/Features.Check/index.js';
-import { components } from '../output/Features.Check.Components/index.js';
+import * as tarjan from '../output/Features.Check.Components/index.js';
 import { wire } from '../output/Format.Diagnostic/index.js';
 import { generator } from './generators.mjs';
 import { checkRejectedAt, resolved } from './phases.mjs';
@@ -115,6 +115,25 @@ test('wrapping an intra-component argument is rejected', () => {
     assert.deepEqual(diagnostic.span, spanAt(source, text, nth));
     assert.equal(diagnostic.message, `Recursive call to `
       + `${component.functions[callee].name} changes its type arguments`);
+  }
+});
+
+// Components succeed on every well-formed graph.
+const components = graph => {
+  const result = tarjan.components(graph);
+  assert.ok(result instanceof Right, JSON.stringify(result));
+  return result.value0;
+};
+
+// A graph that names a node it lacks is a compiler bug: E_INTERNAL, not
+// a partition that silently treats the missing node as a sink.
+test('an edge to a missing node is E_INTERNAL', () => {
+  for (const graph of [[[1]], [[0], [0, 5]], [[-1]]]) {
+    const result = tarjan.components(graph);
+    assert.ok(result instanceof Left, JSON.stringify(graph));
+    const diagnostic = wire(result.value0);
+    assert.equal(diagnostic.code, 'E_INTERNAL');
+    assert.match(diagnostic.message, /Edge to a node outside the graph/);
   }
 });
 

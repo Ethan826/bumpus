@@ -199,3 +199,31 @@ test('three thousand distinct instantiations compile in linear time', () => {
   const functions = go.match(/^func bumpusFn\d+\(/gm).length;
   assert.equal(functions, 2 * instantiationCount + 1, 'one copy per key');
 });
+
+// P001 final review: unifying two unbound metas bound the older to the
+// newer, so sibling metas formed one ever-longer chain that every later
+// walk followed. These took 15.9 s and 8.7 s before the newer meta was
+// bound to the older instead. Every arm but the last is `Nothing`, a fresh
+// meta each, joined to the match's result; a first `Nothing` followed by
+// `Just` arms grows no chain (1.6 s before the fix), so it would not fail.
+const nothingCount = 5000;
+const nilCount = 4000;
+
+test('five thousand Nothing arms join in linear time', () => {
+  const arms = Array.from({ length: nothingCount - 1 },
+    (_, index) => `${index} => Nothing`);
+  const source = 'type Maybe(a) = Nothing | Just(a);'
+    + ` fn main(): Maybe(Int) = match 7 { ${arms.join(', ')}, _ => Just(0) };`;
+  const seconds = secondsFor(() => checked(source));
+  assert.ok(seconds < compileSecondsLimit, `compiling took ${seconds}s`);
+});
+
+test('four thousand Nil arguments unify in linear time', () => {
+  const parameters = Array.from({ length: nilCount },
+    (_, index) => `x${index}: b`);
+  const source = 'type List(a) = Nil | Cons(a, List(a));'
+    + ` fn f(${parameters.join(', ')}): Int = 0;`
+    + ` fn main(): Int = f(${Array(nilCount).fill('Nil').join(', ')});`;
+  const seconds = secondsFor(() => checked(source));
+  assert.ok(seconds < compileSecondsLimit, `compiling took ${seconds}s`);
+});

@@ -291,3 +291,13 @@ resource/cancellation semantics. Documentation only; no feature implemented.
   cyclic binding is caught by the inferred-type bound (E_NESTING), so the
   `occurs` probe requires the exact E_TYPE text rather than any
   rejection.
+- Binding direction is a complexity choice. Binding the older of two
+  unbound metas to the newer chains siblings into one long path that
+  every later walk follows (a 5,000-arm `Nothing` match took 15.8 s);
+  binding newer to older keeps every sibling one link from the oldest
+  (1.55 s). Union-find's rank heuristic is the general form; meta age is
+  a free approximation here.
+- A timing bound's headroom must survive the parallel test runner. A
+  2.9 s workload under a 5 s bound failed once in three reviewer runs and
+  every time with three suites at once; the fix was the workload (Expand's
+  deep `Ord` key comparisons), not the bound or a rerun.

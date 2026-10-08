@@ -11,9 +11,9 @@ Stage 0 is implemented in PureScript. This repository implements one checked
 vertical slice plus closed algebraic data types with exhaustive nested
 `match` (A001), structural comparison operators `== != < <= > >=` on every
 type, and printing of whatever `main` returns (A003, in final review).
-On branch p001 (P001, pending final review), rank-1 polymorphism:
-parameterized types and generic functions, lowered by whole-program
-specialization ([ADR 007](docs/adr/007-specialization.md),
+P001 implements rank-1 polymorphism: parameterized types and generic
+functions, lowered by whole-program specialization
+([ADR 007](docs/adr/007-specialization.md),
 examples/lists.bumpus). HKTs, classes, and rows are planned.
 
 ## Prerequisites and fresh checkout

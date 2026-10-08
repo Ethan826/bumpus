@@ -1304,7 +1304,59 @@ types are bounded at 1,000 levels (E_NESTING, never a crash); a pure
 Specialize phase produces the variable-free monomorphic IR with
 hash-consed keys and a 10,000-key limit. Monomorphic programs emit
 byte-identical Go. Tests grew from 162 to 302 and regression proofs from
-eight to twelve. ADR 007 records the decisions (rulings R1-R19 in the
+eight to twelve. ADR 007 records the decisions (rulings R1-R20 in the
 plan's ledger). Open follow-ups: BACKLOG E006-E011. Pending: final
 whole-branch review and the user's approval to merge; FN001's currying
 direction is to be discussed with the user before its design.
+
+### P001 final review fixes (2026-10-08)
+
+The final whole-branch review (verdict: with fixes) found one Important
+issue and several minors; all were fixed in one commit on p001.
+
+- Unify meta chains (Important). `unifyHeads` bound the left (older) of
+  two unbound metas to the right (newer), so sibling metas joined in turn
+  formed one chain as long as the siblings, which every later `walk`
+  followed: quadratic. Now the newer (larger id) is bound to the older;
+  self-binding, the depth bound and the occurs check are unchanged
+  (`bindMeta` still decides the bound before `bindBounded` resolves). New
+  tests in test/large-source.test.mjs, 5 s bound: 5,000 match arms of
+  `Nothing` (then `_ => Just(0)`) and 4,000 `Nil` arguments to
+  `f(x0: b, …)`. RED (before the fix, built output): 15.8 s and 8.5 s;
+  GREEN: 1.55 s and 0.15 s. A first `Nothing` followed by `Just` arms grows
+  no chain (1.6 s before the fix too), so the test uses all-`Nothing` arms.
+- The reviewer's one unexplained `actual false, expected true`. Reproduced
+  by running the eight P001 test files three at once: it is the 5 s timing
+  bound of poly-depth `an inferred type exactly 1000 deep checks`, which
+  took 2.9 s alone and 7.0-9.0 s under that load. It does not depend on
+  binding direction (2.8 s with either). Profiling showed nearly all of
+  that time in `Ord (Ty Unit)` comparisons of Features.Check.Expand's
+  whole-type map keys, 1,000 applications nested up to 1,000 deep. Expand
+  now keys its numbering by a canonical string spelling of the key (one
+  native string comparison) and keeps number-to-key in a second map:
+  2.8 s to 0.35 s alone, 1.9 s under the same triple load, where it no
+  longer fails; the 3,000-application coverage chain is 0.72 s to 0.65 s.
+  This is a constant-factor fix; hash-consed keys (BACKLOG E008) remain
+  the asymptotic one. The same triple load also failed Go batches,
+  because concurrent runs of one test file in one checkout share
+  .build/go-batches/<id> (BACKLOG T002); verify runs each file once.
+- poly-check rejection rows now also run through `compile` (support.mjs
+  `rejectedAt`), asserting the same code, span and text (design §8,
+  "through the CLI"); the Check-level rows stay.
+- Components: unreachable fallbacks are gone or report E_INTERNAL. A
+  frame carries its node's order and low and `open` maps each open node to
+  its order, so no lookup can miss; an edge to a node outside the graph,
+  a component root missing from the stack and an unnumbered node stop the
+  search with E_INTERNAL (`components` returns `Either Diagnostic`). New
+  test: an edge to a missing node is E_INTERNAL; the reachability and
+  20,000-node tests pass unchanged in substance.
+- Docs: ADR 007 and next-session cite rulings R1-R20; README describes
+  P001 as implemented without branch status; docs/language.md places the
+  occurs-check E_TYPE at the argument `t`.
+
+Verification: `rm -rf output && npm run verify` exits 0 in 90 s wall
+(97 s on an earlier run) with 318 tests (302 + 2 timing + 1 E_INTERNAL +
+13 compile twins), zero warnings and twelve regression proofs
+(.build/p001-final-fix-verify.log). The eight files (`node --test test/unify.test.mjs test/poly-*.test.mjs
+test/diagnostics.test.mjs`, 153 tests) passed three sequential runs
+(.build/p001-final-fix-run{1,2,3}.log).

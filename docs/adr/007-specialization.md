@@ -4,7 +4,7 @@ Accepted and implemented 2026-10-08 (milestone P001, Tasks 1-9, branch
 p001). Binding spec: docs/plans/2026-10-08-polymorphism-design.md
 (sections 3-7); plan docs/plans/2026-10-08-polymorphism-plan.md. This ADR
 records what was built and the decisions taken during execution (rulings
-R1-R19 in the plan's execution ledger). It refines ADR 002's strategy
+R1-R20 in the plan's execution ledger). It refines ADR 002's strategy
 (specialize to monomorphic Go, no Go generics).
 
 ## Context

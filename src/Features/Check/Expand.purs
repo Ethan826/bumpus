@@ -14,6 +14,7 @@ import Data.Foldable (all, foldl)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), isJust, maybe')
+import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst, snd)
 import Domain.Checked.Internal (Open)
@@ -28,19 +29,21 @@ import Features.Check.Tables (Lookup, ctorInfo, typeInfo)
 type Key = Ty Unit
 
 -- Every application reachable from the roots by unfolding constructor
--- fields, numbered; finite by the instantiation rule (design §4.2). The
--- n-th entry of `types` is application n, listing its own constructors in
--- the declared order; their fields name applications as
+-- fields, numbered by its spelling; finite by the instantiation rule
+-- (design §4.2). The n-th entry of `types` is application n, listing its
+-- own constructors in the declared order; their fields name applications as
 -- `TData (TypeId n) []` and the abstract type as Int, which is all
 -- Inhabited reads: inhabited and never a data type.
 type Expansion =
-  { numbers ∷ Map Key Int
+  { numbers ∷ Map String Int
   , types ∷ Array TypeInfo
   , ctors ∷ Array CtorInfo
   }
 
--- `frontier` holds the applications numbered last round, not yet unfolded.
-type Discovery = { numbers ∷ Map Key Int, frontier ∷ Array Key }
+-- `frontier` holds the applications numbered last round, not yet unfolded;
+-- `keys` gives each number its application.
+type Discovery =
+  { numbers ∷ Map String Int, keys ∷ Map Int Key, frontier ∷ Array Key }
 
 -- An application's declared constructors, each with its field types
 -- substituted.
@@ -57,16 +60,17 @@ type Unfolded =
 expand ∷ Array TypeInfo → Array CtorInfo → Array (Ty Open) → Lookup Expansion
 expand types ctors roots = do
   closed ← Array.catMaybes <$> traverse (closedKey ctors) indexed
-  numbers ← tailRecM (discover types ctors)
-    (admit { numbers: Map.empty, frontier: [] } (closed <> map key roots))
-  tables types ctors numbers
+  found ← tailRecM (discover types ctors)
+    (admit start (closed <> map key roots))
+  tables types ctors found
   where
   indexed = Array.mapWithIndex Tuple types
+  start = { numbers: Map.empty, keys: Map.empty, frontier: [] }
 
 -- The expanded type of an applied type; a miss is a compiler bug.
 application ∷ Expansion → Ty Open → Lookup TypeInfo
 application expansion ty = maybe' unexpanded (typeInfo expansion.types)
-  (TypeId <$> Map.lookup (key ty) expansion.numbers)
+  (TypeId <$> Map.lookup (spelling (key ty)) expansion.numbers)
 
 -- A declared field type with the owner's arguments put for its variables.
 substitute ∷ ∀ v. Array (Ty v) → Ty VarId → Lookup (Ty v)
@@ -83,6 +87,19 @@ key = map forget
   where
   forget _ = unit
 
+-- A key's canonical text, the map key for its number. Comparing two
+-- spellings is one native string comparison; comparing two keys walked
+-- both through Ord dictionaries, and with applications nested a thousand
+-- deep that comparison was nearly all of checking (P001 final fix).
+spelling ∷ Key → String
+spelling = case _ of
+  TInt → "i"
+  TBool → "b"
+  TVar _ → "v"
+  TData (TypeId id) arguments → show id <> "("
+    <> joinWith "," (map spelling arguments)
+    <> ")"
+
 closedKey ∷ Array CtorInfo → Tuple Int TypeInfo → Lookup (Maybe Key)
 closedKey ctors (Tuple index info) = judge <$> traverse (ctorInfo ctors)
   info.ctors
@@ -93,20 +110,25 @@ closedKey ctors (Tuple index info) = judge <$> traverse (ctorInfo ctors)
 
 -- Numbers the data applications not seen before, in first-seen order.
 admit ∷ Discovery → Array Key → Discovery
-admit state keys =
-  { numbers: foldl number state.numbers fresh, frontier: fresh }
+admit state keys = numbered (state { frontier = map snd fresh })
   where
-  fresh = Array.filter unseen (Array.nub (Array.filter isData keys))
-  unseen found = not (Map.member found state.numbers)
-  number numbers found = Map.insert found (Map.size numbers) numbers
+  spelled = map withSpelling (Array.filter isData keys)
+  withSpelling found = Tuple (spelling found) found
+  fresh = Array.filter unseen (Array.nubBy (comparing fst) spelled)
+  unseen (Tuple text _) = not (Map.member text state.numbers)
+  numbered start = foldl number start fresh
+  number reached (Tuple text found) = reached
+    { numbers = Map.insert text (Map.size reached.numbers) reached.numbers
+    , keys = Map.insert (Map.size reached.numbers) found reached.keys
+    }
 
 discover
   ∷ Array TypeInfo
   → Array CtorInfo
   → Discovery
-  → Lookup (Step Discovery (Map Key Int))
+  → Lookup (Step Discovery Discovery)
 discover types ctors state =
-  if Array.null state.frontier then pure (Done state.numbers)
+  if Array.null state.frontier then pure (Done state)
   else Loop <<< admit state <<< Array.concat <$> traverse fieldsOf
     state.frontier
   where
@@ -133,19 +155,20 @@ unfoldInfo ctors arguments info = do
 
 -- Application n's types entry lists constructors numbered after those of
 -- applications 0 to n-1.
-tables ∷ Array TypeInfo → Array CtorInfo → Map Key Int → Lookup Expansion
-tables types ctors numbers = do
+tables ∷ Array TypeInfo → Array CtorInfo → Discovery → Lookup Expansion
+tables types ctors found = do
   unfolded ← traverse (unfold types ctors) order
   fields ← traverse (traverse expandedFields <<< _.ctors) unfolded
   let starts = Array.cons 0 (Array.scanl add 0 (map Array.length fields))
   pure
-    { numbers
+    { numbers: found.numbers
     , types: Array.zipWith renumbered starts unfolded
     , ctors: Array.concat (Array.mapWithIndex owned fields)
     }
   where
-  order = map fst (Array.sortWith snd (Map.toUnfoldable numbers))
-  expandedFields unfolded = Tuple unfolded.ctor <$> traverse (field numbers)
+  order = map snd (Map.toUnfoldable found.keys ∷ Array (Tuple Int Key))
+  expandedFields unfolded = Tuple unfolded.ctor <$> traverse
+    (field found.numbers)
     unfolded.fields
   owned index = map (adopt index)
   adopt index (Tuple ctor expanded) =
@@ -155,13 +178,13 @@ tables types ctors numbers = do
   offset start index _ = CtorId (start + index)
 
 -- A substituted field as Inhabited reads it.
-field ∷ Map Key Int → Key → Lookup (Ty VarId)
+field ∷ Map String Int → Key → Lookup (Ty VarId)
 field numbers = case _ of
   TInt → Right TInt
   TBool → Right TBool
   TVar _ → Right TInt
   found@(TData _ _) → maybe' unexpanded (Right <<< applied)
-    (Map.lookup found numbers)
+    (Map.lookup (spelling found) numbers)
   where
   applied number = TData (TypeId number) []
 

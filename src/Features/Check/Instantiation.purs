@@ -23,13 +23,14 @@ import Features.Check.Nested (admissible, nestedTypes)
 instantiationRule ∷ Checked.Program → Either Diagnostic Unit
 instantiationRule checked@(Checked.Program program) = do
   nestedTypes checked
-  traverse_ judgeFunction program.functions
+  component ← components (map callees program.functions)
+  traverse_ (judgeFunction component) program.functions
   where
-  component = components (map callees program.functions)
-  judgeFunction function = foldCalls (judgeCall (context function.id))
+  judgeFunction component function = foldCalls
+    (judgeCall (context component function.id))
     (Right unit)
     function.body
-  context (FunctionId caller) =
+  context component (FunctionId caller) =
     { functions: program.functions, component, caller }
 
 -- Each callee once; edges need no multiplicity.

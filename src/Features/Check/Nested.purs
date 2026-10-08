@@ -22,7 +22,8 @@ import Features.Check.Components (components)
 nestedTypes ∷ Checked.Program → Either Diagnostic Unit
 nestedTypes (Checked.Program program) = do
   owned ← traverse ctorsOf program.types
-  traverse_ (judgeType program.types (components (map edges owned)))
+  component ← components (map edges owned)
+  traverse_ (judgeType program.types component)
     (Array.mapWithIndex owner owned)
   where
   ctorsOf info = traverse (ctorAt info.span) info.ctors

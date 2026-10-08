@@ -104,9 +104,15 @@ unifyAt level subst left right =
   if level > inferredTypeLimit then Left TooDeep
   else unifyHeads level subst (walk subst left) (walk subst right)
 
--- Both sides are walked, so a meta here is unbound.
+-- Both sides are walked, so a meta here is unbound. Of two metas, the
+-- newer (larger) is bound to the older, so siblings joined one after
+-- another all point at the oldest: binding the older to the newer built a
+-- chain as long as the siblings, which every later walk followed (P001
+-- final review: 5,000 `Nothing` arms took 15.9 s).
 unifyHeads ∷ Int → Subst → Ty Flex → Ty Flex → Either Failure Subst
 unifyHeads level subst left right = case left, right of
+  TVar (Meta older), TVar (Meta newer) | older < newer →
+    bindMeta subst newer (TVar (Meta older))
   TVar (Meta meta), _ → bindMeta subst meta right
   _, TVar (Meta meta) → bindMeta subst meta left
   TVar (Rigid one), TVar (Rigid other) | one == other → Right subst
