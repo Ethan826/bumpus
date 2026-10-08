@@ -1694,8 +1694,9 @@ reach Specialize as `Internal "unlowered function"`.
   when g's result is not a function; any other right side is applied to
   `a` (NotAFunction at `a`). `a |> f()` keeps `f()`'s own E_ARITY. (2) The
   over-application E_ARITY is checked before arguments when the declared
-  result is Int, Bool or a declared type, so every pre-FN001 wrong count
-  keeps its order of errors. (3) Only a TypeMismatch is hinted (an occurs
+  result is Int, Bool or a declared type, so those wrong counts keep their
+  pre-FN001 order of errors. (Corrected by the review: a result type
+  variable cannot keep it; see the review fixes below.) (3) Only a TypeMismatch is hinted (an occurs
   failure never has a non-meta expected head). (4) The printable-entry
   check lives in Features.Check (it needs Functional), not
   Check.Signature, which is the coverage signature.
@@ -1737,3 +1738,38 @@ reach Specialize as `Internal "unlowered function"`.
   zero failures/skips, twelve regression proofs, bootstrap snapshots
   unchanged; `twenty thousand parameters are checked in linear time`
   passes unchanged (258 ms). Log .build/fn001-task4-verify.log.
+- Review fixes (follow-up commit). I1: over-application through a result
+  type variable checks the n arguments first, which inherently changes
+  pre-FN001 outcomes with no existing row: `id(true + 1, 2)`,
+  `fst(1, true + 1, 3)`, `loop(true, 2)` E_ARITY → E_TYPE at `true`;
+  `id(id(1, 2), 3)` keeps E_ARITY at the inner `id(1, 2)`; `loop(1, 2)`
+  (`loop: Int → a`) is accepted by Check (each confirmed). Recorded in
+  design §9; the first two pinned in test/fn-check.test.mjs (they pass on
+  0a49dfd, pinning behavior). I2: the Specialize row was vacuous (its
+  prelude's `k` failed first); it now uses its own two-function program and
+  asserts each node's own span for `(fn(x) => x)(1)`, `1 |> add(2)`,
+  `id(add)(1, 2)`, `add(1)(2)`. Isolated mutants: Specialize copying
+  `Apply`'s callee and `Pipe`'s left operand, and `Apply` alone, each make
+  it fail (`invalid program compiled`). M1: a pipe into a saturated call
+  whose declared result is Int, Bool or a declared type is E_ARITY right
+  after the left operand, before the call's arguments (design §9);
+  `1 |> add(true, 2)` failed on 0a49dfd (E_TYPE at `true`). M2:
+  Format.Parse.Expression's primary reports where it starts, so an
+  application of a parenthesized callee spans from its `(`; Task 3's
+  `(g)(x)` row in test/fn-syntax.test.mjs moves from `g)(x)` to `(g)(x)`
+  (with `((g))(x)(y)` and a bare `(g)` rows), the hint row
+  `(fn(x) => add(x))(1)` likewise, and `(add)(1)` is a new no-hint row; on
+  0a49dfd the three span rows and the Specialize row failed (5 failures,
+  test log in the scratchpad). M3: plan Task 4 Files list corrected. M4:
+  docs/language.md Names paragraph points to the design as superseding,
+  pending Task 9. Perf: `supplied` builds the arrow only for a partial
+  application. Match ladder alone, six alternating runs before/after the
+  change: 519/518, 525/519, 524/527, 514/514, 508/535, 578/1,641 ms (the
+  last pair under an external load spike), then four more under load
+  average 7.4: 686/642, 741/715, 715/713, 700/705 ms: no measurable
+  difference (the ladder makes no calls on that path; 0a49dfd's parent was
+  508-516 ms against 523-562 ms at 0a49dfd).
+  GREEN: `rm -rf output && npm run verify` exit 0, 472 tests (468 + 4),
+  zero failures/skips, twelve regression proofs, snapshots unchanged;
+  the ladder took 1,393 ms inside it under external load (BACKLOG T003),
+  `twenty thousand parameters` 286 ms (log .build/fn001-task4-fix-verify.log).

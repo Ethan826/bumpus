@@ -266,9 +266,10 @@ arrows directly.
   partial `Call`/`Construct`, `Apply`, `Lambda (Array Param) Expr`,
   `Pipe Expr Expr`; `Param = { local ∷ Maybe LocalId, ty ∷ Ty Open }`),
   `src/Features/Check/Infer.purs`, `src/Features/Check/Call.purs`,
-  `src/Features/Check/Walk.purs`, `src/Features/Check/Signature.purs`
-  (printable entry), `src/Features/Check/Match.purs` (function
-  scrutinee), `src/Domain/Problem.purs`, `src/Format/Diagnostic.purs`,
+  `src/Features/Check/Walk.purs`, `src/Features/Check.purs` (printable
+  entry; as built, Check.Signature and Check.Match needed no change: a
+  function scrutinee is handled by unification and Signature's arrow
+  column), `src/Domain/Problem.purs`, `src/Format/Diagnostic.purs`,
   the rows listed under Global Constraints
 - Create: `src/Features/Check/Apply.purs` (application and pipe),
   `src/Features/Check/Lambda.purs`, `src/Features/Check/Hint.purs`,

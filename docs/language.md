@@ -71,6 +71,13 @@ ones; a type containing a variable is not (Polymorphism, below).
 and types. Every function is checked, including unused ones and unreachable
 arms.
 
+(FN001, pending plan Task 9's rewrite of this section: bare function and
+constructor names, calls of locals and binders, partial and
+over-application, comparison of functions and a printable `main` now follow
+docs/plans/2026-10-08-functions-design.md §2-§4 and §9, which supersede the
+E_UNBOUND, E_ARITY `Constructor C needs arguments` and E_NOT_CALLABLE rules
+and the comparability rule below.)
+
 Names. Types, and functions plus constructors (one global table), are distinct
 namespaces; locals are parameters then pattern binders. A bare name is a
 local, else a nullary constructor; a bare function name is E_UNBOUND; a bare

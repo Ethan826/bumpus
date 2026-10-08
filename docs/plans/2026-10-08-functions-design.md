@@ -423,6 +423,25 @@ Every rejection row asserts exact code, span and text.
 - Unchanged by decision (user, 2026-10-08): over-application past a
   non-function result and `f()` on a function with parameters keep
   E_ARITY `Wrong number of arguments`.
+- Task 4 review clarification (2026-10-08): over-application through a
+  result type variable checks the callee's n arguments first and is legal
+  when the instantiated result is a function; E_ARITY comes only after
+  them, when the instantiated result is not. A declared result that can
+  never be a function (Int, Bool, a declared type) is still E_ARITY before
+  any argument. So, inherently, some pre-FN001 outcomes change:
+  `id(true + 1, 2)`, `fst(1, true + 1, 3)` and `loop(true, 2)` were
+  E_ARITY and are now E_TYPE at `true`; `id(id(1, 2), 3)` stays E_ARITY
+  but at the inner `id(1, 2)`; `loop(1, 2)` with `fn loop(x: Int): a` is
+  now accepted by checking.
+- Task 4 review clarification: a pipe into a saturated named call,
+  `a |> g(b1…bk)` with k = n, is the call `g(b1…bk, a)` over-applied, and
+  orders its errors as that call does: after the left operand, a declared
+  result of g that can never be a function is E_ARITY before `b1…bk` are
+  checked; an instantiated one that is not a function, after them. The
+  E_ARITY is at the right operand `g(b1…bk)`.
+- Task 4 review clarification: an application of a parenthesized callee
+  spans from its `(`: `(add)(1)` spans `(add)(1)` (section 1's "callee
+  through its closing parenthesis"); a call still starts at its name.
 - Under-application of a function or constructor: E_ARITY becomes a
   function value, typically E_TYPE where it is used, with the hint under
   section 4's provenance rules.

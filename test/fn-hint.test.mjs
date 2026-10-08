@@ -74,10 +74,12 @@ const unhinted = [
   // Through a lambda.
   ['fn f(): Int = fn(x) => add(1, x);', '= fn', 'fn(x) => add(1, x)',
     'Expected Int, found Int -> Int'],
-  ['fn f(): Int = (fn(x) => add(x))(1);', '= (', 'fn(x) => add(x))(1)',
+  ['fn f(): Int = (fn(x) => add(x))(1);', '= (', '(fn(x) => add(x))(1)',
     'Expected Int, found Int -> Int'],
   // Through a pipe.
   ['fn f(): Int = 1 |> add3(2);', '= 1', '1 |> add3(2)',
+    'Expected Int, found Int -> Int'],
+  ['fn f(): Int = (add)(1);', '= (', '(add)(1)',
     'Expected Int, found Int -> Int'],
   // Through another call, and through a further application.
   ['fn f(): Int = id(add(1));', '= id', 'id(add(1))',

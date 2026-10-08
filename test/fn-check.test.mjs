@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bodyTree, bodyType, declared, failsAt, tree } from './fn-checked.mjs';
-import { rejected, rejectedAt } from './support.mjs';
+import { rejectedAt } from './support.mjs';
 
 // FN001 Task 4: application, partial and over-application, lambdas and
 // pipes through Parse, Resolve and Check (design §3-§5). Function ids:
@@ -105,8 +105,17 @@ const rejections = [
     'Wrong number of arguments'],
   ['fn f(): List(Int) = Cons(1, Nil, 2);', '= Cons', 'Cons(1, Nil, 2)',
     'E_ARITY', 'Wrong number of arguments'],
-  // A pipe into a saturated call is that call over-applied.
+  // Through a result variable the n arguments are checked first (design
+  // §9, Task 4 review): pre-FN001 these were E_ARITY at the outer call.
+  ['fn f(): Int = id(true + 1, 2);', '= id', 'true', 'E_TYPE',
+    'Expected Int, found Bool'],
+  ['fn f(): Int = id(id(1, 2), 3);', 'id(id', 'id(1, 2)', 'E_ARITY',
+    'Wrong number of arguments'],
+  // A pipe into a saturated call is that call over-applied; a declared
+  // result that is no function is reported before the call's arguments.
   ['fn f(x: Int): Int = x |> add(1, 2);', '|> add', 'add(1, 2)', 'E_ARITY',
+    'Wrong number of arguments'],
+  ['fn f(): Int = 1 |> add(true, 2);', '|> add', 'add(true, 2)', 'E_ARITY',
     'Wrong number of arguments'],
   ['fn f(x: a, n: Int): a = (fn(y: a) => y)(n);', ')(n', 'n', 'E_TYPE',
     'Expected a, found Int'],
@@ -130,12 +139,15 @@ test('empty calls keep their errors', () => {
     'add()').message, 'Wrong number of arguments');
 });
 
-// Until FN001 Task 5 specialization stops at every new node.
+// Until FN001 Task 5 specialization stops at every new node, at that
+// node's own span. The program has no other function value, so nothing
+// else can stop it first.
 test('checked function programs reach Specialize as Internal', () => {
-  for (const body of ['k(1, 2)', '(fn(x) => x)(1)', '1 |> add(2)',
-    'id(add)(1, 2)']) {
-    const source = `${prelude}fn main(): Int = ${body};`;
-    assert.equal(rejected(source, 'E_INTERNAL').message,
+  const plain = 'fn add(x: Int, y: Int): Int = x + y; fn id(x: a): a = x; ';
+  for (const body of ['(fn(x) => x)(1)', '1 |> add(2)', 'id(add)(1, 2)',
+    'add(1)(2)']) {
+    const source = `${plain}fn main(): Int = ${body};`;
+    assert.equal(rejectedAt(source, 'E_INTERNAL', body).message,
       'unlowered function', body);
   }
 });

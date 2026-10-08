@@ -45,6 +45,9 @@ type Comparison = { text ∷ String, operator ∷ Operator }
 -- A postfix chain's arguments, in order, and where its last `)` ends.
 type Application = { arguments ∷ Array Expr, end ∷ Position }
 
+-- A primary expression and the position its source text starts at.
+type Primary = { value ∷ Expr, start ∷ Position }
+
 comparisons ∷ Array Comparison
 comparisons =
   [ { text: "==", operator: Equal }
@@ -133,10 +136,10 @@ atom ∷ Parser Expr → Parser Expr
 atom inner = applyTo <$> primary inner
   <*> dispatch [ on "(" (Just <$> infixed (chain inner)) ] (pure Nothing)
   where
-  applyTo callee = maybe callee (applied callee)
+  applyTo callee = maybe callee.value (applied callee)
   applied callee found = Apply
-    { start: (exprSpan callee).start, end: found.end }
-    callee
+    { start: callee.start, end: found.end }
+    callee.value
     found.arguments
 
 -- Each group takes at least one argument; the chain ends at its last `)`.
@@ -152,19 +155,23 @@ chain inner = joined <$> group <*> manyOn "(" group
   args found = found.arguments
   endOf found = found.end
 
--- Parentheses return the inner expression with its own span.
-primary ∷ Parser Expr → Parser Expr
+-- Parentheses return the inner expression with its own span; `start` is
+-- where the primary begins, its `(` if parenthesized, so an application
+-- of `(f)` spans from that `(` (FN001 Task 4 review).
+primary ∷ Parser Expr → Parser Primary
 primary inner = dispatch
-  [ on "(" (expect "(" *> inner <* expect ")")
-  , on "true" (boolean true <$> token)
-  , on "false" (boolean false <$> token)
-  , onWhen integerStart (integer <$> integerLiteral)
-  , onWhen isName (named inner)
+  [ on "(" (grouped <$> expect "(" <*> inner <* expect ")")
+  , on "true" (bare <<< boolean true <$> token)
+  , on "false" (bare <<< boolean false <$> token)
+  , onWhen integerStart (bare <<< integer <$> integerLiteral)
+  , onWhen isName (bare <$> named inner)
   ]
-  (refine notAnExpression token)
+  (bare <$> refine notAnExpression token)
   where
   boolean value found = Boolean found.span value
   integer literal = Integer literal.span literal.value
+  grouped open value = { value, start: open.span.start }
+  bare value = { value, start: (exprSpan value).start }
 
 -- Reached past the last token too, where taking reports the missing token.
 notAnExpression ∷ Token → Either Diagnostic Expr

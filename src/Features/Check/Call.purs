@@ -1,12 +1,17 @@
-module Features.Check.Call (checkCall, checkConstruct, saturatedCall) where
+module Features.Check.Call
+  ( checkCall
+  , checkConstruct
+  , saturatedResult
+  , fixedResult
+  ) where
 
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Maybe (maybe)
+import Data.Maybe (Maybe(..))
 import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
-import Domain.Resolved (CtorId(..), FunctionId(..))
+import Domain.Resolved (CtorId(..), FunctionId(..), Ty(..), VarId)
 import Domain.Resolved as Resolved
 import Domain.Syntax (Diagnostic, Span, problemAt)
 import Domain.Type (arrows)
@@ -49,23 +54,33 @@ checkConstruct infer env state span id arguments = do
   use ← ctorUse env state span id
   named infer env span (Checked.Construct id) use arguments
 
--- Whether a resolved expression is a named call or construction written
--- with exactly its declared count of arguments (a bare nullary constructor
--- is a value, not a call).
-saturatedCall ∷ ∀ r. CheckEnv r → Resolved.Expr → Boolean
-saturatedCall env = case _ of
-  Resolved.Call _ (FunctionId index) arguments → maybe false
-    (sameCount arguments <<< parameterCount)
-    (Array.index env.functions index)
+-- The declared result of a resolved named call or construction written
+-- with exactly its declared count of arguments (a bare nullary
+-- constructor is a value, not a call); only its head is meaningful.
+saturatedResult ∷ ∀ r. CheckEnv r → Resolved.Expr → Maybe (Ty VarId)
+saturatedResult env = case _ of
+  Resolved.Call _ (FunctionId index) arguments →
+    Array.index env.functions index >>= function arguments
   Resolved.Construct _ (CtorId index) arguments
-    | not (Array.null arguments) → maybe false
-        (sameCount arguments <<< fieldCount)
-        (Array.index env.ctors index)
-  _ → false
+    | not (Array.null arguments) →
+        Array.index env.ctors index >>= ctor arguments
+  _ → Nothing
   where
-  sameCount arguments count = Array.length arguments == count
-  parameterCount function = Array.length function.parameters
-  fieldCount ctor = Array.length ctor.fields
+  function arguments declared = counted arguments
+    (Array.length declared.parameters)
+    declared.result
+  ctor arguments info = counted arguments (Array.length info.fields)
+    (TData info.owner [])
+  counted arguments count result =
+    if Array.length arguments == count then Just result else Nothing
+
+-- A declared result that can never be a function: Int, Bool or a declared
+-- type, whatever the instantiation.
+fixedResult ∷ Ty VarId → Boolean
+fixedResult = case _ of
+  TFun _ _ → false
+  TVar _ → false
+  _ → true
 
 -- FN001 design §4: the declared arity n decides. With n arguments, or
 -- 0 < j < n, the arguments meet the fields (`supplied`); none for a callee
@@ -129,14 +144,18 @@ supplied infer env span node use arguments = do
     (Array.zipWith argumentPair use.value.fields checked.value)
   pure
     { value: Checked.Expr
-        { ty: arrows (Array.drop (Array.length arguments) use.value.fields)
-            use.value.result
+        { ty: resultType
         , span
         , node: node use.value.scheme.arguments checked.value
         }
     , state: unified.state
     }
   where
+  count = Array.length arguments
+  -- A saturated call (every call before FN001) builds no arrow.
+  resultType
+    | count == Array.length use.value.fields = use.value.result
+    | otherwise = arrows (Array.drop count use.value.fields) use.value.result
   argumentPair ty actual = { ty, actual }
   checkArgument reached pair = threadedUnit <$> require env reached pair.ty
     pair.actual

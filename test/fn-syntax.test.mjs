@@ -137,7 +137,12 @@ test('lambda, application and pipe spans', () => {
   const applied = parsedBody('g(1)(2)(3)');
   assert.deepEqual(applied.value0, bodySpan('g(1)(2)(3)', 'g(1)(2)(3)'));
   assert.deepEqual(applied.value1.value0, bodySpan('g(1)(2)(3)', 'g(1)'));
-  assert.deepEqual(parsedBody('(g)(x)').value0, bodySpan('(g)(x)', 'g)(x)'));
+  // An application of a parenthesized callee starts at its `(` (FN001
+  // Task 4 review; Task 3 started it inside the parentheses).
+  assert.deepEqual(parsedBody('(g)(x)').value0, bodySpan('(g)(x)', '(g)(x)'));
+  assert.deepEqual(parsedBody('((g))(x)(y)').value0,
+    bodySpan('((g))(x)(y)', '((g))(x)(y)'));
+  assert.deepEqual(parsedBody('(g)').value0, bodySpan('(g)', 'g'));
   assert.deepEqual(parsedBody('a + 1 |> g(2)').value0,
     bodySpan('a + 1 |> g(2)', 'a + 1 |> g(2)'));
 });
