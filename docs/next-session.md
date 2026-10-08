@@ -45,6 +45,12 @@ direction document's open-row section for inference and proposed implicit
 universal quantification. Explicit effect-row constraint syntax is a
 future feature outside initial FX001; keep record-row constraints separate.
 
+Language-direction now also captures MileAhead's open error-row pattern
+from read-only ../trailmapper: family rows compose without wrappers, stay
+open until handling, and wrap only to add context. Candidate Bumpus error
+sums hide `Variant`/injection plumbing. FX001/R001 must resolve the open
+error-sum need against R001's deferred general variants before changing scope.
+
 Open items: E002 remainder, E006-E011 (P001 follow-ups: stack margin,
 exponential type size, Expand keys, lowercase-type hint, mismatch `_`,
 near-limit elision), F001-F003, F005-F007, E001, E003, E004, O001, H001,

@@ -235,6 +235,68 @@ language or general traits over rows in the first effects release.
 Internal row inference and well-formedness remain necessary. This
 deferral does not remove R001's planned record-row lacks constraints.
 
+### MileAhead's open error rows and Bumpus surface syntax
+
+Inspected 2026-10-08 at the user's request. The MileAhead reference is
+`../trailmapper` (`../mileahead` is absent). Its AGENTS.md section
+"Errors are rows, combined like the environment", Domain.Units.Error,
+Domain.Geo.Types, Domain.Route.Build and Program.Headless establish a
+specific pattern not previously captured by the general typed-error
+discussion here. Conceptual influence only; reference files remain
+read-only and no implementation is copied.
+
+Preserve these properties as a design brief:
+
+- Each domain defines a concrete error family and one row label carrying
+  that whole family, rather than a label for every failure case.
+- Leaf functions leave the error row open. Callers instantiate compatible
+  rows so composing fallible operations combines families without
+  conversion wrappers or a global application-error ADT.
+- Errors pass through unchanged. Wrap only when adding real context,
+  such as an input position; the contextual error may contain an inner
+  composed error row.
+- Close the row where errors are handled exhaustively, or in tests that
+  need closed comparison/rendering. Partial handling should preserve and
+  forward the unhandled remainder.
+
+Candidate Bumpus syntax avoids exposing PureScript's `Variant` carrier,
+`inj`, proxies and `on`/`case_` plumbing. An error-type expression could
+denote a tagged open sum directly:
+
+```bumpus
+fn validateName(text: Text): Result(ValidationError + ...errors, Name);
+fn saveWidget(widget: Widget): Result(DbError + ...errors, Widget);
+fn createWidget(text: Text):
+  Result(ValidationError + DbError + ...errors, Widget)
+  with Clock + Random + Database;
+```
+
+These are schematic signatures, not implemented syntax. `errors` is an
+ordinary user-chosen error-row variable name, not a reserved word or an
+existential. Generic signatures implicitly quantify it universally; each
+caller can instantiate a compatible row. Only the spread punctuation has
+special syntax. The closed form omits the spread. `Err` should infer
+injection of an ordinary
+error-family value into the required sum; ordinary `match` should expose
+its cases with exhaustiveness checking. The compiler must retain distinct
+family identity and payloads, reject incompatible row compositions, and
+avoid requiring explicit widening calls. Hiding the carrier does not
+eliminate tagged-sum semantics or runtime layout work.
+
+In the direct-style effects candidate the same error sum can parameterize
+`Failure(ValidationError + DbError + ...errors)`. A handling boundary can
+reify that channel as Result. Expected typed failures remain distinct from
+runtime defects, and value-level error rows remain distinct from operation
+requirements and service-record rows.
+
+R001 currently defers general extensible variants. This brief exposes a
+specific need for open error sums; FX001/R001 must review whether to add
+error-specific support or broader extensible sums and explicitly revise
+scope before implementation. Type-identity versus label-based family
+selection, sum syntax, contextual nesting, matching, inference, Go layouts
+and specialization growth are open design questions. Explicit effect-row
+constraint syntax remains deferred; internal error-row solving is separate.
+
 ## Intermediate representations and future targets
 
 The user clarified that "hostable" referred to the inspectable intermediate

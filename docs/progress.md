@@ -1479,3 +1479,21 @@ Verification: `npm run verify` exited 0 with 318 tests, no failures or
 skips, and twelve regression proofs; evidence:
 `.build/fx001-row-direction-verify.log`. This verifies the existing
 compiler, not the proposed effects or notation.
+
+## MileAhead error-row pattern captured (2026-10-08)
+
+The user's error-widening question revealed that earlier direction only
+mentioned extensible errors generically. Read-only inspection of MileAhead
+(../trailmapper, as recorded in provenance) confirmed open error-family
+rows, caller composition without conversion wrappers, context-only
+wrapping, and closure at handling/test boundaries. Language-direction now
+records this brief and independent Bumpus syntax candidates hiding Variant
+and injection plumbing. FX001/R001 must resolve error-sum support against
+the current general-variant deferral; no feature scope or code changed.
+Provenance, BACKLOG and the next-session handoff track the design work.
+Clarified after the user's follow-up: `errors` is an ordinary implicitly
+universally quantified row-variable name, not reserved or existential;
+only the spread punctuation is special syntax in the proposal.
+Verification: `npm run verify` exited 0 with 318 tests, no failures or
+skips, and twelve regression proofs; evidence:
+`.build/fx001-error-rows-verify.log`. Proposed error sums remain unimplemented.
