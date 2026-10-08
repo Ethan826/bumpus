@@ -42,10 +42,11 @@ newtype Subst = Subst (Map Int (Ty Flex))
 data Failure = Mismatch (Ty Flex) (Ty Flex) | Occurs Int (Ty Flex) | TooDeep
 
 -- The deepest type checking may build (ruling R7, in the spirit of ADR 006).
--- Resolution and the occurs check recurse over a type's structure and
--- overflowed the default stack near 5,000 levels (BACKLOG E006); a program
--- within the source nesting limit can compose deeper types, so checking
--- rejects them first.
+-- Unification, resolution and the occurs check recurse over a type's
+-- structure. Unification is the binding limit: inside the checker it
+-- overflowed the default stack between about 1,525 and 1,779 levels
+-- (resolution near 5,000; BACKLOG E006). A program within the source
+-- nesting limit can compose deeper types, so checking rejects them first.
 inferredTypeLimit ∷ Int
 inferredTypeLimit = 1000
 
@@ -141,14 +142,23 @@ exceedsLimit subst ty = tailRec step (Push { ty, level: 1 } Bottom)
     _ → rest
   pushAt level rest argument = Push { ty: argument, level } rest
 
--- The occurs check runs on the resolved type, so it sees through bindings;
--- the stored binding stays unresolved, keeping the substitution triangular.
--- The depth bound is checked first, since resolving recurses.
+-- The depth bound is decided first, by a loop. Only within it does
+-- `bindBounded` resolve the binding, which recurses: bindings made earlier
+-- in the same unification can make `ty` far deeper than the limit.
+-- (`where` bindings are strict, so the resolve lives in that helper rather
+-- than in a binding here, where it would run before the test.)
 bindMeta ∷ Subst → Int → Ty Flex → Either Failure Subst
-bindMeta subst@(Subst bindings) meta ty =
+bindMeta subst meta ty =
   if ty == TVar (Meta meta) then Right subst
   else if exceedsLimit subst ty then Left TooDeep
-  else if mentions meta resolved then Left (Occurs meta resolved)
+  else bindBounded subst meta ty
+
+-- The occurs check runs on the resolved type, so it sees through bindings;
+-- the stored binding stays unresolved, keeping the substitution triangular.
+-- Only for a `ty` already within `inferredTypeLimit`.
+bindBounded ∷ Subst → Int → Ty Flex → Either Failure Subst
+bindBounded subst@(Subst bindings) meta ty =
+  if mentions meta resolved then Left (Occurs meta resolved)
   else Right (Subst (Map.insert meta ty bindings))
   where
   resolved = resolve subst ty

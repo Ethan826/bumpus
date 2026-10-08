@@ -967,6 +967,23 @@ Status: done.
 - Fix-2 GREEN: `rm -rf output && npm run verify` exit 0, 65.9 s wall, 223
   tests (219 + 4), zero failures/skips, eight regression proofs
   (.build/p001-task4-fix2-verify.log).
+- Fix round 3 (re-review): `bindMeta`'s strict `where` resolved the
+  binding before `exceedsLimit` ran. Six or more L^997 links chained in one
+  unification threw a RangeError in that resolve. The resolve and occurs
+  check now live in `bindBounded`, which runs only after the bound.
+  - Test: poly-depth `six chained links of L^997 are E_NESTING, not a
+    crash`, at `same`'s second argument.
+  - RED: RangeError in `resolve` (.build/p001-task4-fix3-red.log).
+  - Reviewer probe /private/tmp/claude-501/probe-t4r2/eager.mjs at 2, 6, 8,
+    12 and 20 links: all E_NESTING.
+  - Audit of compiled Features.Check*: the remaining strict bindings that
+    recurse over a type run only on bounded types (Comparable `variables`,
+    Check `settled`, `bindBounded` `resolved`).
+  - Unify's `inferredTypeLimit` comment now names unify as the binding
+    limit.
+  - GREEN: `rm -rf output && npm run verify` exit 0, 64.7 s wall, 224
+    tests, zero failures/skips, eight regression proofs
+    (.build/p001-task4-fix3-verify.log).
 - Known gap: coverage of a constructor's fields at an applied type (for
   example `match m { Just(n) => n, Nothing => 0 }` over `Maybe(Int)`)
   is E_INTERNAL `Coverage of a type variable` until Task 6.

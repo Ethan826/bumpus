@@ -123,3 +123,38 @@ test('a binding made too deep by its own unification is E_NESTING', () => {
   assert.equal(diagnostic.message,
     `Inferred type nesting exceeds ${limit} levels`);
 });
+
+// Fix round 3: a binding is resolved for the occurs check only after it is
+// bounded. Each link here is L^997, built from 100-, 10- and 1-level calls,
+// so every position binds within the limit, but g1 := D(g2), g2 := D(g3),
+// … chain within one unification. The last position binds h1 to a chain
+// six links (about 6,000 levels) deep, which resolving first overflowed.
+const levels = (count, leaf) => {
+  const steps = [[100, 'l100'], [10, 'l10'], [1, 'l1']];
+  let [remaining, built] = [count, leaf];
+  for (const [size, name] of steps) {
+    for (; remaining >= size; remaining -= size) built = `${name}(${built})`;
+  }
+  return built;
+};
+
+test('six chained links of L^997 are E_NESTING, not a crash', () => {
+  const links = 6;
+  const nested = depth => `${'L('.repeat(depth)}a${')'.repeat(depth)}`;
+  const parameters = count => Array.from({ length: count },
+    (_, index) => `t${index}`).join(', ');
+  const g = Array.from({ length: links + 1 }, (_, index) => `g${index + 1}`);
+  const left = `W(${[...g.slice(0, links), 'h1'].join(', ')})`;
+  const right = `W(${[...g.slice(1).map(binder => levels(997, binder)),
+    'g1'].join(', ')})`;
+  const source = `${list}type T(${parameters(links + 2)}) = Z`
+    + ` | P(${parameters(links + 2)}); type U(${parameters(links + 1)})`
+    + ` = W(${parameters(links + 1)}) | V; fn same(x: a, y: a): Int = 0;`
+    + ` fn l100(x: a): ${nested(100)} = l100(x);`
+    + ` fn l10(x: a): ${nested(10)} = l10(x); fn l1(x: a): L(a) = l1(x);`
+    + ` fn main(): Int = match Z { P(${[...g, 'h1'].join(', ')}) =>`
+    + ` same(${left}, ${right}), Z => 0 };`;
+  const diagnostic = timed(() => checkRejectedAt(source, 'E_NESTING', right));
+  assert.equal(diagnostic.message,
+    `Inferred type nesting exceeds ${limit} levels`);
+});
