@@ -83,29 +83,35 @@ const blamed = (output, names) => {
   return found.length ? found.join(', ') : 'not identified';
 };
 
-const prepare = (dir, entries) => {
-  const names = new Map();
-  for (const entry of entries.filter(entry => !entry.rejection)) {
-    const caseDir = join(dir, entry.ident);
-    mkdirSync(caseDir);
-    writeFileSync(join(caseDir, 'main.go'),
-      asCasePackage(entry.name, entry.ident, entry.transform(entry.go)));
-    names.set(entry.ident, entry.name);
+const rewritten = entry => ({ ...entry, go: entry.transform(entry.go) });
+const rewrite = entry =>
+  ({ ...entry, go: asCasePackage(entry.name, entry.ident, entry.go) });
+
+// Filesystem errors propagate as themselves; only the shape guard's refusal
+// becomes a batch failure.
+const write = (dir, packages) => {
+  for (const entry of packages) {
+    mkdirSync(join(dir, entry.ident));
+    writeFileSync(join(dir, entry.ident, 'main.go'), entry.go);
   }
   writeFileSync(join(dir, 'go.mod'),
     `module ${modulePath}\n\ngo ${goVersion}\n`);
-  writeFileSync(join(dir, 'main.go'), dispatcher([...names.keys()]));
-  return names;
+  writeFileSync(join(dir, 'main.go'),
+    dispatcher(packages.map(entry => entry.ident)));
+  return new Map(packages.map(entry => [entry.ident, entry.name]));
 };
 
 const build = (id, dir, entries) => {
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
-  let names;
-  try { names = prepare(dir, entries); } catch (error) {
+  const transformed = entries.filter(entry => !entry.rejection).map(rewritten);
+  let packages;
+  // asCasePackage is pure text work; its refusal is the only throw here.
+  try { packages = transformed.map(rewrite); } catch (refusal) {
     return { failure: batchFailure(id, 'generated Go was refused',
-      'named below', error.message) };
+      'named below', refusal.message) };
   }
+  const names = write(dir, packages);
   const result = spawnSync('go', ['build', '-o', 'program', '.'], {
     encoding: 'utf8', timeout: buildTimeoutMs, cwd: dir,
     env: { ...process.env, GOCACHE: resolve('.build/go-cache'), GOWORK: 'off' }
@@ -129,20 +135,28 @@ const compiled = entry => {
   }
 };
 
+// Names are strings, as run() looks them up.
 const describe = ([name, spec], index) => ({
-  name, ident: `c${index}`, transform: go => go,
+  name: String(name), ident: `c${index}`, transform: go => go,
   ...(typeof spec === 'string' ? { source: spec } : spec)
 });
 
-// cases: { name: source | { source, transform } }, or an array (names are
-// indexes). transform (Go text → Go text) lets a self-test inject Go the
+// cases: an array of [name, source | { source, transform }] pairs; an array
+// rather than an object, so a computed name collision cannot pass silently. transform (Go text → Go text) lets a self-test inject Go the
 // compiler would not emit. Nothing is compiled or built until the first
 // run/result call, so a file's own timed compiles keep their place.
 export const runGoBatch = (file, cases, label = '') => {
   const id = batchId(file, label);
   assert.ok(!claimed.has(id), `go batch ${id} already claimed in this file`);
+  assert.ok(Array.isArray(cases), `go batch ${id}: cases must be pairs`);
+  const described = cases.map(describe);
+  const seen = new Set();
+  for (const { name } of described) {
+    assert.ok(!seen.has(name),
+      `go batch ${id}: duplicate case name ${JSON.stringify(name)}`);
+    seen.add(name);
+  }
   claimed.add(id);
-  const described = Object.entries(cases).map(describe);
   let entries;
   let outcome;
   const binaryFor = name => {

@@ -33,10 +33,10 @@ test('non-exhaustive matches report the canonical witness', () => {
 
 const optional = `${voidType} type T = A | C(Void);`;
 // The file's one Go execution, through the per-file batch harness (T001).
-const batch = runGoBatch(import.meta.url, {
-  uninhabited: `${optional} fn f(x: T): Int = match x { A => 1 }; `
-    + 'fn main(): Int = f(A);'
-});
+const batch = runGoBatch(import.meta.url, [
+  ['uninhabited', `${optional} fn f(x: T): Int = match x { A => 1 }; `
+    + 'fn main(): Int = f(A);']
+]);
 
 test('uninhabited constructors need no arm', () => {
   assert.equal(batch.run('uninhabited').trim(), '1');

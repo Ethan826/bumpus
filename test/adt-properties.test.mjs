@@ -134,8 +134,8 @@ const nestedCases = drawn(0x487, 12, next => 1 + choose(next, 4), printArms);
 // reject it), some inputs reach a third arm, and some reach the `_` tail.
 const flatCases = drawn(0x6443, 8, next => 2 + choose(next, 3), printFlat);
 // Each case is named by its program text.
-const batch = runGoBatch(import.meta.url, Object.fromEntries(
-  [...nestedCases, ...flatCases].map(({ program }) => [program, program])));
+const batch = runGoBatch(import.meta.url,
+  [...nestedCases, ...flatCases].map(({ program }) => [program, program]));
 const run = program => batch.run(program);
 
 test('12 generated match programs agree with a first-match interpreter', () => {

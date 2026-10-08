@@ -9,14 +9,14 @@ import { runGoBatch } from './go-batch.mjs';
 
 const program = body => `fn main(): Int = ${body};`;
 // Every Go execution in this file, built once (T001).
-const batch = runGoBatch(import.meta.url, {
-  overflow: program('2147483647 + 1'),
-  underflow: program('-2147483648 + -1'),
-  leadingZeros: program('00042'),
-  lazyBranch: 'fn loop(): Int = loop(); fn choose(unused: Int): Int = if false then loop() else 42; fn main(): Int = choose(0);',
-  keywords: 'fn main(): Bool = package(false); fn package(bumpusAdd: Bool): Bool = if bumpusAdd then false else true;',
-  shadowing: 'fn main(): Int = f(42); fn f(f: Int): Int = f;'
-});
+const batch = runGoBatch(import.meta.url, [
+  ['overflow', program('2147483647 + 1')],
+  ['underflow', program('-2147483648 + -1')],
+  ['leadingZeros', program('00042')],
+  ['lazyBranch', 'fn loop(): Int = loop(); fn choose(unused: Int): Int = if false then loop() else 42; fn main(): Int = choose(0);'],
+  ['keywords', 'fn main(): Bool = package(false); fn package(bumpusAdd: Bool): Bool = if bumpusAdd then false else true;'],
+  ['shadowing', 'fn main(): Int = f(42); fn f(f: Int): Int = f;']
+]);
 
 test('example runs through PureScript CLI, Go build, and executable', () => {
   assert.equal(command('node', ['scripts/bumpus.mjs', 'run', 'examples/answer.bumpus']), '42\n');

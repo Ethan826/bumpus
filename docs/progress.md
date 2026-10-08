@@ -600,3 +600,26 @@ Branch t001 (.worktrees/t001) from 62f8192. Brief:
   (unchanged, out of scope), compare 2.1, adt-properties 0.5, adt-match 2.0,
   properties 0.5, compiler 1.6, adt-types 0.4, match-lift 1.2, adt-coverage
   0.5, go-batch 1.4.
+
+T001 review fix round 1 (2026-10-08; review: ready to merge, six cheap items).
+(1) large-source: the 5,000-arm case has its own batch (label `arms`),
+declared inside its test after the timed compile, so that timed compile is
+cold again. (2) The guard self-test gains `package main` followed by
+`package other`, and a second multi-line `func main() {`; the two guard
+clauses that no self-test bound (the `package \w+` count and the `func main`
+count), each replaced by `true`, now fail that test. (3) `runGoBatch` takes
+an array of `[name, spec]` pairs and refuses a duplicate name (compared as
+strings, as `run` looks names up) at declaration; every caller passes pairs.
+New self-test failed first with `Missing expected exception`
+(.build/t001-fix1-dup-red.log). (4) The directory self-test removes its
+neighbour marker in `finally`. (5) docs/engineering.md: batch directories
+persist (`rm -rf .build/go-batches` reclaims them), concurrent test runs in
+one checkout race on them, and the 300 s build timeout does not group-kill
+(noted rather than changed: spawnSync cannot kill a group). (6) Only the
+shape guard's refusal becomes "generated Go was refused"; filesystem errors
+propagate as themselves. Mutants in an isolated copy
+(.build/t001-fix1-mutants.log): all eight (the five earlier, both guard
+clauses, no duplicate check) fail exactly their self-test; healthy 6/6.
+`rm -rf output && npm run verify` exit 0: 162 tests, zero failures/skips,
+eight regression proofs, test phase 19.9 s, 61.8 s wall
+(.build/t001-fix1-verify.log).

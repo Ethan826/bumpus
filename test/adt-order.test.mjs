@@ -27,12 +27,12 @@ const claims = [
 ];
 // Every runGo-style execution in this file, built once (T001); a claim's
 // case is named by its body, which is unique.
-const batch = runGoBatch(import.meta.url, {
-  ...Object.fromEntries(claims.map(([declarations, body]) =>
-    [body, `${declarations} fn main(): Bool = ${body};`])),
-  uninhabited: 'type V = V(V); fn f(a: V, b: V): Bool = a < b; '
-    + 'fn main(): Int = 0;'
-});
+const batch = runGoBatch(import.meta.url, [
+  ...claims.map(([declarations, body]) =>
+    [body, `${declarations} fn main(): Bool = ${body};`]),
+  ['uninhabited', 'type V = V(V); fn f(a: V, b: V): Bool = a < b; '
+    + 'fn main(): Int = 0;']
+]);
 const holds = body => assert.equal(batch.run(body), 'true\n', body);
 
 test('declared values order by constructor, then fields', () => {

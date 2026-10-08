@@ -5,22 +5,22 @@ import { runGoBatch } from './go-batch.mjs';
 
 const list = 'type IntList = Nil | Cons(Int, IntList);';
 // Every Go execution in this file, built once (T001).
-const batch = runGoBatch(import.meta.url, {
-  construction: `${list} fn ignore(xs: IntList): Int = 7; `
-    + 'fn main(): Int = ignore(Cons(1, Cons(2, Nil)));',
-  mutual: 'fn size(t: Tree): Int = 5; '
+const batch = runGoBatch(import.meta.url, [
+  ['construction', `${list} fn ignore(xs: IntList): Int = 7; `
+    + 'fn main(): Int = ignore(Cons(1, Cons(2, Nil)));'],
+  ['mutual', 'fn size(t: Tree): Int = 5; '
     + 'fn main(): Int = size(Node(1, More(Node(2, Empty), Empty))); '
     + 'type Tree = Node(Int, Forest); '
-    + 'type Forest = Empty | More(Tree, Forest);',
-  adtIf: `${list} fn wrap(flag: Bool): IntList = `
+    + 'type Forest = Empty | More(Tree, Forest);'],
+  ['adtIf', `${list} fn wrap(flag: Bool): IntList = `
     + 'if flag then Cons(1, Nil) else Nil; '
     + 'fn head(xs: IntList): Int = match xs { Nil => 0, Cons(x, _) => x }; '
     + 'fn main(): Int = head(wrap(true)) + head(wrap(false)) '
-    + '+ head(if false then Nil else Cons(7, Nil));',
-  shadowing: 'type T = Nil; fn f(Nil: Int): Int = Nil; '
-    + 'fn main(): Int = f(9);',
-  adtMain: `${list} fn main(): IntList = Nil;`
-});
+    + '+ head(if false then Nil else Cons(7, Nil));'],
+  ['shadowing', 'type T = Nil; fn f(Nil: Int): Int = Nil; '
+    + 'fn main(): Int = f(9);'],
+  ['adtMain', `${list} fn main(): IntList = Nil;`]
+]);
 
 test('construction builds and runs', () => {
   assert.equal(batch.run('construction').trim(), '7');

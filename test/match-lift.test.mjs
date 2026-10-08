@@ -23,7 +23,8 @@ const scrutineeFirst = `${list} fn main(): Int = `
   + 'match match 1 { 1 => Cons(2, Nil), _ => Nil } '
   + '{ Cons(h, _) => match h { 2 => 5, _ => 6 }, Nil => 0 };';
 // Every runGo-style execution in this file, built once (T001).
-const batch = runGoBatch(import.meta.url, { preOrder, scrutineeFirst });
+const batch = runGoBatch(import.meta.url,
+  [['preOrder', preOrder], ['scrutineeFirst', scrutineeFirst]]);
 
 test('lifted matches are named in pre-order with captures first', () => {
   const source = preOrder;

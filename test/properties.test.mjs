@@ -53,8 +53,8 @@ const executed = (() => {
   const next = generator(0x7c95);
   return Array.from({ length: 12 }, () => tree(next, 3));
 })();
-const batch = runGoBatch(import.meta.url,
-  executed.map(expected => `fn main(): Int = ${print(expected)};`));
+const batch = runGoBatch(import.meta.url, executed.map((expected, index) =>
+  [String(index), `fn main(): Int = ${print(expected)};`]));
 
 test('12 generated programs agree with an independent BigInt interpreter after Go execution', () => {
   executed.forEach((expected, index) => {

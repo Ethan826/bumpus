@@ -23,10 +23,10 @@ const contexts = {
 };
 // Every runGo-style execution in this file, built once (T001); a row's case
 // is named by its body.
-const batch = runGoBatch(import.meta.url, {
-  ...Object.fromEntries(rows.map(([body]) => [body, bool(body)])),
-  ...contexts
-});
+const batch = runGoBatch(import.meta.url, [
+  ...rows.map(([body]) => [body, bool(body)]),
+  ...Object.entries(contexts)
+]);
 
 test('primitive comparisons run', () => {
   for (const [body, expected] of rows) {

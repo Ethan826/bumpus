@@ -50,7 +50,7 @@ const sources = {
   trailingComma: `${list} fn main(): Int = `
     + 'match Cons(4, Nil) { Nil => 0, Cons(h, _) => h, };'
 };
-const batch = runGoBatch(import.meta.url, sources);
+const batch = runGoBatch(import.meta.url, Object.entries(sources));
 const run = source => batch.run(Object.keys(sources)
   .find(name => sources[name] === source)).trim();
 

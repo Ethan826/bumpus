@@ -58,7 +58,7 @@ adding a bypass allowlist.
   brute-force coverage oracle with brute-forced inhabitedness over generated
   type systems (test/coverage.test.mjs), and fake-host command tests
   (test/program.test.mjs);
-- `npm run verify` runs every test/*.test.mjs file (23 files, 161 tests, no
+- `npm run verify` runs every test/*.test.mjs file (23 files, 162 tests, no
   skips; the list is read from the directory, never hand-kept) and then
   scripts/regression.mjs, a table of isolated-copy mutations, each of which
   must pass on the healthy build and fail on its mutant: `branch`
@@ -75,8 +75,9 @@ adding a bypass allowlist.
   capture program); the A003 order and print tests also use an independent value
   oracle (test/value-oracle.mjs);
 - Go execution in tests is batched per test file (T001, test/go-batch.mjs):
-  `runGoBatch(import.meta.url, cases, label?)` takes named Bumpus sources
-  and, on the first `run(name)`, compiles them all, writes a synthetic module
+  `runGoBatch(import.meta.url, cases, label?)` takes an array of
+  `[name, source]` pairs (an array, so a computed name collision is refused
+  at declaration rather than collapsing silently) and, on the first `run(name)`, compiles them all, writes a synthetic module
   under `.build/go-batches/<id>/` (its own go.mod with module path
   `bumpusbatch` and the pinned toolchain's language version, one package
   `c<N>` per case, a dispatcher `main` importing them), builds once with
@@ -94,7 +95,14 @@ adding a bypass allowlist.
   case(s) when Go's output identifies their package. `run` keeps runGo's
   contract (stdout, exit status 0 asserted); `result` returns the raw
   process outcome. Panics keep their message and exit status; stack traces
-  differ (package path `bumpusbatch/c<N>`, `Main`). Self-tests:
+  differ (package path `bumpusbatch/c<N>`, `Main`). Batch directories
+  (binaries included) persist after a run and are replaced only by that
+  batch's next run; `rm -rf .build/go-batches` reclaims them. Because the
+  directories are fixed per test file, two concurrent test runs in one
+  checkout race on them (and on the build); run one at a time per checkout.
+  The `go build` timeout (300 s) kills only the go command, not its compile
+  children (spawnSync cannot kill a process group); depth.test.mjs's timed
+  builds group-kill because their timeout is an assertion. Self-tests:
   test/go-batch.test.mjs. Not batched: depth.test.mjs timing builds,
   scripts/regression.mjs probes, and `goTest`; `runGo` remains as the
   self-tests' standalone reference;

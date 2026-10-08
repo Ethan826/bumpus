@@ -32,16 +32,15 @@ const drawn = seeds.map(seed => {
 
 // Every first-generation execution in this file, built once (T001). The
 // reprints depend on these outputs, so they form a second batch.
-const batch = runGoBatch(import.meta.url, {
-  nested: `${list} fn main(): L = ${nested};`,
-  nullary: 'type N = N; fn main(): N = N;',
-  fields: 'type P = P(Bool, Int); fn main(): P = P(false, -1);',
-  int: 'fn main(): Int = 42;',
-  bool: 'fn main(): Bool = 1 < 2;',
-  doubling,
-  ...Object.fromEntries(drawn.map(({ seed, original }) =>
-    [`seed ${seed}`, original]))
-});
+const batch = runGoBatch(import.meta.url, [
+  ['nested', `${list} fn main(): L = ${nested};`],
+  ['nullary', 'type N = N; fn main(): N = N;'],
+  ['fields', 'type P = P(Bool, Int); fn main(): P = P(false, -1);'],
+  ['int', 'fn main(): Int = 42;'],
+  ['bool', 'fn main(): Bool = 1 < 2;'],
+  ['doubling', doubling],
+  ...drawn.map(({ seed, original }) => [`seed ${seed}`, original])
+]);
 
 test('main prints a declared value as an expression', () => {
   assert.equal(batch.run('nested'), `${nested}\n`);
@@ -105,8 +104,8 @@ test('printed values recompile to the same value', () => {
     outputs.push(output);
     printed.push(text);
   }
-  const reprints = runGoBatch(import.meta.url, Object.fromEntries(drawn.map(
-    ({ seed, main }, index) => [`seed ${seed}`, main(printed[index])])),
+  const reprints = runGoBatch(import.meta.url, drawn.map(
+    ({ seed, main }, index) => [`seed ${seed}`, main(printed[index])]),
   'reprint');
   drawn.forEach(({ seed }, index) => {
     assert.equal(reprints.run(`seed ${seed}`), outputs[index],

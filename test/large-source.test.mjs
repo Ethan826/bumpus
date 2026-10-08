@@ -42,9 +42,10 @@ const armCount = 5000;
 const armSource = `fn main(): Int = match 7 { ${Array.from(
   { length: armCount - 1 }, (_, index) => `${index} => ${index}`
 ).join(', ')}, _ => 0 };`;
-// Both executions build as one Go batch (T001); the timed compiles below
-// measure checked() alone, as before.
-const batch = runGoBatch(import.meta.url, { declarations, arms: armSource });
+// Each execution has its own Go batch (T001), built lazily inside its test
+// after the timed compile, so each timed checked() is that source's first
+// (cold) compile, as before.
+const batch = runGoBatch(import.meta.url, [['declarations', declarations]]);
 
 test('twenty thousand declarations compile and run', () => {
   const source = declarations;
@@ -129,7 +130,8 @@ test('a five-thousand-arm integer match compiles', () => {
   const source = armSource;
   const seconds = secondsFor(() => checked(source));
   assert.ok(seconds < compileSecondsLimit, `compiling took ${seconds}s`);
-  assert.equal(batch.run('arms'), '7\n');
+  const arms = runGoBatch(import.meta.url, [['arms', source]], 'arms');
+  assert.equal(arms.run('arms'), '7\n');
 });
 
 test('a five-thousand-arm match reports its redundant arm', () => {

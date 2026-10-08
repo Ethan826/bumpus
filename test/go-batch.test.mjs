@@ -26,7 +26,8 @@ const thrown = action => {
 
 test('a rejected case fails alone, with the runGo message', () => {
   const bad = 'fn main(): Int = true;';
-  const batch = runGoBatch(import.meta.url, { good: answer, bad }, 'reject');
+  const batch = runGoBatch(import.meta.url,
+    [['good', answer], ['bad', bad]], 'reject');
   assert.equal(batch.run('good'), '42\n');
   const expected = thrown(() => runGo(bad));
   const actual = thrown(() => batch.run('bad'));
@@ -39,7 +40,7 @@ test('ill-formed generated Go fails the batch, naming its case', () => {
     source: answer, transform: go => `${go}\nfunc broken() { undefinedName }\n`
   };
   const batch = runGoBatch(import.meta.url,
-    { healthy: answer, broken }, 'ill-formed');
+    [['healthy', answer], ['broken', broken]], 'ill-formed');
   for (const name of ['healthy', 'broken']) {
     const error = thrown(() => batch.run(name));
     assert.match(error.message, /failed to compile/, name);
@@ -49,9 +50,9 @@ test('ill-formed generated Go fails the batch, naming its case', () => {
 });
 
 test('a panicking case matches its standalone program', () => {
-  const batch = runGoBatch(import.meta.url, {
-    sibling: answer, panics: { source: nullary, transform: malformed }
-  }, 'panic');
+  const batch = runGoBatch(import.meta.url, [
+    ['sibling', answer], ['panics', { source: nullary, transform: malformed }]
+  ], 'panic');
   assert.equal(batch.run('sibling'), '42\n');
   const work = mkdtempSync(join(tmpdir(), 'bumpus-batch-test-'));
   try {
@@ -78,18 +79,21 @@ test('the rewrite guard rejects unexpected shapes, naming the case', () => {
     'two package clauses':
       go.replace('package main', 'package main\npackage main'),
     'another package': go.replace('package main', 'package other'),
+    'a second, other package':
+      go.replace('package main', 'package main\npackage other'),
     'two mains': `${go}\nfunc main() { fmt.Println(1) }\n`,
     'multiline main': go.replace(/^func main\(\) \{ /m, 'func main() {\n'),
+    'a second, multiline main': `${go}\nfunc main() {\nfmt.Println(1)\n}\n`,
     'existing Main': `${go}\nfunc Main() {}\n`
   };
   for (const [name, shape] of Object.entries(shapes)) {
     assert.throws(() => asCasePackage(name, 'c0', shape),
       new RegExp(`case "${name}" has an unexpected shape`), name);
   }
-  const batch = runGoBatch(import.meta.url, { healthy: answer, odd: {
+  const batch = runGoBatch(import.meta.url, [['healthy', answer], ['odd', {
     source: answer,
     transform: shape => shape.replace('package main', 'package x')
-  } }, 'guard');
+  }]], 'guard');
   for (const name of ['healthy', 'odd']) {
     assert.match(thrown(() => batch.run(name)).message,
       /case "odd" has an unexpected shape/, name);
@@ -102,14 +106,29 @@ test('a batch clears only its own deterministic directory', () => {
   const root = resolve('.build/go-batches');
   const neighbour = join(root, batchId(import.meta.url, 'neighbour'));
   mkdirSync(neighbour, { recursive: true });
-  writeFileSync(join(neighbour, 'marker'), '');
-  mkdirSync(join(root, id), { recursive: true });
-  writeFileSync(join(root, id, 'stale'), '');
-  const batch = runGoBatch(import.meta.url, { answer }, 'own dir');
-  assert.equal(batch.run('answer'), '42\n');
-  assert.ok(existsSync(join(root, id, 'go.mod')), 'synthetic go.mod');
-  assert.ok(!existsSync(join(root, id, 'stale')), 'own directory cleared');
-  assert.ok(existsSync(join(neighbour, 'marker')), 'neighbour untouched');
-  assert.throws(() => runGoBatch(import.meta.url, { answer }, 'own dir'),
+  try {
+    writeFileSync(join(neighbour, 'marker'), '');
+    mkdirSync(join(root, id), { recursive: true });
+    writeFileSync(join(root, id, 'stale'), '');
+    const batch = runGoBatch(import.meta.url, [['answer', answer]], 'own dir');
+    assert.equal(batch.run('answer'), '42\n');
+    assert.ok(existsSync(join(root, id, 'go.mod')), 'synthetic go.mod');
+    assert.ok(!existsSync(join(root, id, 'stale')), 'own directory cleared');
+    assert.ok(existsSync(join(neighbour, 'marker')), 'neighbour untouched');
+  } finally { rmSync(neighbour, { recursive: true, force: true }); }
+  assert.throws(() => runGoBatch(import.meta.url, [['answer', answer]],
+    'own dir'),
     /already claimed/);
+});
+
+test('duplicate case names are refused when the batch is declared', () => {
+  const unique = (count, name) =>
+    [['other', answer], ...Array.from({ length: count }, () => [name, answer])];
+  assert.throws(() => runGoBatch(import.meta.url, unique(2, 'same'), 'dup'),
+    /duplicate case name "same"/);
+  // Names are compared as run() looks them up, so 1 and '1' collide.
+  assert.throws(() => runGoBatch(import.meta.url,
+    [[1, answer], ['1', answer]], 'dup numeric'), /duplicate case name "1"/);
+  assert.equal(runGoBatch(import.meta.url, unique(1, 'same'), 'no dup')
+    .run('same'), '42\n');
 });
