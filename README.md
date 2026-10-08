@@ -70,6 +70,8 @@ PureScript modules, not yet a native Go compiler executable.
 
 ## Where to continue
 
+- [Language direction, effects and future targets](docs/plans/2026-10-08-language-direction.md)
+
 - [Implementation plan](docs/plans/bootstrap.md)
 - [Progress](docs/progress.md)
 - [Language specification](docs/language.md)

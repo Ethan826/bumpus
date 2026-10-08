@@ -1,5 +1,10 @@
 # Provenance and licensing audit
 
+2026-10-08 language direction: user preferences and conceptual discussion of
+PureScript, Rust MIR and ZIO are recorded with primary-source links in
+docs/plans/2026-10-08-language-direction.md. No external implementation or
+reference code copied; no platform backend or effect design implemented.
+
 Inspected 2026-10-07. ~/Desktop/mileahead was absent; the current MileAhead
 reference was ~/Desktop/trailmapper. Syllogic was ~/Desktop/lsatchapelhill.
 The destination workspace was empty. Reference projects were read-only;

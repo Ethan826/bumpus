@@ -65,6 +65,11 @@ Do not redo completed compiler implementation; retain local durable evidence.
 
 ## Next step
 
+Long-term direction recorded 2026-10-08:
+[language, effects and target planning](2026-10-08-language-direction.md).
+P001's approved plan remains the active delivery; this direction does not
+add implementation tasks to it. New milestone designs are separate.
+
 User approved a local baseline (9624bec), isolated audit worktree and inline
 execution with one final fresh reviewer. Audit work was completed in the isolated audit/bootstrap-docs worktree.
 User-authorized local merge into main and merged verification are complete;
