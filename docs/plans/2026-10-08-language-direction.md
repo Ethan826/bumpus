@@ -3,7 +3,7 @@
 Recorded 2026-10-08 at the user's request to commit the current discussion.
 Status: durable direction and hypotheses, not an implementation spec.
 Each subsystem needs its own reviewed design and implementation plan.
-P001 remains the active approved delivery; this adds no work to its scope.
+P001 is complete; this adds no work to its scope or FN001's approved delivery.
 
 ## Intended language and audience
 
@@ -350,14 +350,21 @@ by an additional emitter alone.
 
 ## Planning sequence and evidence
 
-Continue P001 as approved. Do not expand its implementation with effects,
-rows, function values, a VM, or another backend. Design each subsystem,
+LA001 adds a structured cross-language/library/runtime audit:
+[audit plan](2026-10-08-language-audit-plan.md). It covers the user's twelve
+references with a primary-source/section ledger, comparative briefs,
+feature and interaction matrix, concrete scenarios, independent review and
+adopt/adapt/defer/reject decisions. Feed its relevant findings into upcoming
+designs; no audit or feature adoption is claimed by writing this plan.
+
+Keep FN001's approved delivery fixed. Do not expand it with effects,
+rows, a VM, or another backend. Design each subsystem,
 with C001/R001 considered together to avoid overlapping mechanisms,
 with exact interfaces, negative cases, properties, meaningful regression
 mutants, and the existing verification discipline. Updated planning order:
 FN001 follows P001 and precedes C001, R001 and FX001. Their joint-design and
 other prerequisite dependencies must be resolved before implementation;
-the current P001 delivery and its execution method are unchanged.
+existing approved implementation plans and execution methods are unchanged.
 
 Recommended planning probes: the overlapping-service scenario above, then
 a small full-stack example exercising rows, effects, shared pure logic and

@@ -1530,3 +1530,21 @@ Verification: `npm run verify` exited 0 with 318 tests, no failures or
 skips, and twelve regression proofs; evidence:
 `.build/std001-generic-rigor-verify.log`. Generic APIs and laws above are
 future acceptance requirements, not implemented or proven by this run.
+
+## Cross-language audit planned (2026-10-08)
+
+The user asked for a structured audit of leading language specifications
+and library/runtime designs. Existing STD001 only audited helper coverage;
+there was no broader systematic plan. Added LA001 covering all twelve
+named references, a versioned primary-source/section ledger, comparative
+briefs, decision and interaction matrices, practical application scenarios,
+independent review and durable scope decisions. Primary landing pages were
+checked to assemble the roster; detailed reading/audit is not complete.
+Relevant findings feed upcoming designs without expanding FN001 or revoking
+existing advanced-feature deferrals. BACKLOG and handoff track the plan.
+Verification: `npm run verify` exited 1 with 316 of 318 tests passing,
+no skips, and two large-source timing failures (6.572 s and 5.633 s against
+5 s bounds). Regression proofs were not reached. Evidence is
+`.build/la001-plan-verify.log`; BACKLOG T004 records the cases, unconfirmed
+cause and diagnostic next action. No checks or assertions were changed,
+and no rerun concealed the failures. The audit itself remains planned.

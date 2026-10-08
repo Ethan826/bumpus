@@ -62,6 +62,13 @@ fixed-error Result share Functor/Applicative/Monad APIs. Read STD001's
 generic-rigor section for constructor kinds, instance/evidence design,
 user-defined-instance acceptance and law/coherence properties.
 
+LA001 now plans the broader cross-language audit, beyond STD001's helper
+coverage. Read docs/plans/2026-10-08-language-audit-plan.md: twelve required
+references, source/version/section ledger, comparative briefs, feature and
+interaction matrix, practical scenarios and independent review. Feed it
+into upcoming type/row/effect designs without interrupting FN001; existing
+advanced-feature deferrals remain. Source entry points checked, audit not run.
+
 Open items: E002 remainder, E006-E011 (P001 follow-ups: stack margin,
 exponential type size, Expand keys, lowercase-type hint, mismatch `_`,
 near-limit elision), F001-F003, F005-F007, E001, E003, E004, O001, H001,
