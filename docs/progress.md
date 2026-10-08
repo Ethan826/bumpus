@@ -1511,8 +1511,11 @@ Branch fn001. Behavior-preserving: no syntax produces an arrow yet.
   are hand-written: arrow spines are walked in step by a loop, applications
   compare inline (the first version, through helpers, overflowed
   test/poly-depth `an inferred type exactly 1000 deep checks` in verify;
-  fixed: at 1,000 levels `compare` leaves the derived instance's stack
-  headroom, `==` about 8,700 of its 10,000 frames, far above `compare`'s).
+  fixed. Headroom figures are approximate (JIT variance): my probe gave
+  `compare` the derived instance's spare frames at 1,000 levels and `==`
+  about 8,700; the review measured `compare` at 8,592 spare frames in
+  most runs but 6,249 in 2 of 10, and the pipeline's minimum stack for
+  the poly-depth 1,000-deep case at about 559 KB both before and after).
   Bind (substitution) and `ground` walk spines by a loop. Unify: arrow
   against arrow unifies parameters at level + 1 and results at the same
   level in a `tailRec` loop entered only when both heads are arrows (list
@@ -1551,3 +1554,10 @@ Branch fn001. Behavior-preserving: no syntax produces an arrow yet.
 - GREEN: `rm -rf output && npm run verify` exit 0, 330 tests (318 + 12),
   zero failures/skips, twelve regression proofs; bootstrap snapshots
   unchanged.
+- Review fixes (commit after c4e9ed1): test/functional.test.mjs (3 tests:
+  the fixed point through fields, mutual and through applied arguments;
+  `containsFunction`; a 50,000-type chain under 5 s), seen failing on an
+  isolated no-fixed-point mutant (seeds only: 2 of 3 fail); `spineThrough`
+  can no longer file a result as a parameter (its unreachable arm adds
+  none); a redundant Inhabited arm removed; a unify-arrow test renamed;
+  headroom figures above reworded as approximate.

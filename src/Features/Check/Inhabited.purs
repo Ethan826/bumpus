@@ -95,7 +95,6 @@ dataFields ctor = Array.mapMaybe dataIndex ctor.fields
   where
   dataIndex = case _ of
     TData (TypeId index) _ → Just index
-    TFun _ _ → Nothing
     _ → Nothing
 
 start ∷ Graph → Round

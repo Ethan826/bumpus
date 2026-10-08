@@ -103,9 +103,14 @@ spine = spineThrough identity
 
 -- The spine with `look` applied before each step, so a checker can follow
 -- a result that is a bound meta into the arrow it stands for. Two loops:
--- one counts the parameters, one takes them; neither recurses.
+-- one counts the parameters, one takes them; neither recurses. The second
+-- takes exactly as many steps as the first counted arrows, through the
+-- same `look`, so its no-arrow arm never runs; were it to, it would keep
+-- the type as the result and add no parameter, never file a result as a
+-- parameter.
 spineThrough ∷ ∀ v. (Ty v → Ty v) → Ty v → Spine v
-spineThrough look ty = { parameters: taken.value, result: taken.accum }
+spineThrough look ty =
+  { parameters: Array.catMaybes taken.value, result: taken.accum }
   where
   count = tailRec counted (Tuple 0 ty)
   counted (Tuple found rest) = case look rest of
@@ -113,8 +118,8 @@ spineThrough look ty = { parameters: taken.value, result: taken.accum }
     _ → Done found
   taken = mapAccumL take ty (Array.replicate count unit)
   take rest _ = case look rest of
-    TFun parameter more → { accum: more, value: parameter }
-    settled → { accum: settled, value: settled }
+    TFun parameter more → { accum: more, value: Just parameter }
+    settled → { accum: settled, value: Nothing }
 
 -- `arrows [a, b] r` is `a -> b -> r`; Array.foldr is a loop.
 arrows ∷ ∀ v. Array (Ty v) → Ty v → Ty v

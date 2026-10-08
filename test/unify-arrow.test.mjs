@@ -92,7 +92,7 @@ test('parameter nesting counts toward the inferred type limit; spines do not', (
   assert.equal(kind(beyond2.value0), 'TooDeep');
 });
 
-test('a meta bound through a long spine is bounded by parameter nesting', () => {
+test('a meta bound to deep parameter nesting counts at its own position', () => {
   // Compared by Ty's own Eq: assert.deepEqual recurses too deeply here.
   const deeper = substOf(new Map([[0, parameterNest(limit)]]));
   const same = unifier.unify(deeper)(toTy(meta(0)))(toTy(parameterNest(limit)));
