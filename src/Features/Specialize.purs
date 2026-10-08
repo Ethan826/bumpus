@@ -1,119 +1,121 @@
-module Features.Specialize (specialize) where
+module Features.Specialize
+  ( Key
+  , specialize
+  , specializeWith
+  , specializationKeys
+  ) where
 
 import Prelude
+import Control.Monad.Rec.Class (Step(..), tailRecM)
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Foldable (foldl)
+import Data.Map (Map)
+import Data.Map as Map
 import Data.Maybe (maybe')
 import Data.Traversable (traverse)
+import Data.Tuple (Tuple, snd)
 import Domain.Checked.Internal as Checked
 import Domain.IR.Internal as IR
 import Domain.Problem (Problem(..))
-import Domain.Resolved (CtorInfo, TypeInfo)
-import Domain.Syntax (Diagnostic, Span, problemAt)
-import Domain.Type (Ty(..), ground)
+import Domain.Resolved (FunctionId(..))
+import Domain.Syntax (Diagnostic, Span, origin, problemAt)
+import Domain.Type (Ty(..), TypeId(..))
+import Features.Specialize.Body (fillFunction)
+import Features.Specialize.Copy (run)
+import Features.Specialize.Keys (Env, State, Work)
+import Features.Specialize.Lower (fillType)
+import Features.Specialize.Seeds (environment, seeded)
 
--- Lowers the checked IR to the monomorphic IR Go generation reads. Until
--- P001 adds type variables every checked program is monomorphic, so this
--- copies it unchanged: a variable or a type argument cannot occur, and one
--- that does is a compiler bug, E_INTERNAL at the place that holds it.
+-- A key as tests see it: the checked declaration's id and its ground type
+-- arguments (empty for a monomorphic declaration).
+type Key =
+  { declaration ∷ Int, function ∷ Boolean, arguments ∷ Array (Ty Void) }
+
+-- Whole-program specialization (design §6): one copy of each function and
+-- type per key reachable from the monomorphic seeds; holes become Int.
 specialize ∷ Checked.Program → Either Diagnostic IR.Program
-specialize (Checked.Program program) = do
-  ctors ← traverse ctorInfo program.ctors
-  functions ← traverse function program.functions
+specialize = specializeWith TInt
+
+-- `representative` replaces every hole. Programs print the same for any
+-- representative (§6); tests pass another one to check it.
+specializeWith ∷ Ty Void → Checked.Program → Either Diagnostic IR.Program
+specializeWith representative checked = do
+  finished ← specialized representative checked
   pure
     ( IR.Program
-        { types: map typeInfo program.types
-        , ctors
-        , functions
-        , entry: program.entry
+        { types: values finished.state.types
+        , ctors: values finished.state.ctors
+        , functions: values finished.state.functions
+        , entry: finished.entry
         }
     )
 
--- Parameters and field syntax are resolution data Go generation never reads.
-typeInfo ∷ TypeInfo → IR.TypeInfo
-typeInfo info = { name: info.name, ctors: info.ctors, span: info.span }
-
-ctorInfo ∷ CtorInfo → Either Diagnostic IR.CtorInfo
-ctorInfo ctor = withFields <$> traverse (monomorphic ctor.span) ctor.fields
+-- Every key, types then functions, each in output-id order. A key's
+-- arguments name only earlier output types, so one pass rebuilds them.
+specializationKeys ∷ Checked.Program → Either Diagnostic (Array Key)
+specializationKeys checked = do
+  finished ← specialized TInt checked
+  let made = values finished.state.work
+  let types = Array.filter isType made
+  grounds ← foldl groundOf (Right Map.empty) types
+  traverse (key grounds) (types <> Array.filter isFunction made)
   where
-  withFields fields =
-    { name: ctor.name, owner: ctor.owner, fields, span: ctor.span }
+  isType work = not work.function
+  isFunction work = work.function
 
-function ∷ Checked.FunctionDecl → Either Diagnostic IR.FunctionDecl
-function declaration = do
-  parameters ← traverse (monomorphic span) declaration.parameters
-  result ← monomorphic span declaration.result
-  body ← expression declaration.body
+type Finished = { state ∷ State, entry ∷ FunctionId }
+
+specialized ∷ Ty Void → Checked.Program → Either Diagnostic Finished
+specialized representative checked@(Checked.Program program) = do
+  entry ← maybe' missingEntry Right
+    (join (Array.index env.monoFunctions (functionIndex program.entry)))
+  state ← tailRecM (next env) { index: 0, state: seeded env }
+  pure { state, entry: FunctionId entry }
+  where
+  env = environment representative checked
+  missingEntry _ = Left
+    (problemAt (Internal "Invalid entry") { start: origin, end: origin })
+
+-- The worklist (design §6): work items are filled in creation order, so
+-- the loop is first-in first-out; filling one may create later items.
+type Cursor = { index ∷ Int, state ∷ State }
+
+next ∷ Env → Cursor → Either Diagnostic (Step Cursor State)
+next env cursor = maybe' finished filled
+  (Map.lookup cursor.index cursor.state.work)
+  where
+  finished _ = Right (Done cursor.state)
+  filled work = map advanced (run (fillOf work env work) cursor.state)
+  advanced copied = Loop { index: cursor.index + 1, state: copied.state }
+  fillOf work = if work.function then fillFunction else fillType
+
+values ∷ ∀ v. Map Int v → Array v
+values table = map snd (Map.toUnfoldable table ∷ Array (Tuple Int v))
+
+functionIndex ∷ FunctionId → Int
+functionIndex (FunctionId index) = index
+
+type Grounds = Map Int (Ty Void)
+
+groundOf ∷ Either Diagnostic Grounds → Work → Either Diagnostic Grounds
+groundOf found work = do
+  grounds ← found
+  arguments ← traverse (groundType grounds work.span) work.arguments
   pure
-    { id: declaration.id
-    , name: declaration.name
-    , parameters
-    , result
-    , body
-    , span
-    }
+    (Map.insert work.output (TData (TypeId work.declaration) arguments) grounds)
+
+key ∷ Grounds → Work → Either Diagnostic Key
+key grounds work = made <$> traverse (groundType grounds work.span)
+  work.arguments
   where
-  span = declaration.span
+  made arguments =
+    { declaration: work.declaration, function: work.function, arguments }
 
-expression ∷ Checked.Expr → Either Diagnostic IR.Expr
-expression (Checked.Expr checked) = do
-  ty ← monomorphic checked.span checked.ty
-  node ← lowerNode checked.span checked.node
-  pure (IR.Expr { ty, span: checked.span, node })
-
-lowerNode ∷ Span → Checked.Node → Either Diagnostic IR.Node
-lowerNode span = case _ of
-  Checked.Integer value → pure (IR.Integer value)
-  Checked.Boolean value → pure (IR.Boolean value)
-  Checked.Local id → pure (IR.Local id)
-  Checked.Call id types arguments → IR.Call id <$> applied types arguments
-  Checked.Construct id types arguments → IR.Construct id <$> applied types
-    arguments
-  Checked.Add left right → IR.Add <$> expression left <*> expression right
-  Checked.Compare operator left right → IR.Compare operator
-    <$> expression left
-    <*> expression right
-  Checked.If condition yes no → IR.If <$> expression condition
-    <*> expression yes
-    <*> expression no
-  Checked.Match scrutinee arms → IR.Match <$> expression scrutinee
-    <*> traverse arm arms
+groundType ∷ Grounds → Span → IR.Ty → Either Diagnostic (Ty Void)
+groundType grounds span = case _ of
+  IR.TInt → Right TInt
+  IR.TBool → Right TBool
+  IR.TData (TypeId output) → maybe' missing Right (Map.lookup output grounds)
   where
-  applied types arguments =
-    if Array.null types then traverse expression arguments
-    else Left (unspecialized span)
-
-arm ∷ Checked.Arm → Either Diagnostic IR.Arm
-arm checked = do
-  pattern ← lowerPattern checked.pattern
-  body ← expression checked.body
-  pure { pattern, body, span: checked.span }
-
-lowerPattern ∷ Checked.Pattern → Either Diagnostic IR.Pattern
-lowerPattern (Checked.Pattern checked) = do
-  ty ← monomorphic checked.span checked.ty
-  shape ← lowerShape checked.shape
-  pure (IR.Pattern { ty, span: checked.span, shape })
-
-lowerShape ∷ Checked.Shape → Either Diagnostic IR.Shape
-lowerShape = case _ of
-  Checked.Wildcard → pure IR.Wildcard
-  Checked.Bind id → pure (IR.Bind id)
-  Checked.IntLit value → pure (IR.IntLit value)
-  Checked.BoolLit value → pure (IR.BoolLit value)
-  Checked.Ctor id fields → IR.Ctor id <$> traverse lowerPattern fields
-
--- A ground type with no type argument; every other type is unspecialized.
-monomorphic ∷ ∀ v. Span → Ty v → Either Diagnostic IR.Ty
-monomorphic span ty = maybe' missing lowered (ground ty)
-  where
-  missing _ = Left (unspecialized span)
-  lowered = case _ of
-    TInt → Right IR.TInt
-    TBool → Right IR.TBool
-    TData id [] → Right (IR.TData id)
-    TData _ _ → Left (unspecialized span)
-    TVar variable → absurd variable
-
-unspecialized ∷ Span → Diagnostic
-unspecialized = problemAt (Internal "unspecialized type")
+  missing _ = Left (problemAt (Internal "Invalid type id") span)

@@ -10,6 +10,8 @@ import Domain.Resolved (CtorId, FunctionId, LocalId, TypeId)
 data Ty = TInt | TBool | TData TypeId
 
 derive instance eqTy ∷ Eq Ty
+-- Specialization keys order argument vectors (Features.Specialize.Keys).
+derive instance ordTy ∷ Ord Ty
 
 type TypeInfo = { name ∷ String, ctors ∷ Array CtorId, span ∷ Span }
 

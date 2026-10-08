@@ -1105,3 +1105,76 @@ gap is gone. Status: done.
 - Phase reached: these tests reach Check only (`checkedPoly`,
   `checkRejectedAt`, `check`). The CLI still rejects polymorphic programs
   until Task 7.
+
+### Task 7: specialization (2026-10-08)
+
+Language change: polymorphic programs now compile and run end to end
+through the CLI (`npm run bumpus -- run examples/lists.bumpus` prints
+`Pair(Cons(Pair(3, true), Cons(Pair(2, false), Nil)), Just(6))`).
+Status: done.
+
+- Features.Specialize replaces the Task 1 seam: `specialize = specializeWith
+  TInt`; `specializeWith ∷ Ty Void → …` (hole representative, for tests);
+  `specializationKeys` returns `{ declaration, function, arguments }`, types
+  then functions, each in output-id order. Design §6 worklist: seeds are
+  every monomorphic type (its fields may reference applications) then every
+  monomorphic function, in id order; a single first-in first-out list of
+  work items, filled by a `tailRecM` loop; each body is copied in pre-order
+  (signature, then an expression's type, a call's instantiation, its
+  callee, its arguments; a pattern's type before its fields), and a key is
+  created on first reference. Monomorphic declarations keep their order and
+  take the first output ids, so monomorphic programs come out unchanged.
+  A polymorphic declaration never reached is not emitted.
+- R15: keys are hash-consed. Each ground application is numbered once as an
+  output type (`Map (Tuple Int (Array IR.Ty)) Int`; IR.Ty gains `Ord`), so
+  a key compares in time linear in its arity; `specializationKeys`
+  rebuilds `Ty Void` arguments from those numbers.
+- Limit: `specializationLimit = 10000` counts only keys of polymorphic
+  declarations (function instantiations and parameterized type
+  applications); the reference that would create key 10,001 is
+  E_SPECIALIZATION `More than 10000 specializations` (Problem
+  `SpecializationLimit Int`). A key found in a constructor field is
+  reported at its own nested reference (field syntax walked alongside, as
+  Check.Nested does).
+- Modules: Specialize (API, loop), Specialize.Seeds, .Keys, .Lower, .Body
+  and .Copy (a state-and-failure applicative whose Apply does not use Bind,
+  so Array's balanced `traverse` keeps wide bodies in shallow stack). Copy
+  is a sixth module beyond the plan's Keys and Body. Format.Go needed no
+  change: specialized constructors carry source names, so values print and
+  re-read (`Cons(Pair(1, true), Nil)`).
+- Tests: test/poly-run.test.mjs, 27 tests, one Go batch of 23 programs:
+  every §9 function of examples/lists.bumpus printed from `main`; Review
+  Focus 1–5 (namespaces `a(5)` → 5; `loop()` fixed by context → 1; `zip`
+  value printed and re-read → `Cons(Pair(1, true), Nil)` both ways; an
+  8,192-element list from generic `append`, counted by generic `length` →
+  8192; `xs < Cons(2, Nil)` inside a generic function → true); `length` at
+  `List(Int)` and `List(Bool)` in one program → `Pair(1, 2)`; `length(Nil)`
+  → 0 with a single `length` key at Int; exact key order for a small
+  program; an uninstantiated polymorphic function and type are not
+  emitted; the limit (compile only): 6,000 function keys + 4,000 type keys
+  + 500 monomorphic functions and types compile, one more function key and
+  separately one more type key fail at `gx(1)` and `QX(1)`.
+  test/large-source.test.mjs: 3,000 distinct instantiations (3,000
+  function and 3,000 type keys) compile in about 0.6 s (bound 5 s); the
+  20,000-declaration programs are unchanged and pass.
+  test/compiler.test.mjs: bootstrap/lists.go snapshot and CLI run.
+  test/specialize.test.mjs: identity now skips the one polymorphic example
+  by name (its count assertion is unchanged).
+- bootstrap/lists.go generated with `npm run bumpus -- emit
+  examples/lists.bumpus bootstrap/lists.go` and reviewed (types numbered in
+  discovery order, `Pair(Int, Bool)` first from `main`'s signature;
+  constructors in contiguous blocks; one compare and show helper per
+  specialized type; Bool helper emitted). answer.go, shapes.go and tree.go
+  are byte-identical (CLI re-emit `cmp`, and their snapshot assertions).
+- RED: the new poly-run file failed to load (`specializationKeys` not
+  exported); with that import stubbed, all 27 tests failed (the Go cases
+  with E_INTERNAL `unspecialized type`, the key tests on the stub); the
+  limit test first failed on its own syntax (`match` as a `+` operand, now
+  parenthesized), then with `unspecialized type`; the 3,000-instantiation
+  test failed with `unspecialized type` (.build/p001-task7-red.log,
+  .build/p001-task7-red-limit.log).
+- GREEN: `rm -rf output && npm run verify` exit 0, 295 tests (266 + 29),
+  zero failures/skips, eight regression proofs
+  (.build/p001-task7-verify.log).
+- Phase reached: these tests run the whole pipeline (`compile`, the CLI and
+  Go). Task 8 adds the specialization properties.

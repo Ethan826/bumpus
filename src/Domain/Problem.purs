@@ -54,6 +54,7 @@ data Problem
   | AmbiguousType TypeName
   | PolymorphicRecursion String
   | NestedDatatype String
+  | SpecializationLimit Int
   | RedundantArm
   | NonExhaustive Witness
   | Internal String

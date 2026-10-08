@@ -44,6 +44,7 @@ code = case _ of
   AmbiguousType _ → Code.TypeMismatch
   PolymorphicRecursion _ → Code.SpecializationError
   NestedDatatype _ → Code.SpecializationError
+  SpecializationLimit _ → Code.SpecializationError
   RedundantArm → Code.Redundant
   NonExhaustive _ → Code.NonExhaustive
   Internal _ → Code.InternalError
@@ -94,6 +95,7 @@ message = case _ of
     <> " changes its type arguments"
   NestedDatatype name → "Recursive use of " <> name
     <> " changes its type arguments"
+  SpecializationLimit limit → "More than " <> show limit <> " specializations"
   RedundantArm → "Redundant match arm"
   NonExhaustive witness → "Missing pattern: " <> pattern witness
   Internal text → text

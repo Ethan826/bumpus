@@ -1,7 +1,7 @@
-// Runs a source through a prefix of the pipeline. Until P001 Task 7 the
-// full `compile` cannot emit a polymorphic program (Specialize is a seam),
-// so positive polymorphic cases stop at Resolve or Check (plan, "Phase
-// boundaries for tests").
+// Runs a source through a prefix of the pipeline. Before P001 Task 7 the
+// full `compile` could not emit a polymorphic program, so Tasks 2–6 stop
+// at Resolve or Check (plan, "Phase boundaries for tests"); since Task 7
+// `compile` specializes and emits them (test/poly-run.test.mjs).
 import assert from 'node:assert/strict';
 import { Left, Right } from '../output/Data.Either/index.js';
 import { parse } from '../output/Format.Parse/index.js';

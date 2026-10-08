@@ -180,3 +180,22 @@ test('twenty thousand parameters are checked in linear time', () => {
   assert.ok(seconds < parameterSecondsLimit, `checking took ${seconds}s`);
   rejectedAt(source.replace('p19999: Int', 'p7: Int'), 'E_DUPLICATE', 'p7');
 });
+
+// P001 Task 7: a worklist or key table that is quadratic in the number of
+// keys fails this bound. Each f<i> instantiates `single` at its own type,
+// so 3,000 function keys and 3,000 `List` type keys are created.
+const instantiationCount = 3000;
+
+test('three thousand distinct instantiations compile in linear time', () => {
+  const each = index => `type T${index} = C${index};`
+    + ` fn f${index}(): List(T${index}) = single(C${index});`;
+  const source = 'type List(a) = Nil | Cons(a, List(a));'
+    + ' fn single(x: a): List(a) = Cons(x, Nil); '
+    + Array.from({ length: instantiationCount }, (_, index) => each(index))
+      .join(' ') + ' fn main(): Int = 0;';
+  let go = '';
+  const seconds = secondsFor(() => { go = checked(source); });
+  assert.ok(seconds < compileSecondsLimit, `compiling took ${seconds}s`);
+  const functions = go.match(/^func bumpusFn\d+\(/gm).length;
+  assert.equal(functions, 2 * instantiationCount + 1, 'one copy per key');
+});

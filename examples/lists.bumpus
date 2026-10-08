@@ -1,0 +1,91 @@
+type List(a) = Nil | Cons(a, List(a));
+type Maybe(a) = Nothing | Just(a);
+type Pair(a, b) = Pair(a, b);
+type Either(a, b) = Left(a) | Right(b);
+type Tree(a) = Leaf | Node(Tree(a), a, Tree(a));
+
+fn length(xs: List(a)): Int = match xs {
+  Nil => 0,
+  Cons(_, rest) => 1 + length(rest),
+};
+
+fn append(xs: List(a), ys: List(a)): List(a) = match xs {
+  Nil => ys,
+  Cons(x, rest) => Cons(x, append(rest, ys)),
+};
+
+fn reverseOnto(xs: List(a), done: List(a)): List(a) = match xs {
+  Nil => done,
+  Cons(x, rest) => reverseOnto(rest, Cons(x, done)),
+};
+
+fn reverse(xs: List(a)): List(a) = reverseOnto(xs, Nil);
+
+fn zip(xs: List(a), ys: List(b)): List(Pair(a, b)) = match Pair(xs, ys) {
+  Pair(Cons(x, xr), Cons(y, yr)) => Cons(Pair(x, y), zip(xr, yr)),
+  _ => Nil,
+};
+
+fn headOr(xs: List(a), fallback: a): a = match xs {
+  Nil => fallback,
+  Cons(x, _) => x,
+};
+
+fn last(xs: List(a)): Maybe(a) = match xs {
+  Nil => Nothing,
+  Cons(x, Nil) => Just(x),
+  Cons(_, rest) => last(rest),
+};
+
+fn take(count: Int, xs: List(a)): List(a) =
+  if count <= 0 then Nil
+  else match xs {
+    Nil => Nil,
+    Cons(x, rest) => Cons(x, take(count + -1, rest)),
+  };
+
+fn drop(count: Int, xs: List(a)): List(a) =
+  if count <= 0 then xs
+  else match xs {
+    Nil => Nil,
+    Cons(_, rest) => drop(count + -1, rest),
+  };
+
+fn fromMaybe(m: Maybe(a), fallback: a): a = match m {
+  Nothing => fallback,
+  Just(x) => x,
+};
+
+fn fst(p: Pair(a, b)): a = match p { Pair(x, _) => x };
+
+fn snd(p: Pair(a, b)): b = match p { Pair(_, y) => y };
+
+fn swap(p: Pair(a, b)): Pair(b, a) = match p { Pair(x, y) => Pair(y, x) };
+
+fn size(t: Tree(a)): Int = match t {
+  Leaf => 0,
+  Node(left, _, right) => size(left) + 1 + size(right),
+};
+
+fn larger(x: Int, y: Int): Int = if x < y then y else x;
+
+fn depth(t: Tree(a)): Int = match t {
+  Leaf => 0,
+  Node(left, _, right) => 1 + larger(depth(left), depth(right)),
+};
+
+fn flatten(t: Tree(a)): List(a) = match t {
+  Leaf => Nil,
+  Node(left, x, right) => append(flatten(left), Cons(x, flatten(right))),
+};
+
+fn leftOr(e: Either(a, b), fallback: a): a = match e {
+  Left(x) => x,
+  Right(_) => fallback,
+};
+
+fn main(): Pair(List(Pair(Int, Bool)), Maybe(Int)) =
+  Pair(
+    zip(reverse(Cons(1, Cons(2, Cons(3, Nil)))), Cons(true, Cons(false, Nil))),
+    last(flatten(Node(Node(Leaf, 4, Leaf), 5, Node(Leaf, 6, Leaf))))
+  );

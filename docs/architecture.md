@@ -7,7 +7,7 @@ an earlier layer; scripts/structure.mjs enforces it from `purs graph`.
 | Layer | Modules (src/) | Role |
 |---|---|---|
 | Domain | Syntax, Type, Resolved, Problem, Host, Checked.Internal, IR.Internal | syntax trees, spans, `Ty v`, resolved syntax, checked IR, monomorphic IR, `Problem` data, capability-port types |
-| Features | Resolve, Resolve.{Expression,Types,Pattern,Repeated,Fresh}, Check, Check.{Infer,Call,Arms,Match,Require,Scheme,Walk,Comparable,Instantiation,Nested,Components,Unify,Tables,Inhabited,Signature,Matrix,Usefulness,Missing,Coverage,Search}, Specialize | resolution, checking, coverage, specialization; report `Problem` data, never text |
+| Features | Resolve, Resolve.{Expression,Types,Pattern,Repeated,Fresh}, Check, Check.{Infer,Call,Arms,Match,Require,Scheme,Walk,Comparable,Instantiation,Nested,Components,Unify,Tables,Inhabited,Signature,Matrix,Usefulness,Missing,Coverage,Search}, Specialize, Specialize.{Seeds,Keys,Lower,Body,Copy} | resolution, checking, coverage, specialization; report `Problem` data, never text |
 | Format | Lex, Parse, Parse.*, Stack, Go, Go.{Layout,Data,Lowered,Expression,Match,Capture,Compare,Show,Usage}, Diagnostic, Wire, Arguments | text in (tokens, parser, reserved words, uppercase rule); Go out; diagnostic text, `E_*` names, wire records, usage text |
 | Runtime | Node (+ Node.js) | port implementations, argv/stdout/stderr/exit, JSON; the only FFI |
 | Program | Compile, Command, Main | pure `compile`, commands over any `Host`, entry point |
@@ -92,11 +92,20 @@ Format.Wire.
   (G001 Task 4b); usefulness and algorithm I keep their pending heads and
   witness continuations on an explicit Search `Stack` in a `tailRecM` loop,
   so pattern columns cost no JavaScript stack (G001 final review).
-- **Specialize** (Features.Specialize, P001 Task 1) lowers the checked IR to
-  the monomorphic IR, Domain.IR.Internal, converting the constructor table to
-  the IR's own `CtorInfo`. On today's monomorphic programs it is the identity
-  (test/specialize.test.mjs); a variable or type argument is E_INTERNAL
-  `unspecialized type` until P001 Task 7 specializes them.
+- **Specialize** (Features.Specialize, P001 Tasks 1 and 7) lowers the
+  checked IR to the monomorphic IR, Domain.IR.Internal, by whole-program
+  specialization (design §6): a first-in first-out worklist seeded with
+  every monomorphic type and function in id order copies one function or
+  type per key `(declaration, ground arguments)` reached in pre-order.
+  Keys are hash-consed (Specialize.Keys: each ground application is
+  numbered once as an output type, so a key compares in time linear in its
+  arity); holes become a representative (Int; `specializeWith` takes
+  another for tests); more than 10,000 keys of polymorphic declarations is
+  E_SPECIALIZATION. Monomorphic declarations keep their order and come
+  first, so a monomorphic program comes out unchanged
+  (test/specialize.test.mjs). Modules: Specialize (API, worklist loop),
+  Specialize.Seeds, .Keys (memo tables, limit), .Lower (types, constructor
+  fields), .Body (function bodies), .Copy (state-and-failure applicative).
 - **Compare** is one expression form, `Compare Operator Expr Expr`, through
   every phase (Operator is a closed Domain ADT); the checker requires equal
   operand types and yields Bool. No target detail enters IR.

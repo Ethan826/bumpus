@@ -59,7 +59,11 @@ const identical = source => {
     plain(withoutResolution(program), true), source);
 };
 
+// examples/lists.bumpus is polymorphic (P001 Task 7), so specialization
+// copies it rather than returning it; test/poly-run.test.mjs runs it.
+const polymorphicExamples = new Set(['lists.bumpus']);
 const examples = readdirSync('examples').filter(name => name.endsWith('.bumpus'))
+  .filter(name => !polymorphicExamples.has(name))
   .sort().map(name => readFileSync(join('examples', name), 'utf8'));
 
 test('specialize is the identity on monomorphic programs', () => {
