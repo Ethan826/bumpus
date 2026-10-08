@@ -1,5 +1,25 @@
 # Bootstrap evidence and current checkpoint
 
+## Language direction recorded (2026-10-08)
+
+User requested a local commit of the current language/backend/effect
+discussion using the planning guidance. Read brainstorming/writing-plans;
+recorded docs/plans/2026-10-08-language-direction.md as direction and
+hypotheses, not an implementation spec. Goals, early-release deferrals,
+row/service scenarios, effect-design questions, inspectable IR and future
+targets are separated from assistant recommendations and open decisions.
+Backlog follow-ups FX001 (effect design), L001 (lowered IR direction) and
+J001 (JavaScript evaluation direction); P001's approved scope/order intact.
+README, bootstrap index, next-session, findings and provenance linked.
+Self-review checked scope, status, references and distinction between
+proposed acceptance scenarios and implemented behavior. Documentation only.
+
+Fresh `npm run verify` on main exited 0: 162 tests, zero failures/skips,
+zero build warnings/errors, formatting/style/layer gates, strict rebuild
+proof and eight isolated regression proofs passed. Raw evidence:
+.build/language-direction-verify.log. Existing .vscode/settings.json edit
+excluded from this change. No feature implemented and no push authorized.
+
 2026-10-07. The language is renamed from Sprig to Bumpus (A003 Task 3a). Dated evidence below keeps literal historical identifiers (old module names such as `Sprig.Check`, `sprigCmpN`-style Go helpers, old command lines, `.sprig` paths and log names) verbatim because they name artifacts that existed; the prose language name changes.
 
 2026-10-07. The completed documentation/style audit is merged into main through 1f760af.

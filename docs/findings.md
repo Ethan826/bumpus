@@ -224,3 +224,13 @@ policy, without weakening the tests or overstating their automated coverage.
 - A flat sum counts one level per operator, so 130 operands are E_NESTING
   although the phases overflow only near 2,928 operands (ADR 006 table);
   lifting it needs iterative chains in every later phase (BACKLOG O001).
+## Language-direction planning gap (2026-10-08)
+
+The source-language effect system was only a phrase in I001 and the
+self-hosting roadmap; compiler Host ports do not implement it. Recorded
+FX001 for a dedicated design coordinated with rows/classes/FFI. Current
+discussion and unsettled choices are in
+docs/plans/2026-10-08-language-direction.md. "Hostable" was clarified to
+mean inspectable intermediate representations, so no embedding VM was
+selected. Rows simplify service requirements but do not decide runtime
+resource/cancellation semantics. Documentation only; no feature implemented.
