@@ -13,9 +13,10 @@ Review records: docs/plans/adt-printing-review.md and
 docs/plans/applicative-parser-review.md.
 
 Next steps, in order:
-1. T001 (build Go once per test file), then P001 (order approved by the
-   user 2026-10-07). T001's first commit also fixes the stale header comment
-   in src/Format/Go/Capture.purs (parked from the E005 review).
+1. T001 (build Go once per test file) is implemented on branch t001
+   (.worktrees/t001), pending review and user approval to merge; evidence
+   under `## T001 execution` in docs/progress.md.
+2. P001 (order approved by the user 2026-10-07).
 
 Open items: E002 remainder (per-reference name lookups, quadratic coverage
 in arms, quadratic inhabitation in chain length, quadratic binder

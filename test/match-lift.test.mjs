@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { checked, command, runGo } from './support.mjs';
+import { checked, command } from './support.mjs';
+import { runGoBatch } from './go-batch.mjs';
 
 // E005: each match is a top-level Go function `bumpusFn{f}Match{k}`, k in
 // pre-order (scrutinee before arms) within bumpusFn{f}. Its parameters are
@@ -13,13 +14,19 @@ const work = mkdtempSync(join(tmpdir(), 'bumpus-lift-'));
 after(() => rmSync(work, { recursive: true, force: true }));
 
 const headers = go => go.match(/^func bumpusFn[^\n]*$/gm);
+const preOrder = `${list} fn f(xs: L, n: Int): Int = (match xs { Nil => n, `
+  + 'Cons(h, t) => match t { Nil => h + n, Cons(g, _) => g } }) '
+  + '+ (match n { 0 => 1, _ => 2 }); '
+  + 'fn main(): Int = match Cons(1, Nil) { '
+  + 'Cons(a, _) => f(Cons(a, Nil), a), Nil => 0 };';
+const scrutineeFirst = `${list} fn main(): Int = `
+  + 'match match 1 { 1 => Cons(2, Nil), _ => Nil } '
+  + '{ Cons(h, _) => match h { 2 => 5, _ => 6 }, Nil => 0 };';
+// Every runGo-style execution in this file, built once (T001).
+const batch = runGoBatch(import.meta.url, { preOrder, scrutineeFirst });
 
 test('lifted matches are named in pre-order with captures first', () => {
-  const source = `${list} fn f(xs: L, n: Int): Int = (match xs { Nil => n, `
-    + 'Cons(h, t) => match t { Nil => h + n, Cons(g, _) => g } }) '
-    + '+ (match n { 0 => 1, _ => 2 }); '
-    + 'fn main(): Int = match Cons(1, Nil) { '
-    + 'Cons(a, _) => f(Cons(a, Nil), a), Nil => 0 };';
+  const source = preOrder;
   assert.deepEqual(headers(checked(source)), [
     'func bumpusFn0(bumpusLocal0 bumpusTy0, bumpusLocal1 int32) int32 {',
     'func bumpusFn0Match0(bumpusLocal1 int32, '
@@ -30,20 +37,18 @@ test('lifted matches are named in pre-order with captures first', () => {
     'func bumpusFn1() int32 {',
     'func bumpusFn1Match0(bumpusScrutinee bumpusTy0) int32 {'
   ]);
-  assert.equal(runGo(source), '4\n');
+  assert.equal(batch.run('preOrder'), '4\n');
 });
 
 test('a match in a scrutinee is numbered before the arms', () => {
-  const source = `${list} fn main(): Int = `
-    + 'match match 1 { 1 => Cons(2, Nil), _ => Nil } '
-    + '{ Cons(h, _) => match h { 2 => 5, _ => 6 }, Nil => 0 };';
+  const source = scrutineeFirst;
   assert.deepEqual(headers(checked(source)), [
     'func bumpusFn0() int32 {',
     'func bumpusFn0Match0(bumpusScrutinee bumpusTy0) int32 {',
     'func bumpusFn0Match1(bumpusScrutinee int32) bumpusTy0 {',
     'func bumpusFn0Match2(bumpusScrutinee int32) int32 {'
   ]);
-  assert.equal(runGo(source), '5\n');
+  assert.equal(batch.run('scrutineeFirst'), '5\n');
 });
 
 // A parameter (k) and outer binders (h, t) reach matches two and three

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { parse } from '../output/Format.Parse/index.js';
 import { Integer, Add, If, Boolean as Bool } from '../output/Domain.Syntax/index.js';
 import { Right } from '../output/Data.Either/index.js';
-import { checked, rejected, runGo } from './support.mjs';
+import { checked, rejected } from './support.mjs';
+import { runGoBatch } from './go-batch.mjs';
 
 // Fixed seed gives replayable generated trees; no discarded inputs.
 const generator = seed => () => {
@@ -46,12 +47,19 @@ test('200 generated expression trees survive independent printing and parsing', 
   }
 });
 
-test('12 generated programs agree with an independent BigInt interpreter after Go execution', () => {
+// Drawn up front, in the order the test used to draw them, so the 12
+// programs build as one Go batch (T001); a case is named by its index.
+const executed = (() => {
   const next = generator(0x7c95);
-  for (let index = 0; index < 12; index++) {
-    const expected = tree(next, 3);
-    assert.equal(runGo(`fn main(): Int = ${print(expected)};`), `${interpret(expected)}\n`);
-  }
+  return Array.from({ length: 12 }, () => tree(next, 3));
+})();
+const batch = runGoBatch(import.meta.url,
+  executed.map(expected => `fn main(): Int = ${print(expected)};`));
+
+test('12 generated programs agree with an independent BigInt interpreter after Go execution', () => {
+  executed.forEach((expected, index) => {
+    assert.equal(batch.run(index), `${interpret(expected)}\n`);
+  });
 });
 
 test('whitespace shifts error locations without changing name rejection', () => {

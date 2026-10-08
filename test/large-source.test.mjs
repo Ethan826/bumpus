@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { lex } from '../output/Format.Lex/index.js';
 import { Right } from '../output/Data.Either/index.js';
-import { checked, rejected, rejectedAt, runGo } from './support.mjs';
+import { checked, rejected, rejectedAt } from './support.mjs';
+import { runGoBatch } from './go-batch.mjs';
 
 // Lexing and declaration parsing must run in constant stack and linear time
 // (BACKLOG E002); before they were loops, these sizes exhausted the stack or,
@@ -31,12 +32,25 @@ test('a megabyte of trailing whitespace compiles like none', () => {
 const declarationsFrom = separator => Array.from({ length: declarationCount },
   (_, index) => `fn f${index}(): Int = ${index};`).join(separator);
 
+const last = declarationCount - 1;
+const declarations = `${declarationsFrom('\n')}\nfn main(): Int = f${last}();`;
+// Coverage.redundancy searched the arms with an Array.foldM over Either, one
+// stack frame chain per arm, so a match of about 1,929 arms overflowed on a
+// cold compile (G001 Task 4b). Each arm is still judged against the
+// earlier ones; 5,000 arms take about 1.3 s.
+const armCount = 5000;
+const armSource = `fn main(): Int = match 7 { ${Array.from(
+  { length: armCount - 1 }, (_, index) => `${index} => ${index}`
+).join(', ')}, _ => 0 };`;
+// Both executions build as one Go batch (T001); the timed compiles below
+// measure checked() alone, as before.
+const batch = runGoBatch(import.meta.url, { declarations, arms: armSource });
+
 test('twenty thousand declarations compile and run', () => {
-  const last = declarationCount - 1;
-  const source = `${declarationsFrom('\n')}\nfn main(): Int = f${last}();`;
+  const source = declarations;
   const seconds = secondsFor(() => checked(source));
   assert.ok(seconds < compileSecondsLimit, `compiling took ${seconds}s`);
-  assert.equal(runGo(source), `${last}\n`);
+  assert.equal(batch.run('declarations'), `${last}\n`);
 });
 
 const typesFrom = count => Array.from({ length: count },
@@ -111,19 +125,11 @@ test('ten thousand binding arguments resolve in source order', () => {
   assert.ok(!go.includes(`bumpusLocal${wideCount} `), 'no extra binder');
 });
 
-// Coverage.redundancy searched the arms with an Array.foldM over Either, one
-// stack frame chain per arm, so a match of about 1,929 arms overflowed on a
-// cold compile (G001 Task 4b). Each arm is still judged against the
-// earlier ones; 5,000 arms take about 1.3 s.
-const armCount = 5000;
-
 test('a five-thousand-arm integer match compiles', () => {
-  const arms = Array.from({ length: armCount - 1 },
-    (_, index) => `${index} => ${index}`);
-  const source = `fn main(): Int = match 7 { ${arms.join(', ')}, _ => 0 };`;
+  const source = armSource;
   const seconds = secondsFor(() => checked(source));
   assert.ok(seconds < compileSecondsLimit, `compiling took ${seconds}s`);
-  assert.equal(runGo(source), '7\n');
+  assert.equal(batch.run('arms'), '7\n');
 });
 
 test('a five-thousand-arm match reports its redundant arm', () => {

@@ -58,7 +58,7 @@ adding a bypass allowlist.
   brute-force coverage oracle with brute-forced inhabitedness over generated
   type systems (test/coverage.test.mjs), and fake-host command tests
   (test/program.test.mjs);
-- `npm run verify` runs every test/*.test.mjs file (22 files, 156 tests, no
+- `npm run verify` runs every test/*.test.mjs file (23 files, 161 tests, no
   skips; the list is read from the directory, never hand-kept) and then
   scripts/regression.mjs, a table of isolated-copy mutations, each of which
   must pass on the healthy build and fail on its mutant: `branch`
@@ -74,6 +74,30 @@ adding a bypass allowlist.
   misses a local read only there; probe builds and runs test/match-lift's
   capture program); the A003 order and print tests also use an independent value
   oracle (test/value-oracle.mjs);
+- Go execution in tests is batched per test file (T001, test/go-batch.mjs):
+  `runGoBatch(import.meta.url, cases, label?)` takes named Bumpus sources
+  and, on the first `run(name)`, compiles them all, writes a synthetic module
+  under `.build/go-batches/<id>/` (its own go.mod with module path
+  `bumpusbatch` and the pinned toolchain's language version, one package
+  `c<N>` per case, a dispatcher `main` importing them), builds once with
+  GOCACHE under .build and GOWORK off, and runs each case as its own process
+  (the binary invoked with the case's package name). `<id>` is the test
+  file's basename plus an optional label, sanitized; a batch clears only its
+  own directory, never the root, and an id may be claimed once per process.
+  Before rewriting, each program must have exactly one `package main` clause
+  and exactly one `func main() { fmt.Println(...) }` line (Format.Go's
+  entryMain) and no `func Main`; only those two lines change. Failure
+  contract: a Bumpus rejection is recorded per case and rethrown, unchanged,
+  by that case's `run` (runGo's error), while the other cases still build;
+  an unexpected program shape or a Go compile failure is a batch
+  infrastructure failure, thrown by every case's `run`, naming the offending
+  case(s) when Go's output identifies their package. `run` keeps runGo's
+  contract (stdout, exit status 0 asserted); `result` returns the raw
+  process outcome. Panics keep their message and exit status; stack traces
+  differ (package path `bumpusbatch/c<N>`, `Main`). Self-tests:
+  test/go-batch.test.mjs. Not batched: depth.test.mjs timing builds,
+  scripts/regression.mjs probes, and `goTest`; `runGo` remains as the
+  self-tests' standalone reference;
 - scripts/strict-rebuild.mjs (run by verify after the build) copies the
   workspace to .build/strict-rebuild, checks the unmodified copy builds, adds
   a shadowed name to one module and requires two consecutive builds to fail

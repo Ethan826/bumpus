@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runGo } from './support.mjs';
+import { runGoBatch } from './go-batch.mjs';
 
 // Fixed seed gives replayable programs; every draw is used, none discarded.
 // The seed was chosen so the 12 programs include Int-binder arms, 32-bit
@@ -120,24 +120,34 @@ const source = (body, input) => 'type T = A | B(Int) | C(T, T); '
   + `fn pick(v: T): Int = ${body}; `
   + `fn main(): Int = pick(${printValue(input)});`;
 
+// Both properties' programs are drawn up front, in the same order as when
+// each test drew its own, so the whole file builds as one Go batch (T001).
+const drawn = (seed, count, arms, print) => {
+  const next = generator(seed);
+  return Array.from({ length: count }, () => {
+    const { arms: drawnArms, input } = draw(next, arms(next));
+    return { arms: drawnArms, input, program: source(print(drawnArms), input) };
+  });
+};
+const nestedCases = drawn(0x487, 12, next => 1 + choose(next, 4), printArms);
+// The seed was chosen so no generated arm is redundant (the compiler would
+// reject it), some inputs reach a third arm, and some reach the `_` tail.
+const flatCases = drawn(0x6443, 8, next => 2 + choose(next, 3), printFlat);
+// Each case is named by its program text.
+const batch = runGoBatch(import.meta.url, Object.fromEntries(
+  [...nestedCases, ...flatCases].map(({ program }) => [program, program])));
+const run = program => batch.run(program);
+
 test('12 generated match programs agree with a first-match interpreter', () => {
-  const next = generator(0x487);
-  for (let index = 0; index < 12; index++) {
-    const { arms, input } = draw(next, 1 + choose(next, 4));
-    const program = source(printArms(arms), input);
-    assert.equal(runGo(program), `${interpret(arms, input)}\n`, program);
+  for (const { arms, input, program } of nestedCases) {
+    assert.equal(run(program), `${interpret(arms, input)}\n`, program);
   }
 });
 
-// The seed was chosen so no generated arm is redundant (the compiler would
-// reject it), some inputs reach a third arm, and some reach the `_` tail.
 test('8 generated flat multi-arm matches agree with the interpreter', () => {
-  const next = generator(0x6443);
   const reached = [];
-  for (let index = 0; index < 8; index++) {
-    const { arms, input } = draw(next, 2 + choose(next, 3));
-    const program = source(printFlat(arms), input);
-    assert.equal(runGo(program), `${interpret(arms, input)}\n`, program);
+  for (const { arms, input, program } of flatCases) {
+    assert.equal(run(program), `${interpret(arms, input)}\n`, program);
     reached.push(arms.findIndex(arm => matches(arm.pattern, input)));
   }
   assert.ok(reached.some(arm => arm >= 2), `no third arm: ${reached}`);

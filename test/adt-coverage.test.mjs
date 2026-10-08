@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { checked, rejected, rejectedAt, runGo } from './support.mjs';
+import { checked, rejected, rejectedAt } from './support.mjs';
+import { runGoBatch } from './go-batch.mjs';
 
 const list = 'type L = Nil | Cons(Int, L);';
 const voidType = 'type Void = V(Void);';
@@ -31,11 +32,14 @@ test('non-exhaustive matches report the canonical witness', () => {
 });
 
 const optional = `${voidType} type T = A | C(Void);`;
+// The file's one Go execution, through the per-file batch harness (T001).
+const batch = runGoBatch(import.meta.url, {
+  uninhabited: `${optional} fn f(x: T): Int = match x { A => 1 }; `
+    + 'fn main(): Int = f(A);'
+});
 
 test('uninhabited constructors need no arm', () => {
-  const source = `${optional} fn f(x: T): Int = match x { A => 1 }; `
-    + 'fn main(): Int = f(A);';
-  assert.equal(runGo(source).trim(), '1');
+  assert.equal(batch.run('uninhabited').trim(), '1');
   checked(program(optional, 'T', 'match x { A => 1, C(v) => 2 }'));
 });
 

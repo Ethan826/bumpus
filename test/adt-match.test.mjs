@@ -1,61 +1,88 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { checked, command, goTest, rejectedAt, runGo } from './support.mjs';
+import { checked, command, goTest, rejectedAt } from './support.mjs';
+import { runGoBatch } from './go-batch.mjs';
 
 const list = 'type IntList = Nil | Cons(Int, IntList);';
 const sum = 'fn sum(xs: IntList): Int = '
   + 'match xs { Nil => 0, Cons(h, t) => h + sum(t) };';
-const run = source => runGo(source).trim();
-
-test('a list sum runs', () => {
-  const source = `${list} ${sum} `
-    + 'fn main(): Int = sum(Cons(1, Cons(2, Cons(3, Nil))));';
-  assert.equal(run(source), '6');
-});
-
-test('an evaluator special-cases a nested pattern', () => {
-  const source = 'type Exp = Lit(Int) | Plus(Exp, Exp); '
+// Every runGo-style execution in this file, built once (T001); run finds
+// a source's case by its text, so each test still passes its own source.
+const sources = {
+  listSum: `${list} ${sum} `
+    + 'fn main(): Int = sum(Cons(1, Cons(2, Cons(3, Nil))));',
+  evaluator: 'type Exp = Lit(Int) | Plus(Exp, Exp); '
     + 'fn eval(e: Exp): Int = match e { '
     + 'Plus(Lit(n), Lit(m)) => n + m + 1000, '
     + 'Plus(a, b) => eval(a) + eval(b), Lit(n) => n }; '
     + 'fn main(): Int = eval(Plus(Plus(Lit(1), Lit(2)), '
-    + 'Plus(Lit(3), Plus(Lit(4), Lit(5)))));';
-  assert.equal(run(source), '2015');
-});
-
-test('Int and Bool literal patterns select arms', () => {
-  const ints = 'fn sign(n: Int): Int = match n { -1 => 100, 0 => 20, _ => 3 }; '
-    + 'fn main(): Int = sign(-1) + sign(0) + sign(7);';
-  assert.equal(run(ints), '123');
-  const bools = 'fn pick(b: Bool): Int = match b { true => 1, false => 2 }; '
-    + 'fn main(): Int = pick(false) + pick(true) + pick(false);';
-  assert.equal(run(bools), '5');
-});
-
-test('mutually recursive Tree and Forest sizes', () => {
-  const source = 'type Tree = Node(Int, Forest); '
+    + 'Plus(Lit(3), Plus(Lit(4), Lit(5)))));',
+  ints: 'fn sign(n: Int): Int = match n { -1 => 100, 0 => 20, _ => 3 }; '
+    + 'fn main(): Int = sign(-1) + sign(0) + sign(7);',
+  bools: 'fn pick(b: Bool): Int = match b { true => 1, false => 2 }; '
+    + 'fn main(): Int = pick(false) + pick(true) + pick(false);',
+  treeForest: 'type Tree = Node(Int, Forest); '
     + 'type Forest = Empty | More(Tree, Forest); '
     + 'fn size(t: Tree): Int = match t { Node(_, f) => 1 + forest(f) }; '
     + 'fn forest(f: Forest): Int = match f { Empty => 0, '
     + 'More(t, rest) => size(t) + forest(rest) }; '
     + 'fn main(): Int = size(Node(1, More(Node(2, Empty), '
-    + 'More(Node(3, More(Node(4, Empty), Empty)), Empty))));';
+    + 'More(Node(3, More(Node(4, Empty), Empty)), Empty))));',
+  nested: `${list} fn f(xs: IntList): Int = `
+    + 'match match xs { Nil => Cons(5, Nil), _ => xs } { '
+    + 'Cons(h, t) => match t { Nil => h, Cons(g, _) => h + g }, Nil => 0 }; '
+    + 'fn main(): Int = f(Nil) + f(Cons(1, Cons(2, Nil)));',
+  shadow: `${list} fn f(x: Int, xs: IntList): Int = `
+    + 'match xs { Cons(x, _) => x, Nil => x }; '
+    + 'fn main(): Int = f(1, Cons(7, Nil)) + f(100, Nil);',
+  localIds: `${list} fn f(x: Int, xs: IntList): Int = `
+    + 'match match xs { Cons(x, t) => t, Nil => xs } { '
+    + 'Cons(h, t) => match t { Cons(x, _) => x + h, Nil => x + h }, '
+    + 'Nil => f(match xs { Cons(y, _) => y, Nil => x }, Nil) }; '
+    + 'fn main(): Int = f(1, Cons(2, Cons(3, Nil)));',
+  doubling: `${list} ${sum} `
+    + 'fn append(a: IntList, b: IntList): IntList = '
+    + 'match a { Nil => b, Cons(h, t) => Cons(h, append(t, b)) }; '
+    + 'fn grow(n: Int, xs: IntList): IntList = '
+    + 'match n { 13 => xs, _ => grow(n + 1, append(xs, xs)) }; '
+    + 'fn main(): Int = sum(grow(0, Cons(1, Nil)));',
+  trailingComma: `${list} fn main(): Int = `
+    + 'match Cons(4, Nil) { Nil => 0, Cons(h, _) => h, };'
+};
+const batch = runGoBatch(import.meta.url, sources);
+const run = source => batch.run(Object.keys(sources)
+  .find(name => sources[name] === source)).trim();
+
+test('a list sum runs', () => {
+  const source = sources.listSum;
+  assert.equal(run(source), '6');
+});
+
+test('an evaluator special-cases a nested pattern', () => {
+  const source = sources.evaluator;
+  assert.equal(run(source), '2015');
+});
+
+test('Int and Bool literal patterns select arms', () => {
+  const ints = sources.ints;
+  assert.equal(run(ints), '123');
+  const bools = sources.bools;
+  assert.equal(run(bools), '5');
+});
+
+test('mutually recursive Tree and Forest sizes', () => {
+  const source = sources.treeForest;
   assert.equal(run(source), '4');
 });
 
 test('matches nest in arm bodies and in scrutinee position', () => {
-  const source = `${list} fn f(xs: IntList): Int = `
-    + 'match match xs { Nil => Cons(5, Nil), _ => xs } { '
-    + 'Cons(h, t) => match t { Nil => h, Cons(g, _) => h + g }, Nil => 0 }; '
-    + 'fn main(): Int = f(Nil) + f(Cons(1, Cons(2, Nil)));';
+  const source = sources.nested;
   assert.equal(run(source), '8');
 });
 
 test('a binder shadows a parameter only in its arm', () => {
-  const source = `${list} fn f(x: Int, xs: IntList): Int = `
-    + 'match xs { Cons(x, _) => x, Nil => x }; '
-    + 'fn main(): Int = f(1, Cons(7, Nil)) + f(100, Nil);';
+  const source = sources.shadow;
   assert.equal(run(source), '107');
 });
 
@@ -65,11 +92,7 @@ test('a binder shadows a parameter only in its arm', () => {
 // text runs through bumpusFn0 and its lifted matches 0-3 in number order,
 // so it also pins each match's captured parameters and call arguments.
 test('LocalIds in emitted Go follow source pre-order', () => {
-  const source = `${list} fn f(x: Int, xs: IntList): Int = `
-    + 'match match xs { Cons(x, t) => t, Nil => xs } { '
-    + 'Cons(h, t) => match t { Cons(x, _) => x + h, Nil => x + h }, '
-    + 'Nil => f(match xs { Cons(y, _) => y, Nil => x }, Nil) }; '
-    + 'fn main(): Int = f(1, Cons(2, Cons(3, Nil)));';
+  const source = sources.localIds;
   const go = checked(source);
   const body = go.slice(go.indexOf('func bumpusFn0'),
     go.indexOf('func bumpusFn1'));
@@ -86,18 +109,12 @@ test('LocalIds in emitted Go follow source pre-order', () => {
 });
 
 test('an 8192-element list built by doubling sums correctly', () => {
-  const source = `${list} ${sum} `
-    + 'fn append(a: IntList, b: IntList): IntList = '
-    + 'match a { Nil => b, Cons(h, t) => Cons(h, append(t, b)) }; '
-    + 'fn grow(n: Int, xs: IntList): IntList = '
-    + 'match n { 13 => xs, _ => grow(n + 1, append(xs, xs)) }; '
-    + 'fn main(): Int = sum(grow(0, Cons(1, Nil)));';
+  const source = sources.doubling;
   assert.equal(run(source), '8192');
 });
 
 test('a trailing comma is accepted', () => {
-  const source = `${list} fn main(): Int = `
-    + 'match Cons(4, Nil) { Nil => 0, Cons(h, _) => h, };';
+  const source = sources.trailingComma;
   assert.equal(run(source), '4');
 });
 

@@ -1,37 +1,43 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import {
-  checked, goTest, rejectedAt, runGo, traceCalls
-} from './support.mjs';
+import { checked, goTest, rejectedAt, traceCalls } from './support.mjs';
+import { runGoBatch } from './go-batch.mjs';
 
 const bool = body => `fn main(): Bool = ${body};`;
+const rows = [
+  ['1 < 2', 'true'], ['2 <= 2', 'true'], ['3 > 2', 'true'],
+  ['2 >= 3', 'false'], ['1 == 1', 'true'], ['1 != 1', 'false'],
+  ['false < true', 'true'], ['true < false', 'false'],
+  ['true == true', 'true'], ['false >= true', 'false'],
+  ['-2147483648 < 2147483647', 'true'],
+  ['2147483647 + 1 < 0', 'true'],
+  ['1 + 2 == 3', 'true'], ['(1 == 1) == true', 'true']
+];
+const contexts = {
+  condition:
+    'fn f(x: Int): Int = if x < 0 then 0 else x; fn main(): Int = f(-5);',
+  scrutinee: 'fn main(): Int = match 1 < 2 { true => 1, false => 0 };',
+  argument:
+    'fn g(b: Bool): Int = if b then 7 else 8; fn main(): Int = g(2 > 1);'
+};
+// Every runGo-style execution in this file, built once (T001); a row's case
+// is named by its body.
+const batch = runGoBatch(import.meta.url, {
+  ...Object.fromEntries(rows.map(([body]) => [body, bool(body)])),
+  ...contexts
+});
 
 test('primitive comparisons run', () => {
-  const rows = [
-    ['1 < 2', 'true'], ['2 <= 2', 'true'], ['3 > 2', 'true'],
-    ['2 >= 3', 'false'], ['1 == 1', 'true'], ['1 != 1', 'false'],
-    ['false < true', 'true'], ['true < false', 'false'],
-    ['true == true', 'true'], ['false >= true', 'false'],
-    ['-2147483648 < 2147483647', 'true'],
-    ['2147483647 + 1 < 0', 'true'],
-    ['1 + 2 == 3', 'true'], ['(1 == 1) == true', 'true']
-  ];
   for (const [body, expected] of rows) {
-    assert.equal(runGo(bool(body)), `${expected}\n`, body);
+    assert.equal(batch.run(body), `${expected}\n`, body);
   }
 });
 
 test('comparisons work in conditions, scrutinees and arguments', () => {
-  assert.equal(runGo(
-    'fn f(x: Int): Int = if x < 0 then 0 else x; fn main(): Int = f(-5);'
-  ), '0\n');
-  assert.equal(runGo(
-    'fn main(): Int = match 1 < 2 { true => 1, false => 0 };'
-  ), '1\n');
-  assert.equal(runGo(
-    'fn g(b: Bool): Int = if b then 7 else 8; fn main(): Int = g(2 > 1);'
-  ), '7\n');
+  assert.equal(batch.run('condition'), '0\n');
+  assert.equal(batch.run('scrutinee'), '1\n');
+  assert.equal(batch.run('argument'), '7\n');
 });
 
 test('comparisons are rejected where malformed', () => {

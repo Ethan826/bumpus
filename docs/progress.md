@@ -553,3 +553,50 @@ identical; fix round re-review addressed all three findings. Parked: one
 Format.Go.Capture header comment (fixed with T001), wall-clock budgets with
 ~5x headroom. Evidence archived under .build/merged-e005-evidence; worktree
 and branch removed. Next: T001, then P001 (user order 2026-10-07).
+
+## T001 execution (2026-10-08)
+
+Branch t001 (.worktrees/t001) from 62f8192. Brief:
+.superpowers/sdd/t001/brief.md (approved with eight binding amendments).
+
+- Preparatory commit `docs: refresh Format.Go.Capture header`: the header now
+  describes bottom-up free-local sets (parked from the E005 review).
+- Baseline, same machine, warm Go cache (a warm-up verify ran first, 82.3 s):
+  `rm -rf output && npm run verify` 76.4 s wall, its node --test phase
+  33.0 s (duration_ms 33,026; .build/t001-before-verify.log); `node --test`
+  alone 27.0 s (.build/t001-before-tests.log); 156 tests. Serial per-file:
+  large-source 12.4 s, adt-order 8.8, adt-print 8.5, depth 8.0, compare 7.0,
+  adt-properties 6.3, adt-match 4.7, properties 3.8, compiler 3.1, adt-types
+  1.7, match-lift 1.5, adt-coverage 0.5.
+- test/go-batch.mjs adds `runGoBatch` (design and failure contract in
+  docs/engineering.md). Self-tests (test/go-batch.test.mjs, five tests) were
+  first run against a stub that throws: 5/5 failed
+  (.build/t001-selftest-red.log), then passed against the implementation
+  (.build/t001-selftest-green.log). Each also kills a mutant of the harness
+  in an isolated copy (.build/t001-mutants.log): a rejection failing the
+  whole batch, no blame in the compile diagnostic, a disabled shape guard,
+  clearing the go-batches root, and a lost exit status each fail exactly
+  the matching self-test; the healthy copy passes 5/5.
+- No runGo caller pinned stderr: runGo returned stdout only and asserted
+  exit 0, so every caller was migrated: adt-coverage, adt-match, adt-order,
+  adt-print (two batches: reprints depend on the first outputs),
+  adt-properties, adt-types, compare, compiler, large-source, match-lift,
+  properties. Generated-program loops in adt-properties and properties draw
+  their programs at module level in the original order; adt-properties'
+  20 programs were checked identical to the old in-test draws. Assertions
+  and their messages are unchanged; Bumpus sources are unchanged.
+- Batch compilation is lazy (first `run`), so large-source's timed
+  `checked()` of the 20,000-declaration program is still the first compile
+  of that source. Its 5,000-arm timed compile now follows the batch's
+  compile of the same source (JIT-warm); the 5 s bound still fails a
+  quadratic regression by far, and a cold-compile stack overflow would
+  still surface through the batch's own first compile, rethrown by that
+  case's `run`.
+- After: `rm -rf output && npm run verify` exit 0, 60.7 s wall, node --test
+  phase 19.2 s (duration_ms 19,167; .build/t001-after-verify.log), 23 files,
+  161 tests, zero failures/skips, eight regression proofs; `node --test`
+  alone 15.5 s (.build/t001-after-tests.log). Serial per-file: large-source
+  10.7 s, adt-order 6.3 (rest is goTest), adt-print 2.4, depth 8.0
+  (unchanged, out of scope), compare 2.1, adt-properties 0.5, adt-match 2.0,
+  properties 0.5, compiler 1.6, adt-types 0.4, match-lift 1.2, adt-coverage
+  0.5, go-batch 1.4.

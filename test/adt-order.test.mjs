@@ -1,45 +1,59 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { goTest, runGo, traceCalls } from './support.mjs';
+import { goTest, traceCalls } from './support.mjs';
+import { runGoBatch } from './go-batch.mjs';
 import {
   choose, compare3, expressionOf, mixedGenerator, printValue, typeSystem,
   value
 } from './value-oracle.mjs';
 
 const list = 'type L = Nil | Cons(Int, L);';
-const holds = (declarations, body) => assert.equal(
-  runGo(`${declarations} fn main(): Bool = ${body};`), 'true\n', body
-);
+const built = `${list} fn a(): L = Cons(1, Nil); fn b(): L = Cons(1, Nil);`;
+const big = `${list} `
+  + 'fn append(a: L, b: L): L = '
+  + 'match a { Nil => b, Cons(h, t) => Cons(h, append(t, b)) }; '
+  + 'fn grow(n: Int, xs: L): L = '
+  + 'match n { 13 => xs, _ => grow(n + 1, append(xs, xs)) }; '
+  + 'fn bump(xs: L): L = match xs { Nil => Nil, '
+  + 'Cons(h, Nil) => Cons(h + 1, Nil), Cons(h, t) => Cons(h, bump(t)) }; '
+  + 'fn big(): L = grow(0, Cons(1, Nil));';
+const claims = [
+  [list, 'Nil < Cons(0, Nil)'],
+  [list, 'Cons(1, Nil) > Cons(0, Cons(5, Nil))'],
+  [list, 'Cons(0, Nil) < Cons(0, Cons(0, Nil))'],
+  ['type P = P(Bool, Int);', 'P(false, 9) < P(true, 0)'],
+  [built, 'a() == b()'], [built, '(a() < b()) == false'],
+  [big, 'big() == big()'], [big, 'big() < bump(big())']
+];
+// Every runGo-style execution in this file, built once (T001); a claim's
+// case is named by its body, which is unique.
+const batch = runGoBatch(import.meta.url, {
+  ...Object.fromEntries(claims.map(([declarations, body]) =>
+    [body, `${declarations} fn main(): Bool = ${body};`])),
+  uninhabited: 'type V = V(V); fn f(a: V, b: V): Bool = a < b; '
+    + 'fn main(): Int = 0;'
+});
+const holds = body => assert.equal(batch.run(body), 'true\n', body);
 
 test('declared values order by constructor, then fields', () => {
-  holds(list, 'Nil < Cons(0, Nil)');
-  holds(list, 'Cons(1, Nil) > Cons(0, Cons(5, Nil))');
-  holds(list, 'Cons(0, Nil) < Cons(0, Cons(0, Nil))');
-  holds('type P = P(Bool, Int);', 'P(false, 9) < P(true, 0)');
+  holds('Nil < Cons(0, Nil)');
+  holds('Cons(1, Nil) > Cons(0, Cons(5, Nil))');
+  holds('Cons(0, Nil) < Cons(0, Cons(0, Nil))');
+  holds('P(false, 9) < P(true, 0)');
 });
 
 test('separately built equal values are equal', () => {
-  const built = `${list} fn a(): L = Cons(1, Nil); fn b(): L = Cons(1, Nil);`;
-  holds(built, 'a() == b()');
-  holds(built, '(a() < b()) == false');
+  holds('a() == b()');
+  holds('(a() < b()) == false');
 });
 
 test('8192-element lists compare without stack failure', () => {
-  const source = `${list} `
-    + 'fn append(a: L, b: L): L = '
-    + 'match a { Nil => b, Cons(h, t) => Cons(h, append(t, b)) }; '
-    + 'fn grow(n: Int, xs: L): L = '
-    + 'match n { 13 => xs, _ => grow(n + 1, append(xs, xs)) }; '
-    + 'fn bump(xs: L): L = match xs { Nil => Nil, '
-    + 'Cons(h, Nil) => Cons(h + 1, Nil), Cons(h, t) => Cons(h, bump(t)) }; '
-    + 'fn big(): L = grow(0, Cons(1, Nil));';
-  holds(source, 'big() == big()');
-  holds(source, 'big() < bump(big())');
+  holds('big() == big()');
+  holds('big() < bump(big())');
 });
 
 test('a comparison on an uninhabited type builds', () => {
-  assert.equal(runGo('type V = V(V); fn f(a: V, b: V): Bool = a < b; '
-    + 'fn main(): Int = 0;'), '0\n');
+  assert.equal(batch.run('uninhabited'), '0\n');
 });
 
 const recovering = call => `package main
