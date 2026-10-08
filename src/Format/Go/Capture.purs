@@ -1,6 +1,7 @@
--- Free-local sets for match lifting (E005). Lowering builds each
+-- Free-local sets for lifting (E005, FN001). Lowering builds each
 -- expression's set bottom-up from its children's; a lifted match takes the
--- union of its arms' sets as its parameters. Nothing here walks an
+-- union of its arms' sets as its parameters, a lifted lambda its body's
+-- set without its parameters. Nothing here walks an
 -- expression subtree; armFree inspects only the arm's own pattern.
 module Format.Go.Capture
   ( Captured
@@ -9,11 +10,14 @@ module Format.Go.Capture
   , read
   , union
   , armFree
+  , lambdaFree
+  , without
   ) where
 
 import Prelude
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
+import Data.Set as Set
 import Domain.IR.Internal as IR
 import Domain.IR.Internal (Ty)
 import Domain.Resolved (LocalId(..))
@@ -58,6 +62,22 @@ armFree pattern body = map captured (Array.filter isRead distinct)
   reading local = { id: local.id, ty: local.ty, binds: false }
   isRead occurrence = not occurrence.binds
   captured occurrence = { id: occurrence.id, ty: occurrence.ty }
+
+-- A lambda's free locals: its body's, minus its named parameters (FN001
+-- design §7), which the lifted lambda takes after them (§13 rule 5). A
+-- set, so a wide lambda costs no product of its parameters and reads.
+lambdaFree ∷ Array IR.Param → Free → Free
+lambdaFree parameters body = Array.filter free body
+  where
+  bound = Set.fromFoldable (Array.mapMaybe localIndex parameters)
+  localIndex parameter = map index parameter.local
+  free local = not (Set.member (index local.id) bound)
+
+-- The set without one local.
+without ∷ LocalId → Free → Free
+without id = Array.filter different
+  where
+  different local = local.id /= id
 
 -- The first of each run of one id in an array sorted by id, in one pass.
 firstOfEach ∷ ∀ r. Array { id ∷ LocalId | r } → Array { id ∷ LocalId | r }

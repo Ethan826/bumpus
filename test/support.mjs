@@ -65,7 +65,19 @@ export const traceCalls = goSource => goSource.replace(
   (header, index) => `${header}bumpusTrace = append(bumpusTrace, "${index}")\n`
 );
 
-export const goTest = (source, testGo, transform = go => go) => {
+// FN001 timing probes: bumpusFn<index> panics with `bumpus-probe: <label>`
+// as its first statement, so a run shows which probe its body entered
+// first. Exactly one header must match.
+export const panicOnEntry = (goSource, functionIndex, label) => {
+  const header = new RegExp(`^func bumpusFn${functionIndex}\\([^\\n]*\\) `
+    + '[^\\n]* \\{\\n', 'gm');
+  assert.equal((goSource.match(header) ?? []).length, 1,
+    `one header for bumpusFn${functionIndex}`);
+  return goSource.replace(header,
+    found => `${found}panic("bumpus-probe: ${label}")\n`);
+};
+
+export const goTest =(source, testGo, transform = go => go) => {
   const work = mkdtempSync(join(tmpdir(), 'bumpus-gotest-'));
   try {
     writeFileSync(join(work, 'main.go'), transform(checked(source)));

@@ -62,8 +62,9 @@ const identical = source => {
 };
 
 // examples/lists.bumpus is polymorphic (P001 Task 7), so specialization
-// copies it rather than returning it; test/poly-run.test.mjs runs it.
-const polymorphicExamples = new Set(['lists.bumpus']);
+// copies it rather than returning it; test/poly-run.test.mjs runs it. So
+// is examples/functions.bumpus (FN001 Task 6; test/compiler.test.mjs).
+const polymorphicExamples = new Set(['functions.bumpus', 'lists.bumpus']);
 const examples = readdirSync('examples').filter(name => name.endsWith('.bumpus'))
   .filter(name => !polymorphicExamples.has(name))
   .sort().map(name => readFileSync(join('examples', name), 'utf8'));

@@ -7,8 +7,8 @@ an earlier layer; scripts/structure.mjs enforces it from `purs graph`.
 | Layer | Modules (src/) | Role |
 |---|---|---|
 | Domain | Syntax, Type, Resolved, Problem, Host, Checked.Internal, IR.Internal | syntax trees, spans, `Ty v`, resolved syntax, checked IR, monomorphic IR, `Problem` data, capability-port types |
-| Features | Resolve, Resolve.{Expression,Types,Pattern,Repeated,Fresh}, Check, Check.{Infer,Call,Arms,Match,Require,Scheme,Walk,Comparable,Instantiation,Nested,Components,Unify,Tables,Inhabited,Signature,Matrix,Usefulness,Missing,Coverage,Search}, Specialize, Specialize.{Seeds,Keys,Lower,Body,Copy,Intern,Values,Unlowered} | resolution, checking, coverage, specialization; report `Problem` data, never text |
-| Format | Lex, Parse, Parse.*, Stack, Go, Go.{Layout,Data,Lowered,Expression,Match,Capture,Compare,Show,Usage}, Diagnostic, Wire, Arguments | text in (tokens, parser, reserved words, uppercase rule); Go out; diagnostic text, `E_*` names, wire records, usage text |
+| Features | Resolve, Resolve.{Expression,Types,Pattern,Repeated,Fresh}, Check, Check.{Infer,Call,Arms,Match,Require,Scheme,Walk,Comparable,Instantiation,Nested,Components,Unify,Tables,Inhabited,Signature,Matrix,Usefulness,Missing,Coverage,Search}, Specialize, Specialize.{Seeds,Keys,Lower,Body,Copy,Intern,Values} | resolution, checking, coverage, specialization; report `Problem` data, never text |
+| Format | Lex, Parse, Parse.*, Stack, Go, Go.{Layout,Data,Lowered,Expression,Match,Capture,Value,Apply,Lambda,Pipe,Stage,Entry,Compare,Show,Usage}, Diagnostic, Wire, Arguments | text in (tokens, parser, reserved words, uppercase rule); Go out; diagnostic text, `E_*` names, wire records, usage text |
 | Runtime | Node (+ Node.js) | port implementations, argv/stdout/stderr/exit, JSON; the only FFI |
 | Program | Compile, Command, Main | pure `compile`, commands over any `Host`, entry point |
 
@@ -121,8 +121,9 @@ Format.Wire.
   fields), .Body (function bodies), .Copy (state-and-failure applicative).
   FN001 Task 5 adds .Intern (arrows hash-consed into the IR's `funTypes`
   table; `IR.Ty`'s `TFun FunTypeId` is a number), .Values (function
-  references, constructor owners, lambdas) and the temporary guard
-  .Unlowered (until FN001 Task 6). The full FN001 update is Task 9's.
+  references, constructor owners, lambdas); its temporary guard
+  .Unlowered was deleted in FN001 Task 6, when Go lowered function values.
+  The full FN001 update is Task 9's.
 - **P001 tests** (one file per concern): poly-syntax (grammar,
   resolution), unify (+ unify-oracle, union-find reference), poly-check
   (typing), poly-depth (inferred-type bound), poly-termination
@@ -146,8 +147,17 @@ Format.Wire.
   item 6, E005). Format.Go.Compare emits a
   `bumpusCmpN` per declared type (and `bumpusCmpBool`, decided by
   Format.Go.Usage), Format.Go.Show a `bumpusShowN` per type; `main` prints
-  through the latter for declared results (ADR 005). Go representation decisions
-  live here, not in Features.
+  through the latter for declared results (ADR 005). FN001 Task 6 lowers
+  function values (design §13 rules 1-8): saturated calls stay n-ary
+  (Format.Go.Value); a value of arity n ≥ 2 is a staged wrapper
+  `{f}Value`/`{f}Stage{k}` over linked `bumpusNode{N}` environments ending
+  in `{f}Entry`, one n-ary call (Format.Go.Stage, .Entry); lambdas are
+  lifted to `bumpusFn{f}Lambda{k}` of their free locals then parameters
+  (Format.Go.Lambda); applications beyond 64 arguments are split into
+  `bumpusFn{f}Apply{k}` helpers (Format.Go.Apply); a pipe whose left
+  operand is not a literal or local is lifted to `bumpusFn{f}Pipe{k}`
+  (Format.Go.Pipe). Matches, lambdas, pipes and helpers share one counter
+  per function. Go representation decisions live here, not in Features.
 
 Only `Features.Check*` and `Features.Specialize*` import
 `Domain.Checked.Internal`, and only `Features.Specialize*` and `Format.Go*`

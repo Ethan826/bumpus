@@ -2054,3 +2054,125 @@ The user chose to accept the 1.37× isolated gain (7c6c0f5; script
 scripts/ladder-profile.mjs, 6d0906c) and continue to FN001 Task 6. T003
 stays Open with its five recorded design options; ladder in verify now
 748-968 ms against 1,500. Task 6 starts after the T003 review.
+
+### FN001 Task 6: Go lowering (2026-10-08)
+
+Branch fn001. Reach: the whole CLI; programs with function types,
+lambdas, function values, partial and over-application and pipes now
+compile, build and run. Design §13 rules 1-8 as adopted.
+
+- What changed: the guard Features.Specialize.Unlowered and its call in
+  Program.Compile are deleted. Format.Go.Lowered's `Scope` carries the
+  program's `Shape` (signatures and constructors as `Wrapper`s, the
+  `funTypes` table, and a (parameter, result) → number map); `Lowered`
+  gains `wrappers`, the staged wrappers its values need. New modules:
+  Format.Go.Value (a saturated call or construction is today's n-ary call,
+  rule 1; a partial one is `{f}Value(a1)…(aj)`; a bare reference of arity
+  1 is the Go function, of arity n ≥ 2 `{f}Value`; any other application
+  and over-application apply the value), .Apply (rule 6: inline up to 64
+  arguments, else `bumpusFn{f}Apply{k}` helpers of at most 64 stages
+  taking the value so far and their arguments' free locals, each argument
+  evaluated in place), .Lambda (rule 5: `bumpusFn{f}Lambda{k}` of its free
+  locals, ascending, then its parameters, `_` for a discard; the value is
+  the wrapper applied to the free locals through .Apply, or the function
+  itself with no free local and one parameter), .Pipe (rule 7), .Stage
+  (rules 2-3: one `bumpusNode{N}` per distinct argument type of all
+  wrappers, `{f}Value`, `{f}Stage{k}`) and .Entry (rule 4: package-level
+  `{f}Kinds`/`{f}Slots`, one array per distinct type, one loop, one n-ary
+  call). Capture gains `lambdaFree` (a lambda's named parameters are bound
+  in its body; a set, so a wide lambda is not quadratic) and `without`.
+  Expression dispatches every node by an explicit arm (the temporary
+  wildcard is gone); Compare's `TFun` arm and a new explicit Show `TFun`
+  arm emit `malformed` for a function field (never compared or printed,
+  design §3, but every declared type gets both helpers). Emit order: node
+  types after the function types, wrappers after the functions. A program
+  with no function value emits no node, stage, entry or table: the four
+  bootstrap snapshots are byte-identical (compiler, shapes, tree and
+  lists tests). Usage and Layout needed no change.
+- Decisions not dictated (recorded in design §13 "Task 6
+  clarifications"): (1) a stage value with no interned arrow (inside the
+  prefix of a partial application, or of a lambda's free locals) gets
+  the wrapper's own `{f}Arrow{k}` type; every other stage uses the
+  interned `bumpusFun{N}`, found by number, so uses and the wrapper agree.
+  (2) The pipe's temporary is the parameter `bumpusPipe` of a lifted
+  `bumpusFn{f}Pipe{k}` (free locals, then the operand), not an
+  immediately invoked closure, so pipe chains nest no closure; a literal
+  or local left operand is spliced in as the last argument. In both
+  cases a right side `g(b1…bk)` with k < n becomes `g(b1…bk, v)`, so
+  `xs |> take(3)` is a direct call. (3) Matches, lambdas, pipes and
+  helpers share one pre-order counter per function. (4) Entries' tables
+  are `int32`, not `uint16` (no 65,536-type ceiling). (5) Helper bodies
+  are one chained expression, not one statement per stage as in Task 1's
+  prototype. (6) Wrappers are emitted once each by name, in first-request
+  order; node types are numbered in first-appearance order. (7)
+  test/fn-lambdas.mjs now holds Task 5's lambda wrappers, shared by
+  test/fn-representative.test.mjs and test/fn-run.test.mjs (moved, not
+  changed).
+- Deleted rows (the guard's test, test/fn-check.test.mjs `checked
+  function programs stop at the unlowered guard`), each E_INTERNAL
+  `unlowered function` at the span shown, now compiling and printing:
+  `(fn(x) => x)(1)` (1), `1 |> add(2)` (3), `id(add)(1, 2)` (3),
+  `add(1)(2)` (3), `match add(1) { _ => 0 }` at `add(1)` (0), `type T =
+  T(Int -> Int); fn main(): Int = 0;` at `T(Int -> Int)` (0), `fn f(g:
+  Int -> Int): Int = 0; fn main(): Int = 0;` at the declaration (0).
+  test/specialize.test.mjs's monomorphic-identity set excludes the new
+  polymorphic examples/functions.bumpus, as it excludes lists.bumpus (its
+  first verify run failed on the new example's arrow table,
+  .build/fn001-task6-verify1.log). No other existing assertion changed.
+- Tests seen failing first, all at the guard (E_INTERNAL `unlowered
+  function`): test/fn-timing.test.mjs, 6 of 6
+  (.build/fn001-task6-red-timing.log): named value `use(stuck)`, lambda
+  `use(fn(x) => stuck(x))`, partial strictness `ignore(k3(probe(1)))`,
+  pipe order `probe1(1) |> g(probe2(2))`, helper order (a 65-argument
+  application of `w`, whose body is entered at its second stage, before a
+  third argument's probe) and sharing (`twice(k3(probe(10)))` prints `30`
+  with probe entered once in the trace); test/fn-run.test.mjs, 22 of 22
+  (.build/fn001-task6-red-run.log); test/fn-scale.test.mjs, 1 of 1
+  (.build/fn001-task6-red-scale.log). After implementing, two structural
+  rows in fn-run failed because the test assumed declaration-order ids
+  (a generic `length` is numbered after the monomorphic functions); the
+  ids in the tests were corrected, not the assertions.
+- Mutation checks (isolated copies under the scratchpad, one mutant each,
+  rebuilt, test/fn-timing.test.mjs run): eta-expanded value of a
+  one-parameter function returning a function (`func(x) … { return
+  func(y) … { return F(x)(y) } }`): `named value` fails (exit 0); a
+  hoisting application helper (each block's arguments bound before its
+  stages): `helper order` fails (probe2 entered first); lazy partial
+  arguments (a partial call as nested closures around the saturated call):
+  `partial strictness` fails (exit 0) and `sharing` fails (trace
+  `[3 2 0 1 0 1]`, probe twice); a rewritten pipe (left operand spliced in
+  place, no temporary): `pipe order` fails (probe2 first). Every other
+  probe passed under each mutant.
+- Scale (test/fn-scale.test.mjs, through the CLI): 5,000 parameters of
+  Int, Bool and List(Int), each read twice in a strided order (Bool
+  through a helper call, as Task 1's body), called directly and applied
+  as a value through 79 helpers; Go's cache is defeated for the
+  program's own package by a comment nonce. Alone: emit 1.3 s, `go build`
+  4.0 s against the 10 s bound (2.8 s for the same program with the
+  direct call only); the test logs its build time. A first body with
+  `if` terms (3,333 immediately invoked closures) built in 5.8 s (4.5 s
+  direct only); replaced before any verify.
+- Depth (ADR 006 "Functions emitted"): the five FN001 forms joined
+  `forms` and test/depth.test.mjs. Re-measured in an isolated copy with
+  the limit lifted, every form, and the old forms also on an isolated
+  build of 97740c6: FN001 forms 1,507 / 812 / 607 / 607 / 343; old forms
+  unchanged by the lowering (within 5); minimum 276
+  (constructor-argument; 274 at 97740c6), limit 128 unchanged, no
+  anomalies. The drops since ADR 006's G001 table (e.g. plus-chain
+  2,928 → 1,564, constructor-argument 304 → 274) predate Task 6.
+- Differential (scripts/differential.mjs, a scratchpad variant that skips
+  sources the baseline stops at its guard; baseline an isolated build of
+  97740c6; harvest regenerated, its test run exited 0): seed 1, count
+  1,000: 5,094 sources compared and 1,085 isName probes, 0 differences,
+  309 function programs skipped (304 harvested, 5 mutations); seed 6,
+  count 10,000: 32,054 compared and 10,085 probes, 0 differences, 349
+  skipped (.build/fn001-task6-differential{,-10k}.log).
+- GREEN: `rm -rf output && npm run verify` exit 0, 526 tests (487 at 97740c6,
+  minus the guard test with its 7 rows, plus 6 timing probes, 22 run
+  tests, 1 scale, 1 snapshot and 10 CLI depth tests), zero failures or skips, twelve
+  regression proofs, the four bootstrap snapshots unchanged; the match
+  ladder 542 ms; `twenty thousand parameters` 220 ms; the 5,000-parameter
+  `go build` 6,799 ms against its 10 s bound (4.0 s alone; BACKLOG T003
+  records the margin); load average 1.79 before, 6.71 after
+  (.build/fn001-task6-verify3.log; earlier green run
+  .build/fn001-task6-verify2.log). Usage and Layout unchanged.

@@ -10,11 +10,10 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { forms, functionForms } from './depth-forms.mjs';
+import { forms } from './depth-forms.mjs';
 
-// FN001 forms only when named: until Go emits them (FN001 Task 6) their
-// runs below the overflow point end in a diagnostic, reported as anomalies.
-const named = { ...forms, ...functionForms };
+// The FN001 forms are in `forms` since Go emits them (FN001 Task 6).
+const named = forms;
 
 const timeout = 120000;
 const start = 64;

@@ -44,6 +44,7 @@ lowerMatch scope lower next result scrutinee arms =
   , next: bodies.next
   , lifted: [ lifted ] <> subject.lifted <> bodies.lifted
   , free: union [ subject.free, signature.captured ]
+  , wrappers: subject.wrappers <> bodies.wrappers
   }
   where
   signature =

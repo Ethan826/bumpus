@@ -1,0 +1,33 @@
+type List(a) = Nil | Cons(a, List(a));
+type Pair(a, b) = Pair(a, b);
+
+fn map(f: a -> b, xs: List(a)): List(b) = match xs {
+  Nil => Nil,
+  Cons(x, rest) => Cons(f(x), map(f, rest)),
+};
+
+fn filter(keep: a -> Bool, xs: List(a)): List(a) = match xs {
+  Nil => Nil,
+  Cons(x, rest) =>
+    if keep(x) then Cons(x, filter(keep, rest)) else filter(keep, rest),
+};
+
+fn foldLeft(f: (b, a) -> b, acc: b, xs: List(a)): b = match xs {
+  Nil => acc,
+  Cons(x, rest) => foldLeft(f, f(acc, x), rest),
+};
+
+fn compose(f: b -> c, g: a -> b): a -> c = fn(x) => f(g(x));
+
+fn add(x: Int, y: Int): Int = x + y;
+
+fn double(x: Int): Int = x + x;
+
+fn upTo(n: Int): List(Int) = if n <= 0 then Nil else Cons(n, upTo(n + -1));
+
+fn main(): Pair(Int, List(Int)) =
+  Pair(
+    upTo(5) |> filter(fn(x) => x > 2) |> map(compose(add(1), double))
+      |> foldLeft(add, 0),
+    map(add(100), Cons(1, Cons(2, Nil)))
+  );

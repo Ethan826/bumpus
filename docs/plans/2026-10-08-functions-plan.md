@@ -1,6 +1,7 @@
 # First-Class Functions Implementation Plan (FN001)
 
-Status: Task 5 complete 2026-10-08 (instantiation rule and
+Status: Task 6 complete 2026-10-08 (Go lowering; docs/progress.md).
+Task 5 complete 2026-10-08 (instantiation rule and
 specialization; docs/progress.md). Task 4 complete 2026-10-08 (checking;
 docs/progress.md).
 Task 3 complete 2026-10-08 (syntax and resolution;
@@ -391,6 +392,14 @@ in the size of all key types.
 - Modify: `test/support.mjs` (`panicOnEntry(goSource, functionIndex,
   label)`, beside `traceCalls`: inserts `panic("bumpus-probe: <label>")`
   as the first statement of `bumpusFn<index>`)
+- As built: Format.Go.Value (named calls, partials, references, value
+  application), .Lambda, .Pipe and .Entry were also created; Usage and
+  Layout needed no change; test/fn-scale.test.mjs (the 5,000-parameter
+  build bound) and test/fn-lambdas.mjs (Task 5's wrappers, shared with
+  test/fn-representative.test.mjs) created; test/specialize.test.mjs
+  excludes the new polymorphic example from its monomorphic identity
+  set; scripts/depth-forms.mjs, scripts/depth-probe.mjs and
+  test/fn-depth.test.mjs's comment follow the forms' move.
 
 **Interfaces:** design §13 "adopted convention", rules 1-8, exactly:
 direct calls unchanged; one node type per distinct ground Go argument
@@ -407,14 +416,14 @@ declaration naming its result's type by number, so emitting them is
 linear in the number of distinct suffixes; no type name is derived by
 spelling a type.
 
-- [ ] **Step 1a: Write failing timing probes** in test/fn-timing.test.mjs
+- [x] **Step 1a: Write failing timing probes** in test/fn-timing.test.mjs
   with `panicOnEntry`: named value `use(stuck)`, lambda
   `use(fn(x) => stuck(x))`, partial strictness `ignore(k3(probe(1)))`,
   sharing (Review Focus 2, `traceCalls` count) and pipe order
   `probe1(1) |> g(probe2(2))`. Each asserts a non-zero exit whose output
   contains exactly its label, within the batch timeout; none recurses.
   They fail first because the guard rejects every such program.
-- [ ] **Step 1b: Write failing execution tests** (runGoBatch): a
+- [x] **Step 1b: Write failing execution tests** (runGoBatch): a
   65-argument application split into two helpers and a 64-argument one
   inline, both printing the expected value; a lambda with three free
   locals and two parameters; a function of three distinct parameter
@@ -428,9 +437,9 @@ spelling a type.
   parameter; nested lambdas three deep; `|>` chains; a type with a
   function field; the Task 5 representative-independence programs run
   with Int and Bool representatives and print the same.
-- [ ] **Step 2: Run** `node --test test/fn-run.test.mjs
+- [x] **Step 2: Run** `node --test test/fn-run.test.mjs
   test/fn-timing.test.mjs`. Expected: FAIL.
-- [ ] **Step 3: Implement.** examples/functions.bumpus: `map`, `filter`,
+- [x] **Step 3: Implement.** examples/functions.bumpus: `map`, `filter`,
   `foldLeft`, `compose` written as a two-parameter function returning a
   lambda, a partial application, a pipe chain; snapshot
   bootstrap/functions.go asserted byte-equal by test/compiler.test.mjs
@@ -438,14 +447,14 @@ spelling a type.
   explicit exhaustive ones: src/Format/Go/Expression.purs `_ → leaf next
   (unlowered …)` and src/Format/Go/Compare.purs `TFun _ → malformed`
   (Task 5 review, M2).
-- [ ] **Step 3a: Re-measure** ADR 006's margin for the FN001 forms with
+- [x] **Step 3a: Re-measure** ADR 006's margin for the FN001 forms with
   scripts/depth-probe.mjs after lowering (`functionForms` in
   scripts/depth-forms.mjs, named on the command line), then move them
   into `forms` so test/depth.test.mjs runs them through the CLI (added
   by the Task 3 review).
-- [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0,
+- [x] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0,
   four existing snapshots byte-identical.
-- [ ] **Step 5: Commit** `feat: lower functions to staged Go (FN001)`.
+- [x] **Step 5: Commit** `feat: lower functions to staged Go (FN001)`.
 
 ### Task 7: The reference interpreter and generated comparisons
 

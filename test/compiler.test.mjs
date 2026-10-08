@@ -103,6 +103,15 @@ test('lists example matches its snapshot and runs through the CLI', () => {
   'Pair(Cons(Pair(3, true), Cons(Pair(2, false), Nil)), Just(6))\n');
 });
 
+// FN001 Task 6: function values, lambdas, partial application and pipes,
+// lowered to staged Go (design §13), through the CLI.
+test('functions example matches its snapshot and runs through the CLI', () => {
+  const source = readFileSync('examples/functions.bumpus', 'utf8');
+  assert.equal(checked(source), readFileSync('bootstrap/functions.go', 'utf8'));
+  assert.equal(command('node', ['scripts/bumpus.mjs', 'run',
+    'examples/functions.bumpus']), 'Pair(27, Cons(101, Cons(102, Nil)))\n');
+});
+
 test('EOF and multiline diagnostic positions are exact', () => {
   const source = 'fn main(): Int =\n  true;';
   assert.deepEqual(rejected(source, 'E_TYPE').span.start, { offset: 19, line: 2, column: 3 });

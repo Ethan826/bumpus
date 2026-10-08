@@ -111,8 +111,9 @@ fieldComparison field = case _ of
     <> " }\n"
     <> decide (compareName owner <> "(*" <> left <> ", *" <> right <> ")")
   -- Checking rejects every comparison at a type holding an arrow (design
-  -- §3), so this helper never meets two such values; FN001 Task 6 emits
-  -- helpers by usage instead.
+  -- §3), yet every declared type gets its helper; Go cannot compare two
+  -- func values, so a function field is never compared and a constructor
+  -- holding one, never reached, reports a malformed value.
   TFun _ → malformed <> "\n"
   where
   left = "a." <> field

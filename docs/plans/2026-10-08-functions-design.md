@@ -701,3 +701,22 @@ Checked at small sizes by scripts/stage-order.mjs for homogeneous nodes
 shared partial reuse); the per-type node layout of rule 2 was checked by
 checksums only. Task 6's timing probes exercise rules 2-7 on the real
 lowering.
+
+Task 6 clarifications (2026-10-08, as built; rules 1-8 unchanged):
+
+- Stage types. Rule 3's stages need a Go type for every value awaiting
+  argument k. Where Specialize interned that arrow (any suffix of a type
+  some expression has: a bare reference's whole spine, a partial
+  application's remaining arrow, a lambda's own type) the stage uses its
+  `bumpusFun<N>`, found by (parameter, result) numbers. A stage no source
+  expression has (inside the prefix of a partial application, or of a
+  lambda's free locals) gets the wrapper's own `<name>Arrow<k>`, declared
+  beside the wrapper; such a value never meets a source type, so no
+  identity is lost, and the text stays linear in the wrapper's arity.
+- Pipe temporary. Rule 7's temporary is the parameter `bumpusPipe` of a
+  lifted function `bumpusFn{f}Pipe{k}` (free locals of the application,
+  then the operand), not section 7's immediately invoked closure, so a
+  chain of pipes nests no closure (E005's reason for lifting matches).
+- Numbering. Matches, lambdas, pipes and application helpers of one
+  function share its pre-order counter, so a program without the new
+  forms numbers its matches as before.

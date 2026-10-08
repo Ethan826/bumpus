@@ -4,32 +4,14 @@ import { Right } from '../output/Data.Either/index.js';
 import { TBool, TInt } from '../output/Domain.Type/index.js';
 import { specializeWith } from '../output/Features.Specialize/index.js';
 import { checkedPoly } from './phases.mjs';
+import { withLambdas } from './fn-lambdas.mjs';
 import { programs } from './poly-programs.mjs';
 
 // FN001 Task 5: the representative-independence property (ADR 007,
-// condition 4; design §6) gains lambdas with unused parameters. Each
-// generated P001 program has every body wrapped in a lambda whose unused
-// parameters are holes: applied at once to `Nil` (a parameter of type
-// `List(_)`), or never applied (parameters of bare hole type) and matched
-// on. Here on the IR: with Int and with Bool as the representative the
-// copies differ, yet their computations are the same tree. Task 6
-// executes them.
-const wrappers = [
-  body => `(fn(unusedParameter) => ${body})(Nil)`,
-  body => `match (fn(unusedParameter, _) => 0) { _ => ${body} }`,
-  body => `(fn(_, unusedParameter) => ${body})(Nil, Nil)`
-];
-
-// Every function declaration's body is the text after its first ` = `
-// (type texts hold no `=`) up to its `;` (expressions hold none).
-const withLambdas = source => source.split('; ').map((declaration, index) => {
-  if (!declaration.startsWith('fn ')) return declaration;
-  const split = declaration.indexOf(' = ') + ' = '.length;
-  const end = declaration.endsWith(';') ? -1 : declaration.length;
-  const wrap = wrappers[index % wrappers.length];
-  return declaration.slice(0, split)
-    + wrap(declaration.slice(split, end)) + declaration.slice(end);
-}).join('; ');
+// condition 4; design §6) gains lambdas with unused parameters
+// (test/fn-lambdas.mjs). Here on the IR: with Int and with Bool as the
+// representative the copies differ, yet their computations are the same
+// tree. Task 6 executes them (test/fn-run.test.mjs).
 
 const specialized = (source, representative) => {
   const result = specializeWith(representative)(checkedPoly(source));

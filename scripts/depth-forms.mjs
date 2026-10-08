@@ -92,14 +92,11 @@ const mixed = {
   }
 };
 
-export const forms = { ...single, ...mixed };
-
 // FN001 forms (ADR 006, Functions). Each has counted depth d and fails at
-// d + 1 on its leaf (or, for parameter types, at the innermost `->`). They
-// parse and resolve now; Check types them from FN001 Task 4 and Go emits
-// them from Task 6, when they join `forms` (and test/depth.test.mjs). Until
-// then test/fn-depth.test.mjs checks them through Resolve, and
-// scripts/depth-probe.mjs measures them only when named.
+// d + 1 on its leaf (or, for parameter types, at the innermost `->`). Since
+// FN001 Task 6 Go emits them, so they are in `forms` (test/depth.test.mjs,
+// through the CLI); test/fn-depth.test.mjs also checks them through
+// Resolve.
 
 // Generic, so the function's own signature adds no depth.
 const apply = 'fn apply(f: a): Int = 0; ';
@@ -147,3 +144,5 @@ export const functionForms = {
     };
   }
 };
+
+export const forms = { ...single, ...mixed, ...functionForms };

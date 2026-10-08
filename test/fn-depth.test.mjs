@@ -6,8 +6,8 @@ import { rejectedAt } from './support.mjs';
 import { resolved } from './phases.mjs';
 
 // FN001 Task 3: the function nesting forms of scripts/depth-forms.mjs
-// through Parse and Resolve (ADR 006, Functions). They join
-// test/depth.test.mjs, through the CLI, once Go emits them (Task 6).
+// through Parse and Resolve (ADR 006, Functions). Since Task 6 they are
+// also in test/depth.test.mjs, through the CLI.
 const message = `Nesting exceeds ${nestingLimit} levels`;
 
 for (const [name, form] of Object.entries(functionForms)) {

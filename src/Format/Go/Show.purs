@@ -59,8 +59,13 @@ showField id position = case _ of
     <> "(out, *"
     <> field
     <> ")\n"
-  _ → "out = fmt.Append(out, " <> field <> ")\n"
+  TInt → appended
+  TBool → appended
+  -- Printing is rejected at a type holding an arrow (design §3), yet every
+  -- declared type gets its printer; a function field is never printed.
+  TFun _ → malformed <> "\n"
   where
+  appended = "out = fmt.Append(out, " <> field <> ")\n"
   field = "v." <> fieldName id position
 
 appendText ∷ String → String

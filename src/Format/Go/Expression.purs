@@ -6,44 +6,49 @@ import Data.String.Common (joinWith)
 import Domain.IR.Internal as IR
 import Domain.IR.Internal (Ty)
 import Format.Go.Compare (comparison)
-import Format.Go.Data
-  ( boolean
-  , ctorName
-  , functionName
-  , goType
-  , integer
-  , localName
-  )
+import Format.Go.Data (boolean, goType, integer, localName)
 import Format.Go.Capture (union)
+import Format.Go.Lambda (lowerLambda)
 import Format.Go.Lowered
   ( Lowered
   , Scope
   , Several
   , both
+  , ctorWrapper
+  , functionWrapper
   , leaf
   , several
   , variable
   )
 import Format.Go.Match (lowerMatch)
+import Format.Go.Pipe (lowerPipe)
+import Format.Go.Value (applyValue, named, reference)
 
--- `next` is the number the first match met in pre-order will take; each
--- match becomes its own top-level function (Format.Go.Match).
+-- `next` is the number the first lifted function met in pre-order will
+-- take; each match, lambda, temporary pipe and application helper becomes
+-- its own top-level function (Format.Go.Match, .Lambda, .Pipe, .Apply).
+-- One arm per node, each delegating; a flat exhaustive dispatch.
 expression ∷ Scope → Int → IR.Expr → Lowered
-expression scope next (IR.Expr term) = case term.node of
+expression scope next whole@(IR.Expr term) = case term.node of
   IR.Integer value → leaf next (integer value)
   IR.Boolean value → leaf next (boolean value)
   IR.Local id → variable next (localName id) id term.ty
-  IR.Call id arguments → joined (call (functionName id)) (each arguments)
-  IR.Construct id arguments → joined (call (ctorName id)) (each arguments)
+  IR.Call id arguments →
+    named scope lower next (functionWrapper scope.shape id) whole arguments
+  IR.Construct id arguments →
+    named scope lower next (ctorWrapper scope.shape id) whole arguments
   IR.Add left right → pair addition left right
   IR.Compare operator left right →
     pair (comparison operator (IR.typeOf left)) left right
   IR.If condition yes no →
     joined (conditional term.ty) (each [ condition, yes, no ])
   IR.Match scrutinee arms → lowerMatch scope lower next term.ty scrutinee arms
-  -- Function values: unreachable behind Features.Specialize.Unlowered until
-  -- FN001 Task 6 lowers them.
-  _ → leaf next (unlowered term.ty)
+  IR.FunctionRef id → reference next (functionWrapper scope.shape id)
+  IR.CtorRef id → reference next (ctorWrapper scope.shape id)
+  IR.Apply callee arguments → applyValue scope lower next callee arguments
+  IR.Lambda parameters body →
+    lowerLambda scope lower next whole parameters body
+  IR.Pipe left right → lowerPipe scope lower next whole left right
   where
   lower = expression scope
   each = several lower next
@@ -55,18 +60,11 @@ joined render parts =
   , next: parts.next
   , lifted: parts.lifted
   , free: union parts.frees
+  , wrappers: parts.wrappers
   }
 
--- A well-typed Go expression that fails loudly if ever run.
-unlowered ∷ Ty → String
-unlowered ty = "func() " <> goType ty
-  <> " { panic(\"bumpus: unlowered function\") }()"
-
-call ∷ String → Array String → String
-call name arguments = name <> "(" <> joinWith ", " arguments <> ")"
-
 addition ∷ String → String → String
-addition left right = call "bumpusAdd" [ left, right ]
+addition left right = "bumpusAdd(" <> left <> ", " <> right <> ")"
 
 -- `if` keeps its immediately invoked closure; nested `if` branches build
 -- at the nesting limit (test/depth.test.mjs), unlike nested match closures.

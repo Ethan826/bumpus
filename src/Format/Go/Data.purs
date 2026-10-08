@@ -6,6 +6,7 @@ module Format.Go.Data
   , functionName
   , fieldName
   , localName
+  , pipeLocal
   , integer
   , boolean
   , malformed
@@ -54,7 +55,15 @@ functionName ∷ FunctionId → String
 functionName (FunctionId index) = "bumpusFn" <> show index
 
 localName ∷ LocalId → String
-localName (LocalId index) = "bumpusLocal" <> show index
+localName (LocalId index)
+  | index < 0 = "bumpusPipe"
+  | otherwise = "bumpusLocal" <> show index
+
+-- A pipe's left operand, bound as the last parameter of the function the
+-- pipe is lifted to (Format.Go.Pipe). Resolve numbers locals from 0, so
+-- this id names no source local.
+pipeLocal ∷ LocalId
+pipeLocal = LocalId (-1)
 
 integer ∷ Int → String
 integer value = "int32(" <> show value <> ")"

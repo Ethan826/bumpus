@@ -173,3 +173,42 @@ from Task 6, which re-measures them with scripts/depth-probe.mjs (they
 are measured only when named) and moves them into `forms` and
 test/depth.test.mjs; until then test/fn-depth.test.mjs checks each at the
 limit and one past it through Resolve.
+
+## Functions emitted (FN001 Task 6, 2026-10-08)
+
+Go now emits the five `functionForms`, so they joined `forms`
+(scripts/depth-forms.mjs) and test/depth.test.mjs runs each through the
+CLI at depth 128 (compiles, builds, runs) and 129 (E_NESTING);
+test/fn-depth.test.mjs keeps its Resolve-level rows. Re-measured with
+scripts/depth-probe.mjs in an isolated copy with the limit lifted (the
+procedure above), after lowering, all forms; the old forms also on an
+isolated build of 97740c6 (before Task 6), same machine and minute:
+
+| Form | 97740c6 | Task 6 |
+|---|---|---|
+| lambda-bare | — | 1,507 |
+| lambda-parens | — | 812 |
+| parameter-types | — | 607 |
+| type-parentheses | — | 607 |
+| annotation-types | — | 343 |
+| parens | 522 | 522 |
+| if-condition | 674 | 679 |
+| if-branch | 1,067 | 1,067 |
+| match-scrutinee | 799 | 798 |
+| match-arm | 775 | 775 |
+| call-argument | 315 | 315 |
+| constructor-argument | **274** | **276** |
+| constructor-pattern | 371 | 372 |
+| plus-chain | 1,564 | 1,564 |
+| if-left-of-sum | 1,396 | 1,396 |
+| parens-in-call-in-constructor | 363 | 363 |
+| compare-matches | 759 | 759 |
+
+No anomalies. The lowering changes no old form's capacity (differences
+of up to 5 are run-to-run variation near the boundary); the decreases
+since the G001 Task 3 table above (parens 648 → 522, call-argument
+369 → 315, constructor-argument 304 → 274, plus-chain 2,928 → 1,564)
+predate FN001 Task 6 (present at 97740c6; not attributed further here).
+The margin over twice the limit (256) is now 18 levels. The smallest FN001
+form is annotation-types, 343. Rule: min 276, half 138, limit 128,
+unchanged.
