@@ -42,6 +42,14 @@ bind, deferred computations, and explicitly passed instance values.
 
 ## Function values and joint class/record design
 
+The user requires common FP standard-library helpers with approachable
+names informed by Rust, rather than historical abbreviations or joke
+names. STD001's coverage/naming brief is
+[standard-library direction](2026-10-08-standard-library-direction.md).
+Deliver supported helpers after FN001 and coordinate generic operations,
+modules and practical data APIs with K001/C001, M001 and D001 respectively;
+this adds no work to FN001's approved scope.
+
 Bumpus currently has no function values, lambdas or closures. Design FN001
 as its own milestone. Go closures offer a lowering route, but the design
 must specify function typing, captured values, evaluation order and how

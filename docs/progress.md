@@ -1497,3 +1497,19 @@ only the spread punctuation is special syntax in the proposal.
 Verification: `npm run verify` exited 0 with 318 tests, no failures or
 skips, and twelve regression proofs; evidence:
 `.build/fx001-error-rows-verify.log`. Proposed error sums remain unimplemented.
+
+## Standard-library helper direction recorded (2026-10-08)
+
+The user requested planning for common PureScript/Haskell FP helpers with
+approachable Rust-informed names. Added STD001 and a dedicated direction
+document covering optional/result eliminators, defaults, transformations,
+functions, sequences, text, maps/sets and generic collection operations.
+Candidate names distinguish getOrElse from full branch elimination and
+make eager/lazy evaluation explicit. Delivery follows FN001 and stages
+other APIs by their prerequisites; no compiler or helper implementation.
+Acceptance requires an upstream coverage matrix, readable examples,
+behavioral/law tests and explicit deferrals. Handoff and language-direction
+link the brief; exact public names still need reviewed API designs.
+Verification: `npm run verify` exited 0 with 318 tests, no failures or
+skips, and twelve regression proofs; evidence:
+`.build/std001-direction-verify.log`. Helpers are planned, not implemented.
