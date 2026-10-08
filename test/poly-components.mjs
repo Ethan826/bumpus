@@ -66,8 +66,9 @@ const callText = (functions, edge) => `${functions[edge.callee].name}(`
 const signature = definition => Array.from({ length: definition.arity },
   (_, index) => `x${index}: ${variables[index]}`).join(', ');
 
-// The source, with each call's text and offset, for exact spans.
-export const render = component => {
+// The source, with each call's text and offset, for exact spans; `entry`
+// replaces `main` (Task 8 enters the component from it).
+export const render = (component, entry = main) => {
   let source = prelude;
   const located = [];
   component.functions.forEach((definition, caller) => {
@@ -81,7 +82,7 @@ export const render = component => {
     if (component.outside[caller]) source += ' + outside(Cons(x0, Nil))';
     source += '; ';
   });
-  return { source: source + main, calls: located };
+  return { source: source + entry, calls: located };
 };
 
 // The distinct ground types written at the component's own references.

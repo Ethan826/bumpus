@@ -1178,3 +1178,64 @@ Status: done.
   (.build/p001-task7-verify.log).
 - Phase reached: these tests run the whole pipeline (`compile`, the CLI and
   Go). Task 8 adds the specialization properties.
+
+### Task 8: specialization properties (2026-10-08)
+
+Language change: none (tests only). Status: done.
+
+- test/poly-properties.test.mjs, 7 tests, one Go batch of 90 packages
+  (30 generated programs, each as generated, with declarations reversed,
+  and with Bool as the hole representative); the file runs in about 10 s.
+  - execution oracle: each of the 30 programs prints in Go what the
+    reference interpreter computes;
+  - uniqueness: no two `specializationKeys` are equal (normalized keys
+    such as `fn f0[List(List(Int))]`), and every program has polymorphic
+    keys;
+  - determinism: `compile` twice gives equal Go; the reversed program
+    prints the same and has the same normalized key set (sorted arrays,
+    declaration and type ids replaced by source names);
+  - representative independence: `specializeWith TBool` and `specialize`
+    emit different Go for every program (the holes reach specialization)
+    and both print the same;
+  - termination bound (design §4.2): Task 5's 200 components, each entered
+    once from `main` at a random function and random ground arguments
+    (Task 5's four plus `List(List(Bool))` and `List(List(_))`); keys per
+    component ≤ Σ_{d∈C} |T|^arity(d) with T = the entry's arguments ∪ G_C,
+    holes normalized to their representative Int (Task 5's `List(_)`
+    reads `List(Int)`), and every key's arguments lie in T. `outside`'s
+    keys are not counted (its own component). The bound is often reached
+    exactly. Component programs are only counted, never run (R13);
+  - two self-checks that do not depend on specialization: the interpreter
+    against known outputs (examples/lists.bumpus, int32 wrap, constructor
+    order), and the generator mixes permuted and dropped type arguments
+    in calls between generic functions, recursion that runs (at least a
+    third of the programs make a self call at run time), a hole in every
+    program, and `main` instantiations at `List(List(Int))` beside
+    `List(List(Bool))` and `Pair(Int, Bool)` beside `Pair(Bool, Int)` of
+    the same function.
+- Helpers (each under the 250-line limit): test/poly-parse.mjs and
+  test/poly-oracle.mjs, the reference interpreter (own tokenizer and
+  recursive-descent parser, type syntax read and dropped; untyped values,
+  int32 `+`, strict left-to-right, ADR 005 order), sharing no compiler
+  code; test/poly-types.mjs, test/poly-expressions.mjs and
+  test/poly-programs.mjs, the type-directed generator (List, Pair and a
+  generated G whose recursive fields keep or swap its parameters; four
+  generic functions calling only earlier ones, with self calls only on a
+  part of the recursion parameter, so every program terminates);
+  test/poly-keys.mjs, keys by source name. test/poly-components.mjs:
+  `render` takes an optional `entry` in place of `main`. The brief named
+  one helper file; it is split to respect the size target.
+- RED: with `specialized` stubbed to return `Left` (temporary edit,
+  reverted), the five properties failed and the two self-checks passed
+  (.build/p001-task8-red.log). A second temporary mutant, function keys
+  looked up with every applied-type argument treated as equal, failed the
+  execution oracle, determinism and representative tests (the batch's Go
+  no longer compiled) (.build/p001-task8-mutant-key.log); uniqueness and
+  the bound do not catch that mutant, because it reuses keys rather than
+  duplicating them.
+- GREEN: `rm -rf output && npm run verify` exit 0, 302 tests (295 + 7),
+  zero failures/skips, eight regression proofs
+  (.build/p001-task8-verify.log).
+- Phase reached: the whole pipeline (`compile`, `specializeWith`,
+  `specializationKeys`) and Go for the generated programs; the
+  components through Specialize only.

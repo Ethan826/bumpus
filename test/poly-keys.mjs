@@ -1,0 +1,36 @@
+// Specialization keys by source name (P001 Task 8). A key's declaration id
+// becomes its function or type name, and each type id inside its arguments
+// becomes that type's name, so a key reads `fn length[List(Int)]` and keys
+// of two programs that number declarations differently can be compared.
+// Function and type names are unique within a program.
+import assert from 'node:assert/strict';
+import { Right } from '../output/Data.Either/index.js';
+import { TBool, TData, TInt } from '../output/Domain.Type/index.js';
+import { specializationKeys } from '../output/Features.Specialize/index.js';
+import { checkedPoly } from './phases.mjs';
+
+const groundText = (program, type) => {
+  if (type instanceof TInt) return 'Int';
+  if (type instanceof TBool) return 'Bool';
+  assert.ok(type instanceof TData, `not ground: ${JSON.stringify(type)}`);
+  const name = program.types[type.value0].name;
+  const args = type.value1.map(arg => groundText(program, arg));
+  return args.length ? `${name}(${args.join(', ')})` : name;
+};
+
+// Each key as { function, name, arguments (texts), text }.
+export const namedKeys = source => {
+  const program = checkedPoly(source);
+  const result = specializationKeys(program);
+  assert.ok(result instanceof Right, `${source}\n${JSON.stringify(result)}`);
+  return result.value0.map(key => {
+    const name = (key.function ? program.functions : program.types)[
+      key.declaration].name;
+    const args = key.arguments.map(arg => groundText(program, arg));
+    const kind = key.function ? 'fn' : 'type';
+    return { function: key.function, name, arguments: args,
+      text: `${kind} ${name}[${args.join(', ')}]` };
+  });
+};
+
+export const keyTexts = source => namedKeys(source).map(key => key.text);
