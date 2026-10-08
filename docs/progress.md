@@ -1360,3 +1360,14 @@ Verification: `rm -rf output && npm run verify` exits 0 in 90 s wall
 (.build/p001-final-fix-verify.log). The eight files (`node --test test/unify.test.mjs test/poly-*.test.mjs
 test/diagnostics.test.mjs`, 153 tests) passed three sequential runs
 (.build/p001-final-fix-run{1,2,3}.log).
+
+## P001 merged (2026-10-08)
+
+User approved the merge (no push). main fast-forwarded from 79c2327 to
+dcb40fb (P001 Tasks 1-9, the final-review fix wave, and the merged main
+direction commits). Clean `rm -rf output && npm run verify` on main exited
+0: zero warnings, 318 tests, zero failures/skips, twelve regression
+proofs. Raw log: .build/p001-merge-verify.log. Per-task logs, briefs,
+reports, review packages and the ledger (rulings R1-R20) archived under
+.build/merged-p001-evidence; worktree and branch removed. Next: FN001,
+starting with the currying discussion recorded in BACKLOG.
