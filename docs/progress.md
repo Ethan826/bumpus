@@ -1866,3 +1866,16 @@ every function program at the temporary guard after Specialize.
 - GREEN: `rm -rf output && npm run verify` exit 0, 483 tests (472 + 11),
   zero failures/skips, twelve regression proofs; bootstrap snapshots
   unchanged. Log .build/fn001-task5-verify.log.
+
+## FN001 decisions (2026-10-08)
+
+The user approved (a) fixing BACKLOG T003 (match-ladder timing margin:
+1,480, 1,393 and 1,441 ms against 1,500 inside the last three verifies)
+on fn001 after the Task 5 review and before Task 6, by reducing the
+workload, not raising the bound; (b) durability additions: Task 8 Step
+1b commits the Task 4 review's linear-cost table as bounded tests
+(test/fn-linear.test.mjs), Task 8 Step 4 uses a committed
+scripts/fn-milestone.mjs for the 20,000 tier, and Task 9 Step 1b
+promotes four scratchpad mutants to regression rows (block-order,
+value-edge, functional-fixpoint, arrow-key; 22 proofs); (c) the design
+§9 documentation of over-application diagnostic changes (Task 4 review).

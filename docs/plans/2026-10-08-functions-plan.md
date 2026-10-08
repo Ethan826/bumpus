@@ -465,6 +465,9 @@ evidence.
 **Files:**
 - Modify: `test/large-source.test.mjs` (or a new
   `test/fn-scale.test.mjs` to stay under 250 lines)
+- Create: `test/fn-linear.test.mjs` (Bumpus-phase cost of function
+  forms), `scripts/fn-milestone.mjs` (the 20,000 tier, committed so it
+  can be rerun; durability additions approved by the user 2026-10-08)
 
 - [ ] **Step 1: Write tests with time bounds**: Bumpus phases at three
   times Task 1's measured time, recorded in the test's comment, and each
@@ -476,14 +479,26 @@ evidence.
   stored in a generic type (equality, ordering and interned keys end to
   end, with its Go types emitted); the existing 20,000-parameter and
   4,000-`Nil` tests unchanged.
+- [ ] **Step 1b: Commit the Task 4 review's linear-cost table as tests**
+  in test/fn-linear.test.mjs, through Parse → Resolve → Check →
+  Specialize: a value reference `g(f)`, over-application `id(f, …)`, a
+  wide lambda, a mismatch `f(1)`, partial applications `f(1)` and
+  `f(1…n-1)`, `(f)(1…n)` and a pipe, each at 20,000 parameters under a
+  bound of three times its measured time (recorded in the test's
+  comment), and each at 80,000 without stack failure.
 - [ ] **Step 2: Run** each in an isolated copy with one linear piece
   replaced at a time (derived `Eq`/`Ord` restored; spelling-based arrow
   keys; recursive spine walk; nested closures), and record that a bound
   fails (quadratic or stack failure) for each; restore.
 - [ ] **Step 3: Run** `rm -rf output && npm run verify`. Expected: exit 0.
-- [ ] **Step 4: Run the milestone tier**: the same programs at 20,000
-  parameters through the compiler and `go build`, each at most 100 s;
-  record times in progress.
+- [ ] **Step 4: Run the milestone tier** with the committed
+  `scripts/fn-milestone.mjs`: the Step 1 programs (and Step 1b's forms
+  that reach Go) at 20,000 parameters, generated as Bumpus source,
+  compiled by the CLI and built with `go build`, each build at most
+  100 s with an explicit timeout, run and output checked; it prints one
+  line per program and exits non-zero on any failure. Not part of
+  verify; run after Task 6's lowering is complete and before the final
+  branch review, times recorded in progress.
 - [ ] **Step 5: Commit** `test: FN001 scale`.
 
 ### Task 9: Regression proofs and documentation
@@ -509,13 +524,26 @@ evidence.
   `fun-compare` (Comparable ignores arrows; probe: `Type Int -> Int is
   not comparable`). Each needle's surrounding code is shaped so the
   mutant compiles.
-- [ ] **Step 2: Run** `node scripts/regression.mjs`. Expected: eighteen
+- [ ] **Step 1b: Promote four scratchpad mutants** from Tasks 2-6 to rows
+  (durability, approved by the user 2026-10-08): `block-order` (an
+  application helper evaluates its block's arguments before applying
+  any; probe: a 65-argument application through a declared-arity
+  boundary must enter the body after argument m and before argument
+  m + 1, as Task 1's order check); `value-edge` (a bare function
+  reference or a reference inside a lambda is not an instantiation
+  edge; probe: polymorphic recursion through a lambda is
+  E_SPECIALIZATION); `functional-fixpoint` (Functional returns only its
+  seeds; probe: a type functional only through another type's field is
+  not comparable); `arrow-key` (arrows interned without their
+  parameter; probe: `id` at two function types differing in a parameter
+  specializes twice and prints both).
+- [ ] **Step 2: Run** `node scripts/regression.mjs`. Expected: twenty-two
   `Regression proof (…)` lines.
 - [ ] **Step 3: Write** ADR 008 (staging by declared arity, nested
   values, A1 lowering with Task 1's numbers, pipe order, hint
   provenance) and the language.md grammar, names, typing, evaluation and
   diagnostics sections, each claim naming its test file.
 - [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0,
-  eighteen proofs; record wall time and test count.
+  twenty-two proofs; record wall time and test count.
 - [ ] **Step 5: Commit** `docs: FN001 ADR 008, language and regression
   proofs`.
