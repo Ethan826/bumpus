@@ -544,3 +544,43 @@ statements or as one expression. (3) The floor itself is k ≈ 1.5: `n`
 named function types plus an `n`-parameter function; not yet split.
 Per the user's ruling no shape is adopted; the representation is to be
 reconsidered with the user.
+
+### A1 measurement, round 2 (2026-10-08; candidates, nothing adopted)
+
+Authorized by the user as measurement only. Raw logs
+.build/fn001-task1/run4-*.log. Total `go build` seconds (the acceptance
+evidence; differences are attribution only):
+
+| Program | 5,000 | 20,000 | k |
+|---|---|---|---|
+| function types alone | 0.28 | 0.66 | 0.62 |
+| `f`'s signature, body `return p0` | 0.17 | 0.22 | 0.19 |
+| `f` with the checksum body (one 20,000-element literal and a loop) | 0.46 | 5.25 | 1.76 |
+| that `f` and a direct call | 0.45 | 5.23 | 1.77 |
+| today's n-ary convention, mixed body (each parameter read twice) | 1.51 | 33.6 | 2.24 |
+| packed, per-type arrays, mixed body, value built only | 2.49 | 18.2 | 1.43 |
+| packed, per-type arrays, mixed body, applied in blocks of 64 | 2.45 | 19.2 | 1.48 |
+| packed, struct per parameter, mixed body, built only | 2.69 | 24.6 | 1.60 |
+| packed, struct per parameter, mixed body, blocks of 64 | 2.90 | 26.9 | 1.61 |
+| packed, Int body, blocks of 16 | 2.23 | 16.3 | 1.44 |
+| packed, Int body, blocks of 64 | 2.08 | 13.1 | 1.33 |
+| packed, Int body, blocks of 256 | 2.21 | 13.1 | 1.28 |
+
+Run time per full application is linear for every staged program
+(k = 1.05-1.13). Evaluation order, body entry at a declared-arity
+boundary, and reuse of a shared partial application across block
+boundaries match the semantics in four cases (boundaries inside a block,
+on block edges, in the first block; n = 7 to 300); a mutant whose helpers
+evaluate their block's arguments first fails the check.
+
+Findings. (1) The signature and the function types are linear; the
+superlinear Go cost is in large function bodies and expressions, and
+today's n-ary convention already pays it (k = 2.24 for an ordinary mixed
+body), so no representation makes `go build` linear at these sizes. (2)
+The packed convention with per-type arrays builds an ordinary body
+faster than today's n-ary function (18.2 s against 33.6 s at 20,000);
+the struct-per-parameter variant is slower than arrays. (3) Block
+splitting removes the quadratic application chain (287 s or a timeout
+before; 13.1-19.2 s now); blocks of 64 and 256 are equivalent, 16 is
+slower. (4) Not measured: how a function used both directly and as a
+value shares one body between the n-ary entry and the packed one.

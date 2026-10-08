@@ -1467,3 +1467,21 @@ run time is linear. Attribution: the last stage's `n`-local unpack and
 to `n` arguments in one Go function is k ≈ 2 in every shape. Stopped per
 the user's ruling: no representation adopted; decision returned to the
 user. No compiler change.
+
+## FN001 Task 1, round 2 (2026-10-08)
+
+User authorized a second measurement round only. Added
+scripts/stage-baselines.mjs (types, signature, body, call),
+scripts/stage-mixed.mjs (mixed Int/Bool/pointer parameters, each read
+twice out of order; today's n-ary convention, packed per-type arrays,
+packed struct), scripts/stage-blocks.mjs (block-split application,
+arguments evaluated in place), scripts/stage-order.mjs (order, body-entry
+and shared-partial checks with expected output computed from the
+semantics); probe reports total build times and an exponent per program.
+All checksums matched; four order cases matched; a hoisting mutant of the
+helpers failed the order check (scratchpad, not committed). Results in
+design §13 "round 2": Go's growth is confirmed in large bodies (today's
+convention, mixed body: 1.51 s / 33.6 s at 5,000 / 20,000); packed
+arrays plus blocks of 64: 2.45 s / 19.2 s; homogeneous packed, blocks of
+64: 2.08 s / 13.1 s; runtime linear. Nothing adopted; proposed Go bounds
+returned to the user. No compiler change.

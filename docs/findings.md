@@ -310,3 +310,10 @@ resource/cancellation semantics. Documentation only; no feature implemented.
   build at the largest size a test claims, and judge growth by the
   exponent, not by a ratio bound (a "within 5 × 4" bound passed a 16.4×
   quadratic build).
+- Go's own build cost is superlinear in the size of one function body
+  even when its signature is not (FN001 Task 1 round 2: a 20,000-
+  parameter signature is linear, k = 0.19; an ordinary body reading each
+  parameter twice is k = 2.24 under today's n-ary convention). Linear
+  generated text cannot give linear `go build`; bound Go builds by
+  measured times at stated sizes, and keep linearity claims for
+  Bumpus's own phases.
