@@ -226,6 +226,16 @@ policy, without weakening the tests or overstating their automated coverage.
   lifting it needs iterative chains in every later phase (BACKLOG O001).
 ## Language-direction planning gap (2026-10-08)
 
+Review of the direction document identified an untracked prerequisite:
+the current IR has named Call but no function values/lambdas/closures.
+FN001 now follows P001 before C001/R001/FX001. Joint class/record design
+must consider a shared record-of-functions representation. Row-layout
+specialization growth and polymorphic fields are distinct risks; a fallback
+is an option, not an approved change to ADR 002. Default lowered-IR position
+is after specialization and above layouts. D001 records text/numeric/
+collection foundations alongside M001; FX001 compares ZIO/Koka families.
+No P001 code or active worktree changed.
+
 The source-language effect system was only a phrase in I001 and the
 self-hosting roadmap; compiler Host ports do not implement it. Recorded
 FX001 for a dedicated design coordinated with rows/classes/FFI. Current

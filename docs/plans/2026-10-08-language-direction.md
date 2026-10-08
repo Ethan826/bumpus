@@ -16,12 +16,16 @@ the user's current job uses Go and they dislike working in it.
 Long-term ambition: a well-implemented language usable for full-stack web
 development and potentially native applications. Language semantics and
 platform bindings should remain distinct as additional targets develop.
-Rust influence does not settle ownership, borrowing, or memory management.
+Rust-like pragmatics here mean Result-style errors, exhaustive matching,
+useful diagnostics and dependable tooling. They do not settle ownership,
+borrowing, or memory management.
 Haskell influence does not settle laziness or every advanced type feature.
 
 ## Early-release priorities
 
 - Rank-1 polymorphism and parameterized ADTs (P001).
+- First-class function types, lambdas, closures and Go lowering (FN001),
+  after P001 and before C001, R001 and FX001.
 - HKTs and kind checking (K001), classes and dictionary elaboration (C001).
 - Row-polymorphic records (R001), structural service composition, and an
   explicit monadic effect design (FX001).
@@ -33,8 +37,27 @@ hypothesis. Rows do not replace their general expressive power; the aim is
 to avoid needing those mechanisms for common application composition.
 Polymorphic operations stored in service records may eventually require
 higher-ranked types; early designs should expose that boundary explicitly.
-Ordinary service records also need function values and their typing/lowering;
-that prerequisite needs planning rather than being assumed implemented.
+FN001 should supply function values for service records, continuations for
+bind, deferred computations, and explicitly passed instance values.
+
+## Function values and joint class/record design
+
+Bumpus currently has no function values, lambdas or closures. Design FN001
+as its own milestone. Go closures offer a lowering route, but the design
+must specify function typing, captured values, evaluation order and how
+specialization discovers referenced functions. A polymorphic named function
+used as a value should be instantiated at its use site; independently
+polymorphic function fields remain outside the initial rank-1 scope.
+Proposed tests: passing and returning functions, captured locals and
+shadowing, separate concrete uses of a generic function, and invalid calls.
+
+C001 and R001 need a joint design review before separate implementation
+plans. Explicitly selected instances and service environments may both be
+records of functions. Decide whether an instance is an ordinary record,
+whether class selection adds any distinct mechanism, and how evidence and
+instance identity are preserved. They may become one design; do not assume
+two independent selection/representation systems. This does not commit to
+Scala implicits or OCaml modular implicits.
 
 C001's existing direction remains: a Prelude, Eq/Ord as ordinary classes,
 derive, and several selectable instances per type without mandatory
@@ -70,6 +93,16 @@ and useful missing-capability diagnostics. Decide conflicting labels and
 field types explicitly; no implicit overwriting rule is chosen here.
 This scenario is a proposed test brief, not verified language behavior.
 
+ADR 002 currently specializes row-polymorphic functions to concrete record
+layouts. Composed environments can produce many distinct row applications;
+the R001/FX001 design must quantify key counts and code growth in this
+scenario, then choose a strategy. Evaluate shared dictionary/accessor-passed
+representations when layouts multiply, alongside bounded specialization.
+A fallback is not selected; introducing one would revise ADR 002's current
+reservation of a boxed fallback for separate compilation. Independently
+polymorphic operations stored in records are a separate typing and lowering
+problem not supported by P001, not merely another concrete row key.
+
 ## Effects need a separate design: FX001
 
 Current roadmap coverage is insufficient: I001 mentions effect sequencing
@@ -77,7 +110,12 @@ inside Go FFI work, and docs/bootstrap.md needs an explicit effect boundary
 for self-hosting. Neither specifies source-language monadic effects.
 The compiler's own monadic Host ports are not Bumpus language support.
 
-Design FX001 in coordination with R001, K001, C001, and I001. Decide:
+Design FX001 after FN001, coordinated with R001, K001, C001 and I001.
+Compare two design families explicitly: ZIO-like environment/error/result
+computations and Koka-like algebraic effects with effect rows and handlers.
+Evaluate inference, service provision, typed errors, resources, lowering and
+the amount of machinery visible to application authors. Neither is selected.
+Decide:
 
 1. The effect type and distinction between constructing and running it.
 2. Bind/pure operations, laws, sequencing syntax, and evaluation order.
@@ -107,7 +145,10 @@ boundary. A002 is the existing concrete opportunity for target-neutral
 match lowering. Proposed future lowered IR makes calls, control flow,
 constructor operations, and effects explicit; target-specific layouts,
 allocation and calling conventions belong below the shared semantic layer.
-The exact IR shape and placement relative to specialization need a design.
+Default to test: lowered IR after specialization, where concrete operations
+are monomorphic and target-neutral, above target layouts. P001 builds that
+boundary; A002 can give the lowered IR concrete work. The exact shape and
+any generic lowering before specialization still need a design.
 Textual inspection need not imply a stable serialized or binary format.
 
 Routes considered:
@@ -128,13 +169,23 @@ Native application integration remains an ambition with no selected UI
 framework, OS API, runtime or schedule. Self-hosting can continue through Go
 independently of additional output targets.
 
+Full-stack use also needs strings/text with explicit encoding semantics,
+numeric types beyond Int32 with defined arithmetic, practical collections,
+and modules/interfaces (M001). Track these foundations under D001 for
+separate focused designs; sharing pure modules across targets presupposes
+M001 and compatible public data/serialization contracts. None is supplied
+by an additional emitter alone.
+
 ## Planning sequence and evidence
 
 Continue P001 as approved. Do not expand its implementation with effects,
-rows, a VM, or another backend. Design each next subsystem independently,
+rows, function values, a VM, or another backend. Design each subsystem,
+with C001/R001 considered together to avoid overlapping mechanisms,
 with exact interfaces, negative cases, properties, meaningful regression
-mutants, and the existing verification discipline. No reorder of approved
-milestones is authorized by this record.
+mutants, and the existing verification discipline. Updated planning order:
+FN001 follows P001 and precedes C001, R001 and FX001. Their joint-design and
+other prerequisite dependencies must be resolved before implementation;
+the current P001 delivery and its execution method are unchanged.
 
 Recommended planning probes: the overlapping-service scenario above, then
 a small full-stack example exercising rows, effects, shared pure logic and
@@ -152,6 +203,8 @@ No reference source code is copied or licensed for reuse by this record.
   service requirements, typed failures and results.
 - [ZIO resources](https://zio.dev/reference/resource/): execution guarantees
   beyond environmental typing.
+- [Koka](https://koka-lang.github.io/koka/doc/book.html): effect rows and
+  algebraic handlers as a contrasting effects design family.
 - [Go WASM](https://go.dev/wiki/WebAssembly) and
   [LLVM GC](https://llvm.org/docs/GarbageCollection.html): target/runtime
   distinctions.

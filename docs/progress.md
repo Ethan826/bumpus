@@ -2,6 +2,21 @@
 
 ## Language direction recorded (2026-10-08)
 
+User review revisions: FN001 is scheduled after P001 before C001/R001/
+FX001; C001/R001 require joint design review of ordinary record instances.
+Documented row-specialization key/code growth and dictionary/accessor
+passing as an option needing an ADR, not a chosen fallback. Lowered IR's
+default to test is after specialization, above layouts. D001 records text,
+numeric and collection foundations; M001 remains required for shared
+modules. Rust pragmatics are explicit; FX001 compares ZIO-like computations
+and Koka-like effect rows/handlers. All five review points addressed in the
+direction document and backlog/handoff. Current P001 worktree untouched.
+
+Fresh `npm run verify` on main exited 0: 162 tests, zero failures/skips,
+zero build warnings/errors, gates, strict rebuild proof and eight isolated
+regression proofs. Raw log: .build/language-direction-review-verify.log.
+Documentation only; these milestones remain unimplemented.
+
 User requested a local commit of the current language/backend/effect
 discussion using the planning guidance. Read brainstorming/writing-plans;
 recorded docs/plans/2026-10-08-language-direction.md as direction and

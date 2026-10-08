@@ -16,6 +16,9 @@ Next steps, in order:
 1. P001: spec and corrected plan approved 2026-10-08; execution is
    subagent-driven on p001 in .worktrees/p001 (BACKLOG.md). Preserve that
    active work and read its current ledger before continuing.
+2. Design FN001 after P001: first-class functions, lambdas and closures.
+   It precedes C001/R001/FX001. Review C001/R001 jointly before selecting
+   separate implementations; decide whether instances are ordinary records.
 
 Long-term discussion is recorded in
 plans/2026-10-08-language-direction.md: row/service architecture, explicit
@@ -25,4 +28,4 @@ evaluation (J001). These do not expand P001 or authorize new implementation.
 Open items: E002 remainder (per-reference name lookups, quadratic coverage
 in arms, quadratic inhabitation in chain length, quadratic binder
 duplicates), F001-F003, F005-F007, E001, E003, E004, O001, H001,
-A002, A004, A005; design follow-ups FX001, L001 and J001.
+A002, A004, A005; design follow-ups FN001, FX001, L001, J001 and D001.
