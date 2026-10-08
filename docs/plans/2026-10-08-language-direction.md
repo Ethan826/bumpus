@@ -187,6 +187,54 @@ calls may be the natural effects syntax; generic monadic `do` can remain
 a separate facility. Do not assume the effect representation or either
 surface syntax is selected by recording this discussion.
 
+### Algebraic effects and open-row syntax direction
+
+Recorded 2026-10-08 at the user's request following the Koka discussion.
+Evaluate direct-style algebraic effects: functions request typed
+operations, scoped handlers provide their implementation, and effect rows
+track requirements. This aligns with service substitution without
+user-assembled transformer stacks. Generic monadic `do` can remain a
+separate facility. Handler continuation behavior (normal return, abort,
+or multiple resumptions), deferred computations, and runtime lowering
+still require FX001's design; no implementation is authorized here.
+
+The user favors familiar composition/spread notation over single-letter
+open-row tails. Candidate effect syntax is `with Log + ...effects`:
+`+` combines requirements and `effects` names the remaining row. The
+outer annotation syntax is still provisional. It denotes requirements,
+not execution order, environment mutation, or automatic handler setup.
+
+The named rest connects requirements across higher-order APIs. A callback
+requiring Database would give a logging wrapper Log plus Database; a pure
+callback would give it only Log. Inferred row polymorphism should normally
+establish that relationship without explicit source annotations. Widening
+can permit extra effects but does not itself specify which callback's
+requirements an output preserves. An alternative shorthand such as
+`requiring Log` could implicitly introduce an open row; whether bare
+annotations are open or closed remains a design decision.
+
+Proposed quantification: `effects` is a user-chosen row-variable name,
+not a reserved word. Generic function signatures may implicitly quantify
+it universally, as ordinary type variables are quantified, rather than
+requiring a written `forall`. It can be instantiated with different rows
+at different calls; it is not an existentially hidden fixed row. Explicit
+quantifier syntax and variable scoping remain to be designed.
+
+Keep record rows separate. `forall r. { log: Log | r }` describes a record
+with a named field; a familiar candidate spelling is
+`{ log: Log, ...services }`. Under R001's unique-label direction, the rest
+must lack `log`. The compiler should infer routine well-formedness
+constraints; record merging may need additional row relationships.
+Record labels and lack constraints do not automatically apply to effect
+rows, whose duplicate/handler semantics require their own decision.
+
+User decision: explicit constraint syntax on effect rows is a future
+feature, outside the initial FX001 scope. Preserve the possibility of
+constraints on a named rest, but do not implement an effect-row `where`
+language or general traits over rows in the first effects release.
+Internal row inference and well-formedness remain necessary. This
+deferral does not remove R001's planned record-row lacks constraints.
+
 ## Intermediate representations and future targets
 
 The user clarified that "hostable" referred to the inspectable intermediate

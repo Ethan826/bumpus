@@ -1463,3 +1463,19 @@ Verification: `npm run verify` exited 0 with 318 tests, no failures or
 skips, and all twelve regression proofs; evidence:
 `.build/fx001-do-docs-verify.log`. The proposed notation is not implemented
 or behaviorally verified by this suite.
+
+## Effect-row notation and constraint scope recorded (2026-10-08)
+
+The user asked to preserve the algebraic-effect/open-row discussion and
+defer explicit effect-row constraint syntax to a future feature. The
+language-direction document now records direct-style handler evaluation,
+candidate `Log + ...effects` notation, inferred higher-order effect
+relationships and proposed implicit universal row quantification. It
+distinguishes record rows and R001's lacks constraints from effect rows.
+Outer syntax, quantifier scope and handler semantics remain design work;
+no compiler change or implementation authorization. BACKLOG and the
+next-session handoff record the future constraint-syntax scope.
+Verification: `npm run verify` exited 0 with 318 tests, no failures or
+skips, and twelve regression proofs; evidence:
+`.build/fx001-row-direction-verify.log`. This verifies the existing
+compiler, not the proposed effects or notation.
