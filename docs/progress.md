@@ -469,3 +469,18 @@ user review.
   (.build/g001-final-fix-verify.log); answer, shapes, tree emits
   cmp-identical to bootstrap/*.go. G001 Done, pending the controller's
   scoped re-review.
+
+## G001 merged (2026-10-07)
+
+User approved the merge and kept the externally rewritten history. main
+fast-forwarded to 44a735b. Clean `rm -rf output && npm run verify` on main
+exited 0: zero warnings, 151 tests, zero failures/skips, strict rebuild
+proof and seven regression proofs (branch, nil-guard, exhaustive,
+ctor-order, first-field, show-fields, state-thread). Raw log:
+.build/g001-merge-verify.log. Scoped re-review of the final fixes found all
+findings addressed (116,000+ differential coverage cases identical to the
+pre-fix build); remaining wording nits fixed here (engineering test count)
+or parked (coverage-scale comment, Inhabited complexity formula). The
+re-review's out-of-scope allowlist gap is BACKLOG F007. Worktree evidence and
+the SDD ledger are archived under .build/merged-g001-evidence; the g001
+worktree and branch are removed.
