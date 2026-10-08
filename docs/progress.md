@@ -2030,3 +2030,10 @@ emit 46 → 26 ms. `npm run verify` with the script committed: exit 0,
 486 tests, twelve regression proofs, ladder 748 ms (load average 6.05
 before, 19.82 after; .build/t003-script-verify.log).
 
+
+## T003 decision (2026-10-08)
+
+The user chose to accept the 1.37× isolated gain (7c6c0f5; script
+scripts/ladder-profile.mjs, 6d0906c) and continue to FN001 Task 6. T003
+stays Open with its five recorded design options; ladder in verify now
+748-968 ms against 1,500. Task 6 starts after the T003 review.
