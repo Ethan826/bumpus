@@ -13,13 +13,8 @@ module Format.Go.Data
 import Prelude
 import Data.Array as Array
 import Data.String.Common (joinWith)
-import Domain.Resolved
-  ( CtorId(..)
-  , FunctionId(..)
-  , LocalId(..)
-  , Ty(..)
-  , TypeId(..)
-  )
+import Domain.IR.Internal (Ty(..))
+import Domain.Resolved (CtorId(..), FunctionId(..), LocalId(..), TypeId(..))
 import Format.Go.Layout (Declared, Layout, Member)
 
 -- Each type becomes one tagged struct and its constructor functions.

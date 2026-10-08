@@ -5,23 +5,8 @@ import { Integer, Add, If, Boolean as Bool } from '../output/Domain.Syntax/index
 import { Right } from '../output/Data.Either/index.js';
 import { checked, rejected } from './support.mjs';
 import { runGoBatch } from './go-batch.mjs';
+import { executedTrees as executed, generator, parsedTrees, print } from './generators.mjs';
 
-// Fixed seed gives replayable generated trees; no discarded inputs.
-const generator = seed => () => {
-  seed = (Math.imul(seed, 1664525) + 1013904223) | 0;
-  return seed;
-};
-const tree = (next, depth) => {
-  const choice = next() >>> 0;
-  if (!depth || choice % 3 === 0) return { tag: 'int', value: next() };
-  if (choice % 3 === 1) return { tag: 'add', left: tree(next, depth - 1), right: tree(next, depth - 1) };
-  return { tag: 'if', flag: next() < 0, yes: tree(next, depth - 1), no: tree(next, depth - 1) };
-};
-const print = node => {
-  if (node.tag === 'int') return String(node.value);
-  if (node.tag === 'add') return `(${print(node.left)} + ${print(node.right)})`;
-  return `(if ${node.flag} then ${print(node.yes)} else ${print(node.no)})`;
-};
 const shape = node => {
   if (node instanceof Integer) return { tag: 'int', value: node.value1 };
   if (node instanceof Add) return { tag: 'add', left: shape(node.value1), right: shape(node.value2) };
@@ -36,9 +21,7 @@ const interpret = node => {
 };
 
 test('200 generated expression trees survive independent printing and parsing', () => {
-  const next = generator(0x51a6);
-  for (let index = 0; index < 200; index++) {
-    const expected = tree(next, 4);
+  for (const expected of parsedTrees) {
     const source = `fn main(): Int = ${print(expected)};`;
     const parsed = parse(source);
     assert.ok(parsed instanceof Right, source);
@@ -47,12 +30,6 @@ test('200 generated expression trees survive independent printing and parsing', 
   }
 });
 
-// Drawn up front, in the order the test used to draw them, so the 12
-// programs build as one Go batch (T001); a case is named by its index.
-const executed = (() => {
-  const next = generator(0x7c95);
-  return Array.from({ length: 12 }, () => tree(next, 3));
-})();
 const batch = runGoBatch(import.meta.url, executed.map((expected, index) =>
   [String(index), `fn main(): Int = ${print(expected)};`]));
 

@@ -14,7 +14,9 @@ import Domain.Resolved (Global)
 import Domain.Resolved as Resolved
 
 type Signature =
-  { parameters ∷ Array Resolved.Parameter, result ∷ Resolved.Ty }
+  { parameters ∷ Array Resolved.Parameter
+  , result ∷ Resolved.Ty Resolved.VarId
+  }
 
 type Definition =
   { index ∷ Int, function ∷ Syntax.FunctionDecl, signature ∷ Signature }

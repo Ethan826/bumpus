@@ -15,10 +15,12 @@ vertical slice before adding language features. Task tracking is local.
   belong in Runtime.* and Program.*. Imports run only to the same or an
   earlier layer (Domain, Features, Format, Runtime, Program). Expected
   semantic failures are `Either Diagnostic`; error codes are an ADT.
-- Parsing, resolved syntax, checked IR, and Go generation are distinct.
-  Only checking and lowering (Features.Check*, Format.Go*) may import
-  Domain.IR.Internal. Keep its
-  constructors behind that enforced module boundary.
+- Parsing, resolved syntax, checked IR, monomorphic IR, and Go generation
+  are distinct. Only checking and specialization (Features.Check*,
+  Features.Specialize*) may import Domain.Checked.Internal; only
+  specialization and lowering (Features.Specialize*, Format.Go*) may import
+  Domain.IR.Internal. Keep both IRs' constructors behind those enforced
+  module boundaries.
 - Prefer `where`, never `let … in`. A `let` inside `do` may depend on an
   earlier bound value. Name transformations passed to map/traverse/eliminators
   in `where`; no anonymous lambdas. Use `maybe`/`maybe'`/`either` for their

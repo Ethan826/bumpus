@@ -15,7 +15,8 @@ import Format.Go.Data
 import Format.Go.Layout (Layout, tagOf)
 import Format.Go.Lowered (Lowered, Lowering, Scope, several)
 import Domain.IR.Internal as IR
-import Domain.Resolved (CtorId, FunctionId, LocalId, Ty(..))
+import Domain.IR.Internal (Ty(..))
+import Domain.Resolved (CtorId, FunctionId, LocalId)
 
 -- Where a pattern position lives, and whether reaching it dereferences.
 type Access = { path ∷ String, pointer ∷ Boolean }

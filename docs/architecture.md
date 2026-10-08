@@ -6,8 +6,8 @@ an earlier layer; scripts/structure.mjs enforces it from `purs graph`.
 
 | Layer | Modules (src/) | Role |
 |---|---|---|
-| Domain | Syntax, Resolved, Problem, Host, IR.Internal | syntax trees, spans, `Ty`, resolved syntax, checked IR, `Problem` data, capability-port types |
-| Features | Resolve, Resolve.{Expression,Types,Pattern,Repeated,Fresh}, Check, Check.{Match,Tables,Inhabited,Signature,Matrix,Usefulness,Missing,Coverage,Search} | resolution, checking, coverage; report `Problem` data, never text |
+| Domain | Syntax, Type, Resolved, Problem, Host, Checked.Internal, IR.Internal | syntax trees, spans, `Ty v`, resolved syntax, checked IR, monomorphic IR, `Problem` data, capability-port types |
+| Features | Resolve, Resolve.{Expression,Types,Pattern,Repeated,Fresh}, Check, Check.{Match,Tables,Inhabited,Signature,Matrix,Usefulness,Missing,Coverage,Search}, Specialize | resolution, checking, coverage, specialization; report `Problem` data, never text |
 | Format | Lex, Parse, Parse.*, Stack, Go, Go.{Layout,Data,Lowered,Expression,Match,Capture,Compare,Show,Usage}, Diagnostic, Wire, Arguments | text in (tokens, parser, reserved words, uppercase rule); Go out; diagnostic text, `E_*` names, wire records, usage text |
 | Runtime | Node (+ Node.js) | port implementations, argv/stdout/stderr/exit, JSON; the only FFI |
 | Program | Compile, Command, Main | pure `compile`, commands over any `Host`, entry point |
@@ -17,8 +17,8 @@ Domain, Features and Format are pure (core library allowlist, no Effect).
 ## Pipeline
 
 ```text
-String -> Lex/Parse -> Syntax -> Resolve -> Resolved -> Check -> IR
-       -> Coverage (Either Diagnostic) -> Go text
+String -> Lex/Parse -> Syntax -> Resolve -> Resolved -> Check -> checked IR
+       -> Coverage (Either Diagnostic) -> Specialize -> IR -> Go text
 ```
 
 Program.Compile composes the phases; Program.Command runs emit/build/run over
@@ -56,8 +56,16 @@ Format.Wire.
 - **Type table.** `TypeInfo {name, ctors, span}` and `CtorInfo {name, owner,
   fields, span}` travel with the program. Names appear only in messages, never
   in Go.
-- **Check** produces checked IR (`Construct CtorId`, `Match`, `Pattern`) and is
-  the only producer of `CheckedProgram`. It reports E_INTERNAL for invalid
+- **Types.** Domain.Type's `Ty v` (`TInt`, `TBool`, `TData TypeId (Array
+  (Ty v))`, `TVar v`) serves each phase with the variables it may hold:
+  `Ty VarId` in resolved syntax, `Ty Open` (rigid variable or hole) in the
+  checked IR. Its `Monad` bind is substitution. The monomorphic IR has its
+  own variable-free `Ty`, so no type variable can reach Go by construction.
+  Until P001 Task 2 nothing produces a variable or a type argument.
+- **Check** produces the checked IR, Domain.Checked.Internal (`Construct
+  CtorId`, `Match`, `Pattern`; each call and construction records its
+  instantiation, empty until P001 Task 4), and is the only producer of
+  `Checked.Program`. It reports E_INTERNAL for invalid
   local/function/type indices; its resolved-syntax input is a trusted phase
   interface, not a hostile-IR validator.
 - **Coverage** (Features.Check.Coverage, Usefulness, Missing, Matrix,
@@ -71,6 +79,11 @@ Format.Wire.
   (G001 Task 4b); usefulness and algorithm I keep their pending heads and
   witness continuations on an explicit Search `Stack` in a `tailRecM` loop,
   so pattern columns cost no JavaScript stack (G001 final review).
+- **Specialize** (Features.Specialize, P001 Task 1) lowers the checked IR to
+  the monomorphic IR, Domain.IR.Internal, converting the constructor table to
+  the IR's own `CtorInfo`. On today's monomorphic programs it is the identity
+  (test/specialize.test.mjs); a variable or type argument is E_INTERNAL
+  `unspecialized type` until P001 Task 7 specializes them.
 - **Compare** is one expression form, `Compare Operator Expr Expr`, through
   every phase (Operator is a closed Domain ADT); the checker requires equal
   operand types and yields Bool. No target detail enters IR.
@@ -86,8 +99,10 @@ Format.Wire.
   through the latter for declared results (ADR 005). Go representation decisions
   live here, not in Features.
 
-Only `Features.Check*` and `Format.Go*` import `Domain.IR.Internal`. This is an
-enforced project boundary, not PureScript privacy.
+Only `Features.Check*` and `Features.Specialize*` import
+`Domain.Checked.Internal`, and only `Features.Specialize*` and `Format.Go*`
+import `Domain.IR.Internal`. These are enforced project boundaries, not
+PureScript privacy.
 
 ## Verified Go properties
 

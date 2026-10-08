@@ -1,9 +1,23 @@
 module Domain.IR.Internal where
 
+import Prelude
 import Domain.Syntax (Operator, Span)
-import Domain.Resolved (CtorId, CtorInfo, FunctionId, LocalId, Ty, TypeInfo)
+import Domain.Resolved (CtorId, FunctionId, LocalId, TypeId)
 
--- Constructors are internal to elaboration and lowering, enforced by the gate.
+-- The monomorphic IR Go generation reads. Its `Ty` has no variable, so no
+-- type variable can reach Go by construction. Constructors are internal to
+-- specialization and lowering, enforced by the structure gate.
+data Ty = TInt | TBool | TData TypeId
+
+derive instance eqTy ∷ Eq Ty
+
+type TypeInfo = { name ∷ String, ctors ∷ Array CtorId, span ∷ Span }
+
+type CtorInfo =
+  { name ∷ String, owner ∷ TypeId, fields ∷ Array Ty, span ∷ Span }
+
+type Tables = { types ∷ Array TypeInfo, ctors ∷ Array CtorInfo }
+
 newtype Program = Program
   { types ∷ Array TypeInfo
   , ctors ∷ Array CtorInfo

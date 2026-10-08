@@ -33,7 +33,7 @@ typeTable program = do
 resolveType
   ∷ Array Resolved.TypeInfo
   → Syntax.TypeRef
-  → Either Syntax.Diagnostic Resolved.Ty
+  → Either Syntax.Diagnostic (Resolved.Ty Resolved.VarId)
 resolveType types = case _ of
   Syntax.IntRef _ → pure Resolved.TInt
   Syntax.BoolRef _ → pure Resolved.TBool
@@ -41,7 +41,7 @@ resolveType types = case _ of
     (Array.findIndex (named name) types)
   where
   named name info = info.name == name
-  found index = pure (Resolved.TData (Resolved.TypeId index))
+  found index = pure (Resolved.TData (Resolved.TypeId index) [])
   missing span name _ = Left
     (Syntax.problemAt (Unbound UnboundType name) span)
 

@@ -9,7 +9,8 @@ module Format.Go.Layout
 import Prelude
 import Data.Array as Array
 import Data.Maybe (fromMaybe)
-import Domain.Resolved (CtorId(..), CtorInfo, Tables, TypeId(..), TypeInfo)
+import Domain.IR.Internal (CtorInfo, Tables, TypeInfo)
+import Domain.Resolved (CtorId(..), TypeId(..))
 
 -- A constructor with its 1-based position in its owner's declaration.
 type Member = { id ∷ CtorId, tag ∷ Int, ctor ∷ CtorInfo }

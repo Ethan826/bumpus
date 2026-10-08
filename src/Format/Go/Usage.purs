@@ -3,7 +3,7 @@ module Format.Go.Usage (needsBoolHelper) where
 import Prelude
 import Data.Array as Array
 import Domain.IR.Internal as IR
-import Domain.Resolved (Ty(..))
+import Domain.IR.Internal (Ty(..))
 import Format.Go.Compare (isBoolOrdering)
 
 -- Helpers are emitted only when some expression needs them, so programs

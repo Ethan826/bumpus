@@ -632,3 +632,61 @@ exited 0: zero warnings, 162 tests, zero failures/skips, test phase 19.4 s,
 eight regression proofs. Raw log: .build/t001-merge-verify.log. Evidence
 and brief archived under .build/merged-t001-evidence; worktree and branch
 removed. main pushed to origin at the user's request. Next: P001.
+
+## P001 execution
+
+Plan: docs/plans/2026-10-08-polymorphism-plan.md (spec
+docs/plans/2026-10-08-polymorphism-design.md). Branch p001 in
+.worktrees/p001; baseline `npm run verify` exit 0, 162 tests, eight
+regression proofs (.build/p001-baseline-verify.log).
+
+### Task 1: parameterized type, checked IR, Specialize seam (2026-10-08)
+
+Behavior-preserving refactor; no language change. Pipeline is now Parse →
+Resolve → Check → Specialize → Go (Program.Compile `parse >=> resolve >=>
+check >=> specialize`, then `emit`).
+
+- Domain.Type (new): `TypeId` (moved from Domain.Resolved, re-exported
+  there), `VarId`, `data Ty v = TInt | TBool | TData TypeId (Array (Ty v))
+  | TVar v` with Eq, Ord, Functor, Apply, Applicative, Bind (substitution),
+  Monad, and `ground ∷ Ty v → Maybe (Ty Void)`. Domain.Resolved re-exports
+  it; resolved types are `Ty VarId`. Nothing produces `TVar` or a type
+  argument yet.
+- Domain.Checked.Internal (new): the former IR shape over `Ty Open`, `data
+  Open = Rigid VarId | Hole Int`; `Call` and `Construct` carry an
+  `Instantiation` (always empty now); `rigid ∷ Ty VarId → Ty Open`.
+  Features.Check* produce and cover it; `check` returns `Checked.Program`
+  (the `CheckedProgram` alias is gone).
+- Domain.IR.Internal: its own variable-free `Ty`, `TypeInfo`, `CtorInfo`,
+  `Tables` (ruling R1). Format.Go* change only imports.
+- Features.Specialize (new): `specialize ∷ Checked.Program → Either
+  Diagnostic IR.Program`, a copy that converts ground `TData id []`; any
+  variable, type argument or non-empty instantiation is E_INTERNAL
+  `unspecialized type` at the holding span (unreachable until Task 2).
+- Coverage (Signature `candidates`) and Match `typeName` report E_INTERNAL
+  on a `TVar` instead of guessing; Task 6 and Task 3/4 replace those arms.
+- Structure gate: two `{ module, importers }` rules in scripts/structure.mjs
+  `internalModules`. AGENTS.md, docs/engineering.md, docs/architecture.md
+  updated. Regression row `branch` needle follows the rename
+  (`Checked.typeOf`); still one target, same defect.
+- Tests: test/structure.test.mjs gains the two-IR gate test (and its old
+  "Features.Check may import Domain.IR.Internal" row now names
+  Domain.Checked.Internal, since that import is now forbidden);
+  test/specialize.test.mjs `specialize is the identity on monomorphic
+  programs` over examples/*.bumpus and the 232 generated programs of the
+  two property files. Their generators moved to test/generators.mjs
+  (importing a test file would register its tests and build its Go batch);
+  draw order and seeds unchanged. test/diagnostics.test.mjs: the two
+  white-box coverage tests now build their input from
+  Domain.Checked.Internal and pass `TData` its (empty) argument array;
+  their assertions are unchanged.
+- RED: `node --test test/structure.test.mjs` failed the new gate test
+  (`actual: []`, expected `[ 'Features.Check imports Domain.IR.Internal' ]`;
+  .build/p001-task1-red-structure.log). `node --test
+  test/specialize.test.mjs` failed with ERR_MODULE_NOT_FOUND for
+  output/Features.Specialize (.build/p001-task1-red-specialize.log).
+- GREEN: `rm -rf output && npm run verify` exit 0, 85.5 s wall, zero
+  warnings, 164 tests (162 + 2), zero failures/skips, eight regression
+  proofs, bootstrap snapshots unchanged (.build/p001-task1-verify.log).
+- Phase reached: every test runs the full pipeline on monomorphic programs;
+  the CLI does not compile polymorphic programs (none parse yet).

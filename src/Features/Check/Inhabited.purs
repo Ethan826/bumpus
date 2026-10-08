@@ -56,7 +56,7 @@ validate ∷ Array TypeInfo → Array CtorInfo → CtorInfo → Lookup Unit
 validate types ctors ctor = traverse_ field ctor.fields
   where
   field = case _ of
-    TData id → typeInfo types id >>= listed
+    TData id _ → typeInfo types id >>= listed
     _ → pure unit
   listed info = traverse_ (ctorInfo ctors) info.ctors
 
@@ -92,7 +92,7 @@ dataFields ∷ CtorInfo → Array Int
 dataFields ctor = Array.mapMaybe dataIndex ctor.fields
   where
   dataIndex = case _ of
-    TData (TypeId index) → Just index
+    TData (TypeId index) _ → Just index
     _ → Nothing
 
 start ∷ Graph → Round

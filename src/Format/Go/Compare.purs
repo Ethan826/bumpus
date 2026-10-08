@@ -12,7 +12,8 @@ import Prelude
 import Data.Array as Array
 import Data.String.Common (joinWith)
 import Domain.IR.Internal as IR
-import Domain.Resolved (Ty(..), TypeId(..))
+import Domain.IR.Internal (Ty(..))
+import Domain.Resolved (TypeId(..))
 import Domain.Syntax (Operator(..))
 import Format.Go.Data (fieldName, goType, malformed)
 import Format.Go.Layout (Declared, Layout, Member)

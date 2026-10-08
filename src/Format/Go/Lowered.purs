@@ -13,7 +13,8 @@ import Prelude
 import Data.Array as Array
 import Data.Traversable (mapAccumL)
 import Domain.IR.Internal as IR
-import Domain.Resolved (FunctionId, LocalId, Ty)
+import Domain.IR.Internal (Ty)
+import Domain.Resolved (FunctionId, LocalId)
 import Format.Go.Capture (Free, none, read, union)
 import Format.Go.Layout (Layout)
 

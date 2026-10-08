@@ -13,6 +13,7 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (maybe')
 import Domain.Problem (Problem(..), Witness(..))
+import Domain.Checked.Internal (Open, rigid)
 import Domain.Resolved (CtorId(..), CtorInfo, Ty(..), TypeInfo)
 import Features.Check.Inhabited (inhabitation)
 import Features.Check.Tables (Lookup, ctorInfo, typeInfo)
@@ -36,22 +37,25 @@ buildSignature types ctors = withInhabited <$> inhabitation types ctors
 
 -- Heads whose presence makes a column complete, in declaration order.
 -- A type with no inhabited constructor has none, so it is vacuously
--- complete.
-candidates ∷ Signature → Ty → Lookup (Array Head)
+-- complete. No type variable exists before P001 Task 2; reading one as
+-- vacuously complete would be unsound, so it is a compiler bug until
+-- coverage learns variables.
+candidates ∷ Signature → Ty Open → Lookup (Array Head)
 candidates tables = case _ of
   TInt → Right []
   TBool → Right [ HBool true, HBool false ]
-  TData id → typeInfo tables.types id >>= inhabitedHeads
+  TData id _ → typeInfo tables.types id >>= inhabitedHeads
+  TVar _ → Left (Internal "Coverage of a type variable")
   where
   inhabitedHeads info = map HCtor <$> Array.filterA isInhabited info.ctors
   isInhabited id = flag tables.inhabited id
 
-fieldTypes ∷ Signature → Head → Lookup (Array Ty)
+fieldTypes ∷ Signature → Head → Lookup (Array (Ty Open))
 fieldTypes tables = case _ of
   HCtor id → fieldsOf <$> ctorInfo tables.ctors id
   _ → Right []
   where
-  fieldsOf ctor = ctor.fields
+  fieldsOf ctor = map rigid ctor.fields
 
 arity ∷ Signature → Head → Lookup Int
 arity tables head = Array.length <$> fieldTypes tables head

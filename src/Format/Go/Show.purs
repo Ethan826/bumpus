@@ -3,7 +3,8 @@ module Format.Go.Show (showName, showHelpers, printed) where
 import Prelude
 import Data.Array as Array
 import Data.String.Common (joinWith)
-import Domain.Resolved (CtorId, CtorInfo, Ty(..), TypeId(..))
+import Domain.IR.Internal (CtorInfo, Ty(..))
+import Domain.Resolved (CtorId, TypeId(..))
 import Format.Go.Data (fieldName, goType, malformed)
 import Format.Go.Layout (Declared, Layout, Member)
 

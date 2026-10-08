@@ -4,7 +4,7 @@ import Prelude
 import Data.Array as Array
 import Data.String.Common (joinWith)
 import Domain.IR.Internal as IR
-import Domain.Resolved (Ty)
+import Domain.IR.Internal (Ty)
 import Format.Go.Compare (comparison)
 import Format.Go.Data
   ( boolean

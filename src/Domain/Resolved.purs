@@ -1,26 +1,25 @@
-module Domain.Resolved where
+module Domain.Resolved
+  ( module Domain.Resolved
+  , module Domain.Type
+  ) where
 
 import Prelude
 import Domain.Syntax (Operator, Span)
+import Domain.Type (Ty(..), TypeId(..), VarId(..))
 
 newtype FunctionId = FunctionId Int
 newtype LocalId = LocalId Int
-newtype TypeId = TypeId Int
 newtype CtorId = CtorId Int
 
 derive instance eqFunctionId ∷ Eq FunctionId
 derive instance eqLocalId ∷ Eq LocalId
-derive instance eqTypeId ∷ Eq TypeId
 derive instance eqCtorId ∷ Eq CtorId
-
-data Ty = TInt | TBool | TData TypeId
-
-derive instance eqTy ∷ Eq Ty
 
 type TypeInfo = { name ∷ String, ctors ∷ Array CtorId, span ∷ Span }
 
+-- Field types are over the owner's variables; none exist before P001 Task 2.
 type CtorInfo =
-  { name ∷ String, owner ∷ TypeId, fields ∷ Array Ty, span ∷ Span }
+  { name ∷ String, owner ∷ TypeId, fields ∷ Array (Ty VarId), span ∷ Span }
 
 type Tables = { types ∷ Array TypeInfo, ctors ∷ Array CtorInfo }
 
@@ -52,12 +51,12 @@ data Expr
   | If Span Expr Expr Expr
   | Match Span Expr (Array Arm)
 
-type Parameter = { name ∷ String, ty ∷ Ty, span ∷ Span }
+type Parameter = { name ∷ String, ty ∷ Ty VarId, span ∷ Span }
 
 type FunctionDecl =
   { id ∷ FunctionId
   , parameters ∷ Array Parameter
-  , result ∷ Ty
+  , result ∷ Ty VarId
   , body ∷ Expr
   , span ∷ Span
   }

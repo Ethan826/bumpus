@@ -14,7 +14,8 @@ module Format.Go.Capture
 import Prelude
 import Data.Array as Array
 import Domain.IR.Internal as IR
-import Domain.Resolved (LocalId(..), Ty)
+import Domain.IR.Internal (Ty)
+import Domain.Resolved (LocalId(..))
 
 -- A free local: what a lifted match receives as one parameter.
 type Captured = { id ∷ LocalId, ty ∷ Ty }

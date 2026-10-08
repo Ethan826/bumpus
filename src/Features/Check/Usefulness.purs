@@ -5,7 +5,8 @@ import Control.Monad.Rec.Class (Step(..), tailRecM)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (maybe, maybe')
-import Domain.IR.Internal as IR
+import Domain.Checked.Internal (Open)
+import Domain.Checked.Internal as Checked
 import Domain.Resolved (Ty)
 import Features.Check.Matrix
   ( Column
@@ -31,7 +32,7 @@ import Features.Check.Signature
 import Features.Check.Tables (Lookup)
 
 -- One U(P, q) instance; q and every row of P have the types `tys`.
-type Problem = { tys ∷ Array Ty, rows ∷ Array Vector, q ∷ Vector }
+type Problem = { tys ∷ Array (Ty Open), rows ∷ Array Vector, q ∷ Vector }
 
 -- A complete wildcard column: the heads not yet tried, in order.
 type Branch = { rows ∷ Array Vector, split ∷ Column, heads ∷ Array Head }
@@ -46,7 +47,10 @@ type State = { next ∷ Next, pending ∷ Stack Branch }
 -- columns (G001 final review I1). Heads are tried in declaration order and
 -- the first useful one ends the search, as before.
 useful
-  ∷ Signature → Array (Array IR.Pattern) → Array IR.Pattern → Lookup Boolean
+  ∷ Signature
+  → Array (Array Checked.Pattern)
+  → Array Checked.Pattern
+  → Lookup Boolean
 useful signature rows q = tailRecM (step signature)
   { next: Continue problem, pending: Bottom }
   where

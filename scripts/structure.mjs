@@ -17,8 +17,13 @@ const pureLayers = ['Domain', 'Features', 'Format'];
 // long inputs (BACKLOG E002); the rest of Control stays out of pure layers.
 const coreLibraries = /^(Prelude$|Control\.Monad\.Rec\.Class$|Data\.(Array|Either|Maybe|Int|String|Foldable|Traversable)(\.|$))/;
 const partialModules = /(^|\.)(Unsafe|Partial)(\.|$)/;
-const irModule = 'Domain.IR.Internal';
-const irImporters = /^(Features\.Check|Format\.Go)(\.|$)/;
+// Each internal IR is visible only to the phase that produces it and the one
+// that consumes it: Check produces the checked IR, Specialize alone reads it
+// and produces the monomorphic IR, and Go generation alone reads that.
+const internalModules = [
+  { module: 'Domain.Checked.Internal', importers: /^Features\.(Check|Specialize)(\.|$)/ },
+  { module: 'Domain.IR.Internal', importers: /^(Features\.Specialize|Format\.Go)(\.|$)/ }
+];
 // Commands run over capability ports only, so tests can pass fake hosts.
 const portCommands = ['Program.Command'];
 const hostEffects = /^(Effect|Runtime)(\.|$)/;
@@ -29,8 +34,8 @@ const projectFinding = (name, dependency) => {
   const own = layers.indexOf(layerOf(name));
   const target = layers.indexOf(layerOf(dependency));
   if (target > own) return [`${name} (${layerOf(name)}) imports ${dependency} (${layerOf(dependency)})`];
-  if (dependency === irModule && !irImporters.test(name)) return [`${name} imports ${dependency}`];
-  return [];
+  return internalModules.filter(rule => rule.module === dependency && !rule.importers.test(name))
+    .map(() => `${name} imports ${dependency}`);
 };
 
 const libraryFinding = (name, dependency) => {

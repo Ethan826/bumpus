@@ -6,7 +6,8 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe')
 import Data.Traversable (traverse)
-import Domain.IR.Internal as IR
+import Domain.Checked.Internal (Open)
+import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..), Witness(..))
 import Domain.Resolved (Ty(..))
 import Features.Check.Matrix (Vector, complete, defaults, headsOf, simplifyRow)
@@ -22,9 +23,9 @@ import Features.Check.Signature
   )
 import Features.Check.Tables (Lookup)
 
-type Task = { tys ∷ Array Ty, rows ∷ Array Vector }
+type Task = { tys ∷ Array (Ty Open), rows ∷ Array Vector }
 
-type Split = { head ∷ Ty, tail ∷ Array Ty }
+type Split = { head ∷ Ty Open, tail ∷ Array (Ty Open) }
 
 -- A complete column: the heads not yet tried, in declaration order.
 type Branch = { rows ∷ Array Vector, split ∷ Split, heads ∷ Array Head }
@@ -32,7 +33,10 @@ type Branch = { rows ∷ Array Vector, split ∷ Split, heads ∷ Array Head }
 -- What waits on a sub-problem's witness vector: the next head of a complete
 -- column, folding a head's fields into one witness, or the absent head of
 -- an incomplete column.
-data Frame = Alternatives Branch | Rebuild Head | Prepend Ty (Array Head)
+data Frame
+  = Alternatives Branch
+  | Rebuild Head
+  | Prepend (Ty Open) (Array Head)
 
 data Mode = Descend Task | Ascend (Maybe (Array Witness))
 
@@ -45,7 +49,7 @@ type Found = Maybe (Array Witness)
 -- Continuations live on an explicit stack: recursion grew the JavaScript
 -- stack per column and overflowed at about 1,600 (G001 final review I1).
 uncovered
-  ∷ Signature → Array (Array IR.Pattern) → Array Ty → Lookup Found
+  ∷ Signature → Array (Array Checked.Pattern) → Array (Ty Open) → Lookup Found
 uncovered signature rows tys = tailRecM (step signature)
   { mode: Descend { tys, rows: map simplifyRow rows }, frames: Bottom }
 
@@ -113,7 +117,7 @@ ascending ∷ Stack Frame → Found → State
 ascending frames found = { mode: Ascend found, frames }
 
 -- The head an incomplete column lacks: `_` when no head is present.
-absent ∷ Signature → Ty → Array Head → Lookup Witness
+absent ∷ Signature → Ty Open → Array Head → Lookup Witness
 absent signature ty heads =
   if Array.null heads then Right WAny
   else choices ty >>= maybe' unfound (opened signature) <<< Array.find lacking

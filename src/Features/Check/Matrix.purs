@@ -16,7 +16,8 @@ import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe, maybe')
-import Domain.IR.Internal as IR
+import Domain.Checked.Internal (Open)
+import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
 import Domain.Resolved (Ty(..))
 import Features.Check.Signature (Head(..), Signature, arity, candidates)
@@ -27,10 +28,11 @@ data Pat = Any | Headed Head (Array Pat)
 
 type Vector = Array Pat
 
-type Column = { ty ∷ Ty, tys ∷ Array Ty, pat ∷ Pat, rest ∷ Vector }
+type Column =
+  { ty ∷ Ty Open, tys ∷ Array (Ty Open), pat ∷ Pat, rest ∷ Vector }
 
 -- Types and patterns advance together; unequal lengths are a compiler bug.
-column ∷ Array Ty → Vector → Lookup (Maybe Column)
+column ∷ Array (Ty Open) → Vector → Lookup (Maybe Column)
 column tys q = maybe' noTypes withTypes (Array.uncons tys)
   where
   noTypes _ = if Array.null q then Right Nothing else mismatch
@@ -41,7 +43,7 @@ column tys q = maybe' noTypes withTypes (Array.uncons tys)
     { ty: types.head, tys: types.tail, pat: patterns.head, rest: patterns.tail }
 
 -- Int has unboundedly many heads, so it is never complete.
-complete ∷ Signature → Ty → Array Head → Lookup Boolean
+complete ∷ Signature → Ty Open → Array Head → Lookup Boolean
 complete signature ty heads =
   if ty == TInt then Right false
   else Array.all present <$> candidates signature ty
@@ -89,16 +91,16 @@ headsOf = Array.mapMaybe firstHead
 wildcards ∷ Int → Vector
 wildcards count = Array.replicate count Any
 
-simplifyRow ∷ Array IR.Pattern → Vector
+simplifyRow ∷ Array Checked.Pattern → Vector
 simplifyRow = map simplify
 
-simplify ∷ IR.Pattern → Pat
-simplify (IR.Pattern pattern) = case pattern.shape of
-  IR.Wildcard → Any
-  IR.Bind _ → Any
-  IR.IntLit value → Headed (HInt value) []
-  IR.BoolLit value → Headed (HBool value) []
-  IR.Ctor id fields → Headed (HCtor id) (map simplify fields)
+simplify ∷ Checked.Pattern → Pat
+simplify (Checked.Pattern pattern) = case pattern.shape of
+  Checked.Wildcard → Any
+  Checked.Bind _ → Any
+  Checked.IntLit value → Headed (HInt value) []
+  Checked.BoolLit value → Headed (HBool value) []
+  Checked.Ctor id fields → Headed (HCtor id) (map simplify fields)
 
-patternType ∷ IR.Pattern → Ty
-patternType (IR.Pattern pattern) = pattern.ty
+patternType ∷ Checked.Pattern → Ty Open
+patternType (Checked.Pattern pattern) = pattern.ty

@@ -19,8 +19,12 @@ adding a bypass allowlist.
   Runtime, Program; docs/plans/2026-10-07-five-layers-design.md) rejects
   unlayered modules and imports of a later layer, restricts Domain, Features
   and Format to the core library allowlist (no Effect, Unsafe or Partial),
-  and lets only Features.Check* and Format.Go* import Domain.IR.Internal.
-  The allowlist (scripts/structure.mjs `coreLibraries`) is Prelude and
+  and gives each internal IR its own importer allowlist (since P001
+  Task 1): only Features.Check* and Features.Specialize* import
+  Domain.Checked.Internal, and only Features.Specialize* and Format.Go*
+  import Domain.IR.Internal (scripts/structure.mjs `internalModules`;
+  test/structure.test.mjs pins both directions).
+  The core allowlist (scripts/structure.mjs `coreLibraries`) is Prelude and
   Data.{Array, Either, Maybe, Int, String, Foldable, Traversable} modules
   plus, since A003 Task 3b, exactly Control.Monad.Rec.Class, for `tailRecM`
   loops over long inputs (BACKLOG E002); test/structure.test.mjs pins that

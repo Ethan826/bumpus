@@ -10,10 +10,24 @@ test('layer gate rejects effects, reverse dependencies, and unchecked IR access'
     ['Features.Resolve', 'Format.Parse'], ['Runtime.Node', 'Program.Main'],
     ['Program.Command', 'Effect'], ['Program.Command', 'Runtime.Node']
   ]) assert.equal(graphFindings({ [name]: { path: 'src/example.purs', depends: [dependency] } }).length, 1);
-  assert.deepEqual(graphFindings({ 'Features.Check': { path: 'src/check.purs', depends: ['Domain.Syntax', 'Domain.IR.Internal', 'Data.Array'] } }), []);
+  assert.deepEqual(graphFindings({ 'Features.Check': { path: 'src/check.purs', depends: ['Domain.Syntax', 'Domain.Checked.Internal', 'Data.Array'] } }), []);
   assert.deepEqual(graphFindings({ 'Program.Main': { path: 'src/main.purs', depends: ['Effect'] } }), []);
   assert.equal(graphFindings({ 'Unknown': { path: 'src/unknown.purs', depends: [] } }).length, 1);
   assert.equal(graphFindings({ 'Bumpus.Old': { path: 'src/Bumpus/Old.purs', depends: [] } }).length, 1);
+});
+
+// Two IRs, two allowlists: checking produces the checked IR, specialization
+// alone reads it and produces the monomorphic IR that Go generation reads.
+test('IR gate admits each internal IR only to its producer and consumer', () => {
+  const found = (name, dependency) =>
+    graphFindings({ [name]: { path: 'src/example.purs', depends: [dependency] } });
+  for (const [name, dependency] of [
+    ['Features.Check', 'Domain.IR.Internal'],
+    ['Format.Go', 'Domain.Checked.Internal'],
+    ['Features.Resolve', 'Domain.Checked.Internal']
+  ]) assert.deepEqual(found(name, dependency), [`${name} imports ${dependency}`]);
+  assert.deepEqual(graphFindings({ 'Features.Specialize': { path: 'src/example.purs',
+    depends: ['Domain.Checked.Internal', 'Domain.IR.Internal'] } }), []);
 });
 
 test('length gate counts blank lines and includes tooling and tests', () => {
