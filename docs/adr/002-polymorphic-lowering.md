@@ -43,3 +43,10 @@ polymorphic interfaces. Every box requires explicit type evidence, validated
 FFI construction, and checked projections. Nil is not an implicit source value.
 Representation changes require an ABI/version decision and fresh bootstrap
 comparisons. This strategy can be revised by an ADR before implementation.
+
+2026-10-08 note: the user dropped the one-instance-per-type requirement
+above (non-overlapping instances, unique ownership). Several instances per
+type are to be allowed, in the fp-ts style, without newtypes; C001's ADR
+will supersede that clause and say how a value built under one instance is
+kept from use under another. See BACKLOG C001 and
+docs/plans/2026-10-08-polymorphism-design.md section 10.
