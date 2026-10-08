@@ -576,7 +576,9 @@ evaluate their block's arguments first fails the check.
 Findings. (1) The signature and the function types are linear; the
 superlinear Go cost is in large function bodies and expressions, and
 today's n-ary convention already pays it (k = 2.24 for an ordinary mixed
-body), so no representation makes `go build` linear at these sizes. (2)
+body). These measurements establish superlinear compilation for the
+tested large Go bodies, not that every representation must have it;
+that is enough to justify explicit build bounds (below). (2)
 The packed convention with per-type arrays builds an ordinary body
 faster than today's n-ary function (18.2 s against 33.6 s at 20,000);
 the struct-per-parameter variant is slower than arrays. (3) Block
@@ -584,3 +586,85 @@ splitting removes the quadratic application chain (287 s or a timeout
 before; 13.1-19.2 s now); blocks of 64 and 256 are equivalent, 16 is
 slower. (4) Not measured: how a function used both directly and as a
 value shares one body between the n-ary entry and the packed one.
+
+### Scale rule (user, 2026-10-08)
+
+Bumpus's own handling of long parameter lists and arrow spines stays
+linear and stack-safe, and every existing Bumpus bound is preserved.
+Generated Go is held to explicit total `go build` time bounds per
+program: 10 s at 5,000 parameters, checked by `npm run verify`; 100 s at
+20,000 parameters, checked by the milestone probe after lowering is
+complete and before the final branch review. A linearity claim is made
+for Bumpus phases only.
+
+### A1 measurement, round 3, and the adopted convention (2026-10-08)
+
+The shared-body case (scripts/stage-shared.mjs, raw log
+.build/fn001-task1/run5-*.log): one n-ary `F` with an ordinary body
+(Int, Bool and pointer parameters, each read twice out of order), called
+directly with today's Go call and also used as a staged value whose entry
+fills per-type arrays and makes one n-argument call to `F`; each round
+builds one shared partial application over the first half (blocks of 64)
+and completes it twice. Total `go build` seconds, including the entry's
+unpacking and call:
+
+| Distinct parameter types | 5,000 (bound 10) | 20,000 (bound 100) | bytes per stage |
+|---|---|---|---|
+| 3 | 3.4 | 52.1 | 49.3 |
+| 1,000 | 5.1 | 80.0 | 52.0 |
+
+Every checksum matched, both completions of the shared partial included;
+run time per application is linear (k = 1.05-1.16). Allocation per stage
+does not grow with type diversity (3 to 1,000 types: 49 to 52 bytes per
+stage, node and closure together), because each node holds only its own
+argument. Both conditions of the user's conditional approval hold, so
+the convention below is adopted. The 20,000 / 1,000-type build uses 80%
+of its bound; the milestone tier will report its margin.
+
+Adopted convention (Format.Go, plan Task 6):
+
+1. Direct calls are unchanged: a saturated call of a named function or
+   constructor emits today's n-ary Go call, and `F` keeps its n-ary
+   signature and its single body. A program with no function value emits
+   no node, stage, entry or table, so existing snapshots are unchanged.
+2. Nodes: one Go node type per distinct ground Go argument type in the
+   program, `type bumpusNode<N> struct { value <A>; previous any }`, shared
+   by every function. A stage allocates exactly one node holding its own
+   argument, so allocation per stage is independent of how many types a
+   function or program uses.
+3. Staged wrapper of a named function or constructor `F` of declared
+   arity `n ≥ 2`, emitted once per specialization used as a value:
+   `FValue(x)` (stage 1) and top-level `FStage<k>(previous any)` for
+   `k = 2…n`, each returning one closure that takes argument `k`, links a
+   new node to `previous`, and calls the next stage; stage `n`'s closure
+   calls `FEntry(node)`. Arity 1 needs no wrapper: `F` is the value.
+4. Entry: `FEntry(e any)` declares one array per distinct argument type
+   of `F`, walks the chain from position `n - 1` down to 0 in one loop
+   that switches on a package-level kind table (position → that
+   function's type index) and asserts the node type, storing into a
+   package-level slot table's index; then it makes one n-argument call of
+   `F` from the arrays. The body exists once.
+5. Lambdas: each lambda is lifted to a top-level n-ary function of its
+   free locals (Format.Go.Capture, ascending LocalId) followed by its
+   parameters, and the lambda value is that function's staged wrapper
+   partially applied to the free locals at the lambda's evaluation. Its
+   body therefore runs when its last parameter is applied, never earlier
+   or later. A lambda with no free local and one parameter is the lifted
+   function itself.
+6. Application: one source application of a value to `j` arguments emits
+   `h(a1)…(aj)` when `j ≤ 64`; otherwise top-level helpers of at most 64
+   stages each, numbered per owner like lifted matches, each taking the
+   value reached so far and the free locals its argument expressions
+   read, and evaluating each argument in place immediately before its
+   stage. Partial and over-application use the same chain (`FValue` or
+   the over-applied result as `h`).
+7. Pipe: a temporary for the left operand unless it is a literal or a
+   local, then the application of rule 6 with the left operand last.
+8. Go function types: one named type per interned arrow suffix (plan
+   Task 5), each naming its result's type by number.
+
+Checked at small sizes by scripts/stage-order.mjs for homogeneous nodes
+(order across block edges, body entry at a declared-arity boundary,
+shared partial reuse); the per-type node layout of rule 2 was checked by
+checksums only. Task 6's timing probes exercise rules 2-7 on the real
+lowering.

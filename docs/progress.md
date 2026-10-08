@@ -1485,3 +1485,18 @@ convention, mixed body: 1.51 s / 33.6 s at 5,000 / 20,000); packed
 arrays plus blocks of 64: 2.45 s / 19.2 s; homogeneous packed, blocks of
 64: 2.08 s / 13.1 s; runtime linear. Nothing adopted; proposed Go bounds
 returned to the user. No compiler change.
+
+## FN001 Task 1 complete (2026-10-08)
+
+The user approved the scale rule (Bumpus phases linear and stack-safe;
+Go builds at most 10 s per program at 5,000 parameters in verify and
+100 s at 20,000 in the milestone probe) and one final round, adoption
+conditional on the shared-body bound and type-diversity allocation.
+Added scripts/stage-shared.mjs. Round 3 (.build/fn001-task1/run5-*.log):
+shared body with direct call, packed entry and a shared partial, total
+build 3.4 s / 5.1 s at 5,000 (3 / 1,000 types) and 52.1 s / 80.0 s at
+20,000; 49.3 / 52.0 bytes per stage; checksums matched. Both conditions
+hold; convention adopted and written as design §13 rules 1-8; plan Task 6
+interfaces and tests updated; conclusions narrowed ("tested large
+bodies", not "no representation"). The 20,000 / 1,000-type build uses
+80% of its bound. Next: Task 2.

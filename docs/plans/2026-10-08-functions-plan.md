@@ -1,7 +1,10 @@
 # First-Class Functions Implementation Plan (FN001)
 
-Status: nine-task structure approved by the user 2026-10-08 with three
-changes, applied here: no quadratic fallback in Task 1; equality,
+Status: Task 1 complete 2026-10-08 (three measurement rounds; design §13
+records the adopted convention and the scale rule, both approved by the
+user, adoption conditional on round 3, which passed). Nine-task
+structure approved by the user 2026-10-08 with three changes, applied
+here: no quadratic fallback in Task 1; equality,
 ordering and type interning in the scale work (Tasks 2, 5, 6, 8); the
 core timing probes in Task 6's first step. Design Amendment A1's
 architecture is approved; its linked representation awaits Task 1. Task
@@ -45,6 +48,12 @@ test runner, Go 1.26.4. No new dependency.
   curried arrow of a scheme only for a value reference or a partial
   application, and every pass over an arrow walks its result spine with a
   loop (§3). No existing large-source bound is raised.
+- Go build bounds (scale rule, user 2026-10-08, design §13): linearity is
+  claimed for Bumpus phases only. Each generated program's total `go
+  build` time must be at most 10 s at 5,000 parameters (tests in `npm run
+  verify`) and at most 100 s at 20,000 parameters (the milestone probe,
+  run after Task 6's lowering is complete and before the final branch
+  review, its result recorded in progress).
 - Existing assertions are unchanged except the rows of §9, which change in
   the task that changes the behavior, each listed in that task's progress
   entry with its old and new code, span and text. Known rows:
@@ -364,13 +373,16 @@ in the size of all key types.
   label)`, beside `traceCalls`: inserts `panic("bumpus-probe: <label>")`
   as the first statement of `bumpusFn<index>`)
 
-**Interfaces (§7 table with §13):** `F` for a one-parameter function
-value; `FValue` stage chain, generated once per specialization used as a
-value; partial `FValue(a1)…(aj)`; over-application `F(a…)(b1)…`; value
-application `h(a1)(a2)…`; every lambda lifted to a stage chain numbered
-per owner like lifted matches; pipe with a temporary unless the left
-operand is a literal or a local; a constructor value through the
-constructor's own stage chain. Named Go function types are numbered from
+**Interfaces:** design §13 "adopted convention", rules 1-8, exactly:
+direct calls unchanged; one node type per distinct ground Go argument
+type, `{ value; previous any }`; staged wrappers `FValue`/`FStage<k>`
+and an entry that fills per-type arrays through package-level kind and
+slot tables and makes one n-ary call of `F`; lambdas lifted to n-ary
+functions of their free locals then parameters, valued as that wrapper
+partially applied to the free locals; application chains longer than 64
+split into per-owner helpers that evaluate each argument in place; pipe
+with a temporary unless the left operand is a literal or a local.
+Named Go function types are numbered from
 Task 5's interned arrow numbers, one declaration per suffix, each
 declaration naming its result's type by number, so emitting them is
 linear in the number of distinct suffixes; no type name is derived by
@@ -383,7 +395,12 @@ spelling a type.
   `probe1(1) |> g(probe2(2))`. Each asserts a non-zero exit whose output
   contains exactly its label, within the batch timeout; none recurses.
   They fail first because the guard rejects every such program.
-- [ ] **Step 1b: Write failing execution tests** (runGoBatch): `map`,
+- [ ] **Step 1b: Write failing execution tests** (runGoBatch): a
+  65-argument application split into two helpers and a 64-argument one
+  inline, both printing the expected value; a lambda with three free
+  locals and two parameters; a function of three distinct parameter
+  types used as a value and also called directly (one body in the Go);
+  `map`,
   `fold`, compose-by-lambda; closures capturing parameters and match
   binders (Review Focus 4); returning closures; partial and
   over-application; `add`/`stuck` timing through `use(add)` printing 0;
@@ -434,10 +451,11 @@ evidence.
 - Modify: `test/large-source.test.mjs` (or a new
   `test/fn-scale.test.mjs` to stay under 250 lines)
 
-- [ ] **Step 1: Write tests with time bounds** set at three times Task 1's
-  measured wall time on this machine, recorded in the test's comment: a
-  5,000-parameter declaration called directly, used as a value and
-  partially applied through every stage, compiled, built and run; a
+- [ ] **Step 1: Write tests with time bounds**: Bumpus phases at three
+  times Task 1's measured time, recorded in the test's comment, and each
+  program's total `go build` at most 10 s (scale rule): a 5,000-parameter
+  declaration with a mixed body, called directly, used as a value and
+  partially applied with the partial shared, compiled, built and run; a
   chain of 1,000 partial applications; a 1,000-long written arrow type;
   a 5,000-parameter function type passed through a generic function and
   stored in a generic type (equality, ordering and interned keys end to
@@ -448,7 +466,10 @@ evidence.
   keys; recursive spine walk; nested closures), and record that a bound
   fails (quadratic or stack failure) for each; restore.
 - [ ] **Step 3: Run** `rm -rf output && npm run verify`. Expected: exit 0.
-- [ ] **Step 4: Commit** `test: FN001 scale`.
+- [ ] **Step 4: Run the milestone tier**: the same programs at 20,000
+  parameters through the compiler and `go build`, each at most 100 s;
+  record times in progress.
+- [ ] **Step 5: Commit** `test: FN001 scale`.
 
 ### Task 9: Regression proofs and documentation
 

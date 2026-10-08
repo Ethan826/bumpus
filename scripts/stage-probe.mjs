@@ -7,6 +7,7 @@
 //   node scripts/stage-probe.mjs                   round 2's matrix
 //   node scripts/stage-probe.mjs packed:5000:b64 … chosen runs
 //   node scripts/stage-probe.mjs order             evaluation-order checks
+//   node scripts/stage-probe.mjs sharedBody:5000:t3  shared body, 3 types
 //
 // Modes: `full` (per-stage statements), `idle` and `bare` (build only),
 // `chain` (one chained expression), `bNN` (blocks of NN stages).
@@ -21,6 +22,7 @@ import { join, resolve } from 'node:path';
 import { baseline, baselineShapes } from './stage-baselines.mjs';
 import { mixed, mixedShapes } from './stage-mixed.mjs';
 import { orderProgram } from './stage-order.mjs';
+import { sharedBody } from './stage-shared.mjs';
 import { checksum, program } from './stage-shapes.mjs';
 
 const root = '.build/fn001-task1';
@@ -59,6 +61,7 @@ const buildOnly = mode => ['idle', 'bare'].includes(mode);
 const generate = (shape, n, count, mode) => {
   if (baselineShapes.includes(shape)) return baseline(shape, n, count);
   if (mixedShapes.includes(shape)) return mixed(shape, n, count, mode);
+  if (shape === 'sharedBody') return sharedBody(n, count, mode);
   return { go: program(shape, n, count, mode),
     expected: buildOnly(mode) ? null : checksum(n, count) };
 };
@@ -101,8 +104,9 @@ const measure = (shape, n, mode) => {
   const run = timed('./program', [], { cwd: work, timeout: runTimeoutMs });
   row.run = outcome(run.result);
   if (row.run !== 'ok') return row;
-  const [nanoseconds, printed] = run.result.stdout.trim().split(' ')
-    .map(Number);
+  const [nanoseconds, printed, perStage] = run.result.stdout.trim()
+    .split(' ').map(Number);
+  if (perStage !== undefined) row.bytesPerStage = Number(perStage.toFixed(1));
   row.checksumOk = printed === generated.expected;
   row.runSeconds = seconds(nanoseconds / 1e6);
   row.microsecondsPerApplication =
