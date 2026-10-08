@@ -1513,3 +1513,20 @@ link the brief; exact public names still need reviewed API designs.
 Verification: `npm run verify` exited 0 with 318 tests, no failures or
 skips, and twelve regression proofs; evidence:
 `.build/std001-direction-verify.log`. Helpers are planned, not implemented.
+
+## STD001 generic rigor clarified (2026-10-08)
+
+The user clarified that approachable naming must preserve theoretical
+rigor and HKT-based shared operations. STD001 now pins generic bimap over
+any lawful Bifunctor, shared Functor/Applicative/Monad contracts, required
+constructor kinds and partial type application, and coherent instance
+evidence under the current rank-1/specialization constraints. Concrete
+helpers are incremental delivery, not completion of the generic library.
+Acceptance includes generic clients, user-defined product/sum instances,
+algebraic law properties and cross-operation coherence; pure callback laws
+remain distinct from FX001 effectful sequencing. BACKLOG and handoff track
+the clarification. No language or library implementation changed.
+Verification: `npm run verify` exited 0 with 318 tests, no failures or
+skips, and twelve regression proofs; evidence:
+`.build/std001-generic-rigor-verify.log`. Generic APIs and laws above are
+future acceptance requirements, not implemented or proven by this run.

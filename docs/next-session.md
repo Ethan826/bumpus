@@ -56,6 +56,11 @@ naming direction, informed by Rust. Read
 docs/plans/2026-10-08-standard-library-direction.md: inventory, candidate
 names (getOrElse, mapOrElse, matchWith, joinWith), eager/lazy distinctions,
 coverage acceptance and staged prerequisites. No helpers added to FN001.
+User clarification: naming convenience must preserve lawful HKT-based
+generic contracts. bimap works for any Bifunctor; optional values and
+fixed-error Result share Functor/Applicative/Monad APIs. Read STD001's
+generic-rigor section for constructor kinds, instance/evidence design,
+user-defined-instance acceptance and law/coherence properties.
 
 Open items: E002 remainder, E006-E011 (P001 follow-ups: stack margin,
 exponential type size, Expand keys, lowercase-type hint, mismatch `_`,
