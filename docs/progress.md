@@ -1371,3 +1371,16 @@ proofs. Raw log: .build/p001-merge-verify.log. Per-task logs, briefs,
 reports, review packages and the ledger (rulings R1-R20) archived under
 .build/merged-p001-evidence; worktree and branch removed. Next: FN001,
 starting with the currying discussion recorded in BACKLOG.
+
+## FN001 direction settled (2026-10-08)
+
+Discussed with the user before any design decision, as BACKLOG required.
+Settled: curried semantics with Algol-like multi-argument syntax as
+proposed (partial application, over-application, under-application
+becomes a function-typed value with a `missing N argument(s)` hint
+replacing today's under-application E_ARITY); lambdas `fn(x) => body`
+reusing `fn` and `=>`, parameter annotations optional and inferred
+locally; `|>` included in FN001 (left-associative, below comparison),
+`>>`/`<<` wait for a Prelude; no local binding form in FN001 (separate
+item), so closures capture parameters and pattern variables by value.
+Next: FN001 design document (docs/plans/2026-10-08-functions-design.md).

@@ -17,9 +17,10 @@ with rulings R1-R20: .build/merged-p001-evidence/sdd/
 2026-10-08-polymorphism-plan/progress.md.
 
 Next steps, in order:
-1. FN001 (first-class functions, lambdas, closures). Before any design
-   decision, discuss the proposed currying direction with the user (its
-   BACKLOG entry records it as not settled). FN001 precedes C001, R001 and
+1. FN001 (first-class functions, lambdas, closures). Direction settled
+   with the user 2026-10-08 (curried, `fn(x) => body`, `|>` in scope, no
+   let; see BACKLOG and progress). Write the design document
+   docs/plans/2026-10-08-functions-design.md next. FN001 precedes C001, R001 and
    FX001; review C001/R001 jointly and decide whether instances are
    ordinary records.
 
