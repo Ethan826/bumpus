@@ -9,8 +9,9 @@ values and records the user's answers to the open questions (section 12
 maps each finding to its resolution). Approved by the user 2026-10-08.
 Nothing is implemented. Amendment A1 (section 13,
 from a measurement made while writing the plan) changes how staged
-values are lowered, not what they mean, and needs the user's
-confirmation; the plan is docs/plans/2026-10-08-functions-plan.md.
+values are lowered, not what they mean; its architecture was approved
+2026-10-08, its linked representation awaits measurement. The plan is
+docs/plans/2026-10-08-functions-plan.md.
 
 ## Goal and non-goals
 
@@ -115,8 +116,9 @@ The bare-name rules of docs/language.md change as follows; the rest stay.
   signature variables (rigid); any other lowercase name is E_UNBOUND
   `Unbound type variable b`. Lambdas are monomorphic: there is no
   generalization of a lambda's type.
-- Calling a local is no longer E_NOT_CALLABLE: it is an application,
-  checked by types (section 3).
+- Calling a local with one or more arguments is no longer
+  E_NOT_CALLABLE: it is an application, checked by types (section 3).
+  `x()` keeps E_NOT_CALLABLE (section 4).
 
 ## 3. Types and checking
 
@@ -175,9 +177,13 @@ applied, and not before. For `f(a1, …, aj)`:
   right; the result is a function value awaiting argument `j + 1`.
 - `j > n`: over-application: `f(a1…an)` runs the body and its result is
   applied to the rest. If the instantiated result type is Int, Bool, a
-  declared type or a rigid variable, this is E_ARITY `Expected n
-  argument(s)` at the call, as today's over-application.
+  declared type or a rigid variable, this is E_ARITY `Wrong number of
+  arguments` at the call, today's over-application text unchanged.
 - `n = 0`: only `f()`; `f()(x)` applies its result.
+- Empty calls keep today's errors: `f()` on a function with parameters is
+  E_ARITY `Wrong number of arguments`, `x()` on a local is E_NOT_CALLABLE
+  `Local is not callable: x`, and `N()` on a nullary constructor stays
+  E_NOT_CALLABLE. Application needs at least one argument.
 
 The boundary is a property of the declaration, not of the type, and it
 survives every use as a value. Two functions with the same type
@@ -289,7 +295,10 @@ stays linear: `type bumpusFun1 func(int32) int32`, `type bumpusFun2
 func(int32) bumpusFun1`. Function literals are written with the named
 result type and are assignable to the named type.
 
-Lowering, with `F` a named function of declared arity `n`:
+Lowering, with `F` a named function of declared arity `n`. The nested
+closures of the wrapper and lambda rows are superseded by Amendment A1
+(section 13): the same stages, as top-level functions over immutable
+environments.
 
 | Source | Go |
 |---|---|
@@ -406,8 +415,12 @@ Every rejection row asserts exact code, span and text.
 - Bare function name: E_UNBOUND becomes a function value (no diagnostic);
   bare zero-parameter function becomes E_ARITY `Expected f()`.
 - Bare constructor with fields: E_ARITY becomes a function value.
-- Calling a local or a binder: E_NOT_CALLABLE becomes application,
-  E_TYPE `Expected a function, found T` when its type is not a function.
+- Calling a local or a binder with arguments: E_NOT_CALLABLE becomes
+  application, E_TYPE `Expected a function, found T` when its type is not
+  a function. With no arguments it stays E_NOT_CALLABLE.
+- Unchanged by decision (user, 2026-10-08): over-application past a
+  non-function result and `f()` on a function with parameters keep
+  E_ARITY `Wrong number of arguments`.
 - Under-application of a function or constructor: E_ARITY becomes a
   function value, typically E_TYPE where it is used, with the hint under
   section 4's provenance rules.
@@ -458,7 +471,7 @@ while writing the plan; see Amendment A1 (section 13).
 | Generated depth of long declarations | Spine-flat nesting measure, iterative spine traversal, named Go function types for linear text, 5,000-parameter scale tests (sections 1, 3, 7, 8). |
 | References in lambda bodies | Stated: every reference at any depth is a graph edge of the enclosing function (section 6); tests include one inside a lambda inside an arm. |
 
-## 13. Amendment A1: linear staged lowering (2026-10-08, proposed)
+## 13. Amendment A1: linear staged lowering (2026-10-08)
 
 Measured with Go 1.26.4 on hand-written Go of section 7's shape (a
 named function of `n` Int parameters, its staged wrapper as nested
@@ -490,8 +503,14 @@ captures a single environment value:
 
 Same hand-written measurement with an environment struct copied per
 stage: 1.1 s at n = 300, 1.1 s at 1,000, 12.8 s at 5,000. Copying the
-whole struct costs O(n) per stage, O(n²) per full application; the plan
+whole struct costs O(n) per stage, O(n²) per full application, which
+the linear-cost requirement excludes; it is not a fallback. The plan
 uses a linked environment (each stage allocates one node holding its
 argument and a pointer to the previous node; the last stage reads the
-chain once), O(1) per stage and O(n) text, and re-measures it as its
-first task before any lowering code is written.
+chain once), O(1) per stage and O(n) text, and measures it as its first
+task before any lowering code is written. If it fails that measurement,
+the representation is reconsidered with the user.
+
+Status: architecture approved by the user 2026-10-08 (top-level stages,
+immutable environments); the linked representation awaits Task 1's
+measurement.

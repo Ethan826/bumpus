@@ -1430,3 +1430,21 @@ ladder 1,830 ms over its 1.5 s bound under external load, 471 ms alone;
 .build/fn001-plan-verify.log), recorded as BACKLOG T003 before
 re-running; second run exit 0, 318 tests, twelve regression proofs, the
 ladder at 752 ms (.build/fn001-plan-verify-2.log).
+
+## FN001 plan approved with changes (2026-10-08)
+
+The user approved A1's architecture (top-level stages, immutable
+environments) and the nine-task structure with three changes, applied to
+the plan: Task 1 has no quadratic fallback (if the linked environment
+fails its linearity thresholds, stop and reconsider with the user) and
+benchmarks runtime with repeated applications, every argument consumed,
+explicit build/run timeouts; equality, ordering and type interning are in
+the scale work (hand-written spine-iterative `Eq`/`Ord` for both `Ty`s in
+Tasks 2 and 5, arrows hash-consed in Specialize.Keys, Go function type
+names numbered from interned suffixes in Task 6, a 5,000-parameter
+function type as a generic argument in Tasks 5 and 8); the core timing
+probes move into Task 6's first step, Task 7 keeps the interpreter and
+generated comparisons. Accepted diagnostic adjustments now in the design
+(§2, §4, §9): over-application past a non-function and `f()` keep
+E_ARITY `Wrong number of arguments`; `x()` and `N()` keep E_NOT_CALLABLE.
+Task 1 (measurement only) authorized in .worktrees/fn001.

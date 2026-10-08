@@ -1,9 +1,12 @@
 # First-Class Functions Implementation Plan (FN001)
 
-Status: draft for the user's review, written 2026-10-08 after the design
-was approved. It assumes design Amendment A1 (linear staged lowering,
-design §13), which the user has not yet confirmed. Nothing is
-implemented.
+Status: nine-task structure approved by the user 2026-10-08 with three
+changes, applied here: no quadratic fallback in Task 1; equality,
+ordering and type interning in the scale work (Tasks 2, 5, 6, 8); the
+core timing probes in Task 6's first step. Design Amendment A1's
+architecture is approved; its linked representation awaits Task 1. Task
+1 (measurement only) is authorized; Tasks 2-9 follow Task 1's result.
+Nothing is implemented.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -51,8 +54,8 @@ test runner, Go 1.26.4. No new dependency.
   `N()` on a nullary constructor stay E_NOT_CALLABLE (application needs
   at least one argument); `f()` on a one-parameter function stays E_ARITY
   `Wrong number of arguments`; over-application whose result is not a
-  function keeps E_ARITY `Wrong number of arguments` (the design's
-  `Expected n argument(s)` wording is not adopted, so no existing text
+  function keeps E_ARITY `Wrong number of arguments` (design §4 and §9,
+  amended 2026-10-08 at the user's decision, so no existing text
   changes).
 - New problem texts, exactly:
   - `FunctionNeedsCall f` (E_ARITY) → `Expected <f>()`
@@ -113,19 +116,29 @@ lowering code exists.
 - Modify: `docs/findings.md`, `docs/progress.md`,
   `docs/plans/2026-10-08-functions-design.md` (§13 result)
 
-- [ ] **Step 1: Write** the generator for three shapes at `n` Int
-  parameters: nested closures (§7 as first approved), copied environment
-  struct, linked environment (each stage allocates `{ value, previous }`;
-  the last stage reads the chain into `F`'s arguments once). Each is
-  called through all `n` stages and prints a value that depends on the
-  first and last arguments.
-- [ ] **Step 2: Run** at n = 50, 300, 1,000, 5,000 and 20,000 (the nested
-  shape only up to 200). Record build and run times per shape and `n`.
-- [ ] **Step 3: Decide.** Linked environment is adopted if its build at
-  5,000 is within 2× of the copied struct and its run is linear in `n`
-  (20,000 within 8× of 5,000 doubled twice). Otherwise adopt the copied
-  struct and record the O(n²) run cost in findings. Write the result into
-  design §13 and remove "proposed" only if the user has confirmed A1.
+- [ ] **Step 1: Write** the generator for the linked environment at
+  `n` Int parameters (each stage allocates `{ value, previous }`; the
+  last stage reads the chain into `F`'s arguments once), plus the copied
+  struct and nested closures as reference points only. `F` consumes every
+  argument (for example a position-weighted sum), so no argument is dead.
+  The program applies the staged value through all `n` stages `R` times,
+  `R` chosen so the run phase lasts well over process start-up (at least
+  about a second at the largest `n`), varying the arguments per round,
+  and prints a checksum the script verifies against its own computation.
+  Run time is measured inside the program around the `R` rounds, apart
+  from build and start-up.
+- [ ] **Step 2: Run** at n = 50, 300, 1,000, 5,000 and 20,000 (nested
+  closures only up to 200). Every `go build` and run has an explicit
+  timeout (builds 300 s, runs 120 s); a timeout is recorded as such.
+  Record build time, per-application run time and binary size per shape
+  and `n`, raw output under .build/fn001-task1/.
+- [ ] **Step 3: Decide.** The linked environment is adopted if its build
+  time grows at most linearly (20,000 within 5× of 4 × the 5,000 time) and
+  its per-application run time is linear in `n` (20,000 within 5× of 4 ×
+  the 5,000 time). If it fails either, stop: report the measurements to
+  the user and reconsider the representation. The copied struct is not a
+  fallback (it is O(n²) per application). Record the result in design
+  §13 and findings.
 - [ ] **Step 4: Commit** `docs: FN001 staged lowering measurement`.
 
 ### Task 2: The arrow type through every type pass
@@ -152,6 +165,12 @@ arrows directly.
   loop; a meta against an arrow binds as against any type; the occurs
   check and `exceedsLimit` enter parameters at `level + 1` and results at
   the same level.
+- Equality and ordering: `Ty`'s derived `Eq` and `Ord` recurse once per
+  arrow, so a 20,000-long spine can overflow the stack wherever types are
+  compared (`bindMeta`'s self test, Map keys, test helpers). Replace them
+  with hand-written instances that walk result spines in a loop and
+  recurse only into parameters and type arguments (bounded by the depth
+  measure), keeping today's order on existing types.
 - Comparable: a type containing `TFun`, directly or through applied
   fields, is `NotComparable`, after the rigid and hole checks (§3).
 - Inhabited: every arrow is inhabited.
@@ -163,7 +182,10 @@ arrows directly.
   differing subterms; meta against an arrow; occurs through an arrow
   (`α` against `α -> Int`); rigid against an arrow fails; a 5,000-long
   spine unifies without stack failure; a 1,001-deep parameter nesting is
-  `TooDeep` while a 5,000-long spine is not. Extend the generated
+  `TooDeep` while a 5,000-long spine is not; `==` and `compare` on two
+  equal 20,000-long spines and on two differing only in the last
+  parameter terminate without stack failure, and `compare` agrees with
+  the derived order on generated arrow-free types. Extend the generated
   property tests and the independent oracle with arrows.
 - [ ] **Step 2: Run** `node --test test/unify.test.mjs`. Expected: FAIL.
 - [ ] **Step 3: Implement.** Comparable, Inhabited and Expand cases get
@@ -297,13 +319,24 @@ arrows directly.
 - Create: `src/Features/Specialize/Unlowered.purs` (the guard),
   `src/Features/Specialize/Values.purs` if Body exceeds budget
 
+**Interfaces:** `IR.Ty`'s `Eq`/`Ord` are hand-written like Task 2's
+(spine loop). Specialize.Keys interns arrows as hash-consed nodes
+(parameter number, result number), as ruling R15 interns applications,
+so every suffix of a spine is numbered once and a key is compared by
+numbers, never by spelling or by walking a whole type: total work linear
+in the size of all key types.
+
 - [ ] **Step 1: Write failing tests:** `fn f(x: a): Int = g(fn(y) =>
   f(Cons(x, Nil)))`-shaped polymorphic recursion through a lambda inside
   a match arm is E_SPECIALIZATION at the reference; a bare `f` at a
   changed instantiation inside its component likewise; `type T(a) = C(a
   -> T(List(a)));` is E_SPECIALIZATION; the component generator gains
   value-reference edges (some inside lambdas) and still meets the §4.2
-  bound; `map(id, …)` at Int and Bool specializes `id` twice; the
+  bound; `map(id, …)` at Int and Bool specializes `id` twice; a
+  5,000-parameter function type as a generic argument (`id(f)` and
+  `Box(f)` with `f` a 5,000-parameter function) specializes, with two
+  such keys differing only in the last parameter kept distinct, within a
+  time bound that a spelling-based or re-walking key fails; the
   representative-independence property gains lambdas with unused
   parameters (checked on the IR here, executed in Task 6).
 - [ ] **Step 2: Run** the three files. Expected: FAIL.
@@ -325,8 +358,11 @@ arrows directly.
 - Delete: `src/Features/Specialize/Unlowered.purs` and its CLI test
 - Create: `src/Format/Go/Stage.purs` (stage chains for wrappers and
   lambdas, Task 1's environment shape), `src/Format/Go/Apply.purs`,
-  `test/fn-run.test.mjs`, `examples/functions.bumpus`,
-  `bootstrap/functions.go`
+  `test/fn-run.test.mjs`, `test/fn-timing.test.mjs`,
+  `examples/functions.bumpus`, `bootstrap/functions.go`
+- Modify: `test/support.mjs` (`panicOnEntry(goSource, functionIndex,
+  label)`, beside `traceCalls`: inserts `panic("bumpus-probe: <label>")`
+  as the first statement of `bumpusFn<index>`)
 
 **Interfaces (§7 table with §13):** `F` for a one-parameter function
 value; `FValue` stage chain, generated once per specialization used as a
@@ -334,9 +370,20 @@ value; partial `FValue(a1)…(aj)`; over-application `F(a…)(b1)…`; value
 application `h(a1)(a2)…`; every lambda lifted to a stage chain numbered
 per owner like lifted matches; pipe with a temporary unless the left
 operand is a literal or a local; a constructor value through the
-constructor's own stage chain.
+constructor's own stage chain. Named Go function types are numbered from
+Task 5's interned arrow numbers, one declaration per suffix, each
+declaration naming its result's type by number, so emitting them is
+linear in the number of distinct suffixes; no type name is derived by
+spelling a type.
 
-- [ ] **Step 1: Write failing execution tests** (runGoBatch): `map`,
+- [ ] **Step 1a: Write failing timing probes** in test/fn-timing.test.mjs
+  with `panicOnEntry`: named value `use(stuck)`, lambda
+  `use(fn(x) => stuck(x))`, partial strictness `ignore(k3(probe(1)))`,
+  sharing (Review Focus 2, `traceCalls` count) and pipe order
+  `probe1(1) |> g(probe2(2))`. Each asserts a non-zero exit whose output
+  contains exactly its label, within the batch timeout; none recurses.
+  They fail first because the guard rejects every such program.
+- [ ] **Step 1b: Write failing execution tests** (runGoBatch): `map`,
   `fold`, compose-by-lambda; closures capturing parameters and match
   binders (Review Focus 4); returning closures; partial and
   over-application; `add`/`stuck` timing through `use(add)` printing 0;
@@ -345,7 +392,8 @@ constructor's own stage chain.
   parameter; nested lambdas three deep; `|>` chains; a type with a
   function field; the Task 5 representative-independence programs run
   with Int and Bool representatives and print the same.
-- [ ] **Step 2: Run** `node --test test/fn-run.test.mjs`. Expected: FAIL.
+- [ ] **Step 2: Run** `node --test test/fn-run.test.mjs
+  test/fn-timing.test.mjs`. Expected: FAIL.
 - [ ] **Step 3: Implement.** examples/functions.bumpus: `map`, `filter`,
   `foldLeft`, `compose` written as a two-parameter function returning a
   lambda, a partial application, a pipe chain; snapshot
@@ -355,21 +403,20 @@ constructor's own stage chain.
   four existing snapshots byte-identical.
 - [ ] **Step 5: Commit** `feat: lower functions to staged Go (FN001)`.
 
-### Task 7: Timing probes and the reference interpreter
+### Task 7: The reference interpreter and generated comparisons
+
+The core timing probes are Task 6's. This task adds independent
+evidence.
 
 **Files:**
-- Modify: `test/support.mjs` (`panicOnEntry(goSource, functionIndex,
-  label)`, beside `traceCalls`: inserts `panic("bumpus-probe: <label>")`
-  as the first statement of `bumpusFn<index>`), `test/poly-oracle.mjs`,
-  `test/poly-parse.mjs`, `test/poly-programs.mjs`,
-  `test/poly-properties.test.mjs`
-- Create: `test/fn-timing.test.mjs`, `test/fn-programs.mjs` (generator)
+- Modify: `test/poly-oracle.mjs`, `test/poly-parse.mjs`,
+  `test/poly-programs.mjs`, `test/poly-properties.test.mjs`,
+  `test/fn-timing.test.mjs` (oracle agreement on the probes)
+- Create: `test/fn-programs.mjs` (generator)
 
-- [ ] **Step 1: Write failing tests:** each probe of §8 (named value
-  `use(stuck)`, lambda `use(fn(x) => stuck(x))`, partial strictness
-  `ignore(k3(probe(1)))`, Review Focus 2 sharing via `traceCalls` count,
-  pipe order). A probe asserts a non-zero exit whose output contains
-  exactly its label, within the batch timeout; none recurses.
+- [ ] **Step 1: Write failing tests:** the interpreter, on each Task 6
+  probe program, reports the same first entered probe as the Go run; the
+  generated-program property (below) runs. Both fail until Step 2.
 - [ ] **Step 2: Extend** the reference interpreter independently:
   closures, staged application with declared arity (a function value
   remembers its remaining stage count), constructor values, `|>` with
@@ -392,10 +439,14 @@ constructor's own stage chain.
   5,000-parameter declaration called directly, used as a value and
   partially applied through every stage, compiled, built and run; a
   chain of 1,000 partial applications; a 1,000-long written arrow type;
-  the existing 20,000-parameter and 4,000-`Nil` tests unchanged.
-- [ ] **Step 2: Run** each with the linear helpers temporarily replaced by
-  recursive ones in an isolated copy, and record that the bound fails
-  (quadratic or stack failure); restore.
+  a 5,000-parameter function type passed through a generic function and
+  stored in a generic type (equality, ordering and interned keys end to
+  end, with its Go types emitted); the existing 20,000-parameter and
+  4,000-`Nil` tests unchanged.
+- [ ] **Step 2: Run** each in an isolated copy with one linear piece
+  replaced at a time (derived `Eq`/`Ord` restored; spelling-based arrow
+  keys; recursive spine walk; nested closures), and record that a bound
+  fails (quadratic or stack failure) for each; restore.
 - [ ] **Step 3: Run** `rm -rf output && npm run verify`. Expected: exit 0.
 - [ ] **Step 4: Commit** `test: FN001 scale`.
 

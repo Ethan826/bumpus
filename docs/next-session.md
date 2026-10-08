@@ -21,10 +21,10 @@ Next steps, in order:
    with the user 2026-10-08 (curried, `fn(x) => body`, `|>` in scope, no
    let; see BACKLOG and progress). The design draft is
    docs/plans/2026-10-08-functions-design.md; approved 2026-10-08;
-   Amendment A1 (section 13, linear staged lowering, from a go build
-   measurement) awaits the user's confirmation. The plan
-   docs/plans/2026-10-08-functions-plan.md awaits review; execution is
-   subagent-driven on branch fn001 in .worktrees/fn001. FN001 precedes C001, R001 and
+   Amendment A1's architecture approved; the plan
+   docs/plans/2026-10-08-functions-plan.md approved with changes. Task 1
+   (measure the linked environment; no quadratic fallback) runs on branch
+   fn001 in .worktrees/fn001; Tasks 2-9 depend on its result. FN001 precedes C001, R001 and
    FX001; review C001/R001 jointly and decide whether instances are
    ordinary records.
 
