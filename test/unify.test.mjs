@@ -198,3 +198,13 @@ test('an infinite type is E_TYPE with both types named', () => {
   assert.deepEqual(wire({ problem: infinite, span }),
     { code: 'E_TYPE', message: 'Infinite type: _ occurs in List(_)', span });
 });
+
+// Ruling R7: unification recurses by type level, so past the limit it fails
+// with TooDeep rather than recursing (a level counts like resolved depth).
+test('unification stops with TooDeep past the inferred type limit', () => {
+  const nested = (depth, leaf) => depth === 1 ? leaf : list(nested(depth - 1, leaf));
+  const deepest = unifier.inferredTypeLimit;
+  assert.deepEqual(unify(new Map(), nested(deepest, int), nested(deepest, int)), new Map());
+  const failure = unify(new Map(), nested(deepest + 1, int), nested(deepest + 1, int));
+  assert.equal(failure.constructor.name, 'TooDeep');
+});

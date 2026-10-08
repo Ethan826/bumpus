@@ -82,9 +82,13 @@ resolve subst ty = case walk subst ty of
 
 -- Rigid matches only the same rigid; a meta binds to any type that does not
 -- properly contain it; applied types unify argument-wise, left to right,
--- stopping at the first failure.
+-- stopping at the first failure. The recursion is bounded by level (one per
+-- applied type entered, so a level is a resolved depth): metas bound
+-- earlier in the same unification can chain into types deeper than either
+-- operand was, so past `inferredTypeLimit` it fails with TooDeep instead of
+-- recursing further (ruling R7, fix round 2).
 unify ∷ Subst → Ty Flex → Ty Flex → Either Failure Subst
-unify subst left right = unifyHeads subst (walk subst left) (walk subst right)
+unify = unifyAt 1
 
 -- The type itself if it is not a bound meta, else the end of its chain.
 walk ∷ Subst → Ty Flex → Ty Flex
@@ -94,9 +98,14 @@ walk (Subst bindings) start = tailRec step start
     TVar (Meta meta) → maybe (Done ty) Loop (Map.lookup meta bindings)
     _ → Done ty
 
+unifyAt ∷ Int → Subst → Ty Flex → Ty Flex → Either Failure Subst
+unifyAt level subst left right =
+  if level > inferredTypeLimit then Left TooDeep
+  else unifyHeads level subst (walk subst left) (walk subst right)
+
 -- Both sides are walked, so a meta here is unbound.
-unifyHeads ∷ Subst → Ty Flex → Ty Flex → Either Failure Subst
-unifyHeads subst left right = case left, right of
+unifyHeads ∷ Int → Subst → Ty Flex → Ty Flex → Either Failure Subst
+unifyHeads level subst left right = case left, right of
   TVar (Meta meta), _ → bindMeta subst meta right
   _, TVar (Meta meta) → bindMeta subst meta left
   TVar (Rigid one), TVar (Rigid other) | one == other → Right subst
@@ -105,10 +114,16 @@ unifyHeads subst left right = case left, right of
   TData one lefts, TData other rights
     | one == other && Array.length lefts == Array.length rights →
         foldM unifyPair subst (Array.zip lefts rights)
-  _, _ → Left (Mismatch (resolve subst left) (resolve subst right))
+  _, _ → mismatch subst left right
   where
   unifyPair reached (Tuple leftArgument rightArgument) =
-    unify reached leftArgument rightArgument
+    unifyAt (level + 1) reached leftArgument rightArgument
+
+-- The differing pair is resolved for the message only when that is safe.
+mismatch ∷ Subst → Ty Flex → Ty Flex → Either Failure Subst
+mismatch subst left right =
+  if exceedsLimit subst left || exceedsLimit subst right then Left TooDeep
+  else Left (Mismatch (resolve subst left) (resolve subst right))
 
 -- Whether `ty`, resolved, is deeper than `inferredTypeLimit`, decided
 -- without resolving it: an explicit-stack walk that stops past the limit,

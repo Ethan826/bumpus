@@ -936,6 +936,37 @@ Status: done.
   (.build/p001-task4-fix1-verify.log). Re-measured: `deep` nested 8 to 127
   is E_NESTING in 2–3 ms. `dup` nested 12/16/20 now takes 42 ms / 441 ms /
   6.8 s (BACKLOG E006, E007 updated).
+- Fix round 2 (re-review: R7 partially addressed). Within one unification,
+  metas bound at earlier positions chained into each other. Two operands,
+  each bounded beforehand, then unified as chains about 1,780 levels deep,
+  and unify's recursion threw a RangeError. Unify now threads a level
+  (`unifyAt`, one level per applied type, which equals resolved depth) and
+  fails with `TooDeep` past `inferredTypeLimit`. A Mismatch whose pair is
+  too deep to resolve also fails with `TooDeep`. The span is the expression
+  whose unification failed (Require `expectType`, the actual operand).
+  Tests:
+  - poly-depth: two links of deep^7 and three links of deep^4 are
+    E_NESTING at `same`'s second argument.
+  - poly-depth: a binding made too deep within its own unification (bindMeta
+    `TooDeep`) is E_NESTING at `same`'s second argument.
+  - unify: 1,000 levels unify; 1,001 fail with `TooDeep`.
+- Fix-2 RED (.build/p001-task4-fix2-red.log):
+  - The two-link case threw a RangeError.
+  - The three-link case reported E_NESTING at the second arm's pattern `Z`,
+    not at the failed unification.
+  - The unit test unified 1,001 levels.
+  - The bindMeta row already passed, because that branch existed but was
+    untested.
+- Fix-2 mutants, each in an isolated copy (.build/p001-task4-fix2-mutants.log):
+  - Without the bindMeta bound, only the bindMeta row fails.
+  - Without the level bound, the two chain rows and the unit test fail.
+- Fix-2 margins: inside the checker, unify overflowed between 1,525 and
+  about 1,779 levels; in unit context, between 2,218 and 2,250. The bound
+  of 1,000 therefore leaves at least a 1.5x margin, not fix 1's 5x, which
+  was resolve's figure.
+- Fix-2 GREEN: `rm -rf output && npm run verify` exit 0, 65.9 s wall, 223
+  tests (219 + 4), zero failures/skips, eight regression proofs
+  (.build/p001-task4-fix2-verify.log).
 - Known gap: coverage of a constructor's fields at an applied type (for
   example `match m { Just(n) => n, Nothing => 0 }` over `Maybe(Int)`)
   is E_INTERNAL `Coverage of a type variable` until Task 6.
