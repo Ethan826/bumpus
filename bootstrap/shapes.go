@@ -54,27 +54,31 @@ panic("bumpus: malformed value")
 }
 
 func bumpusFn0(bumpusLocal0 bumpusTy0) int32 {
-return func(bumpusMatch0 bumpusTy0) int32 {
-if bumpusMatch0.tag == 1 { return int32(1) }
-if bumpusMatch0.tag == 2 {
-bumpusLocal1 := bumpusMatch0.c1f0
+return bumpusFn0Match0(bumpusLocal0)
+}
+
+func bumpusFn0Match0(bumpusScrutinee bumpusTy0) int32 {
+if bumpusScrutinee.tag == 1 { return int32(1) }
+if bumpusScrutinee.tag == 2 {
+bumpusLocal1 := bumpusScrutinee.c1f0
 _ = bumpusLocal1
 return bumpusAdd(bumpusAdd(bumpusAdd(bumpusLocal1, bumpusLocal1), bumpusLocal1), bumpusLocal1)
 }
-if bumpusMatch0.tag == 3 && bumpusMatch0.c2f0 != nil && bumpusMatch0.c2f0.tag == 1 && bumpusMatch0.c2f1 != nil && bumpusMatch0.c2f1.tag == 1 { return int32(2) }
-if bumpusMatch0.tag == 3 && bumpusMatch0.c2f0 != nil && bumpusMatch0.c2f1 != nil {
-bumpusLocal2 := *bumpusMatch0.c2f0
+if bumpusScrutinee.tag == 3 && bumpusScrutinee.c2f0 != nil && bumpusScrutinee.c2f0.tag == 1 && bumpusScrutinee.c2f1 != nil && bumpusScrutinee.c2f1.tag == 1 { return int32(2) }
+if bumpusScrutinee.tag == 3 && bumpusScrutinee.c2f0 != nil && bumpusScrutinee.c2f1 != nil {
+bumpusLocal2 := *bumpusScrutinee.c2f0
 _ = bumpusLocal2
-bumpusLocal3 := *bumpusMatch0.c2f1
+bumpusLocal3 := *bumpusScrutinee.c2f1
 _ = bumpusLocal3
-return func(bumpusMatch1 bumpusTy0) int32 {
-if bumpusMatch1.tag == 1 { return bumpusAdd(int32(100), bumpusFn0(bumpusLocal3)) }
-if true { return bumpusAdd(bumpusFn0(bumpusLocal2), bumpusFn0(bumpusLocal3)) }
-panic("bumpus: unmatched value")
-}(bumpusLocal2)
+return bumpusFn0Match1(bumpusLocal2, bumpusLocal3, bumpusLocal2)
 }
 panic("bumpus: unmatched value")
-}(bumpusLocal0)
+}
+
+func bumpusFn0Match1(bumpusLocal2 bumpusTy0, bumpusLocal3 bumpusTy0, bumpusScrutinee bumpusTy0) int32 {
+if bumpusScrutinee.tag == 1 { return bumpusAdd(int32(100), bumpusFn0(bumpusLocal3)) }
+if true { return bumpusAdd(bumpusFn0(bumpusLocal2), bumpusFn0(bumpusLocal3)) }
+panic("bumpus: unmatched value")
 }
 
 func bumpusFn1() int32 {

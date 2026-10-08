@@ -216,9 +216,11 @@ policy, without weakening the tests or overstating their automated coverage.
   Array.modifyAtIndices nests one ST bind per index and overflows between
   6,000 and 8,000 indices, so the new worklist sets flags in chunks.
 - Go's inliner expands nested immediately invoked closures exponentially:
-  a match nested 24 deep takes 34.6 s and 7.5 GB to build (BACKLOG E005).
-  The compiler accepts these programs; the remedy is pending a user
-  decision.
+  a match nested 24 deep took 34.6 s and 7.5 GB to build (BACKLOG E005).
+  Lowering each match to a named top-level function removed the blow-up
+  (128 nested matches build in 0.14 s); an emitter shape that is cheap in
+  PureScript can still be pathological for the target's optimizer, so
+  depth tests must build and run, not only emit.
 - A flat sum counts one level per operator, so 130 operands are E_NESTING
   although the phases overflow only near 2,928 operands (ADR 006 table);
   lifting it needs iterative chains in every later phase (BACKLOG O001).

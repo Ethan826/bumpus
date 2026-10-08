@@ -8,7 +8,7 @@ an earlier layer; scripts/structure.mjs enforces it from `purs graph`.
 |---|---|---|
 | Domain | Syntax, Resolved, Problem, Host, IR.Internal | syntax trees, spans, `Ty`, resolved syntax, checked IR, `Problem` data, capability-port types |
 | Features | Resolve, Resolve.{Expression,Types,Pattern,Repeated,Fresh}, Check, Check.{Match,Tables,Inhabited,Signature,Matrix,Usefulness,Missing,Coverage,Search} | resolution, checking, coverage; report `Problem` data, never text |
-| Format | Lex, Parse, Parse.*, Stack, Go, Go.{Layout,Data,Match,Compare,Show,Usage}, Diagnostic, Wire, Arguments | text in (tokens, parser, reserved words, uppercase rule); Go out; diagnostic text, `E_*` names, wire records, usage text |
+| Format | Lex, Parse, Parse.*, Stack, Go, Go.{Layout,Data,Lowered,Expression,Match,Capture,Compare,Show,Usage}, Diagnostic, Wire, Arguments | text in (tokens, parser, reserved words, uppercase rule); Go out; diagnostic text, `E_*` names, wire records, usage text |
 | Runtime | Node (+ Node.js) | port implementations, argv/stdout/stderr/exit, JSON; the only FFI |
 | Program | Compile, Command, Main | pure `compile`, commands over any `Host`, entry point |
 
@@ -75,7 +75,12 @@ Format.Wire.
   every phase (Operator is a closed Domain ADT); the checker requires equal
   operand types and yields Bool. No target detail enters IR.
 - **Go** (Format.Go*) emits one tagged struct per type, constructors, and
-  sequential first-match lowering with nil guards. Format.Go.Compare emits a
+  sequential first-match lowering with nil guards. Format.Go.Expression
+  threads a per-function match counter (Format.Go.Lowered) and
+  Format.Go.Match lifts each match to a top-level `bumpusFn{f}Match{k}` whose
+  parameters are the locals Format.Go.Capture finds its arms read, then the
+  scrutinee; lifted functions follow their function in number order (ADR 003
+  item 6, E005). Format.Go.Compare emits a
   `bumpusCmpN` per declared type (and `bumpusCmpBool`, decided by
   Format.Go.Usage), Format.Go.Show a `bumpusShowN` per type; `main` prints
   through the latter for declared results (ADR 005). Go representation decisions

@@ -58,7 +58,7 @@ adding a bypass allowlist.
   brute-force coverage oracle with brute-forced inhabitedness over generated
   type systems (test/coverage.test.mjs), and fake-host command tests
   (test/program.test.mjs);
-- `npm run verify` runs every test/*.test.mjs file (21 files, 151 tests, no
+- `npm run verify` runs every test/*.test.mjs file (22 files, 155 tests, no
   skips; the list is read from the directory, never hand-kept) and then
   scripts/regression.mjs, a table of isolated-copy mutations, each of which
   must pass on the healthy build and fail on its mutant: `branch`
@@ -69,7 +69,9 @@ adding a bypass allowlist.
   the last field first), `show-fields` (Format.Go.Show prints only the
   first field) and `state-thread` (Format.Parse.Grammar's `apply` runs the
   second parser from the original state; examples/answer.bumpus must still
-  compile to bootstrap/answer.go); the A003 order and print tests also use an independent value
+  compile to bootstrap/answer.go) and `capture` (Format.Go.Capture ignores
+  nested matches' scrutinees, so a lifted match misses a local read only
+  there; probe builds and runs test/match-lift's capture program); the A003 order and print tests also use an independent value
   oracle (test/value-oracle.mjs);
 - scripts/strict-rebuild.mjs (run by verify after the build) copies the
   workspace to .build/strict-rebuild, checks the unmodified copy builds, adds

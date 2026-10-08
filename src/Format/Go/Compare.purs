@@ -52,16 +52,16 @@ compareHelpers program = joinWith "" (map compareHelper program.types)
 
 -- Go evaluates call operands left to right, so every form keeps that order.
 -- Go == on the structs would compare field pointers, so declared types
--- always go through their helper.
-comparison
-  ∷ (IR.Expr → String) → Operator → IR.Expr → IR.Expr → String
-comparison lower operator left right = case IR.typeOf left of
+-- always go through their helper. `ty` is the operands' type; `left` and
+-- `right` are their lowered code.
+comparison ∷ Operator → Ty → String → String → String
+comparison operator ty left right = case ty of
   TData owner → viaHelper (compareName owner)
-  _ | isBoolOrdering operator left → viaHelper "bumpusCmpBool"
-  _ → "(" <> lower left <> " " <> symbol <> " " <> lower right <> ")"
+  TBool | isOrdering operator → viaHelper "bumpusCmpBool"
+  _ → "(" <> left <> " " <> symbol <> " " <> right <> ")"
   where
   symbol = goOperator operator
-  viaHelper name = "(" <> name <> "(" <> lower left <> ", " <> lower right
+  viaHelper name = "(" <> name <> "(" <> left <> ", " <> right
     <> ") "
     <> symbol
     <> " 0)"

@@ -484,3 +484,37 @@ or parked (coverage-scale comment, Inhabited complexity formula). The
 re-review's out-of-scope allowlist gap is BACKLOG F007. Worktree evidence and
 the SDD ledger are archived under .build/merged-g001-evidence; the g001
 worktree and branch are removed.
+
+## E005 execution
+
+- 2026-10-07, branch e005 from 0777cf6, design approved by the user. Each
+  match lowers to a top-level Go function `bumpusFn{f}Match{k}` (k in
+  per-function pre-order, scrutinee before arms), taking its captured
+  locals in LocalId order and then `bumpusScrutinee`; lifted functions
+  follow their function in number order (ADR 003 item 6). New modules
+  Format.Go.Lowered (counter threading), Format.Go.Expression (moved out of
+  Format.Go) and Format.Go.Capture; Format.Go.Compare's `comparison` now
+  takes lowered operand code.
+- RED on the closure compiler: test/match-lift.test.mjs's two signature
+  tests failed (no `bumpusFn0Match*` functions; .build/e005-red-lift.log);
+  its capture test passed, as expected for closures, and its RED is the
+  `capture` mutant. The 128-deep timing test hit its 10 s spawn timeout
+  (.build/e005-red-timing.log). The full-limit match-arm and
+  compare-matches runs were not executed on the closure compiler (prior
+  record: killed at 128).
+- Mutants of Format.Go.Capture in isolated copies: dropping nested
+  scrutinees (the `capture` row) and capturing nothing both make the probe
+  fail with `captured local lost` and Go's `undefined: bumpusLocal3` /
+  `bumpusLocal1` (.build/e005-mutants.log).
+- Timings (.build/e005-timing.log, `go build`, Go 1.26.4): closures 0.31 s
+  at d = 16, 1.26 s / 596 MB at 20, 7.99 s / 2.7 GB at 22; named functions
+  0.13-0.15 s and about 67 MB at every d from 8 to 128.
+- test/adt-match.test.mjs `LocalIds in emitted Go follow source pre-order`
+  pinned the emitted text of one closure-form body; its expected sequence
+  now covers bumpusFn0 and its four lifted matches (same binder numbering,
+  plus capture parameters and arguments).
+- bootstrap/answer.go byte-identical; shapes.go and tree.go regenerated
+  through the CLI (matches become `bumpusFn0Match0`/`Match1` functions).
+- `rm -rf output && npm run verify` exit 0: zero warnings, 22 files, 155
+  tests, zero failures/skips, eight regression proofs including `capture`
+  (.build/e005-verify.log).

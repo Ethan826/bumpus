@@ -60,7 +60,10 @@ test('a binder shadows a parameter only in its arm', () => {
 });
 
 // Pins resolver numbering: parameters 0..n-1, then binders in source
-// pre-order (scrutinee before arms, pattern before body), shadowing per arm.
+// pre-order (scrutinee before arms, pattern before body), shadowing per arm:
+// x = 2, t = 3 (inner scrutinee), h = 4, t = 5, x = 6, y = 7. Since E005 the
+// text runs through bumpusFn0 and its lifted matches 0-3 in number order,
+// so it also pins each match's captured parameters and call arguments.
 test('LocalIds in emitted Go follow source pre-order', () => {
   const source = `${list} fn f(x: Int, xs: IntList): Int = `
     + 'match match xs { Cons(x, t) => t, Nil => xs } { '
@@ -72,8 +75,13 @@ test('LocalIds in emitted Go follow source pre-order', () => {
     go.indexOf('func bumpusFn1'));
   const ids = body.match(/bumpusLocal\d+/g)
     .map(name => Number(name.slice('bumpusLocal'.length)));
-  assert.deepEqual(ids, [0, 1, 4, 4, 5, 5, 6, 6, 6, 4, 0, 4, 5, 7, 7, 7,
-    0, 1, 2, 2, 3, 3, 3, 1, 1]);
+  assert.deepEqual(ids, [
+    0, 1, 0, 1, 1, 1, // bumpusFn0
+    0, 1, 4, 4, 5, 5, 0, 4, 5, 0, 1, // Match0
+    1, 2, 2, 3, 3, 3, 1, // Match1, the scrutinee's match
+    0, 4, 6, 6, 6, 4, 0, 4, // Match2
+    0, 7, 7, 7, 0 // Match3
+  ]);
   assert.equal(run(source), '4');
 });
 

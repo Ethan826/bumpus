@@ -5,20 +5,13 @@ import Data.Array as Array
 import Data.String.Common (joinWith)
 import Features.Check (CheckedProgram)
 import Domain.IR.Internal as IR
-import Format.Go.Compare (boolHelper, compareHelpers, comparison)
-import Format.Go.Data
-  ( boolean
-  , ctorName
-  , declarations
-  , goType
-  , integer
-  , localName
-  )
+import Format.Go.Compare (boolHelper, compareHelpers)
+import Format.Go.Data (declarations, functionName, goType, localName)
+import Format.Go.Expression (expression)
 import Format.Go.Layout (Layout, layout)
-import Format.Go.Match (lowerMatch)
 import Format.Go.Show (printed, showHelpers)
 import Format.Go.Usage (needsBoolHelper)
-import Domain.Resolved (FunctionId(..), LocalId(..), Ty)
+import Domain.Resolved (FunctionId, LocalId(..))
 
 emit ∷ CheckedProgram → String
 emit (IR.Program program) =
@@ -44,54 +37,19 @@ entryMain entry definition
       <> printed definition.result (functionName entry <> "()")
       <> ") }\n"
 
+-- Each function is followed by the functions its matches were lifted to,
+-- in match-number order (Format.Go.Match).
 function ∷ Layout → IR.FunctionDecl → String
 function tables definition =
   "func " <> functionName definition.id <> "(" <> joinWith ", " parameters
     <> ") "
     <> goType definition.result
     <> " {\nreturn "
-    <> expression tables 0 definition.body
+    <> body.code
     <> "\n}\n"
+    <> joinWith "" (map separated body.lifted)
   where
+  body = expression { tables, owner: definition.id } 0 definition.body
   parameters = Array.mapWithIndex parameter definition.parameters
   parameter index ty = localName (LocalId index) <> " " <> goType ty
-
--- The depth counts enclosing match arm bodies; it names match parameters.
-expression ∷ Layout → Int → IR.Expr → String
-expression tables depth (IR.Expr term) = case term.node of
-  IR.Integer value → integer value
-  IR.Boolean value → boolean value
-  IR.Local id → localName id
-  IR.Call id arguments → invoke lower (functionName id) arguments
-  IR.Construct id arguments → invoke lower (ctorName id) arguments
-  IR.Add left right → addition lower left right
-  IR.Compare operator left right → comparison lower operator left right
-  IR.If condition yes no → conditional lower term.ty condition yes no
-  IR.Match scrutinee arms → lowerMatch tables (expression tables) depth
-    term.ty
-    scrutinee
-    arms
-  where
-  lower = expression tables depth
-
-invoke ∷ (IR.Expr → String) → String → Array IR.Expr → String
-invoke lower name arguments = name <> "("
-  <> joinWith ", " (map lower arguments)
-  <> ")"
-
-addition ∷ (IR.Expr → String) → IR.Expr → IR.Expr → String
-addition lower left right = "bumpusAdd(" <> lower left <> ", " <> lower right
-  <> ")"
-
-conditional
-  ∷ (IR.Expr → String) → Ty → IR.Expr → IR.Expr → IR.Expr → String
-conditional lower ty condition yes no = "func() " <> goType ty <> " { if "
-  <> lower condition
-  <> " { return "
-  <> lower yes
-  <> " }; return "
-  <> lower no
-  <> " }()"
-
-functionName ∷ FunctionId → String
-functionName (FunctionId index) = "bumpusFn" <> show index
+  separated lifted = "\n" <> lifted

@@ -2,6 +2,7 @@ module Format.Go.Data
   ( declarations
   , goType
   , ctorName
+  , functionName
   , fieldName
   , localName
   , integer
@@ -12,7 +13,13 @@ module Format.Go.Data
 import Prelude
 import Data.Array as Array
 import Data.String.Common (joinWith)
-import Domain.Resolved (CtorId(..), LocalId(..), Ty(..), TypeId(..))
+import Domain.Resolved
+  ( CtorId(..)
+  , FunctionId(..)
+  , LocalId(..)
+  , Ty(..)
+  , TypeId(..)
+  )
 import Format.Go.Layout (Declared, Layout, Member)
 
 -- Each type becomes one tagged struct and its constructor functions.
@@ -30,6 +37,9 @@ goType = case _ of
 
 ctorName ∷ CtorId → String
 ctorName (CtorId index) = "bumpusCtor" <> show index
+
+functionName ∷ FunctionId → String
+functionName (FunctionId index) = "bumpusFn" <> show index
 
 localName ∷ LocalId → String
 localName (LocalId index) = "bumpusLocal" <> show index

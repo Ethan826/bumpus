@@ -14,13 +14,13 @@ const limit = nestingLimit;
 const work = mkdtempSync(join(tmpdir(), 'bumpus-depth-'));
 after(() => rmSync(work, { recursive: true, force: true }));
 
-const cli = (verb, source) => {
+const cli = (verb, source, timeout = 120000) => {
   const input = join(work, 'input.bumpus');
   writeFileSync(input, source);
   const extra = verb === 'emit' ? [join(work, 'output.go')] : [];
   const result = spawnSync('node',
     ['scripts/bumpus.mjs', verb, input, ...extra],
-    { encoding: 'utf8', timeout: 120000,
+    { encoding: 'utf8', timeout,
       env: { ...process.env, GOCACHE: resolve('.build/go-cache') } });
   assert.ifError(result.error);
   const output = result.stdout + result.stderr;
@@ -51,24 +51,12 @@ const runs = (program) => {
   assert.equal(result.stdout, program.output);
 };
 
-// BACKLOG E005: `go build` is exponential in nested match arms (each a
-// nested immediately invoked closure): 0.25 s at 16 levels, 34.6 s and
-// 7.5 GB at 24, killed at 128. These compile at the limit and run at 16.
-const goBlowup =
-  { depth: 16, forms: new Set(['match-arm', 'compare-matches']) };
-
+// Every form, the nested-match ones included (E005: each match is now a
+// named Go function, not a nested closure that Go's inliner expands).
 for (const [name, form] of Object.entries(forms)) {
-  if (goBlowup.forms.has(name)) {
-    test(`${name}: depth ${limit} compiles; depth ${goBlowup.depth} runs`,
-      () => {
-        assert.equal(cli('emit', form(limit).source).status, 0);
-        runs(form(goBlowup.depth));
-      });
-  } else {
-    test(`${name}: depth ${limit} compiles, builds and runs`, () => {
-      runs(form(limit));
-    });
-  }
+  test(`${name}: depth ${limit} compiles, builds and runs`, () => {
+    runs(form(limit));
+  });
 
   test(`${name}: depth ${limit + 1} is E_NESTING`, () => {
     nestingAt(form(limit + 1));
@@ -100,4 +88,20 @@ test('siblings and later declarations do not add depth', () => {
   const result = cli('run', source);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, '2\n');
+});
+
+// E005 acceptance: a match nested to the limit builds and runs in under
+// 10 s (closures: 34.6 s at depth 24, killed at 128). The leaf differs from
+// the match-arm form's so Go's build cache cannot supply the binary.
+const buildBudgetMs = 10_000;
+
+test(`a match nested ${limit} deep builds and runs in under 10 s`, () => {
+  const source = 'fn main(): Int = ' + 'match 0 { _ => '.repeat(limit)
+    + '7' + ' }'.repeat(limit) + ';';
+  const started = performance.now();
+  const result = cli('run', source, buildBudgetMs);
+  const elapsed = performance.now() - started;
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, '7\n');
+  assert.ok(elapsed < buildBudgetMs, `took ${elapsed} ms`);
 });

@@ -99,6 +99,29 @@ const prints = (source, expected, message) => () => {
 const ordered = (body, message) =>
   prints(`${list} fn main(): Bool = ${body};`, 'true\n', `${message}: ${body}`);
 
+// Duplicates `capturing` in test/match-lift.test.mjs (probes import only
+// the compiler under test): t reaches the middle match only through inner
+// scrutinees, and k and h are captured two and three matches down (E005).
+const capturing = `${list} fn f(xs: L, k: Int): Int = match xs { `
+  + 'Nil => k, Cons(h, t) => match h { '
+  + '0 => match t { Nil => k, Cons(g, _) => g + h + k }, '
+  + '_ => match k { 0 => h, _ => match t { Nil => h + k, '
+  + 'Cons(g2, u) => match u { Nil => g2 + h, Cons(z, _) => z + k } } } } }; '
+  + 'fn main(): Int = f(Cons(0, Cons(5, Nil)), 100) '
+  + '+ f(Cons(3, Cons(4, Cons(6, Nil))), 1000) + f(Cons(2, Nil), 10) '
+  + '+ f(Nil, 1);';
+
+// A lost capture leaves an undefined Go variable, so the build itself fails.
+const capture = () => {
+  let output;
+  try { output = printed(capturing); } catch (error) { output = error.message; }
+  if (output !== '1124\n') {
+    console.error(`captured local lost: ${output}`);
+    process.exit(1);
+  }
+  console.log('capture regression detects the defect');
+};
+
 // Grammar's apply is the only place the remaining input is threaded; if the
 // second parser restarts from the first's state, no program parses as written.
 const stateThread = () => {
@@ -118,7 +141,7 @@ const probes = {
     'first differing field ignored'),
   'show-fields': prints(`${list} fn main(): L = Cons(1, Cons(2, Nil));`,
     'Cons(1, Cons(2, Nil))\n', 'printed value lost fields'),
-  'state-thread': stateThread
+  'state-thread': stateThread, capture
 };
 assert.ok(probe in probes, `unknown probe: ${probe}`);
 probes[probe]();

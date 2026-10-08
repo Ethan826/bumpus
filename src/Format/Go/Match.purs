@@ -3,49 +3,87 @@ module Format.Go.Match (lowerMatch) where
 import Prelude
 import Data.Array as Array
 import Data.String.Common (joinWith)
-import Format.Go.Data (boolean, fieldName, goType, integer, localName)
+import Format.Go.Capture (Captured, captures)
+import Format.Go.Data
+  ( boolean
+  , fieldName
+  , functionName
+  , goType
+  , integer
+  , localName
+  )
 import Format.Go.Layout (Layout, tagOf)
+import Format.Go.Lowered (Lowered, Lowering, Scope, several)
 import Domain.IR.Internal as IR
-import Domain.Resolved (CtorId, LocalId, Ty(..))
+import Domain.Resolved (CtorId, FunctionId, LocalId, Ty(..))
 
 -- Where a pattern position lives, and whether reaching it dereferences.
 type Access = { path ∷ String, pointer ∷ Boolean }
 
 type Binding = { id ∷ LocalId, value ∷ String }
 
--- An immediately invoked function whose parameter is named by match nesting
--- depth. Arms are tested in order; the panic guards only malformed values.
-lowerMatch
-  ∷ Layout
-  → (Int → IR.Expr → String)
-  → Int
-  → Ty
-  → IR.Expr
-  → Array IR.Arm
-  → String
-lowerMatch tables lower depth ty scrutinee arms =
-  "func(" <> parameter <> " " <> goType (IR.typeOf scrutinee) <> ") "
-    <> goType ty
-    <> " {\n"
-    <> joinWith "" (map lowerArm arms)
-    <> "panic(\"bumpus: unmatched value\")\n}("
-    <> lower depth scrutinee
-    <> ")"
-  where
-  parameter = "bumpusMatch" <> show depth
-  lowerArm arm = armCode tables (lower (depth + 1)) parameter arm
+type Signature =
+  { name ∷ String, captured ∷ Array Captured, scrutinee ∷ Ty, result ∷ Ty }
 
-armCode ∷ Layout → (IR.Expr → String) → String → IR.Arm → String
-armCode tables lower parameter arm =
+-- Each match is lifted to a top-level function, not an immediately invoked
+-- closure: Go's inliner expands nested closures exponentially (E005). The
+-- k-th match of bumpusFn{f}, numbered in pre-order with the scrutinee
+-- before the arms, is bumpusFn{f}Match{k}. It takes the locals its arms
+-- capture, then the scrutinee, which the call site evaluates once, where the
+-- closure did. Arms are tested in order; the panic guards only malformed
+-- values. Lifted functions follow their bumpusFn in number order.
+lowerMatch
+  ∷ Scope → Lowering → Int → Ty → IR.Expr → Array IR.Arm → Lowered
+lowerMatch scope lower next result scrutinee arms =
+  { code: signature.name <> "("
+      <> joinWith ", " (map capturedName signature.captured <> [ subject.code ])
+      <> ")"
+  , next: bodies.next
+  , lifted: [ lifted ] <> subject.lifted <> bodies.lifted
+  }
+  where
+  signature =
+    { name: matchName scope.owner next
+    , captured: captures arms
+    , scrutinee: IR.typeOf scrutinee
+    , result
+    }
+  subject = lower (next + 1) scrutinee
+  bodies = several lower subject.next (map armBody arms)
+  armBody arm = arm.body
+  capturedName captured = localName captured.id
+  lifted = matchFunction signature
+    (Array.zipWith (armCode scope.tables) arms bodies.codes)
+
+matchName ∷ FunctionId → Int → String
+matchName owner number = functionName owner <> "Match" <> show number
+
+scrutineeName ∷ String
+scrutineeName = "bumpusScrutinee"
+
+matchFunction ∷ Signature → Array String → String
+matchFunction signature arms =
+  "func " <> signature.name <> "(" <> joinWith ", " parameters <> ") "
+    <> goType signature.result
+    <> " {\n"
+    <> joinWith "" arms
+    <> "panic(\"bumpus: unmatched value\")\n}\n"
+  where
+  parameters = map parameter signature.captured
+    <> [ scrutineeName <> " " <> goType signature.scrutinee ]
+  parameter captured = localName captured.id <> " " <> goType captured.ty
+
+armCode ∷ Layout → IR.Arm → String → String
+armCode tables arm body =
   if Array.null bound then
-    "if " <> condition <> " { return " <> lower arm.body <> " }\n"
+    "if " <> condition <> " { return " <> body <> " }\n"
   else
     "if " <> condition <> " {\n" <> joinWith "" (map binding bound)
       <> "return "
-      <> lower arm.body
+      <> body
       <> "\n}\n"
   where
-  root = { path: parameter, pointer: false }
+  root = { path: scrutineeName, pointer: false }
   tests = conditions tables root arm.pattern
   bound = bindings root arm.pattern
   condition = if Array.null tests then "true" else joinWith " && " tests

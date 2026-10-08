@@ -40,10 +40,26 @@ proposed, not verified.
 5. **CtorId versus tag.** The checked IR names a constructor by `CtorId`
    (global, declaration order). The Go tag (1-based index within the owner)
    exists only in lowering, so the IR says nothing about representation.
-6. **Depth naming.** A match's Go parameter is `bumpusMatch<d>` where d counts
-   enclosing arm bodies; a scrutinee lowers at its enclosing depth. No counter
-   is threaded. Checked by `matches nest in arm bodies and in scrutinee
-   position` (test/adt-match.test.mjs).
+6. **Lifted match functions (E005; superseded depth naming).** Each match
+   lowers to a top-level Go function, not an immediately invoked closure,
+   because Go's inliner expands nested closures exponentially (24 nested
+   matches took 34.6 s and 7.5 GB to build; 128 were killed). The k-th match
+   of `bumpusFn{f}`, numbered from 0 in one pre-order walk of the body that
+   visits a match's scrutinee before its arms, is `bumpusFn{f}Match{k}`; a
+   counter is threaded through expression lowering (Format.Go.Lowered). Its
+   parameters are the locals its arms capture, ascending by LocalId and named
+   `bumpusLocal{id}` with their IR types, then `bumpusScrutinee`; the call
+   site passes the same locals, then the scrutinee expression, so the
+   scrutinee is still evaluated once at the same point. Capture analysis
+   (Format.Go.Capture) reads the whole of every arm, nested scrutinees and
+   nested arms included, minus every binder introduced inside the match
+   (LocalIds are unique per function); only the match's own scrutinee is
+   excluded. Lifted functions follow their `bumpusFn{f}` in number order,
+   each preceded by a blank line. `if` keeps its closure. Checked by
+   test/match-lift.test.mjs (exact signatures and order; captures through
+   nested matches), test/depth.test.mjs (match-arm and compare-matches at the
+   nesting limit; 128 nested matches build and run in under 10 s) and the
+   `capture` regression row.
 7. **E_DUPLICATE at the first occurrence**, the Stage 0 rule, applied to
    types, global names (functions and constructors share one table),
    parameters and binders (test/diagnostics.test.mjs). For a

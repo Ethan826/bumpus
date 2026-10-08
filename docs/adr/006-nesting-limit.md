@@ -122,9 +122,7 @@ compiles, builds and runs with the expected output; depth 129 exits 1 with
 is still `E_SYNTAX`; siblings and later declarations do not add depth.
 test/diagnostics.test.mjs gains the `E_NESTING` family row.
 
-Exception (BACKLOG E005): `go build` is exponential in nested `match` arms,
-each lowered to a nested immediately invoked closure (0.25 s at 16 levels,
-34.6 s and 7.5 GB at 24, killed at 128; with `-gcflags=-l` 128 levels build
-in 0.12 s). The match-arm and compare-matches forms therefore compile at
-the limit and run at depth 16. This is a Go-emission defect independent of
-the limit.
+Every form, including match-arm and compare-matches, builds and runs at the
+limit since E005 lowered each match to a named Go function (ADR 003 item
+6); before that, nested match closures made `go build` exponential and
+those two forms ran only at depth 16.

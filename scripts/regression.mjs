@@ -46,6 +46,14 @@ const rows = [
     needle: 'given ← argument applied.rest',
     replacement: 'given ← argument state',
     probe: 'state-thread', message: /parser state not threaded/
+  },
+  {
+    // E005: an outer binder read only by an inner match's scrutinee must
+    // still be captured by the match lifted around that inner match.
+    name: 'capture', file: 'src/Format/Go/Capture.purs',
+    needle: 'nested scrutinee arms = occurrences scrutinee\n  <> Array',
+    replacement: 'nested _ arms = Array',
+    probe: 'capture', message: /captured local lost/
   }
 ];
 const base = '.build/regression';
