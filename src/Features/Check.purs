@@ -12,6 +12,7 @@ import Domain.Syntax (Diagnostic)
 import Features.Check.Comparable (comparable)
 import Features.Check.Coverage (coverage)
 import Features.Check.Infer (Env, infer)
+import Features.Check.Instantiation (instantiationRule)
 import Features.Check.Require (require, tooDeepAt)
 import Features.Check.Scheme (firstTooDeep, holes, resolved, start)
 import Features.Check.Walk (retype)
@@ -26,7 +27,9 @@ check program = do
       , functions
       , entry: program.entry
       }
-  -- Coverage runs only once every function has type-checked.
+  -- The instantiation rule needs every body's final types; coverage runs
+  -- last, on a program whose specialization is known to be finite.
+  instantiationRule checked
   coverage checked
   pure checked
   where
@@ -59,6 +62,7 @@ checkFunction env function = do
   comparable env settled
   pure
     { id: function.id
+    , name: function.name
     , parameters: map parameterType function.parameters
     , result: rigid function.result
     , body: holes settled

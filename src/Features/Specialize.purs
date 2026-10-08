@@ -44,7 +44,14 @@ function declaration = do
   parameters ← traverse (monomorphic span) declaration.parameters
   result ← monomorphic span declaration.result
   body ← expression declaration.body
-  pure { id: declaration.id, parameters, result, body, span }
+  pure
+    { id: declaration.id
+    , name: declaration.name
+    , parameters
+    , result
+    , body
+    , span
+    }
   where
   span = declaration.span
 

@@ -33,8 +33,10 @@ newtype Program = Program
   , entry ∷ FunctionId
   }
 
+-- The name appears only in diagnostics.
 type FunctionDecl =
   { id ∷ FunctionId
+  , name ∷ String
   , parameters ∷ Array (Ty Open)
   , result ∷ Ty Open
   , body ∷ Expr

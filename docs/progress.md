@@ -990,3 +990,62 @@ Status: done.
 - Phase reached: these tests reach Check only (`checkedPoly`,
   `checkRejectedAt`). The CLI still rejects polymorphic programs until
   Task 7 (Specialize: E_INTERNAL `unspecialized type`).
+
+### Task 5: the instantiation rule (2026-10-08)
+
+Language change: polymorphic recursion and nested datatypes that would
+make specialization infinite are rejected (design §4.1). Status: done.
+
+- Check order: typing, then the instantiation rule, then coverage.
+  `instantiationRule ∷ Checked.Program → Either Diagnostic Unit`
+  (Features.Check.Instantiation) judges types first, in declaration order
+  (Features.Check.Nested), then each function's calls in pre-order. Inside
+  a strongly connected component of the call graph or of the type
+  reference graph (an edge for every declared type a field mentions, at any
+  depth), each type argument must be a bare variable of the referrer or
+  mention no variable; a hole counts as ground.
+- Diagnostics: new ErrorCode `SpecializationError` (wire E_SPECIALIZATION).
+  `PolymorphicRecursion f` → `Recursive call to <f> changes its type
+  arguments`, at the call; `NestedDatatype t` → `Recursive use of <t>
+  changes its type arguments`, at the offending nested reference, found
+  by walking the resolved field alongside `CtorInfo.fieldSyntax`.
+- Features.Check.Components: `components ∷ Array (Array Int) → Array Int`,
+  iterative Tarjan (explicit frame stack, self tail calls, Data.Map and
+  Data.Set state), numbered in closing order.
+- Function names: the message names the callee, so Resolved, Checked and
+  IR `FunctionDecl` gain `name` (Specialize copies it so the identity test
+  still compares checked and monomorphic IR unchanged; Go ignores it).
+- Tests: test/poly-termination.test.mjs, 23 tests: the brief's accepted
+  rows (`length(t)`, mutual `even`/`odd`, swapping, dropping, ground
+  substitution, Rose/Forest, `T(b, a)`) plus a hole as ground and wrapping
+  into another component (functions and types); rejected rows with exact
+  code, span and text (self and mutual `List(a)` calls, §4.3's
+  conservative case, `Pair(x, 1)`, first offence in pre-order, `Nest`,
+  the nested `W(Pair(Int, a))` reference, mutual types, types before
+  functions); generator coverage; 200 generated components accepted and
+  each wrapped variant rejected at its call; components against a
+  brute-force reachability oracle (300 graphs); 20,000-node chain and
+  cycle under 5 s each (about 0.23 s for both). test/poly-components.mjs
+  exports the generator (ruling R3): per component its functions,
+  arities, calls (variable or ground arguments) and `groundTypes`, plus
+  `render` and `wrapped`, for Task 8's bound.
+- RED: with the components import stubbed (the module did not exist), 12
+  of 23 failed: every rejection row, the generated wrapping test and both
+  components tests (.build/p001-task5-red.log). The accepted rows and the
+  generator check passed there, as they pin non-rejection. Mutants in an
+  isolated copy: a rule that admits nothing fails every accepted row
+  (.build/p001-task5-mutant-overreject.log); ignoring components fails
+  both cross-component rows, the nested `W` row and the generated test
+  (.build/p001-task5-mutant-components.log); treating holes as variables
+  fails the hole row and the generated test
+  (.build/p001-task5-mutant-hole.log).
+- GREEN: `rm -rf output && npm run verify` exit 0, 66.4 s wall, 247 tests
+  (224 + 23), zero failures/skips, eight regression proofs
+  (.build/p001-task5-verify.log).
+- Known gap: `length(t)` and `even`/`odd` match on `List(a)`, which still
+  ends in E_INTERNAL `Coverage of a type variable` until Task 6; the test
+  accepts exactly that diagnostic for those two rows (coverage runs after
+  the rule, so reaching it proves the rule accepted). Task 6 should make
+  them plain acceptances.
+- Phase reached: these tests reach Check only (`checkRejectedAt`,
+  `check`). The CLI still rejects polymorphic programs until Task 7.

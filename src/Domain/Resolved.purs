@@ -69,6 +69,7 @@ type Parameter = { name ∷ String, ty ∷ Ty VarId, span ∷ Span }
 -- variable in first-occurrence order, parameters then result.
 type FunctionDecl =
   { id ∷ FunctionId
+  , name ∷ String
   , variables ∷ Array String
   , parameters ∷ Array Parameter
   , result ∷ Ty VarId

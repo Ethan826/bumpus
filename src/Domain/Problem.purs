@@ -52,6 +52,8 @@ data Problem
   | InfiniteType TypeName TypeName
   | NotComparable TypeName
   | AmbiguousType TypeName
+  | PolymorphicRecursion String
+  | NestedDatatype String
   | RedundantArm
   | NonExhaustive Witness
   | Internal String

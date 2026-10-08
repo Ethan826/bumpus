@@ -42,6 +42,8 @@ code = case _ of
   InfiniteType _ _ → Code.TypeMismatch
   NotComparable _ → Code.TypeMismatch
   AmbiguousType _ → Code.TypeMismatch
+  PolymorphicRecursion _ → Code.SpecializationError
+  NestedDatatype _ → Code.SpecializationError
   RedundantArm → Code.Redundant
   NonExhaustive _ → Code.NonExhaustive
   Internal _ → Code.InternalError
@@ -61,6 +63,7 @@ codeName = case _ of
   Code.ArityMismatch → "E_ARITY"
   Code.Redundant → "E_REDUNDANT"
   Code.NonExhaustive → "E_NON_EXHAUSTIVE"
+  Code.SpecializationError → "E_SPECIALIZATION"
 
 message ∷ Problem → String
 message = case _ of
@@ -87,6 +90,10 @@ message = case _ of
     <> typeName whole
   NotComparable ty → "Type " <> typeName ty <> " is not comparable"
   AmbiguousType ty → "Ambiguous type " <> typeName ty <> " in comparison"
+  PolymorphicRecursion name → "Recursive call to " <> name
+    <> " changes its type arguments"
+  NestedDatatype name → "Recursive use of " <> name
+    <> " changes its type arguments"
   RedundantArm → "Redundant match arm"
   NonExhaustive witness → "Missing pattern: " <> pattern witness
   Internal text → text

@@ -25,8 +25,10 @@ newtype Program = Program
   , entry ∷ FunctionId
   }
 
+-- The source name is carried for diagnostics; Go names functions by id.
 type FunctionDecl =
   { id ∷ FunctionId
+  , name ∷ String
   , parameters ∷ Array Ty
   , result ∷ Ty
   , body ∷ Expr

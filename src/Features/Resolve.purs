@@ -110,6 +110,7 @@ resolveFunction globals ctors definition = withBody <$> runFresh
     { name: parameter.name, id: Resolved.LocalId index }
   withBody body =
     { id: Resolved.FunctionId definition.index
+    , name: definition.function.name
     , variables: definition.signature.variables
     , parameters: definition.signature.parameters
     , result: definition.signature.result

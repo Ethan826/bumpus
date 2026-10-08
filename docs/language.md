@@ -140,5 +140,6 @@ based; LF increments line and resets column. Parenthesized expressions keep
 the inner span. A diagnostic reports the first error in phase/traversal order.
 E_INTERNAL is a compiler invariant failure. Codes are a closed ADT: E_LEX,
 E_SYNTAX, E_INTEGER, E_ENTRY, E_DUPLICATE, E_UNBOUND, E_NOT_CALLABLE, E_TYPE,
-E_ARITY, E_REDUNDANT, E_NON_EXHAUSTIVE, E_NESTING, E_INTERNAL. The CLI adds
+E_ARITY, E_REDUNDANT, E_NON_EXHAUSTIVE, E_NESTING, E_SPECIALIZATION,
+E_INTERNAL. The CLI adds
 E_USAGE, E_IO and E_TOOL.

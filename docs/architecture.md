@@ -7,7 +7,7 @@ an earlier layer; scripts/structure.mjs enforces it from `purs graph`.
 | Layer | Modules (src/) | Role |
 |---|---|---|
 | Domain | Syntax, Type, Resolved, Problem, Host, Checked.Internal, IR.Internal | syntax trees, spans, `Ty v`, resolved syntax, checked IR, monomorphic IR, `Problem` data, capability-port types |
-| Features | Resolve, Resolve.{Expression,Types,Pattern,Repeated,Fresh}, Check, Check.{Infer,Call,Arms,Match,Require,Scheme,Walk,Comparable,Unify,Tables,Inhabited,Signature,Matrix,Usefulness,Missing,Coverage,Search}, Specialize | resolution, checking, coverage, specialization; report `Problem` data, never text |
+| Features | Resolve, Resolve.{Expression,Types,Pattern,Repeated,Fresh}, Check, Check.{Infer,Call,Arms,Match,Require,Scheme,Walk,Comparable,Instantiation,Nested,Components,Unify,Tables,Inhabited,Signature,Matrix,Usefulness,Missing,Coverage,Search}, Specialize | resolution, checking, coverage, specialization; report `Problem` data, never text |
 | Format | Lex, Parse, Parse.*, Stack, Go, Go.{Layout,Data,Lowered,Expression,Match,Capture,Compare,Show,Usage}, Diagnostic, Wire, Arguments | text in (tokens, parser, reserved words, uppercase rule); Go out; diagnostic text, `E_*` names, wire records, usage text |
 | Runtime | Node (+ Node.js) | port implementations, argv/stdout/stderr/exit, JSON; the only FFI |
 | Program | Compile, Command, Main | pure `compile`, commands over any `Host`, entry point |
@@ -18,7 +18,8 @@ Domain, Features and Format are pure (core library allowlist, no Effect).
 
 ```text
 String -> Lex/Parse -> Syntax -> Resolve -> Resolved -> Check -> checked IR
-       -> Coverage (Either Diagnostic) -> Specialize -> IR -> Go text
+       -> Instantiation rule -> Coverage (Either Diagnostic) -> Specialize
+       -> IR -> Go text
 ```
 
 Program.Compile composes the phases; Program.Command runs emit/build/run over
@@ -71,7 +72,12 @@ Format.Wire.
   instantiates its scheme with fresh metas, every type equality is a
   unification (Features.Check.Require, whose messages name the whole
   resolved types), comparisons must be ground (Features.Check.Comparable),
-  and unsolved metas become holes numbered per function. It reports
+  and unsolved metas become holes numbered per function. Since P001
+  Task 5 the instantiation rule (Features.Check.Instantiation, Nested,
+  Components; design §4.1) then runs over the whole typed program: inside
+  each strongly connected component of the call graph and of the type
+  reference graph, every type argument must be a bare variable of the
+  referrer or ground (E_SPECIALIZATION). It reports
   E_INTERNAL for invalid
   local/function/type indices; its resolved-syntax input is a trusted phase
   interface, not a hostile-IR validator.

@@ -73,6 +73,7 @@ data ErrorCode
   | ArityMismatch
   | Redundant
   | NonExhaustive
+  | SpecializationError
 
 derive instance eqErrorCode ∷ Eq ErrorCode
 
