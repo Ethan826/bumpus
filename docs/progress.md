@@ -1940,8 +1940,12 @@ workload and the test's place in verify are unchanged. Acceptance was a
 2× drop in the isolated median, or, if that needs a design change, the
 profile and the options.
 
-Profile (c120d48, built in an isolated copy; scripts in the session
-scratchpad). Steady state per phase (median of 15, in-process): parse
+Profile (c120d48, built in an isolated copy). The measurement is
+committed as scripts/ladder-profile.mjs (`node scripts/ladder-profile.mjs
+--rounds 7 --baseline DIR`: cold compiles in fresh processes alternating
+with a built baseline tree, steady per-phase medians, load average); the
+CPU and allocation profiles below used `node --cpu-prof` and V8
+allocation sampling on the same source. Steady state per phase (median of 15, in-process): parse
 137 ms (lex 55), resolve 22, check 134 (infer 61, coverage 36,
 firstTooDeep 9, holes 8, instantiation rule 9, retype 7, comparable 5),
 specialize 24, Go emission 46. One cold compile (fresh process, the
@@ -2016,4 +2020,13 @@ earlier arm; (3) fusing the checker's remaining whole-body passes
 (firstTooDeep, comparable, coverage roots, instantiation's two call
 folds) into one; (4) an allocation-light State/Parsed representation.
 BACKLOG T003 stays Open with these.
+
+Re-run with the committed script (18:37, load average 7.03 before, 6.40
+after; 7 alternating rounds against the c120d48 copy): cold baseline
+513 539 504 494 520 500 501, median 504 ms; current 396 373 392 382 373
+368 368, median 373 ms. Steady medians baseline → current: lex 61 → 31,
+parse 136 → 96, resolve 21 → 21, check 136 → 86, specialize 22 → 21,
+emit 46 → 26 ms. `npm run verify` with the script committed: exit 0,
+486 tests, twelve regression proofs, ladder 748 ms (load average 6.05
+before, 19.82 after; .build/t003-script-verify.log).
 
