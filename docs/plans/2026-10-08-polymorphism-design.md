@@ -6,7 +6,8 @@ comparison constraint); specialization is a separate pure phase (approach A).
 The user's first written review (2026-10-08) gave conditional approval and
 required revisions to the termination rule, the handling of unsolved
 variables, and several precision points; section 12 maps each finding to
-its resolution. The revised spec awaits re-review. Nothing is implemented.
+its resolution. The revised spec was approved 2026-10-08. Nothing is
+implemented; the plan is docs/plans/2026-10-08-polymorphism-plan.md.
 
 ## Goal and non-goals
 
