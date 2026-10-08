@@ -1049,3 +1049,59 @@ make specialization infinite are rejected (design §4.1). Status: done.
   them plain acceptances.
 - Phase reached: these tests reach Check only (`checkRejectedAt`,
   `check`). The CLI still rejects polymorphic programs until Task 7.
+
+### Task 6: coverage over applied types (2026-10-08)
+
+Language change: matches over applied types (`List(a)`, `Maybe(Void)`,
+`List(List(Int))`) and over type variables are checked for exhaustiveness
+and redundancy (design §5); the E_INTERNAL `Coverage of a type variable`
+gap is gone. Status: done.
+
+- Features.Check.Expand: `expand ∷ Array TypeInfo → Array CtorInfo →
+  Array (Ty Open) → Lookup Expansion` numbers every application reachable
+  from the roots by unfolding constructor fields (finite by Task 5),
+  keyed with variables forgotten (rigid variables and holes are one
+  abstract type), and builds monomorphic-shaped `types`/`ctors` tables
+  over those numbers: application fields as `TData (TypeId n) []`, the
+  abstract type as Int (inhabited, no data). Discovery is a `tailRecM`
+  loop of one round per frontier, so it is stack-safe. Roots: every data
+  type the bodies carry (Features.Check.Walk `foldTypes`, deduplicated in
+  a Set) plus every declared type whose constructors mention no variable,
+  so inhabitation still settles over every monomorphic declaration.
+- Signature: `buildSignature` runs the unchanged `inhabitation` fixpoint
+  on the expanded tables; `candidates` maps an application's inhabited
+  expanded constructors back to the declared ones (declaration order) and
+  gives rigid variables and holes no heads; `fieldTypes ∷ Signature →
+  Ty Open → Head → …` substitutes the column's type arguments. Matrix
+  `complete` treats a variable column like Int (never complete). Witness
+  format unchanged (constructor names only).
+- Tests: test/poly-coverage.test.mjs, 19 tests through Parse, Resolve and
+  Check: exhaustive `Nil`/`Cons(_, _)` over `List(a)`, a binder over `a`,
+  binders under constructors over `a`, `Nothing` alone over `Maybe(Void)`,
+  `Maybe(Maybe(Void))`, a hole column, nested heads through
+  `List(List(a))`; E_TYPE for `Nothing` over `a` (Task 4 guard); exact
+  witnesses `Cons(_, Cons(_, _))` and `Cons(Cons(_, _), _)` through
+  `List(List(Int))`, `Pair(_, false)`, `Nothing`, `Just(_)`, `Cons(_, _)`
+  over a hole; redundant `_` after a binder and after `Nothing` over
+  `Maybe(Void)`; a generic function with a non-exhaustive match called at
+  two types reports one diagnostic at the match span; five arm sets over
+  `Maybe(Void)` give the same verdict as monomorphic `type MV = N |
+  J(Void)` (ADR 003); a 3,000-type parameterized chain where `Dead` needs
+  an arm only for `U(Int)` and `U(a)`, not `U(Void)`, each under 5 s
+  (about 1.1 s for the test).
+- R12: test/poly-termination.test.mjs's `length(t)` and `even`/`odd` rows
+  now require plain acceptance; no poly-* test tolerates E_INTERNAL.
+- RED: the new test against the pre-change source (src restored, rebuilt):
+  14 of 19 failed (six with E_INTERNAL `Coverage of a type variable`; the
+  `Maybe(Void)` rows and the chain because inhabitation was per declaration,
+  not per application) (.build/p001-task6-red.log). The five that passed
+  pin behavior the old code already had (the E_TYPE guard and witnesses
+  whose types need no variable column).
+- GREEN: `rm -rf output && npm run verify` exit 0, 266 tests (247 + 19),
+  zero failures/skips, eight regression proofs; coverage.test.mjs,
+  coverage-scale.test.mjs and adt-coverage.test.mjs unchanged and passing
+  (10,000-type chain 1.10 s, was 0.89 s in Task 5's log)
+  (.build/p001-task6-verify.log).
+- Phase reached: these tests reach Check only (`checkedPoly`,
+  `checkRejectedAt`, `check`). The CLI still rejects polymorphic programs
+  until Task 7.

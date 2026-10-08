@@ -19,32 +19,21 @@ const prelude = 'type List(a) = Nil | Cons(a, List(a));'
 const main = ' fn main(): Int = 0;';
 const code = 'E_SPECIALIZATION';
 
-// Matching on `List(a)` reaches coverage over an applied type, which is
-// E_INTERNAL `Coverage of a type variable` until Task 6. Coverage runs
-// after the rule, so reaching that gap proves the rule accepted.
-const coverageGap = { code: 'E_INTERNAL',
-  message: 'Coverage of a type variable' };
-const accepted = (source, gap = false) => {
+const accepted = source => {
   const result = check(resolved(source));
-  if (gap && result instanceof Left) {
-    const { code: found, message } = wire(result.value0);
-    assert.deepEqual({ code: found, message }, coverageGap, source);
-    return;
-  }
   if (result instanceof Left) {
     assert.fail(`${source}\n${JSON.stringify(wire(result.value0))}`);
   }
   assert.ok(result instanceof Right);
 };
 
-// [name, program after the prelude, needs a match over an applied type]
+// [name, program after the prelude]
 const acceptedRows = [
   ['length(t)', 'fn length(xs: List(a)): Int = match xs { Nil => 0,'
-    + ' Cons(_, t) => 1 + length(t) };' + main, true],
+    + ' Cons(_, t) => 1 + length(t) };' + main],
   ['mutual even and odd over List(a)', 'fn even(xs: List(a)): Bool ='
     + ' match xs { Nil => true, Cons(_, t) => odd(t) }; fn odd(xs: List(a)):'
-    + ' Bool = match xs { Nil => false, Cons(_, t) => even(t) };' + main,
-  true],
+    + ' Bool = match xs { Nil => false, Cons(_, t) => even(t) };' + main],
   ['swapping', 'fn f(x: a, y: b): Int = g(y, x);'
     + ' fn g(x: a, y: b): Int = f(y, x);' + main],
   ['dropping', 'fn f(x: a, y: b): Int = g(x); fn g(x: a): Int = f(x, x);'
@@ -62,8 +51,8 @@ const acceptedRows = [
     + main]
 ];
 
-for (const [name, program, gap] of acceptedRows) {
-  test(`accepted: ${name}`, () => accepted(prelude + program, gap));
+for (const [name, program] of acceptedRows) {
+  test(`accepted: ${name}`, () => accepted(prelude + program));
 }
 
 // [program after the prelude, offending text, its occurrence, message]

@@ -3,18 +3,20 @@ module Features.Check.Coverage (coverage) where
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..), either)
-import Data.Foldable (traverse_)
+import Data.Foldable (foldl, traverse_)
 import Data.Maybe (Maybe(..), maybe)
+import Data.Set as Set
 import Domain.Checked.Internal (Open)
 import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
-import Domain.Resolved (Ty)
+import Domain.Resolved (Ty(..))
 import Domain.Syntax (Diagnostic, Span, problemAt)
 import Features.Check.Search (firstJust)
 import Features.Check.Signature (Signature, buildSignature)
 import Features.Check.Tables (Lookup)
 import Features.Check.Missing (uncovered)
 import Features.Check.Usefulness (useful)
+import Features.Check.Walk (foldTypes)
 
 -- Functions in declaration order; within each, matches in source pre-order.
 -- The signature is program-wide, so its failure (a table miss, which is a
@@ -23,7 +25,7 @@ import Features.Check.Usefulness (useful)
 coverage ∷ Checked.Program → Either Diagnostic Unit
 coverage (Checked.Program program) = traverse_ coverFunction program.functions
   where
-  tables = buildSignature program.types program.ctors
+  tables = buildSignature program.types program.ctors (roots program.functions)
   coverFunction function = do
     signature ← located function.span tables
     covered signature function.body
@@ -85,6 +87,16 @@ located ∷ ∀ a. Span → Lookup a → Either Diagnostic a
 located span = either failure Right
   where
   failure problem = Left (problemAt problem span)
+
+-- The data types the bodies carry, deduplicated: every match's column types
+-- are reached from them by unfolding constructor fields.
+roots ∷ Array Checked.FunctionDecl → Array (Ty Open)
+roots functions = Array.fromFoldable (foldl body Set.empty functions)
+  where
+  body found function = foldTypes collect found function.body
+  collect found _ ty = case ty of
+    TData _ _ → Set.insert ty found
+    _ → found
 
 armRow ∷ Checked.Arm → Array Checked.Pattern
 armRow arm = [ arm.pattern ]

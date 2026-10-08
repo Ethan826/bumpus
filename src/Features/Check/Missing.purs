@@ -104,7 +104,7 @@ attempt
   → { head ∷ Head, tail ∷ Array Head }
   → Lookup (Step State Found)
 attempt signature branch rest split = do
-  types ← fieldTypes signature split.head
+  types ← fieldTypes signature branch.split.head split.head
   rows ← Matrix.specialize signature split.head branch.rows
   pure $ Loop
     { mode: Descend { tys: types <> branch.split.tail, rows }

@@ -42,13 +42,18 @@ column tys q = maybe' noTypes withTypes (Array.uncons tys)
   split types patterns =
     { ty: types.head, tys: types.tail, pat: patterns.head, rest: patterns.tail }
 
--- Int has unboundedly many heads, so it is never complete.
+-- Int has unboundedly many heads, and a rigid variable or a hole is
+-- abstract (design §5), so none of them is ever complete.
 complete ∷ Signature → Ty Open → Array Head → Lookup Boolean
 complete signature ty heads =
-  if ty == TInt then Right false
+  if open ty then Right false
   else Array.all present <$> candidates signature ty
   where
   present head = Array.elem head heads
+  open = case _ of
+    TInt → true
+    TVar _ → true
+    _ → false
 
 -- Resolution enforces constructor arity, so a head whose field count
 -- disagrees with the signature is a compiler bug, never a non-match. The

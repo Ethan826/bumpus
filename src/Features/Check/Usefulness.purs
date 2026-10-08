@@ -114,7 +114,7 @@ judge signature rows split = case split.pat of
 specialized
   ∷ Signature → Array Vector → Column → Head → Vector → Lookup Problem
 specialized signature rows split head fields = do
-  types ← fieldTypes signature head
+  types ← fieldTypes signature split.ty head
   specializedRows ← specialize signature head rows
   pure
     { tys: types <> split.tys, rows: specializedRows, q: fields <> split.rest }
