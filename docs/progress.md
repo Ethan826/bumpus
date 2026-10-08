@@ -623,3 +623,12 @@ clauses, no duplicate check) fail exactly their self-test; healthy 6/6.
 `rm -rf output && npm run verify` exit 0: 162 tests, zero failures/skips,
 eight regression proofs, test phase 19.9 s, 61.8 s wall
 (.build/t001-fix1-verify.log).
+
+## T001 merged (2026-10-08)
+
+User approved. main fast-forwarded to 4230eb9 (T001 7cbf2dd, c4e5cd0 and
+review fix round 4230eb9). Clean `rm -rf output && npm run verify` on main
+exited 0: zero warnings, 162 tests, zero failures/skips, test phase 19.4 s,
+eight regression proofs. Raw log: .build/t001-merge-verify.log. Evidence
+and brief archived under .build/merged-t001-evidence; worktree and branch
+removed. main pushed to origin at the user's request. Next: P001.

@@ -1,8 +1,7 @@
 # Local backlog
 
-Current delivery: T001 (build Go once per test file) on branch t001
-(.worktrees/t001), pending review and user approval to merge; then P001.
-A003, G001 and E005 are merged into main. Plan and verification evidence
+Current delivery: P001 (rank-1 polymorphism), in design.
+A003, G001, E005 and T001 are merged into main. Plan and verification evidence
 are in docs/plans/bootstrap.md and docs/progress.md. No remote tracking.
 
 | ID | State | Next concrete work and acceptance |
