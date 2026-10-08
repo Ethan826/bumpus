@@ -87,7 +87,9 @@ primary     = integer | "true" | "false" | identifier
   operand may be an unparenthesized `if`, `match` or lambda.
 - Application is postfix and repeatable on any primary: `f(1)(2)`,
   `(g)(x)`, `make()(x)`. `f()` with no arguments is allowed only on a
-  named zero-parameter function (section 4).
+  named zero-parameter function (section 4). Task 3 clarification: a
+  value application with an empty argument list (`f(1)()`, `(g)()`) is
+  E_SYNTAX `Expected an expression` at `)`.
 - A function's span is unchanged; a lambda spans `fn` through its body;
   a pipeline spans its left operand through its right; an application
   spans its callee through its closing parenthesis.

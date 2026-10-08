@@ -3,7 +3,7 @@ module Format.Parse.Expression (expression) where
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Maybe (Maybe, maybe)
+import Data.Maybe (Maybe(..), maybe)
 import Domain.Problem (Problem(..))
 import Domain.Syntax
   ( Diagnostic
@@ -42,7 +42,7 @@ import Format.Parse.Pattern (arms)
 
 type Comparison = { text ∷ String, operator ∷ Operator }
 
--- One postfix `(arguments)` and where its `)` ends.
+-- A postfix chain's arguments, in order, and where its last `)` ends.
 type Application = { arguments ∷ Array Expr, end ∷ Position }
 
 comparisons ∷ Array Comparison
@@ -124,24 +124,33 @@ matchExpression inner = matchOf <$> expect "match" <*> inner <* expect "{"
   matchOf keyword scrutinee matched close =
     Match { start: keyword.span.start, end: close.span.end } scrutinee matched
 
--- A primary, then any number of postfix applications, folded left:
--- `g(1)(2)` applies `g(1)` to 2. Each pushes its callee one level deeper,
--- like an infix operator (ADR 006), and takes at least one argument.
+-- A primary, then any number of postfix `(…)` groups, read as one
+-- application of every group's arguments in order: by design §5
+-- `g(1)(2)` is `g(1, 2)`, same order and stage boundaries, so `g(1)(2)`
+-- is `Apply (Call g [1]) [2]`. The callee is one level deeper, once for
+-- the whole chain (ADR 006), so no phase recurses once per group.
 atom ∷ Parser Expr → Parser Expr
-atom inner = Array.foldl applied <$> primary inner
-  <*> manyOn "(" (application inner)
+atom inner = applyTo <$> primary inner
+  <*> dispatch [ on "(" (Just <$> infixed (chain inner)) ] (pure Nothing)
   where
+  applyTo callee = maybe callee (applied callee)
   applied callee found = Apply
     { start: (exprSpan callee).start, end: found.end }
     callee
     found.arguments
 
-application ∷ Parser Expr → Parser Application
-application inner = applicationOf <$ infixed (expect "(")
-  <*> sepBy1 "," inner
-  <*> expect ")"
+-- Each group takes at least one argument; the chain ends at its last `)`.
+chain ∷ Parser Expr → Parser Application
+chain inner = joined <$> group <*> manyOn "(" group
   where
-  applicationOf arguments close = { arguments, end: close.span.end }
+  group = groupOf <$ expect "(" <*> sepBy1 "," inner <*> expect ")"
+  groupOf arguments close = { arguments, end: close.span.end }
+  joined first rest =
+    { arguments: Array.concat (Array.cons first.arguments (map args rest))
+    , end: maybe first.end endOf (Array.last rest)
+    }
+  args found = found.arguments
+  endOf found = found.end
 
 -- Parentheses return the inner expression with its own span.
 primary ∷ Parser Expr → Parser Expr

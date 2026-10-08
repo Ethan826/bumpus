@@ -1579,11 +1579,12 @@ their P001 resolution until Task 4.
   `groupedAt`) and none once closed, recorded in ADR 006's new FN001
   section. Format.Parse.Lambda parses `fn(x, _: T) => body` (`Expected a
   parameter`); Format.Parse.Expression adds `|>` (a `chainLeft1` over
-  comparisons) and postfix application (Grammar `manyOn`), each further
-  `(…)` an infix-like level; a name call stays `Call`. Domain.Resolved
+  comparisons) and postfix application (Grammar `manyOn`; flattened by
+  the review fixes below); a name call stays `Call`. Domain.Resolved
   gains `Lambda` (with `Param = { local, ty, span }`), `Apply` and `Pipe`;
   Features.Resolve.Lambda resolves parameters (E_DUPLICATE `Duplicate
-  parameter x` at the first repeated name, as for functions; `_` gets no
+  parameter x` at the first occurrence of the earliest repeated name,
+  `fn(b, a, a, b)` at the first `b`, as for functions; `_` gets no
   LocalId; annotations against the signature's variables, E_UNBOUND
   `Unbound type variable b`); `resolveType` and `occurrences` walk
   written spines by loops. Check.Infer returns `Internal "unchecked
@@ -1624,3 +1625,24 @@ their P001 resolution until Task 4.
 - GREEN: `rm -rf output && npm run verify` exit 0, 380 tests (333 + 47),
   zero failures/skips, twelve regression proofs; bootstrap snapshots
   unchanged. Log .build/fn001-task3-verify.log.
+- Review fixes (follow-up commit): I1, postfix chains are flattened into
+  one `Apply` of every group's arguments in order (`g(1)(2)(3)` is `Apply
+  (Call g [1]) [2, 3]`, exact under design §5), the callee one level
+  deeper once per chain, replacing the per-group level, which made plan
+  Task 8's 1,000-application chain E_NESTING. Seen failing first: the new
+  row `a chain of 1000 postfix groups resolves to one Apply` failed with
+  E_NESTING (NestingTooDeep 128 at the 129th group's `(`; log
+  .build/fn001-task3-i1-red.log), as did the flattened shape and span
+  rows; the 128-application E_NESTING row is removed. M1, ADR 006 states
+  that a parenthesized type raises its contents' depth while parsed, with
+  the four `L^127((Int -> Int))`/`L^128((Int))` rows in the new
+  test/fn-depth.test.mjs (passing on arrival: they pin behavior). M2,
+  design §1 clarifies empty value applications. M3, five FN001 forms in
+  scripts/depth-forms.mjs (`functionForms`, named-only in
+  depth-probe.mjs), checked at the limit and one past it through Resolve
+  by test/fn-depth.test.mjs; the review's lifted-limit figures in ADR 006;
+  plan Task 6 Step 3a re-measures them. M4, BACKLOG E003 trigger
+  reworded. M5, the duplicate wording above, with a `fn(b, a, a, b)` row.
+  GREEN: `rm -rf output && npm run verify` exit 0, 387 tests (380 - 1 + 8),
+  zero failures/skips, twelve regression proofs, snapshots unchanged (log
+  .build/fn001-task3-fix-verify.log).

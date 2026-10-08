@@ -131,7 +131,8 @@ those two forms ran only at depth 16.
 
 Function syntax extends what counts, with the measure of the FN001 design
 (docs/plans/2026-10-08-functions-design.md section 1); the limit is
-unchanged. Tests: test/fn-syntax.test.mjs, through Parse and Resolve.
+unchanged. Tests: test/fn-syntax.test.mjs and test/fn-depth.test.mjs,
+through Parse and Resolve.
 
 - Types: an arrow's parameter side is one level deeper than the arrow, its
   result side is not, so `Int -> … -> Int` of any length is one level and
@@ -140,14 +141,35 @@ unchanged. Tests: test/fn-syntax.test.mjs, through Parse and Resolve.
   depth, and when `->` follows one, its peak plus one must be within the
   limit, else E_NESTING at that `->`. 128 nested parameter positions
   resolve; 129 are E_NESTING.
-- Parentheses around types add nothing to the measure but are one level
-  deeper while parsed (Cursor `groupedAt`), so parsing never recurses past
-  the limit: more than 128 nested parentheses are E_NESTING even where
-  they are redundant (`Int -> ((…(Int)…))`), the only departure from the
-  design's measure.
+- A parenthesized type raises its contents' depth by one while they are
+  parsed (Cursor `groupedAt`) and adds nothing to the measure passed
+  outward, so parsing never recurses past the limit. One redundant pair
+  at the limit is therefore E_NESTING: `L^127((Int -> Int))` and
+  `L^128((Int))` are, while `L^127(Int -> Int)` and `L^128(Int)` are not
+  (`L^k` is k nested type arguments; test/fn-depth.test.mjs). This is the
+  only departure from the design's measure.
 - Expressions: a lambda body is a nested position; `|>` operands count as
-  `+` operands do (`chainLeft1`); each postfix application after a
-  primary or call (`g(1)(2)`, `(g)(x)`) pushes its callee one level
-  deeper, as an infix operator does (`infixed`), so after `g(1)` 127
-  further applications parse and 128 are E_NESTING. A name call `g(1)`
-  counts as before.
+  `+` operands do (`chainLeft1`).
+- Postfix application chains are flattened: `g(1)(2)(3)` is one
+  `Apply (Call g [1]) [2, 3]` and `(h)(1)(2)` is `Apply h [1, 2]`, exact
+  under design section 5 (`e(a1, …, aj)` is `e(a1)…(aj)`, with the same
+  order and stage boundaries). The callee is one level deeper once for the
+  whole chain (`infixed`) and each argument is nested as a call argument
+  is; a name call `g(1)` counts as before. A chain of one level per group
+  would make plan Task 8's chain of 1,000 partial applications E_NESTING,
+  and lifting the limit would not help: every later phase would recurse
+  once per group (the Task 3 review measured Resolve overflowing between
+  3,500 and 3,546 nested Applys with the limit lifted). A 1,000-group chain
+  resolves to one Apply (test/fn-syntax.test.mjs).
+
+Task 3 measurements (the Task 3 review, limit lifted, before the chains
+were flattened; smallest overflowing depth per form, cold CLI): 419,
+1,682, 613, 613 and 613 for the review's five forms, in that order:
+parenthesized nested lambdas, bare nested lambdas, nested parameter
+types, type parentheses and annotation types, each above twice the limit.
+scripts/depth-forms.mjs now has a form of each kind (`functionForms`,
+whose exact shapes may differ from the review's). The forms emit Go only
+from Task 6, which re-measures them with scripts/depth-probe.mjs (they
+are measured only when named) and moves them into `forms` and
+test/depth.test.mjs; until then test/fn-depth.test.mjs checks each at the
+limit and one past it through Resolve.

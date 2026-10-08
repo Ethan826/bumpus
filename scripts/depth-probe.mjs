@@ -10,7 +10,11 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { forms } from './depth-forms.mjs';
+import { forms, functionForms } from './depth-forms.mjs';
+
+// FN001 forms only when named: until Go emits them (FN001 Task 6) their
+// runs below the overflow point end in a diagnostic, reported as anomalies.
+const named = { ...forms, ...functionForms };
 
 const timeout = 120000;
 const start = 64;
@@ -31,7 +35,7 @@ const classify = (result) => {
 
 const outcome = (form, depth) => {
   const input = join(work, 'probe.bumpus');
-  writeFileSync(input, forms[form](depth).source);
+  writeFileSync(input, named[form](depth).source);
   const result = spawnSync('node',
     ['scripts/bumpus.mjs', 'emit', input, join(work, 'probe.go')],
     { encoding: 'utf8', timeout });

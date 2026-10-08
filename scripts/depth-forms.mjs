@@ -93,3 +93,57 @@ const mixed = {
 };
 
 export const forms = { ...single, ...mixed };
+
+// FN001 forms (ADR 006, Functions). Each has counted depth d and fails at
+// d + 1 on its leaf (or, for parameter types, at the innermost `->`). They
+// parse and resolve now; Check types them from FN001 Task 4 and Go emits
+// them from Task 6, when they join `forms` (and test/depth.test.mjs). Until
+// then test/fn-depth.test.mjs checks them through Resolve, and
+// scripts/depth-probe.mjs measures them only when named.
+
+// Generic, so the function's own signature adds no depth.
+const apply = 'fn apply(f: a): Int = 0; ';
+const lambdaText = 'fn(x: Int) => ';
+
+// `apply(` is one level and each piece one more; `1` is the leaf.
+const applied = pieces => {
+  const before = apply + main('Int') + 'apply(' + pieces.join('');
+  const opened = pieces.filter(piece => piece === '(').length;
+  return {
+    source: `${before}1${')'.repeat(opened + 1)};`, at: before.length,
+    text: '1', output: '0\n'
+  };
+};
+
+const alternating = count => Array.from({ length: count },
+  (_, index) => (index % 2 === 0 ? '(' : lambdaText));
+
+export const functionForms = {
+  'lambda-bare': d => applied(Array(d - 1).fill(lambdaText)),
+  'lambda-parens': d => applied(alternating(d - 1)),
+  // (…(Int -> Int) -> Int…): d parameter positions, d - 1 parentheses.
+  'parameter-types': d => {
+    const before = `fn f(g: ${'('.repeat(d - 1)}Int `;
+    return {
+      source: `${before}-> Int${') -> Int'.repeat(d - 1)}): Int = 0; `
+        + `${main('Int')}0;`,
+      at: before.length, text: '->', output: '0\n'
+    };
+  },
+  'type-parentheses': d => {
+    const before = `fn f(g: ${'('.repeat(d)}`;
+    return {
+      source: `${before}Int${')'.repeat(d)}): Int = 0; ${main('Int')}0;`,
+      at: before.length, text: 'Int', output: '0\n'
+    };
+  },
+  // A lambda annotation L^(d-1)(Int) inside `apply(`, one level.
+  'annotation-types': d => {
+    const before = 'type L(a) = N; ' + apply + main('Int')
+      + `apply(fn(y: ${'L('.repeat(d - 1)}`;
+    return {
+      source: `${before}Int${')'.repeat(d - 1)}) => 0);`, at: before.length,
+      text: 'Int', output: '0\n'
+    };
+  }
+};

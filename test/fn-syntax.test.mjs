@@ -90,10 +90,14 @@ test('a lambda extends right; |> is looser than comparison, left first',
       'Call(g, [Lambda([{name: Just(y), ty: Nothing}], Variable(y))])');
   });
 
+// A postfix chain is one Apply of every group's arguments in order: by
+// design §5 `e(a)(b)` is `e(a, b)`, with the same order and boundaries.
 test('postfix application repeats on any primary; a name call stays Call',
   () => {
-    assert.equal(bodyShape('g(1)(2)(3, 4)'), 'Apply(Apply(Call(g, '
-      + '[Integer(1)]), [Integer(2)]), [Integer(3), Integer(4)])');
+    assert.equal(bodyShape('g(1)(2)(3, 4)'), 'Apply(Call(g, [Integer(1)]), '
+      + '[Integer(2), Integer(3), Integer(4)])');
+    assert.equal(bodyShape('(h)(1)(2)'),
+      'Apply(Variable(h), [Integer(1), Integer(2)])');
     assert.equal(bodyShape('(g)(x)'), 'Apply(Variable(g), [Variable(x)])');
     assert.equal(bodyShape('make()(x)'),
       'Apply(Call(make, []), [Variable(x)])');
@@ -102,17 +106,24 @@ test('postfix application repeats on any primary; a name call stays Call',
     assert.equal(bodyShape('1(2)'), 'Apply(Integer(1), [Integer(2)])');
   });
 
-// Each further application pushes its callee one level deeper, as an
-// infix operator does (ADR 006), so a chain cannot outgrow the stack.
-const appliedTimes = count => `fn f(x: Int): Int = f(1)${'(1)'.repeat(count)};`
-  + main;
+// The callee of a chain is one level deeper however long the chain is, so
+// a long chain (plan Task 8: 1,000 partial applications) is one node.
+const chainLength = 1000;
+const chainSeconds = 5;
+const millisecondsPerSecond = 1000;
 
-test(`${nestingLimit - 1} further applications parse; one more is E_NESTING`,
-  () => {
-    assert.ok(parse(appliedTimes(nestingLimit - 1)) instanceof Right);
-    rejectedAt(appliedTimes(nestingLimit), 'E_NESTING', '(',
-      nestingLimit + 1);
-  });
+test(`a chain of ${chainLength} postfix groups resolves to one Apply`, () => {
+  const groups = Array.from({ length: chainLength }, (_, k) => `(${k})`);
+  const started = performance.now();
+  const program = resolved(`fn g(x: Int): Int = x; fn f(x: Int): Int = `
+    + `g(0)${groups.join('')};${main}`);
+  const seconds = (performance.now() - started) / millisecondsPerSecond;
+  assert.ok(seconds < chainSeconds, `took ${seconds} s`);
+  const body = program.functions[1].body;
+  assert.equal(shape(body.value1), 'Call(0, [Integer(0)])');
+  assert.equal(body.value2.length, chainLength);
+  assert.equal(shape(body.value2.at(-1)), `Integer(${chainLength - 1})`);
+});
 
 test('lambda, application and pipe spans', () => {
   const lambda = 'fn(y: Int, _) => y + 1';
@@ -123,9 +134,9 @@ test('lambda, application and pipe spans', () => {
     [bodySpan(`(${lambda})`, 'y'), bodySpan(`(${lambda})`, '_')]);
   assert.equal(shape(parameters), '[{name: Just(y), ty: Just(IntRef)}, '
     + '{name: Nothing, ty: Nothing}]');
-  const applied = parsedBody('g(1)(2)');
-  assert.deepEqual(applied.value0, bodySpan('g(1)(2)', 'g(1)(2)'));
-  assert.deepEqual(applied.value1.value0, bodySpan('g(1)(2)', 'g(1)'));
+  const applied = parsedBody('g(1)(2)(3)');
+  assert.deepEqual(applied.value0, bodySpan('g(1)(2)(3)', 'g(1)(2)(3)'));
+  assert.deepEqual(applied.value1.value0, bodySpan('g(1)(2)(3)', 'g(1)'));
   assert.deepEqual(parsedBody('(g)(x)').value0, bodySpan('(g)(x)', 'g)(x)'));
   assert.deepEqual(parsedBody('a + 1 |> g(2)').value0,
     bodySpan('a + 1 |> g(2)', 'a + 1 |> g(2)'));

@@ -418,6 +418,11 @@ spelling a type.
   lambda, a partial application, a pipe chain; snapshot
   bootstrap/functions.go asserted byte-equal by test/compiler.test.mjs
   alongside the others.
+- [ ] **Step 3a: Re-measure** ADR 006's margin for the FN001 forms with
+  scripts/depth-probe.mjs after lowering (`functionForms` in
+  scripts/depth-forms.mjs, named on the command line), then move them
+  into `forms` so test/depth.test.mjs runs them through the CLI (added
+  by the Task 3 review).
 - [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0,
   four existing snapshots byte-identical.
 - [ ] **Step 5: Commit** `feat: lower functions to staged Go (FN001)`.

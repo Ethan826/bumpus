@@ -65,6 +65,9 @@ const rejections = [
     'Duplicate parameter y'],
   ['fn f(x: Int): Int = (fn(_, y, _, y) => 1)(x);', 'E_DUPLICATE', 'y', 0,
     'Duplicate parameter y'],
+  // The first occurrence of the earliest repeated name, as for functions.
+  ['fn f(x: Int): Int = (fn(b, a, a, b) => 1)(x);', 'E_DUPLICATE', 'b', 0,
+    'Duplicate parameter b'],
   ['fn f(x: a): a = (fn(y: b) => x)(x);', 'E_UNBOUND', 'b', 0,
     'Unbound type variable b'],
   ['fn g(x: b): b = x; fn f(x: a): a = (fn(y: Int -> b) => x)(x);',
