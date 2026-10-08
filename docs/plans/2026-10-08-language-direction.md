@@ -21,6 +21,13 @@ useful diagnostics and dependable tooling. They do not settle ownership,
 borrowing, or memory management.
 Haskell influence does not settle laziness or every advanced type feature.
 
+Developer experience also includes the user's requested syntax highlighting
+and IDE support (IDE001), first-class doctests (DOC001), property-based
+testing for Bumpus programs (PBT001), and LLM skills/discoverability (AI001).
+Literate capabilities (LIT001) remain exploratory. See
+[tooling direction](2026-10-08-tooling-direction.md) for intended outcomes,
+dependencies and proposed acceptance; no tooling implementation is selected.
+
 ## Early-release priorities
 
 - Rank-1 polymorphism and parameterized ADTs (P001).

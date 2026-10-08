@@ -57,6 +57,10 @@ turn the audit into an unbounded bibliography.
    target-neutral IR, runtime layouts, backend constraints and code growth.
 7. Diagnostics, documentation, formatting, editor support, testing,
    packaging and realistic full-stack/native application needs.
+   Include the user's tooling requirements: highlighting/IDE services,
+   first-class doctests, property testing, possible literate capabilities,
+   and versioned LLM skills/discovery (IDE001/DOC001/PBT001/LIT001/AI001).
+   Distinguish compiler features from libraries and ecosystem tools.
 
 Use these axes for comparable briefs; mark absent/not applicable topics
 explicitly. Bibliography size and matching feature names are not sufficient
@@ -113,6 +117,10 @@ evidence of coverage or semantic compatibility.
 - [ ] Walk through modules sharing pure domain code, safe foreign ingress,
   practical text/numbers/collections, and the proposed web/native targets.
   Sketches are not working demonstrations until independently tested.
+- [ ] Walk through an IDE diagnostic on an incomplete edit, a failing
+  doctest located in its document, a shrunk/replayed property failure, and
+  discovery of a version-correct API/example by a coding agent. Evaluate
+  literate authoring as an explicit optional decision, not a requirement.
 
 ## Task 5: Review and durable handoff
 

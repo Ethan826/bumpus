@@ -1548,3 +1548,20 @@ no skips, and two large-source timing failures (6.572 s and 5.633 s against
 `.build/la001-plan-verify.log`; BACKLOG T004 records the cases, unconfirmed
 cause and diagnostic next action. No checks or assertions were changed,
 and no rerun concealed the failures. The audit itself remains planned.
+
+## Developer tooling direction recorded (2026-10-08)
+
+The user requested highlighting/IDE support, first-class doctests,
+property-based testing, possible literate capabilities, and LLM
+skills/discoverability. Added distinct IDE001, DOC001, PBT001, LIT001 and
+AI001 entries with docs/plans/2026-10-08-tooling-direction.md. The brief
+records outcomes, proposed acceptance and dependencies without selecting
+syntax, tool protocols or implementations; literate capabilities remain
+exploratory. LA001 now includes these concerns in its comparison axes and
+application scenarios. Updated language direction and next-session handoff.
+No language/compiler code changed and FN001's delivery is unchanged.
+Verification: `npm run verify` exited 0 with 318 tests passing, no failures
+or skips, and all twelve isolated regression proofs passing; evidence:
+`.build/tooling-direction-verify.log`. This checks the existing compiler,
+not the proposed tooling. T004's earlier timing failures remain recorded
+and unresolved; this successful run does not establish their cause.

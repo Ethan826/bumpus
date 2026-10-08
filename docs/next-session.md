@@ -69,6 +69,14 @@ interaction matrix, practical scenarios and independent review. Feed it
 into upcoming type/row/effect designs without interrupting FN001; existing
 advanced-feature deferrals remain. Source entry points checked, audit not run.
 
+Tooling direction is recorded in plans/2026-10-08-tooling-direction.md:
+IDE001 highlighting/editor support, DOC001 first-class doctests, PBT001
+language-user generators/shrinking/replay and law suites, AI001 versioned
+LLM skills/discovery, and exploratory LIT001 literate capabilities. Feed
+these into LA001 and focused subsystem designs; no tooling implementation
+is authorized or added to FN001. Existing compiler properties do not
+complete PBT001. Preserve the tentative status of literate capabilities.
+
 Open items: E002 remainder, E006-E011 (P001 follow-ups: stack margin,
 exponential type size, Expand keys, lowercase-type hint, mismatch `_`,
 near-limit elision), F001-F003, F005-F007, E001, E003, E004, O001, H001,
