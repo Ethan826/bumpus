@@ -840,3 +840,70 @@ No language change; nothing calls the unifier until Task 4. Status: done.
   proofs (.build/p001-task3-verify.log).
 - Phase reached: unit level only (compiled module loaded from output/). The
   CLI does not compile polymorphic programs until Task 7.
+
+### Task 4: polymorphic checking (2026-10-08)
+
+Language change: rank-1 polymorphic functions and constructors type-check.
+Status: done.
+
+- Features.Check is split (every file under 250 lines): Check.purs
+  (`check`, `checkFunction`), Check.Infer (expressions), Check.Call (calls
+  and constructions), Check.Arms (`checkMatch`), Check.Match (patterns;
+  `checkPattern` keeps its old signature, from a fresh state),
+  Check.Require (`require`/`expectType` by unification, `typeName`),
+  Check.Scheme (state, instantiation, holes), Check.Walk (IR type
+  traversal), Check.Comparable (comparison groundness).
+- State: `{ subst, next }` threaded explicitly through `infer` in Either;
+  arrays are threaded by a private applicative (`threadAll`), whose
+  traverse is balanced, so 5,000 arms and 10,000 arguments stay linear and
+  stack-safe. During checking a checked-IR `Hole m` is the meta m.
+- A function: parameters bind rigid types; the body is inferred, every
+  former type equality now a unification in the same order (arguments all
+  inferred, then unified; `if` else against then; arms against the first);
+  the result unifies; the resolved body's comparisons must be ground (rigid
+  variable: E_TYPE `Type <t> is not comparable`; otherwise a hole: E_TYPE
+  `Ambiguous type <t> in comparison`; pre-order, at the left operand); then
+  unsolved metas are renumbered `Hole 0, 1, …` per function in
+  `foldTypes` pre-order. Each use of a function instantiates its
+  `variables`, each constructor its owner's `parameters`; `Call` and
+  `Construct` record the resolved instantiation in that order.
+- Messages: E_TYPE `Expected <t>, found <u>` names both whole operands
+  resolved under the substitution before the failing unification (not
+  Unify's innermost pair); `InfiniteType` names the meta (`_`) and the
+  resolved containing type. Domain.Problem gains `NotComparable` and
+  `AmbiguousType` (E_TYPE). The constructor-pattern arity guard (an
+  internal error) now runs before the owner lookup and unification.
+- Regression row `branch` now targets Features.Check.Infer's
+  `checkConditional` (still one target, same defect); docs/engineering.md
+  and docs/architecture.md updated.
+- Tests: test/poly-check.test.mjs, 16 tests: the brief's rows (rigid
+  mismatches, occurs, not comparable at `a` and `List(a)`, ambiguous
+  `Nil == Nil` and `Proxy == Proxy`, literal pattern on `a`), plus a
+  constructor pattern on `a`, whole-type messages (`Pair(Int, Int)` versus
+  `Pair(Int, Bool)`, `Maybe(List(_))`), rigid beside a hole; checked-IR
+  rows: `pair(id(1), id(true))` records `[Int, Bool]` (and `[Int]`,
+  `[Bool]`, rigid `[a, b]` inside `pair`), `length(Nil)` `[Hole 0]`, dense
+  per-function hole numbering, and a pattern's instantiated type.
+  test/diagnostics.test.mjs and every adt-* test pass untouched.
+- RED: `node --test test/poly-check.test.mjs` on the pre-change build: 16
+  of 16 failed (.build/p001-task4-red.log; the final file, rerun against
+  HEAD c6e87bc in an isolated copy: 16 of 16 failed,
+  .build/p001-task4-red-final.log). GREEN: 16 of 16.
+- GREEN: `rm -rf output && npm run verify` exit 0, 96.3 s wall, zero
+  warnings, 211
+  tests (195 + 16), zero failures/skips, eight regression proofs
+  (.build/p001-task4-verify.log).
+- Measurements (checking only, warm Node default stack): existing
+  depth-forms at 128 and 20,000 declarations: deepest checked type 1;
+  `id` nested 128: 1; `wrap(x: a): L(a)` nested 127: 128; `deep(x: a):
+  L^127(a)` nested k: checks at k = 40 (5,081 deep), RangeError in
+  Unify `resolve` from k = 44 — within every source limit (BACKLOG E006,
+  .build/p001-task4-measure-depth.log). `dup(x: a): Pair(a, a)` nested
+  12/16/20: 21 ms / 208 ms / 3.2 s, doubling per level (BACKLOG E007,
+  .build/p001-task4-measure-dup.log).
+- Known gap: coverage of a constructor's fields at an applied type (for
+  example `match m { Just(n) => n, Nothing => 0 }` over `Maybe(Int)`)
+  is E_INTERNAL `Coverage of a type variable` until Task 6.
+- Phase reached: these tests reach Check only (`checkedPoly`,
+  `checkRejectedAt`). The CLI still rejects polymorphic programs until
+  Task 7 (Specialize: E_INTERNAL `unspecialized type`).

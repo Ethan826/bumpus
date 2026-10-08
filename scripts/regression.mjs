@@ -4,9 +4,11 @@ import { spawnSync } from 'node:child_process';
 // Each row restores one defect in its own isolated copy of the sources.
 const rows = [
   {
-    name: 'branch', file: 'src/Features/Check.purs',
-    needle: 'second ← infer env no\n  require env (Checked.typeOf first) second',
-    replacement: 'second ← infer env no\n  require env (Checked.typeOf second) second',
+    name: 'branch', file: 'src/Features/Check/Infer.purs',
+    needle: 'branches.no\n  checked ← require env second.state'
+      + ' (Checked.typeOf first.value)',
+    replacement: 'branches.no\n  checked ← require env second.state'
+      + ' (Checked.typeOf second.value)',
     probe: 'branch', message: /branch type mismatch was accepted/
   },
   {

@@ -7,7 +7,7 @@ an earlier layer; scripts/structure.mjs enforces it from `purs graph`.
 | Layer | Modules (src/) | Role |
 |---|---|---|
 | Domain | Syntax, Type, Resolved, Problem, Host, Checked.Internal, IR.Internal | syntax trees, spans, `Ty v`, resolved syntax, checked IR, monomorphic IR, `Problem` data, capability-port types |
-| Features | Resolve, Resolve.{Expression,Types,Pattern,Repeated,Fresh}, Check, Check.{Match,Tables,Inhabited,Signature,Matrix,Usefulness,Missing,Coverage,Search}, Specialize | resolution, checking, coverage, specialization; report `Problem` data, never text |
+| Features | Resolve, Resolve.{Expression,Types,Pattern,Repeated,Fresh}, Check, Check.{Infer,Call,Arms,Match,Require,Scheme,Walk,Comparable,Unify,Tables,Inhabited,Signature,Matrix,Usefulness,Missing,Coverage,Search}, Specialize | resolution, checking, coverage, specialization; report `Problem` data, never text |
 | Format | Lex, Parse, Parse.*, Stack, Go, Go.{Layout,Data,Lowered,Expression,Match,Capture,Compare,Show,Usage}, Diagnostic, Wire, Arguments | text in (tokens, parser, reserved words, uppercase rule); Go out; diagnostic text, `E_*` names, wire records, usage text |
 | Runtime | Node (+ Node.js) | port implementations, argv/stdout/stderr/exit, JSON; the only FFI |
 | Program | Compile, Command, Main | pure `compile`, commands over any `Host`, entry point |
@@ -64,8 +64,15 @@ Format.Wire.
   Until P001 Task 2 nothing produces a variable or a type argument.
 - **Check** produces the checked IR, Domain.Checked.Internal (`Construct
   CtorId`, `Match`, `Pattern`; each call and construction records its
-  instantiation, empty until P001 Task 4), and is the only producer of
-  `Checked.Program`. It reports E_INTERNAL for invalid
+  instantiation), and is the only producer of `Checked.Program`. Since
+  P001 Task 4 each function is checked with a substitution and a meta
+  counter threaded through Features.Check.Infer (Features.Check.Scheme
+  `State`): parameters are rigid, each use of a function or constructor
+  instantiates its scheme with fresh metas, every type equality is a
+  unification (Features.Check.Require, whose messages name the whole
+  resolved types), comparisons must be ground (Features.Check.Comparable),
+  and unsolved metas become holes numbered per function. It reports
+  E_INTERNAL for invalid
   local/function/type indices; its resolved-syntax input is a trusted phase
   interface, not a hostile-IR validator.
 - **Coverage** (Features.Check.Coverage, Usefulness, Missing, Matrix,

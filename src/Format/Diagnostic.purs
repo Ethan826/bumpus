@@ -39,6 +39,8 @@ code = case _ of
   TypeArguments _ → Code.ArityMismatch
   TypeMismatch _ _ → Code.TypeMismatch
   InfiniteType _ _ → Code.TypeMismatch
+  NotComparable _ → Code.TypeMismatch
+  AmbiguousType _ → Code.TypeMismatch
   RedundantArm → Code.Redundant
   NonExhaustive _ → Code.NonExhaustive
   Internal _ → Code.InternalError
@@ -80,6 +82,8 @@ message = case _ of
   InfiniteType meta whole → "Infinite type: " <> typeName meta
     <> " occurs in "
     <> typeName whole
+  NotComparable ty → "Type " <> typeName ty <> " is not comparable"
+  AmbiguousType ty → "Ambiguous type " <> typeName ty <> " in comparison"
   RedundantArm → "Redundant match arm"
   NonExhaustive witness → "Missing pattern: " <> pattern witness
   Internal text → text

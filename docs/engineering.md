@@ -66,11 +66,11 @@ adding a bypass allowlist.
   brute-force coverage oracle with brute-forced inhabitedness over generated
   type systems (test/coverage.test.mjs), and fake-host command tests
   (test/program.test.mjs);
-- `npm run verify` runs every test/*.test.mjs file (26 files, 195 tests at
-  P001 Task 3, no skips; the list is read from the directory, never hand-kept) and then
+- `npm run verify` runs every test/*.test.mjs file (27 files, 211 tests at
+  P001 Task 4, no skips; the list is read from the directory, never hand-kept) and then
   scripts/regression.mjs, a table of isolated-copy mutations, each of which
   must pass on the healthy build and fail on its mutant: `branch`
-  (Features.Check branch type), `nil-guard` (Format.Go.Match drops the `!= nil`
+  (Features.Check.Infer branch type), `nil-guard` (Format.Go.Match drops the `!= nil`
   test; probe requires the unmatched panic, not a runtime error),
   `exhaustive` (Features.Check.Coverage always succeeds), `ctor-order`
   (Format.Go.Compare reverses the tag comparison), `first-field` (compares

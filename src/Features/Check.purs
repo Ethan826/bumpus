@@ -2,24 +2,18 @@ module Features.Check (check) where
 
 import Prelude
 import Data.Array as Array
-import Data.Either (Either(..))
-import Data.Maybe (maybe')
+import Data.Either (Either)
 import Data.Traversable (traverse)
-import Features.Check.Coverage (coverage)
-import Features.Check.Match (Typed, checkMatch, require)
-import Domain.Checked.Internal (Open, rigid)
+import Domain.Checked.Internal (rigid)
 import Domain.Checked.Internal as Checked
-import Domain.Problem (Problem(..))
-import Domain.Syntax (Diagnostic, Operator, Span, problemAt)
-import Domain.Resolved (Ty(..))
 import Domain.Resolved as Resolved
-
-type Env =
-  { functions ∷ Array Resolved.FunctionDecl
-  , types ∷ Array Resolved.TypeInfo
-  , ctors ∷ Array Resolved.CtorInfo
-  , locals ∷ Array Typed
-  }
+import Domain.Syntax (Diagnostic)
+import Features.Check.Comparable (comparable)
+import Features.Check.Coverage (coverage)
+import Features.Check.Infer (Env, infer)
+import Features.Check.Require (require)
+import Features.Check.Scheme (holes, resolved, start)
+import Features.Check.Walk (retype)
 
 check ∷ Resolved.Program → Either Diagnostic Checked.Program
 check program = do
@@ -35,180 +29,37 @@ check program = do
   coverage checked
   pure checked
   where
-  checkDefinition definition = checkFunction (environment program) definition
+  checkDefinition definition = checkFunction (environment program definition)
+    definition
 
-environment ∷ Resolved.Program → Env
-environment program =
+environment ∷ Resolved.Program → Resolved.FunctionDecl → Env
+environment program function =
   { functions: program.functions
   , types: program.types
   , ctors: program.ctors
-  , locals: []
+  , variables: function.variables
+  , locals: Array.mapWithIndex parameterLocal function.parameters
   }
+  where
+  parameterLocal index parameter =
+    { id: Resolved.LocalId index, ty: rigid parameter.ty }
 
+-- Parameters bind rigid types; the body is inferred; then the result
+-- unifies; then the body's comparisons must be ground; then the metas
+-- still unsolved become holes.
 checkFunction
   ∷ Env → Resolved.FunctionDecl → Either Diagnostic Checked.FunctionDecl
 checkFunction env function = do
-  body ← infer scoped function.body
-  require scoped (rigid function.result) body
+  body ← infer env start function.body
+  finished ← require env body.state (rigid function.result) body.value
+  let settled = retype (resolved finished.subst) body.value
+  comparable env settled
   pure
     { id: function.id
     , parameters: map parameterType function.parameters
     , result: rigid function.result
-    , body
+    , body: holes settled
     , span: function.span
     }
   where
-  scoped = env
-    { locals = Array.mapWithIndex parameterLocal function.parameters }
   parameterType parameter = rigid parameter.ty
-  parameterLocal index parameter =
-    { id: Resolved.LocalId index, ty: parameterType parameter }
-
-infer ∷ Env → Resolved.Expr → Either Diagnostic Checked.Expr
-infer env expression = case expression of
-  Resolved.Integer span value → checkedInteger span value
-  Resolved.Boolean span value → checkedBoolean span value
-  Resolved.Local span id → checkLocal env span id
-  Resolved.Call span id arguments → checkCall env span id arguments
-  Resolved.Construct span id arguments → checkConstruct env span id arguments
-  Resolved.Add span left right → checkAddition env span left right
-  Resolved.Compare span operator left right → checkComparison env span
-    operator
-    left
-    right
-  Resolved.If span condition yes no → checkConditional env span condition yes
-    no
-  Resolved.Match span scrutinee arms → checkMatch infer env span scrutinee arms
-
-checkedInteger ∷ Span → Int → Either Diagnostic Checked.Expr
-checkedInteger span value = pure
-  (Checked.Expr { ty: TInt, span, node: Checked.Integer value })
-
-checkedBoolean ∷ Span → Boolean → Either Diagnostic Checked.Expr
-checkedBoolean span value = pure
-  (Checked.Expr { ty: TBool, span, node: Checked.Boolean value })
-
-checkAddition
-  ∷ Env
-  → Span
-  → Resolved.Expr
-  → Resolved.Expr
-  → Either Diagnostic Checked.Expr
-checkAddition env span left right = do
-  first ← infer env left
-  second ← infer env right
-  require env TInt first
-  require env TInt second
-  pure (Checked.Expr { ty: TInt, span, node: Checked.Add first second })
-
-checkComparison
-  ∷ Env
-  → Span
-  → Operator
-  → Resolved.Expr
-  → Resolved.Expr
-  → Either Diagnostic Checked.Expr
-checkComparison env span operator left right = do
-  first ← infer env left
-  second ← infer env right
-  require env (Checked.typeOf first) second
-  pure
-    ( Checked.Expr
-        { ty: TBool, span, node: Checked.Compare operator first second }
-    )
-
-checkConditional
-  ∷ Env
-  → Span
-  → Resolved.Expr
-  → Resolved.Expr
-  → Resolved.Expr
-  → Either Diagnostic Checked.Expr
-checkConditional env span condition yes no = do
-  predicate ← infer env condition
-  require env TBool predicate
-  first ← infer env yes
-  second ← infer env no
-  require env (Checked.typeOf first) second
-  pure
-    ( Checked.Expr
-        { ty: Checked.typeOf first
-        , span
-        , node: Checked.If predicate first second
-        }
-    )
-
-checkLocal
-  ∷ Env → Span → Resolved.LocalId → Either Diagnostic Checked.Expr
-checkLocal env span id = maybe' missing found
-  (Array.find named env.locals)
-  where
-  missing _ = Left (problemAt (Internal "Invalid resolved local") span)
-  found local = pure
-    (Checked.Expr { ty: local.ty, span, node: Checked.Local id })
-  named local = local.id == id
-
-checkCall
-  ∷ Env
-  → Span
-  → Resolved.FunctionId
-  → Array Resolved.Expr
-  → Either Diagnostic Checked.Expr
-checkCall env span id@(Resolved.FunctionId index) arguments = maybe'
-  missing
-  found
-  (Array.index env.functions index)
-  where
-  missing _ = Left (problemAt (Internal "Invalid resolved function") span)
-  found function = do
-    checked ← checkArguments env span (map parameterType function.parameters)
-      arguments
-    pure
-      ( Checked.Expr
-          { ty: rigid function.result
-          , span
-          , node: Checked.Call id [] checked
-          }
-      )
-  parameterType parameter = rigid parameter.ty
-
-checkConstruct
-  ∷ Env
-  → Span
-  → Resolved.CtorId
-  → Array Resolved.Expr
-  → Either Diagnostic Checked.Expr
-checkConstruct env span id@(Resolved.CtorId index) arguments = maybe'
-  missing
-  found
-  (Array.index env.ctors index)
-  where
-  missing _ = Left
-    (problemAt (Internal "Invalid resolved constructor") span)
-  found ctor = do
-    checked ← checkArguments env span (map rigid ctor.fields) arguments
-    pure
-      ( Checked.Expr
-          { ty: TData ctor.owner []
-          , span
-          , node: Checked.Construct id [] checked
-          }
-      )
-
--- Arity is checked before any argument, as Stage 0 calls always did.
-checkArguments
-  ∷ Env
-  → Span
-  → Array (Ty Open)
-  → Array Resolved.Expr
-  → Either Diagnostic (Array Checked.Expr)
-checkArguments env span expected arguments = do
-  when (Array.length arguments /= Array.length expected)
-    (Left (problemAt Arity span))
-  checked ← traverse checkExpression arguments
-  _ ← traverse checkArgument (Array.zipWith argumentPair expected checked)
-  pure checked
-  where
-  checkExpression argument = infer env argument
-  argumentPair ty actual = { ty, actual }
-  checkArgument pair = require env pair.ty pair.actual

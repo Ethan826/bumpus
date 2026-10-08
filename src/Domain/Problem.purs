@@ -49,6 +49,8 @@ data Problem
   | TypeArguments String
   | TypeMismatch TypeName TypeName
   | InfiniteType TypeName TypeName
+  | NotComparable TypeName
+  | AmbiguousType TypeName
   | RedundantArm
   | NonExhaustive Witness
   | Internal String
