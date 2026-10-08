@@ -33,6 +33,12 @@ row/service architecture, explicit effects design (FX001), inspectable
 lowered IR (L001), and future target evaluation (J001). These do not
 authorize new implementation.
 
+The same direction document records proposed `do` notation under FX001:
+bind/lambda elaboration, result bindings and discarded results, final
+computation, deferred execution, and inferred service/error requirements.
+Syntax, bind/pure selection and monadic versus algebraic effects remain
+open; this records discussion without authorizing implementation.
+
 Open items: E002 remainder, E006-E011 (P001 follow-ups: stack margin,
 exponential type size, Expand keys, lowercase-type hint, mismatch `_`,
 near-limit elision), F001-F003, F005-F007, E001, E003, E004, O001, H001,

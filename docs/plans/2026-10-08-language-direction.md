@@ -133,6 +133,60 @@ I001 retains foreign-value validation and Go integration; FX001 owns the
 language effect semantics. Effects must respect ADR 001's explicit
 sequencing requirement rather than rely on incidental Go evaluation.
 
+### Proposed `do` notation
+
+Recorded 2026-10-08 at the user's request. This is a sequencing proposal
+for FX001, not approved syntax or authorization to implement effects.
+Make `do` an expression elaborated into bind and lambdas. Illustrative
+syntax, including block punctuation and `<-`, remains subject to design:
+
+```bumpus
+fn profile(id) =
+  do {
+    user <- fetchUser(id);
+    preferences <- fetchPreferences(user.id);
+    logAccess(user.id);
+    pure(renderProfile(user, preferences))
+  };
+```
+
+Its proposed meaning is:
+
+```bumpus
+bind(fetchUser(id), fn(user) =>
+  bind(fetchPreferences(user.id), fn(preferences) =>
+    bind(logAccess(user.id), fn(_) =>
+      pure(renderProfile(user, preferences))
+    )
+  )
+)
+```
+
+`name <- computation` scopes a successful result over the rest of the
+block. A computation without a binding discards its result. The final
+expression supplies the resulting computation; `pure` lifts an ordinary
+value. The selected abstraction determines sequencing: Result-like bind
+bypasses later continuations on failure; a deferred effect constructs a
+computation that performs the operations when run. `do` itself provides
+neither scheduling nor resource cleanup. The effect design must explain
+how Bumpus's strict evaluation distinguishes construction from execution.
+
+For service-oriented effects, aim to infer the combined service
+requirements and typed failures, with real or fake services supplied at
+the execution boundary and no user-assembled transformer stack. How rows
+combine, and whether errors use variants, remain separate design choices.
+
+FX001 must decide how a block selects bind/pure evidence, coordinated with
+C001's explicit instance selection. Also decide local pure bindings,
+pattern bindings and their failure behavior, and diagnostics for mixing
+incompatible computations. FN001's deferred local-binding form is not
+implicitly authorized by this proposal.
+
+If FX001 chooses algebraic effects with handlers, ordinary sequential
+calls may be the natural effects syntax; generic monadic `do` can remain
+a separate facility. Do not assume the effect representation or either
+surface syntax is selected by recording this discussion.
+
 ## Intermediate representations and future targets
 
 The user clarified that "hostable" referred to the inspectable intermediate

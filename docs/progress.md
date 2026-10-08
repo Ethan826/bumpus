@@ -1448,3 +1448,18 @@ generated comparisons. Accepted diagnostic adjustments now in the design
 (§2, §4, §9): over-application past a non-function and `f()` keep
 E_ARITY `Wrong number of arguments`; `x()` and `N()` keep E_NOT_CALLABLE.
 Task 1 (measurement only) authorized in .worktrees/fn001.
+
+## FX001 sequencing discussion recorded (2026-10-08)
+
+At the user's request, language-direction records proposed `do` notation
+as an expression elaborated into bind and lambdas, with an illustrative
+block and its expansion. Result binding, discarded results, final
+computation and the distinction between constructing and running deferred
+effects are explained. Service/error inference is a goal; bind/pure
+selection, binding rules and monadic versus algebraic effects stay open.
+This is direction only, with no compiler change or implementation
+authorization. Next-session and the FX001 backlog row point to the proposal.
+Verification: `npm run verify` exited 0 with 318 tests, no failures or
+skips, and all twelve regression proofs; evidence:
+`.build/fx001-do-docs-verify.log`. The proposed notation is not implemented
+or behaviorally verified by this suite.
