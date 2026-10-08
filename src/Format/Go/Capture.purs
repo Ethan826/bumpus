@@ -1,3 +1,7 @@
+-- Free-local sets for match lifting (E005). Lowering builds each
+-- expression's set bottom-up from its children's; a lifted match takes the
+-- union of its arms' sets as its parameters. Nothing here walks an
+-- expression subtree; armFree inspects only the arm's own pattern.
 module Format.Go.Capture
   ( Captured
   , Free
@@ -12,7 +16,7 @@ import Data.Array as Array
 import Domain.IR.Internal as IR
 import Domain.Resolved (LocalId(..), Ty)
 
--- A local that a lifted match receives as a parameter.
+-- A free local: what a lifted match receives as one parameter.
 type Captured = { id ∷ LocalId, ty ∷ Ty }
 
 -- The locals an expression reads but does not bind, ascending by LocalId,
@@ -21,7 +25,8 @@ type Captured = { id ∷ LocalId, ty ∷ Ty }
 -- re-scanning made a 127-deep, 50-arm ladder compile 11 times slower.
 type Free = Array Captured
 
--- A read of a local, or the pattern binder that introduces one.
+-- Within armFree: a read from the arm's body, or one of its pattern's
+-- binders.
 type Occurrence = { id ∷ LocalId, ty ∷ Ty, binds ∷ Boolean }
 
 none ∷ Free
