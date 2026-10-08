@@ -38,6 +38,7 @@ code = case _ of
   FieldArity → Code.ArityMismatch
   TypeArguments _ → Code.ArityMismatch
   TypeMismatch _ _ → Code.TypeMismatch
+  InfiniteType _ _ → Code.TypeMismatch
   RedundantArm → Code.Redundant
   NonExhaustive _ → Code.NonExhaustive
   Internal _ → Code.InternalError
@@ -76,6 +77,9 @@ message = case _ of
   TypeMismatch expected found → "Expected " <> typeName expected
     <> ", found "
     <> typeName found
+  InfiniteType meta whole → "Infinite type: " <> typeName meta
+    <> " occurs in "
+    <> typeName whole
   RedundantArm → "Redundant match arm"
   NonExhaustive witness → "Missing pattern: " <> pattern witness
   Internal text → text

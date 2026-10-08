@@ -783,3 +783,60 @@ variables, parenthesized application. Status: done.
   Check (E_INTERNAL `Unnamed type variable`) or Specialize (E_INTERNAL
   `unspecialized type`). A declaration whose parameters no field or
   signature uses still compiles, as a monomorphic type.
+
+### Task 3: the unifier (2026-10-08)
+
+No language change; nothing calls the unifier until Task 4. Status: done.
+
+- Features.Check.Unify (new): `Flex = Rigid VarId | Meta Int`; triangular
+  `Subst` (a Map from meta to `Ty Flex`), `empty`; `substitute` (one pass,
+  Ty's bind; defined on every substitution) and `compose` (law
+  `substitute (compose s2 s1) = substitute s2 ∘ substitute s1`);
+  `resolve` (full normalization, acyclic substitutions only); `Failure =
+  Mismatch | Occurs`; `unify` (rigid only with the same rigid; a meta binds
+  to its walked partner unless the resolved partner properly contains it;
+  TData argument-wise, left to right, stopping at the first failure). A
+  Mismatch carries the first differing subterm pair, an Occurs the meta and
+  the containing type, both resolved under the substitution reached at the
+  failure. Meta-to-meta chains are followed by a `tailRec` loop (`walk`);
+  recursion is over type structure only (see E006).
+- Domain.Problem / Format.Diagnostic: `InfiniteType TypeName TypeName`,
+  E_TYPE `Infinite type: <a> occurs in <b>` (raised from Task 4).
+- Dependencies (user-approved): spago.yaml adds ordered-collections and
+  tuples (already locked through tools/style; spago.lock's workspace entry
+  lists them; build offline from .spago cache). scripts/structure.mjs
+  `coreLibraries` admits exactly Data.Map, Data.Set and Data.Tuple;
+  docs/engineering.md records the rule.
+- Tests: test/structure.test.mjs `pure layers may use Data.Map, Data.Set
+  and Data.Tuple only` (rejects Data.List, Data.Map.Internal, Data.MapX,
+  Data.Tuple.Nested, Data.Set.NonEmpty). test/unify.test.mjs, 9 tests: the
+  brief's pairs; left-to-right stop; substitute versus resolve on
+  {m0 ↦ List(m1), m1 ↦ Int}; 500-case properties (substitute equals a
+  one-pass reading and obeys the composition law over arbitrary, possibly
+  cyclic substitutions; resolve idempotent with no bound meta left over
+  acyclic ones; unify results acyclic, sound, most general for
+  ground-range σ pairs, and in agreement with test/unify-oracle.mjs, an
+  independent union-find unifier, on success and on the unified types up
+  to renaming of metas, for single pairs and for pairs threaded after a
+  σ pair: 268 of 1,000 sequences succeed); stack safety at 128-deep types
+  and a 10,000-meta chain; the InfiniteType wire rendering (code and text).
+- Generator note: drawing the keep/drop decision before each binding
+  correlated with the next LCG draw and never produced a bare-variable
+  binding, so a `resolve` that stops after one link passed the resolve
+  property; the binding is now drawn first.
+- Mutation checks (isolated copy under the session scratchpad, not
+  regression rows; Task 7 adds `occurs` and `rigid`): occurs check removed,
+  rigid unifying with any rigid, resolve stopping after one link, no walk
+  in unify, compose with reversed union bias, arguments right to left: each
+  fails at least one unify test.
+- RED: `node --test test/structure.test.mjs` failed the new gate test
+  (`[ 'pure module Features.Check.Unify imports Data.Map' ]`,
+  .build/p001-task3-red-structure.log); `node --test test/unify.test.mjs`
+  failed with ERR_MODULE_NOT_FOUND for output/Features.Check.Unify
+  (.build/p001-task3-red-unify.log). GREEN: 9 of 9
+  (.build/p001-task3-green-unify.log).
+- GREEN: `rm -rf output && npm run verify` exit 0, 71.2 s wall, zero
+  warnings, 195 tests (185 + 10), zero failures/skips, eight regression
+  proofs (.build/p001-task3-verify.log).
+- Phase reached: unit level only (compiled module loaded from output/). The
+  CLI does not compile polymorphic programs until Task 7.

@@ -11,9 +11,11 @@
             "foldable-traversable",
             "integers",
             "maybe",
+            "ordered-collections",
             "prelude",
             "strings",
-            "tailrec"
+            "tailrec",
+            "tuples"
           ]
         },
         "test": {

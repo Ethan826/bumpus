@@ -48,6 +48,7 @@ data Problem
   | FieldArity
   | TypeArguments String
   | TypeMismatch TypeName TypeName
+  | InfiniteType TypeName TypeName
   | RedundantArm
   | NonExhaustive Witness
   | Internal String

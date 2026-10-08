@@ -49,3 +49,17 @@ test('pure layers may loop with tailRecM and nothing else from Control', () => {
     assert.equal(pure(dependency).length, 1, dependency);
   }
 });
+
+// P001 Task 3: the unifier keeps its substitution in a Map, so pure layers
+// admit exactly Data.Map, Data.Set and Data.Tuple, and nothing broader.
+test('pure layers may use Data.Map, Data.Set and Data.Tuple only', () => {
+  const pure = dependency => graphFindings(
+    { 'Features.Check.Unify': { path: 'src/u.purs', depends: [dependency] } });
+  for (const dependency of ['Data.Map', 'Data.Set', 'Data.Tuple']) {
+    assert.deepEqual(pure(dependency), [], dependency);
+  }
+  for (const dependency of ['Data.List', 'Data.Map.Internal', 'Data.MapX',
+    'Data.Tuple.Nested', 'Data.Set.NonEmpty']) {
+    assert.equal(pure(dependency).length, 1, dependency);
+  }
+});

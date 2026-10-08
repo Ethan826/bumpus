@@ -28,7 +28,11 @@ adding a bypass allowlist.
   Data.{Array, Either, Maybe, Int, String, Foldable, Traversable} modules
   plus, since A003 Task 3b, exactly Control.Monad.Rec.Class, for `tailRecM`
   loops over long inputs (BACKLOG E002); test/structure.test.mjs pins that
-  Control.Monad.ST, Control.Monad and near-miss names stay rejected;
+  Control.Monad.ST, Control.Monad and near-miss names stay rejected. Since
+  P001 Task 3 it also admits exactly Data.Map, Data.Set and Data.Tuple
+  (packages ordered-collections and tuples), for the unifier's
+  substitution; their submodules (Data.Map.Internal, Data.Set.NonEmpty,
+  Data.Tuple.Nested) and Data.List stay rejected, pinned by the same file;
 - no JS FFI files outside src/Runtime; all runtime capabilities live in
   Runtime and Program; Program.Command runs over the Domain.Host ports and
   may not import Effect or Runtime, so tests drive it with fake hosts;
@@ -62,8 +66,8 @@ adding a bypass allowlist.
   brute-force coverage oracle with brute-forced inhabitedness over generated
   type systems (test/coverage.test.mjs), and fake-host command tests
   (test/program.test.mjs);
-- `npm run verify` runs every test/*.test.mjs file (23 files, 162 tests, no
-  skips; the list is read from the directory, never hand-kept) and then
+- `npm run verify` runs every test/*.test.mjs file (26 files, 195 tests at
+  P001 Task 3, no skips; the list is read from the directory, never hand-kept) and then
   scripts/regression.mjs, a table of isolated-copy mutations, each of which
   must pass on the healthy build and fail on its mutant: `branch`
   (Features.Check branch type), `nil-guard` (Format.Go.Match drops the `!= nil`
@@ -139,7 +143,9 @@ padding, 20,000 declarations) checks it, and only for the paths it drives.
 No coverage percentage is claimed. Properties use deterministic generators
 and explicit edge cases with no discarded inputs. Parsing tests compare with
 independent generated trees; executable comparisons use a BigInt interpreter.
-There is no unification implementation yet, so no fake unification properties.
+The unifier (Features.Check.Unify, P001 Task 3) is compared with an
+independent union-find oracle (test/unify-oracle.mjs) and checked for
+soundness, acyclicity and most-generality over generated pairs.
 
 ## Definition of done and handoff
 
