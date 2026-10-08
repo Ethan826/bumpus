@@ -2,14 +2,28 @@
 // becomes its function or type name, and each type id inside its arguments
 // becomes that type's name, so a key reads `fn length[List(Int)]` and keys
 // of two programs that number declarations differently can be compared.
-// Function and type names are unique within a program.
+// Function and type names are unique within a program. An arrow reads as
+// written, `(Int -> Int) -> Bool`; its spine is walked by a loop (FN001).
 import assert from 'node:assert/strict';
 import { Right } from '../output/Data.Either/index.js';
-import { TBool, TData, TInt } from '../output/Domain.Type/index.js';
+import {
+  TBool, TData, TFun, TInt
+} from '../output/Domain.Type/index.js';
 import { specializationKeys } from '../output/Features.Specialize/index.js';
 import { checkedPoly } from './phases.mjs';
 
+const arrowText = (program, type) => {
+  const parts = [];
+  let rest = type;
+  for (; rest instanceof TFun; rest = rest.value1) {
+    const parameter = groundText(program, rest.value0);
+    parts.push(rest.value0 instanceof TFun ? `(${parameter})` : parameter);
+  }
+  return [...parts, groundText(program, rest)].join(' -> ');
+};
+
 const groundText = (program, type) => {
+  if (type instanceof TFun) return arrowText(program, type);
   if (type instanceof TInt) return 'Int';
   if (type instanceof TBool) return 'Bool';
   assert.ok(type instanceof TData, `not ground: ${JSON.stringify(type)}`);

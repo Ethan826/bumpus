@@ -30,6 +30,11 @@ usesBoolOrdering (IR.Expr expression) = case expression.node of
   IR.If condition yes no → anyOf [ condition, yes, no ]
   IR.Match scrutinee arms → usesBoolOrdering scrutinee
     || Array.any armUses arms
+  IR.FunctionRef _ → false
+  IR.CtorRef _ → false
+  IR.Apply applied arguments → anyOf (Array.cons applied arguments)
+  IR.Lambda _ body → usesBoolOrdering body
+  IR.Pipe left right → anyOf [ left, right ]
   where
   anyOf = Array.any usesBoolOrdering
   armUses arm = usesBoolOrdering arm.body

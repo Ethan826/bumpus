@@ -1773,3 +1773,96 @@ reach Specialize as `Internal "unlowered function"`.
   zero failures/skips, twelve regression proofs, snapshots unchanged;
   the ladder took 1,393 ms inside it under external load (BACKLOG T003),
   `twenty thousand parameters` 286 ms (log .build/fn001-task4-fix-verify.log).
+
+### FN001 Task 5: instantiation rule and specialization (2026-10-08)
+
+Branch fn001. Reach: Parse → Resolve → Check → Specialize (`specialize`,
+`specializeWith` and `specializationKeys` called directly); the CLI stops
+every function program at the temporary guard after Specialize.
+
+- What changed: Check.Instantiation's `foldCalls` makes a bare
+  `FunctionRef` an edge with its instantiation and enters lambda bodies,
+  so references at any depth (match arms, lambdas, `Apply`, `Pipe`) are
+  judged and form components (design §6); Components needed no change.
+  Domain.IR.Internal gains `TFun Ty Ty` with hand-written Eq/Ord (one
+  spine loop, the derived order), `spine` (two loops), and `FunctionRef`,
+  `CtorRef`, `Apply`, `Lambda (Array Param)`, `Pipe`. The new
+  Features.Specialize.Intern hash-conses arrows: a key part is
+  `KInt | KBool | KData n | KFun n`, an arrow is numbered by its
+  (parameter, result) numbers, and Lower interns a spine's suffixes from
+  its final result outwards while lowering it (parameters by a balanced
+  `traverse`, the interning by `Array.foldr`), so every suffix is numbered
+  once and no key is found by walking or spelling a type. Lower returns a
+  `Lowered = { ty, key }`; Keys' `Key` is `Tuple Int (Array Interned)`,
+  `Work.arguments` are `Lowered`, the state holds the arrow table; arrow
+  fields are lowered beside their written spine (as Check.Nested pairs
+  them). Body copies the new nodes through the new Specialize.Values
+  (`callee` for calls and bare references, `ownerCtor`: a partial
+  construction or constructor value names its owner's copy, the final
+  result of its arrow, `lambda`). `specializationKeys` rebuilds arrow
+  arguments by a loop. The new Features.Specialize.Unlowered `reject` is
+  called by Program.Compile after `specialize`. Format.Go: `goType`
+  spells `TFun` inline as `func(A) func(B) R` along the spine; the field
+  comparison of an arrow field emits `malformed`; Usage walks the new
+  nodes; Expression lowers them to `func() T { panic("bumpus: unlowered
+  function") }()`. All unreachable behind the guard; Task 6 replaces them.
+- Decisions not dictated by the plan: (1) The guard rejects arrow types as
+  well as the new nodes (a constructor with an arrow field, at the
+  constructor; a signature holding an arrow, at the declaration; an
+  arrow-typed expression such as a partial call, at it), so the CLI still
+  emits no program using a function type (Global Constraints); before, a
+  constructor's arrow field was rejected at the field's type. (2)
+  Constructors, called or bare, are no edges: they have no body, so they
+  are in no component with a function. (3) A bare reference keeps the
+  existing text `Recursive call to f changes its type arguments` (no new
+  text is listed). (4) IR's `TFun` carries no number: plan and design say
+  `TFun Ty Ty`. Task 6's named Go types (design §13 rule 8) must reach the
+  numbers through Features.Specialize.Intern or carry them into the IR;
+  left to Task 6. (5) The generator's edge kinds come from a seeded stream
+  of their own, so P001's components are unchanged. (6) Representative
+  independence is checked on the IR as a bisimulation: from both entries,
+  the bodies agree node for node ignoring types and spans, constructors by
+  name, and each pair of referenced functions is compared once.
+- Changed rows: test/fn-check.test.mjs `checked function programs reach
+  Specialize as Internal` becomes `... stop at the unlowered guard`; its
+  four rows keep code (E_INTERNAL), span (each node's own) and text
+  (`unlowered function`), now reported by the guard; three rows added
+  (partial call at `add(1)`, arrow field at `T(Int -> Int)`, arrow
+  parameter at the declaration). The `spec-key` regression row's needle
+  is now `key = Tuple declaration (map keyOf arguments)` and its mutant
+  collapses a data argument to `dataType 0`; still one target, still
+  fails. No other existing assertion changed.
+- Tests seen failing first (logs .build/fn001-task5-red-*.log):
+  test/poly-termination.test.mjs, 5 of the new rows failed (lambda in a
+  match arm, bare `walk`, bare `step` joining a component, bare `walk`
+  inside a lambda, and `wrapping an intra-component argument` over the
+  generator's value and lambda edges); the arrow type row and the two
+  accepted rows passed on arrival (the arrow row since Task 3's Nested),
+  kept as characterization. test/fn-specialize.test.mjs (map(id) twice,
+  constructor values' owners, the 5,000-parameter keys) 3 of 3 failed;
+  test/fn-representative.test.mjs failed; poly-properties' §4.2 bound
+  failed (each `unlowered function` from Specialize); the guard row failed
+  on the arrow-field span.
+- Mutants (scratchpad copies, not committed): keys of whole IR types,
+  compared by the spine loop: the 5,000-parameter test took 5.5 s against
+  0.23 s; keys spelled as strings: 12.6 s (bound 2 s); arrows interned
+  without their parameter: `fn id[…]` keys merged, the distinctness row
+  fails; no `FunctionRef` edge: 3 rejected rows and the wrapped generator
+  test fail; no lambda edge: 2 rows and the wrapped test fail; owner taken
+  as the arrow itself: the owner row fails; no guard: the CLI row fails;
+  a lambda parameter dropping its local when lowered at Bool: the IR
+  independence property fails, but only after its third wrapper (a
+  lambda never applied, so its unused parameters are bare holes) was
+  added: the first version, whose parameters were `List(_)`, let it
+  survive. The §4.2 bound itself passes on both rule mutants: accepted
+  generated components use bare variables or ground types only, so it
+  cannot distinguish them; the wrapped-variant test does.
+- Linear cost: no large-source bound changed; `twenty thousand
+  parameters` 310 ms and `three thousand distinct instantiations` 747 ms
+  inside verify. Specializing the 5,000-parameter program takes 0.23 s
+  alone.
+- Observed: inside the green verify the match ladder took 1,441 ms against
+  its 1.5 s bound (BACKLOG T003, evidence added).
+- GREEN: `rm -rf output && npm run verify` exit 0, 483 tests (472 + 11),
+  zero failures/skips, twelve regression proofs; bootstrap snapshots
+  unchanged. Log .build/fn001-task5-verify.log.

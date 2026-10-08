@@ -8,6 +8,7 @@ module Features.Specialize.Keys
   , specializationLimit
   , enqueue
   , applied
+  , arrowOf
   , called
   , ctorAt
   , internal
@@ -26,6 +27,14 @@ import Domain.Resolved (CtorId(..), CtorInfo, FunctionId(..), TypeInfo)
 import Domain.Syntax (Span, problemAt)
 import Domain.Type (Ty, TypeId(..))
 import Features.Specialize.Copy (Copy, failWith, get, modify)
+import Features.Specialize.Intern
+  ( Arrows
+  , Interned
+  , Lowered
+  , dataType
+  , internSpine
+  , keyOf
+  )
 
 -- The checked program's tables and what Specialize computed from them
 -- once: the output id of each monomorphic type and function, each
@@ -41,16 +50,17 @@ type Env =
   }
 
 -- A key is hash-consed (R15): a declaration and its ground arguments, each
--- already numbered as an output type, so comparing two keys costs their
--- arity, never the size of the types they stand for.
-type Key = Tuple Int (Array IR.Ty)
+-- already numbered as an output type or an interned arrow
+-- (Features.Specialize.Intern), so comparing two keys costs their arity,
+-- never the size of the types they stand for.
+type Key = Tuple Int (Array Interned)
 
 -- One output declaration to fill, in creation order, with the span of the
 -- reference that created it (a seed's own declaration).
 type Work =
   { output ∷ Int
   , declaration ∷ Int
-  , arguments ∷ Array IR.Ty
+  , arguments ∷ Array Lowered
   , function ∷ Boolean
   , span ∷ Span
   }
@@ -58,8 +68,9 @@ type Work =
 type Counts =
   { types ∷ Int, ctors ∷ Int, functions ∷ Int, work ∷ Int, polymorphic ∷ Int }
 
--- Output declarations by output id, the memo tables of polymorphic keys,
--- and the worklist (never emptied: it also records every key in order).
+-- Output declarations by output id, the memo tables of polymorphic keys
+-- and of arrows, and the worklist (never emptied: it also records every
+-- key in order).
 type State =
   { typeKeys ∷ Map Key Int
   , functionKeys ∷ Map Key Int
@@ -67,6 +78,7 @@ type State =
   , ctors ∷ Map Int IR.CtorInfo
   , functions ∷ Map Int IR.FunctionDecl
   , work ∷ Map Int Work
+  , arrows ∷ Arrows
   , counts ∷ Counts
   }
 
@@ -84,27 +96,39 @@ enqueue item state = state
 
 -- The output type of a declared type at ground arguments, created on
 -- first reference at `span`.
-applied ∷ Env → Span → TypeId → Array IR.Ty → Specializing IR.Ty
+applied ∷ Env → Span → TypeId → Array Lowered → Specializing Lowered
 applied env span (TypeId declaration) arguments
   | Array.null arguments = maybe' (internal "Invalid type id" span)
-      (pure <<< monoType)
+      (pure <<< dataType)
       (join (Array.index env.monoTypes declaration))
   | otherwise = get >>= remembered
       where
-      key = Tuple declaration arguments
-      remembered state = maybe' (newType env span key) (pure <<< monoType)
+      key = Tuple declaration (map keyOf arguments)
+      remembered state = maybe' (newType env span key arguments)
+        (pure <<< dataType)
         (Map.lookup key state.typeKeys)
 
+-- The arrow of `parameters` to `result`, every suffix interned once.
+arrowOf ∷ Array Lowered → Lowered → Specializing Lowered
+arrowOf parameters result = do
+  state ← get
+  let spun = internSpine parameters result state.arrows
+  modify (withArrows spun.arrows)
+  pure spun.lowered
+  where
+  withArrows arrows state = state { arrows = arrows }
+
 -- The output function for a call at ground arguments.
-called ∷ Env → Span → FunctionId → Array IR.Ty → Specializing FunctionId
+called ∷ Env → Span → FunctionId → Array Lowered → Specializing FunctionId
 called env span (FunctionId declaration) arguments
   | Array.null arguments = maybe' (internal "Invalid function id" span)
       (pure <<< FunctionId)
       (join (Array.index env.monoFunctions declaration))
   | otherwise = get >>= remembered
       where
-      key = Tuple declaration arguments
-      remembered state = maybe' (newFunction span key) (pure <<< FunctionId)
+      key = Tuple declaration (map keyOf arguments)
+      remembered state = maybe' (newFunction span key arguments)
+        (pure <<< FunctionId)
         (Map.lookup key state.functionKeys)
 
 -- The output constructor of `id` in the output type `owner`.
@@ -117,9 +141,6 @@ ctorAt env span owner (CtorId id) = do
 internal ∷ ∀ a b. String → Span → a → Specializing b
 internal text span _ = failWith (problemAt (Internal text) span)
 
-monoType ∷ Int → IR.Ty
-monoType = IR.TData <<< TypeId
-
 outputCtor ∷ State → IR.Ty → Int → Maybe CtorId
 outputCtor state owner position = case owner of
   IR.TData (TypeId output) → Map.lookup output state.types >>= at
@@ -130,14 +151,15 @@ outputCtor state owner position = case owner of
 -- A type key takes the next output id and a block of constructor ids, one
 -- per declared constructor in order; its fields are filled when its work
 -- item is reached.
-newType ∷ Env → Span → Key → Unit → Specializing IR.Ty
-newType env span key@(Tuple declaration arguments) _ = do
+newType
+  ∷ Env → Span → Key → Array Lowered → Unit → Specializing Lowered
+newType env span key@(Tuple declaration _) arguments _ = do
   claim span
   info ← maybe' (internal "Invalid type id" span) pure
     (Array.index env.types declaration)
   modify (created info)
   state ← get
-  pure (monoType (state.counts.types - 1))
+  pure (dataType (state.counts.types - 1))
   where
   created info state = enqueue
     { output: state.counts.types
@@ -161,8 +183,9 @@ newType env span key@(Tuple declaration arguments) _ = do
     }
   offset base index _ = CtorId (base + index)
 
-newFunction ∷ Span → Key → Unit → Specializing FunctionId
-newFunction span key@(Tuple declaration arguments) _ = do
+newFunction
+  ∷ Span → Key → Array Lowered → Unit → Specializing FunctionId
+newFunction span key@(Tuple declaration _) arguments _ = do
   claim span
   modify created
   state ← get

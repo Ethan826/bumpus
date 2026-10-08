@@ -6,26 +6,43 @@ import Data.Map as Map
 import Data.Maybe (maybe')
 import Data.Traversable (sequence, traverse)
 import Domain.Checked.Internal (Open(..))
-import Domain.IR.Internal as IR
 import Domain.Resolved (CtorId(..), CtorInfo)
-import Domain.Syntax (Span, TypeRef(..), typeRefSpan)
-import Domain.Type (Ty(..), TypeId(..), VarId(..))
+import Domain.Syntax (Span, TypeRef(..), typeRefSpan, typeRefSpine)
+import Domain.Type (Spine, Ty(..), TypeId(..), VarId(..), spine)
 import Features.Specialize.Copy (get, modify)
-import Features.Specialize.Keys (Env, Specializing, Work, applied, internal)
+import Features.Specialize.Intern (Lowered, bool, int, loweredType)
+import Features.Specialize.Keys
+  ( Env
+  , Specializing
+  , Work
+  , applied
+  , arrowOf
+  , internal
+  )
 
 -- A body type at one key: rigid variable i is the key's i-th argument and
 -- every hole is the representative (design §6). An application's arguments
 -- are numbered before it, so each key refers only to earlier output types.
-lowerType ∷ Env → Array IR.Ty → Span → Ty Open → Specializing IR.Ty
+-- An arrow's parameters and final result are lowered in order, along its
+-- spine, then its suffixes interned (FN001 Task 5): no recursion per arrow.
+lowerType ∷ Env → Array Lowered → Span → Ty Open → Specializing Lowered
 lowerType env arguments span = case _ of
-  TInt → pure IR.TInt
-  TBool → pure IR.TBool
+  TInt → pure int
+  TBool → pure bool
   TData id parts → traverse recur parts >>= applied env span id
   TVar (Rigid (VarId index)) → argument span arguments index
   TVar (Hole _) → lowerType env [] span (map absurd env.representative)
-  TFun _ _ → unlowered span
+  arrow@(TFun _ _) → lowerSpine recur (spine arrow)
   where
   recur part = lowerType env arguments span part
+
+-- Parameters left to right, then the result, then the interned arrow.
+lowerSpine
+  ∷ ∀ v. (Ty v → Specializing Lowered) → Spine v → Specializing Lowered
+lowerSpine lower found = do
+  parameters ← traverse lower found.parameters
+  result ← lower found.result
+  arrowOf parameters result
 
 -- Fills a type's output constructors: each declared constructor, in order,
 -- takes the next id of the type's block, with its fields at the key's
@@ -52,33 +69,43 @@ fillCtor env work (CtorId output) ctor = do
   where
   inserted fields state = state
     { ctors = Map.insert output
-        { name: ctor.name, owner: TypeId work.output, fields, span: ctor.span }
+        { name: ctor.name
+        , owner: TypeId work.output
+        , fields: map loweredType fields
+        , span: ctor.span
+        }
         state.ctors
     }
 
 -- A field's applications are created at their own references in the
 -- constructor's source, walked alongside it as Check.Nested does.
-lowerField ∷ Env → Array IR.Ty → Ty VarId → TypeRef → Specializing IR.Ty
+lowerField
+  ∷ Env → Array Lowered → Ty VarId → TypeRef → Specializing Lowered
 lowerField env arguments ty syntax = case ty, syntax of
   TData id parts, NamedRef span _ references →
     paired span parts references (lowerField env arguments)
       >>= applied env span id
   TData _ _, _ → mismatch
   TVar (VarId index), _ → argument (typeRefSpan syntax) arguments index
-  TInt, _ → pure IR.TInt
-  TBool, _ → pure IR.TBool
-  TFun _ _, _ → unlowered (typeRefSpan syntax)
+  TInt, _ → pure int
+  TBool, _ → pure bool
+  TFun _ _, FunRef span _ _ → lowerWritten span (spine ty)
+    (typeRefSpine syntax)
+  TFun _ _, _ → mismatch
   where
   mismatch = internal "Field syntax mismatch" (typeRefSpan syntax) unit
-
--- The monomorphic IR has no arrow until FN001 Task 5.
-unlowered ∷ ∀ a. Span → Specializing a
-unlowered span = internal "unlowered function" span unit
+  recur = lowerField env arguments
+  -- Each parameter and the final result beside its written source, as
+  -- Check.Nested pairs them.
+  lowerWritten span found written = do
+    parameters ← paired span found.parameters written.parameters recur
+    result ← recur found.result written.result
+    arrowOf parameters result
 
 missingType ∷ ∀ a b. Work → a → Specializing b
 missingType work = internal "Invalid type id" work.span
 
-argument ∷ Span → Array IR.Ty → Int → Specializing IR.Ty
+argument ∷ Span → Array Lowered → Int → Specializing Lowered
 argument span arguments index =
   maybe' (internal "Invalid type variable" span) pure
     (Array.index arguments index)

@@ -4,7 +4,10 @@
 // reuses them for the termination bound of design §4.2, so a component
 // also reports its functions, arities and the ground types written at its
 // intra-component references. A test file cannot export these: importing
-// it would register its tests.
+// it would register its tests. FN001 Task 5: an edge is also written as a
+// value reference or inside a lambda (design §6), each an edge as a call
+// is; `kind` says which, drawn from a stream of its own so the components
+// themselves are those P001 drew.
 import { generator } from './generators.mjs';
 
 const choose = (next, count) => (next() >>> 0) % count;
@@ -58,15 +61,32 @@ const draw = next => {
   return { functions, calls, outside };
 };
 
+// How an edge is written: a call; the callee as a value, applied; and
+// either of those inside a lambda applied at once. `at` is where the
+// reference the instantiation rule reports starts within the text.
+export const edgeKinds = ['call', 'value', 'lambda', 'lambdaValue'];
+const lambdaOpen = '(fn(z) => ';
+const written = (kind, name, args) => {
+  const called = `${name}(${args})`;
+  const value = `(${name})(${args})`;
+  const inner = kind === 'call' || kind === 'lambda' ? called : value;
+  const prefix = kind.startsWith('lambda') ? lambdaOpen : '';
+  const text = kind.startsWith('lambda') ? `${prefix}${inner})(0)` : inner;
+  const shift = inner === value ? 1 : 0;
+  return { text, at: prefix.length + shift,
+    reported: inner === value ? name : called };
+};
+
 const argumentText = value => 'variable' in value ? `x${value.variable}`
   : 'wrapped' in value ? `Cons(x${value.wrapped}, Nil)`
     : groundArguments[value.ground].text;
-const callText = (functions, edge) => `${functions[edge.callee].name}(`
-  + `${edge.arguments.map(argumentText).join(', ')})`;
+const callText = (functions, edge) => written(edge.kind ?? 'call',
+  functions[edge.callee].name, edge.arguments.map(argumentText).join(', '));
 const signature = definition => Array.from({ length: definition.arity },
   (_, index) => `x${index}: ${variables[index]}`).join(', ');
 
-// The source, with each call's text and offset, for exact spans; `entry`
+// The source, with each reference's reported text and offset, for exact
+// spans; `entry`
 // replaces `main` (Task 8 enters the component from it).
 export const render = (component, entry = main) => {
   let source = prelude;
@@ -75,9 +95,10 @@ export const render = (component, entry = main) => {
     source += `fn ${definition.name}(${signature(definition)}): Int = `;
     component.calls[caller].forEach((edge, index) => {
       if (index) source += ' + ';
-      const text = callText(component.functions, edge);
-      located.push({ ...edge, text, offset: source.length });
-      source += text;
+      const shown = callText(component.functions, edge);
+      located.push({ ...edge, text: shown.reported,
+        offset: source.length + shown.at });
+      source += shown.text;
     });
     if (component.outside[caller]) source += ' + outside(Cons(x0, Nil))';
     source += '; ';
@@ -90,9 +111,15 @@ export const groundTypes = component => [...new Set(component.calls.flat()
   .flatMap(edge => edge.arguments).filter(value => 'ground' in value)
   .map(value => groundArguments[value.ground].type))];
 
+const withKinds = (component, next) => ({ ...component,
+  calls: component.calls.map(row => row.map(edge =>
+    ({ ...edge, kind: edgeKinds[choose(next, edgeKinds.length)] }))) });
+
 export const components = (() => {
   const next = generator(0x5ca1);
-  return Array.from({ length: componentCount }, () => draw(next));
+  const kinds = generator(0x7a5c);
+  return Array.from({ length: componentCount },
+    () => withKinds(draw(next), kinds));
 })();
 
 // The same component with one argument of one intra-component call

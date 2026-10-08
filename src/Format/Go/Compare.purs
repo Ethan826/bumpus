@@ -110,6 +110,10 @@ fieldComparison field = case _ of
     <> malformed
     <> " }\n"
     <> decide (compareName owner <> "(*" <> left <> ", *" <> right <> ")")
+  -- Checking rejects every comparison at a type holding an arrow (design
+  -- §3), so this helper never meets two such values; FN001 Task 6 emits
+  -- helpers by usage instead.
+  TFun _ _ → malformed <> "\n"
   where
   left = "a." <> field
   right = "b." <> field

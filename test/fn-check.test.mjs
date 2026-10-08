@@ -139,15 +139,28 @@ test('empty calls keep their errors', () => {
     'add()').message, 'Wrong number of arguments');
 });
 
-// Until FN001 Task 5 specialization stops at every new node, at that
-// node's own span. The program has no other function value, so nothing
-// else can stop it first.
-test('checked function programs reach Specialize as Internal', () => {
+// Until FN001 Task 6 the CLI stops every program holding a function value
+// or type at the guard after Specialize (Features.Specialize.Unlowered),
+// at the first new node or arrow-typed expression of the first function in
+// output order, after any constructor with an arrow field. Deleted with the
+// guard in Task 6.
+test('checked function programs stop at the unlowered guard', () => {
   const plain = 'fn add(x: Int, y: Int): Int = x + y; fn id(x: a): a = x; ';
   for (const body of ['(fn(x) => x)(1)', '1 |> add(2)', 'id(add)(1, 2)',
     'add(1)(2)']) {
     const source = `${plain}fn main(): Int = ${body};`;
     assert.equal(rejectedAt(source, 'E_INTERNAL', body).message,
       'unlowered function', body);
+  }
+  const rows = [
+    // A partial call is an old node whose type is an arrow.
+    [`${plain}fn main(): Int = match add(1) { _ => 0 };`, 'add(1)'],
+    ['type T = T(Int -> Int); fn main(): Int = 0;', 'T(Int -> Int)'],
+    ['fn f(g: Int -> Int): Int = 0; fn main(): Int = 0;',
+      'fn f(g: Int -> Int): Int = 0;']
+  ];
+  for (const [source, text] of rows) {
+    assert.equal(rejectedAt(source, 'E_INTERNAL', text).message,
+      'unlowered function', source);
   }
 });

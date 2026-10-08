@@ -136,6 +136,16 @@ their arity, never the size of the types they stand for. Keys are still
 compared structurally, never by printed names. The `spec-key` regression
 row merges `List(List(Int))` with `List(List(Bool))` and fails.
 
+FN001 Task 5 extends this to arrows (Features.Specialize.Intern): a key
+argument is Int, Bool, an output type's number or an arrow's number, and
+arrows are hash-consed as (parameter number, result number), so each
+suffix of a spine is numbered once, while its type is lowered, and two
+5,000-parameter function types differing only in their last parameter
+compare in constant time (test/fn-specialize.test.mjs: 0.23 s, against
+5.5 s for keys of whole types and 12.6 s for spelled keys, measured with
+scratchpad mutants). Value references and references inside lambdas are
+call-graph edges (design §6); constructors, called or bare, are not.
+
 ### The specialization limit
 
 `specializationLimit = 10000`, global. It counts only keys created from

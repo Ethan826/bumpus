@@ -67,10 +67,14 @@ judgeCall context judged span (FunctionId callee) instantiation =
   reject function = Left (problemAt (PolymorphicRecursion function.name) span)
   missing _ = Left (problemAt (Internal "Invalid function id") span)
 
--- Every call of a checked body in pre-order: a call before its arguments,
--- a scrutinee before its arms, an applied function before its arguments.
--- Value references and lambda bodies become edges in FN001 Task 5; until
--- then specialization rejects every program holding them.
+-- Every reference to a named function in a checked body, in pre-order: a
+-- call before its arguments, a scrutinee before its arms, an applied
+-- function before its arguments. A bare reference is an edge exactly as a
+-- call is, and a lambda's body belongs to its enclosing function, so
+-- references at any depth inside lambdas count (design §6, FN001 Task 5).
+-- A constructor, called or bare, is no edge: it has no body, so it is in
+-- no component with a function, as for calls in P001. Applying a local
+-- creates no edge.
 foldCalls
   ∷ ∀ b
   . (b → Span → FunctionId → Instantiation → b)
@@ -90,6 +94,9 @@ foldCalls step found (Checked.Expr expression) = case expression.node of
   Checked.Apply callee arguments → foldl recur found
     (Array.cons callee arguments)
   Checked.Pipe left right → foldl recur found [ left, right ]
+  Checked.FunctionRef id instantiation →
+    step found expression.span id instantiation
+  Checked.Lambda _ body → recur found body
   _ → found
   where
   recur = foldCalls step

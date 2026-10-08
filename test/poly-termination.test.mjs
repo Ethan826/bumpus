@@ -8,16 +8,19 @@ import { generator } from './generators.mjs';
 import { checkRejectedAt, resolved } from './phases.mjs';
 import { spanAt } from './support.mjs';
 import {
-  components as generated, groundArguments, groundTypes, render, wrapped
+  components as generated, edgeKinds, groundArguments, groundTypes, render,
+  wrapped
 } from './poly-components.mjs';
 
 // P001 Task 5: the instantiation rule (design §4.1), through Parse,
 // Resolve and Check only; the CLI compiles no polymorphic program until
-// Task 7.
+// Task 7. FN001 Task 5 adds value references and lambdas (design §6).
 const prelude = 'type List(a) = Nil | Cons(a, List(a));'
   + ' type Pair(a, b) = Pair(a, b); ';
 const main = ' fn main(): Int = 0;';
 const code = 'E_SPECIALIZATION';
+const use = 'fn use(h: b -> Int, v: b): Int = h(v); ';
+const apply = 'fn apply(h: Int -> Int): Int = h(0); ';
 
 const accepted = source => {
   const result = check(resolved(source));
@@ -48,7 +51,13 @@ const acceptedRows = [
   ['swapped type arguments', 'type T(a, b) = C(T(b, a)) | D;' + main],
   ['a variable wrapped by another component\'s type',
     'type Rose(a) = Node(a, List(Rose(a))); type Box(a) = Box(List(a));'
-    + main]
+    + main],
+  // FN001 Task 5 (design §6): value references are edges, at bare
+  // variables here.
+  ['a value reference at the caller\'s variable', use
+    + 'fn walk(x: a): Int = use(walk, x);' + main],
+  ['a lambda calling its function at the caller\'s variable',
+    'fn walk(x: a): Int = (fn(y) => walk(x))(0);' + main]
 ];
 
 for (const [name, program] of acceptedRows) {
@@ -79,7 +88,24 @@ const rejectedRows = [
   // Types are judged before functions.
   ['fn f(x: a): Int = f(Cons(x, Nil)); type Nest(a) = N | M(Nest(List(a)));'
     + main, 'Nest(List(a))', 0,
-  'Recursive use of Nest changes its type arguments']
+  'Recursive use of Nest changes its type arguments'],
+  // FN001 Task 5 (design §6). A reference inside a lambda inside a match
+  // arm is an edge of the enclosing function.
+  [apply + 'fn walk(x: a): Int = match x { _ => apply(fn(y) =>'
+    + ' walk(Cons(x, Nil))) };' + main, 'walk(Cons(x, Nil))', 0,
+  'Recursive call to walk changes its type arguments'],
+  // A bare reference at a changed instantiation, reported at the name.
+  [use + 'fn walk(x: a): Int = use(walk, Cons(x, Nil));' + main, 'walk', 1,
+    'Recursive call to walk changes its type arguments'],
+  // Only the value reference joins walk and step into one component.
+  [use + 'fn walk(x: a): Int = use(step, Cons(x, Nil));'
+    + ' fn step(x: a): Int = walk(x);' + main, 'step', 0,
+  'Recursive call to step changes its type arguments'],
+  [use + 'fn walk(x: a): Int = (fn(z) => use(walk, Cons(x, Nil)))(0);'
+    + main, 'walk', 1, 'Recursive call to walk changes its type arguments'],
+  // `->` is a type constructor of the type-reference graph.
+  ['type T(a) = C(a -> T(List(a)));' + main, 'T(List(a))', 0,
+    'Recursive use of T changes its type arguments']
 ];
 
 for (const [program, text, nth, message] of rejectedRows) {
@@ -98,6 +124,8 @@ test('generated components mix permutation, dropping and ground', () => {
   const dropped = edges.filter(edge => edge.arguments.filter(variable)
     .length < edge.arguments.length);
   assert.ok(permuted.length > 0 && dropped.length > 0);
+  const kinds = new Set(edges.map(edge => edge.kind));
+  assert.deepEqual([...kinds].sort(), [...edgeKinds].sort());
   const grounds = new Set(generated.flatMap(groundTypes));
   assert.deepEqual([...grounds].sort(),
     groundArguments.map(each => each.type).sort());

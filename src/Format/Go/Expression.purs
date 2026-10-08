@@ -41,6 +41,9 @@ expression scope next (IR.Expr term) = case term.node of
   IR.If condition yes no →
     joined (conditional term.ty) (each [ condition, yes, no ])
   IR.Match scrutinee arms → lowerMatch scope lower next term.ty scrutinee arms
+  -- Function values: unreachable behind Features.Specialize.Unlowered until
+  -- FN001 Task 6 lowers them.
+  _ → leaf next (unlowered term.ty)
   where
   lower = expression scope
   each = several lower next
@@ -53,6 +56,11 @@ joined render parts =
   , lifted: parts.lifted
   , free: union parts.frees
   }
+
+-- A well-typed Go expression that fails loudly if ever run.
+unlowered ∷ Ty → String
+unlowered ty = "func() " <> goType ty
+  <> " { panic(\"bumpus: unlowered function\") }()"
 
 call ∷ String → Array String → String
 call name arguments = name <> "(" <> joinWith ", " arguments <> ")"

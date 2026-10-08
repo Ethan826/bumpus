@@ -13,7 +13,7 @@ module Format.Go.Data
 import Prelude
 import Data.Array as Array
 import Data.String.Common (joinWith)
-import Domain.IR.Internal (Ty(..))
+import Domain.IR.Internal (Spine, Ty(..), spine)
 import Domain.Resolved (CtorId(..), FunctionId(..), LocalId(..), TypeId(..))
 import Format.Go.Layout (Declared, Layout, Member)
 
@@ -29,6 +29,16 @@ goType = case _ of
   TInt → "int32"
   TBool → "bool"
   TData (TypeId index) → "bumpusTy" <> show index
+  arrow@(TFun _ _) → inlineFunction (spine arrow)
+
+-- FN001 Task 5: unreachable behind Features.Specialize.Unlowered; Task 6
+-- replaces it with one named Go type per interned arrow (design §13 rule
+-- 8). Spelled along the spine, `func(A) func(B) R`, by a loop.
+inlineFunction ∷ Spine → String
+inlineFunction found = joinWith "" (map stage found.parameters)
+  <> goType found.result
+  where
+  stage parameter = "func(" <> goType parameter <> ") "
 
 ctorName ∷ CtorId → String
 ctorName (CtorId index) = "bumpusCtor" <> show index
@@ -56,7 +66,8 @@ typeName (TypeId index) = "bumpusTy" <> show index
 fieldName ∷ CtorId → Int → String
 fieldName (CtorId ctor) index = "c" <> show ctor <> "f" <> show index
 
--- ADT fields are pointers so a type may contain itself.
+-- ADT fields are pointers so a type may contain itself; a Go func value is
+-- already a reference (design §7).
 fieldType ∷ Ty → String
 fieldType = case _ of
   TData (TypeId index) → "*bumpusTy" <> show index

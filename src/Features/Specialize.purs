@@ -20,9 +20,10 @@ import Domain.IR.Internal as IR
 import Domain.Problem (Problem(..))
 import Domain.Resolved (FunctionId(..))
 import Domain.Syntax (Diagnostic, Span, origin, problemAt)
-import Domain.Type (Ty(..), TypeId(..))
+import Domain.Type (Ty(..), TypeId(..), arrows)
 import Features.Specialize.Body (fillFunction)
 import Features.Specialize.Copy (run)
+import Features.Specialize.Intern (Lowered, loweredType)
 import Features.Specialize.Keys (Env, State, Work)
 import Features.Specialize.Lower (fillType)
 import Features.Specialize.Seeds (environment, seeded)
@@ -52,7 +53,8 @@ specializeWith representative checked = do
     )
 
 -- Every key, types then functions, each in output-id order. A key's
--- arguments name only earlier output types, so one pass rebuilds them.
+-- arguments name only earlier output types, so one pass rebuilds them; an
+-- arrow is rebuilt along its spine by a loop.
 specializationKeys ∷ Checked.Program → Either Diagnostic (Array Key)
 specializationKeys checked = do
   finished ← specialized TInt checked
@@ -101,21 +103,28 @@ type Grounds = Map Int (Ty Void)
 groundOf ∷ Either Diagnostic Grounds → Work → Either Diagnostic Grounds
 groundOf found work = do
   grounds ← found
-  arguments ← traverse (groundType grounds work.span) work.arguments
+  arguments ← traverse (groundLowered grounds work.span) work.arguments
   pure
     (Map.insert work.output (TData (TypeId work.declaration) arguments) grounds)
 
 key ∷ Grounds → Work → Either Diagnostic Key
-key grounds work = made <$> traverse (groundType grounds work.span)
+key grounds work = made <$> traverse (groundLowered grounds work.span)
   work.arguments
   where
   made arguments =
     { declaration: work.declaration, function: work.function, arguments }
+
+groundLowered ∷ Grounds → Span → Lowered → Either Diagnostic (Ty Void)
+groundLowered grounds span = groundType grounds span <<< loweredType
 
 groundType ∷ Grounds → Span → IR.Ty → Either Diagnostic (Ty Void)
 groundType grounds span = case _ of
   IR.TInt → Right TInt
   IR.TBool → Right TBool
   IR.TData (TypeId output) → maybe' missing Right (Map.lookup output grounds)
+  arrow@(IR.TFun _ _) → groundSpine (IR.spine arrow)
   where
   missing _ = Left (problemAt (Internal "Invalid type id") span)
+  recur part = groundType grounds span part
+  groundSpine found = arrows <$> traverse recur found.parameters
+    <*> recur found.result

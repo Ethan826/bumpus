@@ -1,6 +1,8 @@
 # First-Class Functions Implementation Plan (FN001)
 
-Status: Task 4 complete 2026-10-08 (checking; docs/progress.md).
+Status: Task 5 complete 2026-10-08 (instantiation rule and
+specialization; docs/progress.md). Task 4 complete 2026-10-08 (checking;
+docs/progress.md).
 Task 3 complete 2026-10-08 (syntax and resolution;
 docs/progress.md). Task 2 complete 2026-10-08 (arrow type).
 Task 1 complete 2026-10-08 (three measurement rounds; design §13
@@ -328,9 +330,13 @@ arrows directly.
   `src/Features/Specialize/Body.purs`,
   `src/Features/Specialize/Seeds.purs`, `src/Features/Specialize/Copy.purs`,
   `test/poly-termination.test.mjs`, `test/poly-components.mjs`,
-  `test/specialize.test.mjs`
+  `test/specialize.test.mjs` (as built: Components, Copy and
+  test/specialize.test.mjs needed no change; test/poly-keys.mjs,
+  test/fn-check.test.mjs and scripts/regression.mjs's `spec-key` row did)
 - Create: `src/Features/Specialize/Unlowered.purs` (the guard),
-  `src/Features/Specialize/Values.purs` if Body exceeds budget
+  `src/Features/Specialize/Values.purs` if Body exceeds budget (created),
+  `src/Features/Specialize/Intern.purs` (the arrow table, as built),
+  `test/fn-specialize.test.mjs`, `test/fn-representative.test.mjs`
 
 **Interfaces:** `IR.Ty`'s `Eq`/`Ord` are hand-written like Task 2's
 (spine loop). Specialize.Keys interns arrows as hash-consed nodes
@@ -339,7 +345,7 @@ so every suffix of a spine is numbered once and a key is compared by
 numbers, never by spelling or by walking a whole type: total work linear
 in the size of all key types.
 
-- [ ] **Step 1: Write failing tests:** `fn f(x: a): Int = g(fn(y) =>
+- [x] **Step 1: Write failing tests:** `fn f(x: a): Int = g(fn(y) =>
   f(Cons(x, Nil)))`-shaped polymorphic recursion through a lambda inside
   a match arm is E_SPECIALIZATION at the reference; a bare `f` at a
   changed instantiation inside its component likewise; `type T(a) = C(a
@@ -352,12 +358,12 @@ in the size of all key types.
   time bound that a spelling-based or re-walking key fails; the
   representative-independence property gains lambdas with unused
   parameters (checked on the IR here, executed in Task 6).
-- [ ] **Step 2: Run** the three files. Expected: FAIL.
-- [ ] **Step 3: Implement**, including the guard; a CLI test asserts a
+- [x] **Step 2: Run** the three files. Expected: FAIL.
+- [x] **Step 3: Implement**, including the guard; a CLI test asserts a
   program with a lambda is rejected with `Internal "unlowered function"`
   (deleted with the guard in Task 6).
-- [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0.
-- [ ] **Step 5: Commit** `feat: specialize function values (FN001)`.
+- [x] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0.
+- [x] **Step 5: Commit** `feat: specialize function values (FN001)`.
 
 ### Task 6: Go lowering
 

@@ -81,16 +81,17 @@ const rows = [
     probe: 'instantiate', message: /scheme metas shared across uses/
   },
   {
-    // P001 (R15): a key's arguments are numbered output types. Dropping
-    // which type an argument is (keeping only that it is a data type)
-    // merges List(List(Int)) and List(List(Bool)) into one Go type.
+    // P001 (R15): a key's arguments are numbered output types (FN001 Task
+    // 5: interned, Features.Specialize.Intern). Dropping which type an
+    // argument is (keeping only that it is a data type) merges
+    // List(List(Int)) and List(List(Bool)) into one Go type.
     name: 'spec-key', file: 'src/Features/Specialize/Keys.purs',
-    needle: '      key = Tuple declaration arguments\n'
+    needle: '      key = Tuple declaration (map keyOf arguments)\n'
       + '      remembered state = maybe\' (newType',
-    replacement: '      key = Tuple declaration (map outermost arguments)\n'
-      + '      outermost = case _ of\n'
-      + '        IR.TData _ → IR.TData (TypeId 0)\n'
-      + '        ground → ground\n'
+    replacement: '      key = Tuple declaration (map (keyOf <<< outermost) arguments)\n'
+      + '      outermost argument = case argument.ty of\n'
+      + '        IR.TData _ → dataType 0\n'
+      + '        _ → argument\n'
       + '      remembered state = maybe\' (newType',
     probe: 'spec-key', message: /nested specialization keys collided/
   }
