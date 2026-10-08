@@ -3,7 +3,7 @@ module Format.Go.Match (lowerMatch) where
 import Prelude
 import Data.Array as Array
 import Data.String.Common (joinWith)
-import Format.Go.Capture (Captured, captures)
+import Format.Go.Capture (Captured, armFree, union)
 import Format.Go.Data
   ( boolean
   , fieldName
@@ -31,7 +31,9 @@ type Signature =
 -- before the arms, is bumpusFn{f}Match{k}. It takes the locals its arms
 -- capture, then the scrutinee, which the call site evaluates once, where the
 -- closure did. Arms are tested in order; the panic guards only malformed
--- values. Lifted functions follow their bumpusFn in number order.
+-- values. Lifted functions follow their bumpusFn in number order. The
+-- match's own free locals, which an enclosing match must capture, are its
+-- scrutinee's and its captures (Format.Go.Capture).
 lowerMatch
   ∷ Scope → Lowering → Int → Ty → IR.Expr → Array IR.Arm → Lowered
 lowerMatch scope lower next result scrutinee arms =
@@ -40,17 +42,20 @@ lowerMatch scope lower next result scrutinee arms =
       <> ")"
   , next: bodies.next
   , lifted: [ lifted ] <> subject.lifted <> bodies.lifted
+  , free: union [ subject.free, signature.captured ]
   }
   where
   signature =
     { name: matchName scope.owner next
-    , captured: captures arms
+    , captured: union (Array.zipWith armFree patterns bodies.frees)
     , scrutinee: IR.typeOf scrutinee
     , result
     }
   subject = lower (next + 1) scrutinee
   bodies = several lower subject.next (map armBody arms)
   armBody arm = arm.body
+  patterns = map armPattern arms
+  armPattern arm = arm.pattern
   capturedName captured = localName captured.id
   lifted = matchFunction signature
     (Array.zipWith (armCode scope.tables) arms bodies.codes)

@@ -50,9 +50,9 @@ const rows = [
   {
     // E005: an outer binder read only by an inner match's scrutinee must
     // still be captured by the match lifted around that inner match.
-    name: 'capture', file: 'src/Format/Go/Capture.purs',
-    needle: 'nested scrutinee arms = occurrences scrutinee\n  <> Array',
-    replacement: 'nested _ arms = Array',
+    name: 'capture', file: 'src/Format/Go/Match.purs',
+    needle: 'free: union [ subject.free, signature.captured ]',
+    replacement: 'free: signature.captured',
     probe: 'capture', message: /captured local lost/
   }
 ];

@@ -50,14 +50,18 @@ proposed, not verified.
    parameters are the locals its arms capture, ascending by LocalId and named
    `bumpusLocal{id}` with their IR types, then `bumpusScrutinee`; the call
    site passes the same locals, then the scrutinee expression, so the
-   scrutinee is still evaluated once at the same point. Capture analysis
-   (Format.Go.Capture) reads the whole of every arm, nested scrutinees and
-   nested arms included, minus every binder introduced inside the match
-   (LocalIds are unique per function); only the match's own scrutinee is
-   excluded. Lifted functions follow their `bumpusFn{f}` in number order,
+   scrutinee is still evaluated once at the same point. The captures are
+   every local read anywhere in the arms, nested scrutinees and nested arms
+   included, minus every binder introduced inside the match (LocalIds are
+   unique per function); only the match's own scrutinee is excluded. They
+   are computed in one bottom-up pass: lowering returns each subtree's free
+   locals (Format.Go.Capture), an arm's are its body's minus its pattern's
+   binders, and a match's are its scrutinee's plus its captures. Re-scanning
+   each match's subtree instead made a 127-deep, 50-arm ladder compile in
+   3.0 s rather than 0.3 s. Lifted functions follow their `bumpusFn{f}` in number order,
    each preceded by a blank line. `if` keeps its closure. Checked by
    test/match-lift.test.mjs (exact signatures and order; captures through
-   nested matches), test/depth.test.mjs (match-arm and compare-matches at the
+   nested matches; the ladder compiles in under 1.5 s), test/depth.test.mjs (match-arm and compare-matches at the
    nesting limit; 128 nested matches build and run in under 10 s) and the
    `capture` regression row.
 7. **E_DUPLICATE at the first occurrence**, the Stage 0 rule, applied to

@@ -518,3 +518,25 @@ worktree and branch are removed.
 - `rm -rf output && npm run verify` exit 0: zero warnings, 22 files, 155
   tests, zero failures/skips, eight regression proofs including `capture`
   (.build/e005-verify.log).
+- Review fix round 1 (2026-10-07). (1) Capture cost: each lifted match
+  re-scanned its subtree. A 127-deep ladder of 50-arm matches (147 KB)
+  compiled in 3.0 s against 0.27 s on 0777cf6 (depth 64: 0.71 vs 0.15 s).
+  Lowering now returns each subtree's free locals (Format.Go.Lowered `free`;
+  Format.Go.Capture `union`/`armFree`), so captures come from one bottom-up
+  pass: 0.31 s at 127. New test `a deep, wide match ladder compiles in under
+  1.5 s` failed first at 3,028 ms (.build/e005-fix1-red-ladder.log). Generated
+  Go is byte-identical to the pre-fix head on 21 programs (the three
+  examples, the match-lift, LocalId and capture programs, an if/match mix,
+  ladders at 32 and 127, and every depth form at 128) and cmp-identical to
+  bootstrap/*.go (.build/e005-fix1-identical.log). The `capture` row now
+  drops a match's scrutinee from its free set (Format.Go.Match); its mutant
+  fails with `undefined: bumpusLocal3` (.build/e005-fix1-mutant.log).
+  (2) The 128-deep timing test emits Go, then runs `go build` detached in
+  its own process group, killed as a group on timeout, and removes its temp
+  directory in `finally`. Against the closure compiler it failed with `go
+  build killed at 10000 ms` and left no go/compile process or temp
+  directory (.build/e005-fix1-groupkill.log). (3) Its comment now says the
+  build cache may supply the binary and why the bound stays honest.
+  `rm -rf output && npm run verify` exit 0: zero warnings, 22 files, 156
+  tests, zero failures/skips, eight regression proofs
+  (.build/e005-fix1-verify.log).

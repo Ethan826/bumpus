@@ -78,8 +78,8 @@ Format.Wire.
   sequential first-match lowering with nil guards. Format.Go.Expression
   threads a per-function match counter (Format.Go.Lowered) and
   Format.Go.Match lifts each match to a top-level `bumpusFn{f}Match{k}` whose
-  parameters are the locals Format.Go.Capture finds its arms read, then the
-  scrutinee; lifted functions follow their function in number order (ADR 003
+  parameters are its arms' free locals (computed bottom-up with the code;
+  Format.Go.Capture), then the scrutinee; lifted functions follow their function in number order (ADR 003
   item 6, E005). Format.Go.Compare emits a
   `bumpusCmpN` per declared type (and `bumpusCmpBool`, decided by
   Format.Go.Usage), Format.Go.Show a `bumpusShowN` per type; `main` prints

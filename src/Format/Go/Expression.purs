@@ -14,7 +14,16 @@ import Format.Go.Data
   , integer
   , localName
   )
-import Format.Go.Lowered (Lowered, Scope, Several, both, leaf, several)
+import Format.Go.Capture (union)
+import Format.Go.Lowered
+  ( Lowered
+  , Scope
+  , Several
+  , both
+  , leaf
+  , several
+  , variable
+  )
 import Format.Go.Match (lowerMatch)
 
 -- `next` is the number the first match met in pre-order will take; each
@@ -23,7 +32,7 @@ expression ∷ Scope → Int → IR.Expr → Lowered
 expression scope next (IR.Expr term) = case term.node of
   IR.Integer value → leaf next (integer value)
   IR.Boolean value → leaf next (boolean value)
-  IR.Local id → leaf next (localName id)
+  IR.Local id → variable next (localName id) id term.ty
   IR.Call id arguments → joined (call (functionName id)) (each arguments)
   IR.Construct id arguments → joined (call (ctorName id)) (each arguments)
   IR.Add left right → pair addition left right
@@ -39,7 +48,11 @@ expression scope next (IR.Expr term) = case term.node of
 
 joined ∷ (Array String → String) → Several → Lowered
 joined render parts =
-  { code: render parts.codes, next: parts.next, lifted: parts.lifted }
+  { code: render parts.codes
+  , next: parts.next
+  , lifted: parts.lifted
+  , free: union parts.frees
+  }
 
 call ∷ String → Array String → String
 call name arguments = name <> "(" <> joinWith ", " arguments <> ")"
