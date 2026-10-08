@@ -1,5 +1,6 @@
 module Features.Check.Require
   ( Names
+  , Requiring
   , typeName
   , require
   , expectType
@@ -18,6 +19,7 @@ import Domain.Problem (Problem(..), TypeName(..))
 import Domain.Resolved (TypeInfo)
 import Domain.Syntax (Diagnostic, Span, problemAt)
 import Domain.Type (Ty(..), TypeId(..), VarId(..), spine)
+import Features.Check.Hint (Declared, hinted)
 import Features.Check.Scheme (State, flexible, opened, resolved, tooDeep)
 import Features.Check.Unify (Failure(..), inferredTypeLimit, unify)
 
@@ -25,17 +27,24 @@ import Features.Check.Unify (Failure(..), inferredTypeLimit, unify)
 -- enclosing function's variables (`VarId i` is the i-th).
 type Names r = { types ∷ Array TypeInfo, variables ∷ Array String | r }
 
--- The expression's type must unify with the expected one.
+-- What `require` needs: names for its message, declarations for its hint.
+type Requiring r = Names (Declared r)
+
+-- The expression's type must unify with the expected one. A mismatch may
+-- gain the under-application hint (Features.Check.Hint).
 require
   ∷ ∀ r
-  . Names r
+  . Requiring r
   → State
   → Ty Open
   → Checked.Expr
   → Either Diagnostic State
-require env state expected actual = expectType env state expected
-  (Checked.typeOf actual)
-  (Checked.spanOf actual)
+require env state expected actual = either hint Right
+  ( expectType env state expected (Checked.typeOf actual)
+      (Checked.spanOf actual)
+  )
+  where
+  hint = Left <<< hinted env state expected actual
 
 -- A failure names the whole expected and found types, resolved under the
 -- substitution before this comparison, as monomorphic checking always did;

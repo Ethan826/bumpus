@@ -35,6 +35,8 @@ covered signature (Checked.Expr expression) = case expression.node of
   Checked.Integer _ → pure unit
   Checked.Boolean _ → pure unit
   Checked.Local _ → pure unit
+  Checked.FunctionRef _ _ → pure unit
+  Checked.CtorRef _ _ → pure unit
   Checked.Call _ _ arguments → traverse_ recur arguments
   Checked.Construct _ _ arguments → traverse_ recur arguments
   Checked.Add left right → traverse_ recur [ left, right ]
@@ -42,6 +44,9 @@ covered signature (Checked.Expr expression) = case expression.node of
   Checked.If condition yes no → traverse_ recur [ condition, yes, no ]
   Checked.Match scrutinee arms → coverMatch signature expression.span scrutinee
     arms
+  Checked.Apply callee arguments → traverse_ recur (Array.cons callee arguments)
+  Checked.Lambda _ body → recur body
+  Checked.Pipe left right → traverse_ recur [ left, right ]
   where
   recur = covered signature
 

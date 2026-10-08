@@ -81,7 +81,14 @@ copyNode scope span ty = case _ of
     <*> recur no
   Checked.Match scrutinee arms → IR.Match <$> recur scrutinee
     <*> traverse (arm scope) arms
+  -- Function values are copied from FN001 Task 5.
+  Checked.FunctionRef _ _ → unlowered
+  Checked.CtorRef _ _ → unlowered
+  Checked.Apply _ _ → unlowered
+  Checked.Lambda _ _ → unlowered
+  Checked.Pipe _ _ → unlowered
   where
+  unlowered = internal "unlowered function" span unit
   recur = expression scope
   each = traverse recur
 

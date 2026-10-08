@@ -15,7 +15,9 @@ import Features.Check.Require (require)
 import Features.Check.Scheme (State, Threaded, threadAll)
 
 -- Open rows let Features.Check pass its own environment through unchanged.
-type MatchEnv r = PatternEnv (locals ∷ Array Typed | r)
+-- The declarations name an arm body's under-application hint.
+type MatchEnv r = PatternEnv
+  (locals ∷ Array Typed, functions ∷ Array Resolved.FunctionDecl | r)
 
 -- Arms' own row: Features.Check.Infer's `infer` reaches here through
 -- checkMatch with its whole Env, of which matching needs the pattern

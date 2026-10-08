@@ -10,8 +10,12 @@ import Domain.Problem (Problem(..))
 import Domain.Resolved (Ty(..))
 import Domain.Resolved as Resolved
 import Domain.Syntax (Diagnostic, Operator, Span, problemAt)
+import Features.Check.Apply (checkApply)
 import Features.Check.Arms (checkMatch)
 import Features.Check.Call (checkCall, checkConstruct)
+import Features.Check.Lambda (checkLambda)
+import Features.Check.Pipe (checkPipe)
+import Features.Check.Use (checkCtorRef, checkFunctionRef)
 import Features.Check.Match (Typed)
 import Features.Check.Require (bounded, require)
 import Features.Check.Scheme (State, Threaded)
@@ -38,14 +42,15 @@ infer env state expression = do
 
 -- Every type equality is a unification, in the order monomorphic checking
 -- compared types, so a monomorphic program's first error is unchanged.
--- Functions, lambdas and pipes are typed from FN001 Task 4. A flat
--- exhaustive dispatch (BACKLOG E003).
+-- A flat exhaustive dispatch (BACKLOG E003).
 inferNode ∷ Env → State → Resolved.Expr → Inferred
 inferNode env state expression = case expression of
   Resolved.Integer span value → typed state span TInt (Checked.Integer value)
   Resolved.Boolean span value → typed state span TBool
     (Checked.Boolean value)
   Resolved.Local span id → checkLocal env state span id
+  Resolved.FunctionRef span id → checkFunctionRef env state span id
+  Resolved.CtorRef span id → checkCtorRef env state span id
   Resolved.Call span id arguments → checkCall infer env state span id
     arguments
   Resolved.Construct span id arguments → checkConstruct infer env state span
@@ -62,12 +67,13 @@ inferNode env state expression = case expression of
   Resolved.Match span scrutinee arms → checkMatch infer env state span
     scrutinee
     arms
-  Resolved.Lambda span _ _ → unchecked span
-  Resolved.Apply span _ _ → unchecked span
-  Resolved.Pipe span _ _ → unchecked span
-
-unchecked ∷ Span → Inferred
-unchecked = Left <<< problemAt (Internal "unchecked function")
+  Resolved.Lambda span parameters body → checkLambda infer env state span
+    parameters
+    body
+  Resolved.Apply span callee arguments → checkApply infer env state span
+    callee
+    arguments
+  Resolved.Pipe span left right → checkPipe infer env state span left right
 
 typed ∷ State → Span → Ty Open → Checked.Node → Inferred
 typed state span ty node = pure

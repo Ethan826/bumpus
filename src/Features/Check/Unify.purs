@@ -7,6 +7,7 @@ module Features.Check.Unify
   , substitute
   , compose
   , resolve
+  , walk
   , unify
   , exceedsLimit
   ) where

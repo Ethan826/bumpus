@@ -132,8 +132,8 @@ test('patterns and matches are rejected precisely', () => {
     [f('match xs { Red => 0, _ => 1 }'), 'E_TYPE', 'Red', 1],
     [f('match b { 1 => 0, _ => 1 }'), 'E_TYPE', '1'],
     [f('match xs { Nil => 0, Cons(_, _) => true }'), 'E_TYPE', 'true'],
-    [f('match xs { Cons(f, _) => f(1), Nil => 0 }'), 'E_NOT_CALLABLE',
-      'f(1)'],
+    // FN001 (design §9): applying a binder is checked by its type.
+    [f('match xs { Cons(f, _) => f(1), Nil => 0 }'), 'E_TYPE', '1'],
     [f('match xs { Cons(z, _) => z, Nil => z }'), 'E_UNBOUND', 'z', 2],
     [f('1 + match xs { Nil => 0, _ => 1 }'), 'E_SYNTAX', 'match'],
     [f('match xs {}'), 'E_SYNTAX', '}']

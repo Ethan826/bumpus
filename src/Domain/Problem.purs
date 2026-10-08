@@ -32,7 +32,15 @@ data DuplicateKind
   | DuplicateBinder
   | DuplicateTypeParameter
 
-data EntryKind = MissingEntry | EntryParameters | EntryPolymorphic
+data EntryKind
+  = MissingEntry
+  | EntryParameters
+  | EntryPolymorphic
+  | EntryFunction
+
+-- What a diagnostic suggests beside its problem: a partial application
+-- of the named function or constructor, short of this many arguments.
+data Hint = MissingArguments String Int
 
 -- The lexer and parser are Format, so their payloads may be text.
 data Problem
@@ -46,11 +54,12 @@ data Problem
   | Unbound UnboundKind String
   | NotCallable String
   | CtorNotCallable String
-  | CtorNeedsArguments String
+  | FunctionNeedsCall String
   | Arity
   | FieldArity
   | TypeArguments String
   | TypeMismatch TypeName TypeName
+  | NotAFunction TypeName
   | InfiniteType TypeName TypeName
   | NotComparable TypeName
   | AmbiguousType TypeName
@@ -60,3 +69,5 @@ data Problem
   | RedundantArm
   | NonExhaustive Witness
   | Internal String
+  -- Rendered as its problem, with the hint after; code and span unchanged.
+  | Hinted Problem Hint

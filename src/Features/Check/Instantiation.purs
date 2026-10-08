@@ -68,7 +68,9 @@ judgeCall context judged span (FunctionId callee) instantiation =
   missing _ = Left (problemAt (Internal "Invalid function id") span)
 
 -- Every call of a checked body in pre-order: a call before its arguments,
--- a scrutinee before its arms.
+-- a scrutinee before its arms, an applied function before its arguments.
+-- Value references and lambda bodies become edges in FN001 Task 5; until
+-- then specialization rejects every program holding them.
 foldCalls
   ∷ ∀ b
   . (b → Span → FunctionId → Instantiation → b)
@@ -85,6 +87,9 @@ foldCalls step found (Checked.Expr expression) = case expression.node of
   Checked.If condition yes no → foldl recur found [ condition, yes, no ]
   Checked.Match scrutinee arms → foldl recur found
     (Array.cons scrutinee (map armBody arms))
+  Checked.Apply callee arguments → foldl recur found
+    (Array.cons callee arguments)
+  Checked.Pipe left right → foldl recur found [ left, right ]
   _ → found
   where
   recur = foldCalls step

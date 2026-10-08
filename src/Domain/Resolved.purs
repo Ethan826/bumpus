@@ -39,7 +39,9 @@ type Tables = { types ∷ Array TypeInfo, ctors ∷ Array CtorInfo }
 -- The resolver's scope entry: a source name and the id it resolves to.
 type Local = { name ∷ String, id ∷ LocalId }
 
-data GlobalRef = FunctionRef FunctionId | CtorRef CtorId
+-- A function carries its declared parameter count, which decides what its
+-- bare name means (FN001 design §2).
+data GlobalRef = GlobalFunction FunctionId Int | GlobalCtor CtorId
 
 -- Functions and constructors share one global namespace.
 type Global = { name ∷ String, ref ∷ GlobalRef }
@@ -57,6 +59,8 @@ data Expr
   = Integer Span Int
   | Boolean Span Boolean
   | Local Span LocalId
+  | FunctionRef Span FunctionId
+  | CtorRef Span CtorId
   | Call Span FunctionId (Array Expr)
   | Construct Span CtorId (Array Expr)
   | Add Span Expr Expr
@@ -97,6 +101,8 @@ exprSpan expression = case expression of
   Integer span _ → span
   Boolean span _ → span
   Local span _ → span
+  FunctionRef span _ → span
+  CtorRef span _ → span
   Call span _ _ → span
   Construct span _ _ → span
   Add span _ _ → span

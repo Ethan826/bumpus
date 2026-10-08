@@ -1,6 +1,7 @@
 # First-Class Functions Implementation Plan (FN001)
 
-Status: Task 3 complete 2026-10-08 (syntax and resolution;
+Status: Task 4 complete 2026-10-08 (checking; docs/progress.md).
+Task 3 complete 2026-10-08 (syntax and resolution;
 docs/progress.md). Task 2 complete 2026-10-08 (arrow type).
 Task 1 complete 2026-10-08 (three measurement rounds; design §13
 records the adopted convention and the scale rule, both approved by the
@@ -296,7 +297,7 @@ arrows directly.
   argument after `require` fails, wrapping only that failure's problem.
 - Coverage: a function-typed scrutinee admits `_` and binders only.
 
-- [ ] **Step 1: Write failing tests** (Parse → Resolve → Check): partial,
+- [x] **Step 1: Write failing tests** (Parse → Resolve → Check): partial,
   saturated and over-application of functions, constructors and locals;
   application of a non-function; `fn(f) => f(f)` E_TYPE `Infinite type`;
   comparison of `Int -> Int` and of `Box(Int)`; patterns on a function
@@ -304,13 +305,13 @@ arrows directly.
   each hinted row the same program's unhinted diagnostic compared field by
   field except the suffix; type rendering of nested arrows; a lambda
   annotated with the signature's rigid `a`.
-- [ ] **Step 2: Run** `node --test test/fn-check.test.mjs`. Expected: FAIL.
-- [ ] **Step 3: Implement**; update the known changed rows to their
+- [x] **Step 2: Run** `node --test test/fn-check.test.mjs`. Expected: FAIL.
+- [x] **Step 3: Implement**; update the known changed rows to their
   checked outcomes (E_TYPE texts as rendered by §3) and list each in
   progress.
-- [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0;
+- [x] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0;
   `twenty thousand parameters are checked in linear time` unchanged.
-- [ ] **Step 5: Commit** `feat: checking functions, lambdas and pipes
+- [x] **Step 5: Commit** `feat: checking functions, lambdas and pipes
   (FN001)`.
 
 ### Task 5: Instantiation rule and specialization

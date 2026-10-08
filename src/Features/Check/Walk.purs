@@ -10,12 +10,20 @@ import Domain.Type (Ty)
 -- Every type a checked body carries, in pre-order: an expression's type,
 -- then its instantiation, then its parts left to right; an arm's pattern
 -- before its body; a pattern's type before its fields. Each type comes with
--- the span of the expression or pattern holding it.
+-- the span of the expression or pattern holding it. A lambda's parameter
+-- types come before its body, with the lambda's span. A flat exhaustive
+-- dispatch (BACKLOG E003).
 foldTypes ∷ ∀ b. (b → Span → Ty Open → b) → b → Checked.Expr → b
 foldTypes step found (Checked.Expr expression) = case expression.node of
+  Checked.FunctionRef _ instantiation → applied instantiation []
+  Checked.CtorRef _ instantiation → applied instantiation []
   Checked.Call _ instantiation arguments → applied instantiation arguments
   Checked.Construct _ instantiation arguments → applied instantiation
     arguments
+  Checked.Apply callee arguments → foldl recur (recur own callee) arguments
+  Checked.Lambda parameters body → recur (foldl parameter own parameters)
+    body
+  Checked.Pipe left right → foldl recur own [ left, right ]
   Checked.Add left right → foldl recur own [ left, right ]
   Checked.Compare _ left right → foldl recur own [ left, right ]
   Checked.If condition yes no → foldl recur own [ condition, yes, no ]
@@ -27,6 +35,7 @@ foldTypes step found (Checked.Expr expression) = case expression.node of
   applied instantiation arguments =
     foldl recur (foldl (flip step expression.span) own instantiation)
       arguments
+  parameter reached declared = step reached expression.span declared.ty
   arm reached checked = recur (foldPattern step reached checked.pattern)
     checked.body
 
@@ -37,6 +46,10 @@ retype change (Checked.Expr expression) = Checked.Expr
   where
   recur = retype change
   node = case _ of
+    Checked.FunctionRef id instantiation → Checked.FunctionRef id
+      (map change instantiation)
+    Checked.CtorRef id instantiation → Checked.CtorRef id
+      (map change instantiation)
     Checked.Call id instantiation arguments → Checked.Call id
       (map change instantiation)
       (map recur arguments)
@@ -51,7 +64,13 @@ retype change (Checked.Expr expression) = Checked.Expr
       (recur no)
     Checked.Match scrutinee arms → Checked.Match (recur scrutinee)
       (map arm arms)
+    Checked.Apply callee arguments → Checked.Apply (recur callee)
+      (map recur arguments)
+    Checked.Lambda parameters body → Checked.Lambda (map parameter parameters)
+      (recur body)
+    Checked.Pipe left right → Checked.Pipe (recur left) (recur right)
     leaf → leaf
+  parameter declared = declared { ty = change declared.ty }
   arm checked = checked
     { pattern = retypePattern change checked.pattern
     , body = recur checked.body

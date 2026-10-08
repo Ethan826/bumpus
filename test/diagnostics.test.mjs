@@ -50,8 +50,9 @@ const rows = [
     'Wrong number of arguments'],
   [pair + ' fn f(p: P): Int = match p { Pair(a) => a };' + tail, 'E_ARITY',
     53, 60, 'Wrong number of fields'],
-  [pair + ' fn f(): P = Pair;' + tail, 'E_ARITY', 37, 41,
-    'Constructor Pair needs arguments'],
+  // FN001: a constructor with fields is a function value (design §9).
+  [pair + ' fn f(): P = Pair;' + tail, 'E_TYPE', 37, 41,
+    'Expected P, found Int -> Int -> P'],
   ['fn main(): Int = true + 1;', 'E_TYPE', 17, 21, 'Expected Int, found Bool'],
   ['fn main(): Int = if 1 then 2 else 3;', 'E_TYPE', 20, 21,
     'Expected Bool, found Int'],

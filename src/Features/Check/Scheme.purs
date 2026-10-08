@@ -9,6 +9,7 @@ module Features.Check.Scheme
   , flexible
   , opened
   , resolved
+  , headOf
   , tooDeep
   , firstTooDeep
   , holes
@@ -26,7 +27,7 @@ import Domain.Checked.Internal (Open(..))
 import Domain.Checked.Internal as Checked
 import Domain.Syntax (Diagnostic, Span)
 import Domain.Type (Ty(..), VarId(..), children)
-import Features.Check.Unify (Flex, Subst, exceedsLimit, resolve)
+import Features.Check.Unify (Flex, Subst, exceedsLimit, resolve, walk)
 import Features.Check.Unify as Unify
 import Features.Check.Walk (foldTypes, retype)
 
@@ -40,24 +41,26 @@ type Threaded a = { value ∷ a, state ∷ State }
 -- One use of a scheme: its variable `VarId i` became meta `base + i`.
 type Scheme = { arguments ∷ Array (Ty Open), base ∷ Int }
 
--- Threads the state through an array, left to right. Array's traverse
--- nests its applies in a balanced tree, so long arrays (thousands of arms
--- or arguments) neither copy per item nor nest one frame per item.
-newtype Thread a = Thread (State → Either Diagnostic (Threaded a))
+-- Threads a state through an array, left to right: the checking state, or
+-- (for an application) that state with the type still to be applied.
+-- Array's traverse nests its applies in a balanced tree, so long arrays
+-- (thousands of arms or arguments) neither copy per item nor nest one
+-- frame per item.
+newtype Thread s a = Thread (s → Either Diagnostic { value ∷ a, state ∷ s })
 
-instance functorThread ∷ Functor Thread where
+instance functorThread ∷ Functor (Thread s) where
   map change (Thread run) = Thread (map changed <<< run)
     where
     changed threaded = threaded { value = change threaded.value }
 
-instance applyThread ∷ Apply Thread where
+instance applyThread ∷ Apply (Thread s) where
   apply (Thread runChange) (Thread run) = Thread applied
     where
     applied state = runChange state >>= continue
     continue changing = map (changed changing.value) (run changing.state)
     changed change threaded = threaded { value = change threaded.value }
 
-instance applicativeThread ∷ Applicative Thread where
+instance applicativeThread ∷ Applicative (Thread s) where
   pure value = Thread threaded
     where
     threaded state = Right { value, state }
@@ -66,11 +69,11 @@ start ∷ State
 start = { subst: Unify.empty, next: 0 }
 
 threadAll
-  ∷ ∀ a b
-  . (State → a → Either Diagnostic (Threaded b))
-  → State
+  ∷ ∀ s a b
+  . (s → a → Either Diagnostic { value ∷ b, state ∷ s })
+  → s
   → Array a
-  → Either Diagnostic (Threaded (Array b))
+  → Either Diagnostic { value ∷ Array b, state ∷ s }
 threadAll step state items = running (traverse threaded items)
   where
   threaded item = Thread (flip step item)
@@ -107,6 +110,15 @@ opened = map toOpen
 
 resolved ∷ Subst → Ty Open → Ty Open
 resolved subst ty = opened (resolve subst (flexible ty))
+
+-- The type with its outer chain of bound metas followed, so its head is
+-- final; its parts stay unresolved. Only a bound meta is converted, at the
+-- cost of its binding's size, so stepping along a long arrow costs nothing
+-- per step.
+headOf ∷ State → Ty Open → Ty Open
+headOf state = case _ of
+  TVar (Hole meta) → opened (walk state.subst (TVar (Unify.Meta meta)))
+  ty → ty
 
 tooDeep ∷ Subst → Ty Open → Boolean
 tooDeep subst ty = exceedsLimit subst (flexible ty)

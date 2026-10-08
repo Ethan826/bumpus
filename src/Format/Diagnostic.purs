@@ -13,6 +13,7 @@ import Data.String (joinWith)
 import Domain.Problem
   ( DuplicateKind(..)
   , EntryKind(..)
+  , Hint(..)
   , Problem(..)
   , TypeName(..)
   , UnboundKind(..)
@@ -35,11 +36,12 @@ code = case _ of
   Unbound _ _ → Code.UnboundName
   NotCallable _ → Code.NotCallable
   CtorNotCallable _ → Code.NotCallable
-  CtorNeedsArguments _ → Code.ArityMismatch
+  FunctionNeedsCall _ → Code.ArityMismatch
   Arity → Code.ArityMismatch
   FieldArity → Code.ArityMismatch
   TypeArguments _ → Code.ArityMismatch
   TypeMismatch _ _ → Code.TypeMismatch
+  NotAFunction _ → Code.TypeMismatch
   InfiniteType _ _ → Code.TypeMismatch
   NotComparable _ → Code.TypeMismatch
   AmbiguousType _ → Code.TypeMismatch
@@ -49,6 +51,7 @@ code = case _ of
   RedundantArm → Code.Redundant
   NonExhaustive _ → Code.NonExhaustive
   Internal _ → Code.InternalError
+  Hinted problem _ → code problem
 
 codeName ∷ ErrorCode → String
 codeName = case _ of
@@ -80,13 +83,14 @@ message = case _ of
   Unbound kind name → "Unbound " <> unboundWord kind <> " " <> name
   NotCallable name → "Local is not callable: " <> name
   CtorNotCallable name → "Constructor is not callable: " <> name
-  CtorNeedsArguments name → "Constructor " <> name <> " needs arguments"
+  FunctionNeedsCall name → "Expected " <> name <> "()"
   Arity → "Wrong number of arguments"
   FieldArity → "Wrong number of fields"
   TypeArguments name → "Wrong number of type arguments for " <> name
   TypeMismatch expected found → "Expected " <> typeName expected
     <> ", found "
     <> typeName found
+  NotAFunction found → "Expected a function, found " <> typeName found
   InfiniteType meta whole → "Infinite type: " <> typeName meta
     <> " occurs in "
     <> typeName whole
@@ -100,6 +104,7 @@ message = case _ of
   RedundantArm → "Redundant match arm"
   NonExhaustive witness → "Missing pattern: " <> pattern witness
   Internal text → text
+  Hinted problem hint → message problem <> hintMessage hint
 
 wire ∷ Diagnostic → WireDiagnostic
 wire diagnostic =
@@ -113,6 +118,17 @@ entryMessage = case _ of
   MissingEntry → "Expected fn main()"
   EntryParameters → "main must have no parameters"
   EntryPolymorphic → "Expected fn main() with a concrete result type"
+  EntryFunction → "Expected fn main() with a printable result type"
+
+hintMessage ∷ Hint → String
+hintMessage (MissingArguments name count) = "; missing " <> counted
+  <> " to "
+  <> name
+  <> "?"
+  where
+  counted
+    | count == 1 = "1 argument"
+    | otherwise = show count <> " arguments"
 
 duplicateWord ∷ DuplicateKind → String
 duplicateWord = case _ of

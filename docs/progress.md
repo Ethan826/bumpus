@@ -1646,3 +1646,94 @@ their P001 resolution until Task 4.
   GREEN: `rm -rf output && npm run verify` exit 0, 387 tests (380 - 1 + 8),
   zero failures/skips, twelve regression proofs, snapshots unchanged (log
   .build/fn001-task3-fix-verify.log).
+
+### FN001 Task 4: checking (2026-10-08)
+
+Branch fn001. Reach: Parse → Resolve → Check (test/phases.mjs,
+test/fn-checked.mjs); one CLI row asserts that checked function programs
+reach Specialize as `Internal "unlowered function"`.
+
+- Resolution (design §2): Domain.Resolved's `GlobalRef` constructors are
+  renamed `GlobalFunction FunctionId Int` (with the declared parameter
+  count) and `GlobalCtor CtorId`, freeing `FunctionRef Span FunctionId`
+  and `CtorRef Span CtorId` for expressions. A bare name is a local, else a
+  function with parameters (`FunctionRef`), else a zero-parameter function
+  (Resolve: E_ARITY `Expected f()`, new `Problem.FunctionNeedsCall`), else
+  a constructor (`Construct` with none if nullary, `CtorRef` otherwise),
+  else E_UNBOUND. A local called with arguments is `Apply (Local …)`, the
+  local spanning the name; `x()` stays E_NOT_CALLABLE. `CtorNeedsArguments`
+  is removed (no longer produced).
+- Checked IR: `FunctionRef`, `CtorRef`, `Apply`, `Lambda (Array Param)`,
+  `Pipe`; `Call`/`Construct` hold 1..n arguments (partial when fewer).
+- Checking: Features.Check.Use (schemes; value references build the
+  curried arrow, direct calls keep fields as an array), Call (named callee:
+  j = n today's path; 0 < j < n checks j fields, typed as the arrow of the
+  rest; `f()` with parameters E_ARITY before arguments; j > n: E_ARITY
+  before any argument if the declared result can never be a function
+  (Int, Bool, declared type), else check n, E_ARITY at the call if the
+  instantiated result is not an arrow or unbound meta, else apply the rest
+  as `Apply (Call f a1…an) rest`), Apply (one argument at a time, the type
+  threaded with the state by Scheme's `threadAll`, now generic in its
+  state; an unbound meta is bound to `α -> β`; anything else is E_TYPE
+  `Expected a function, found T` at that argument), Pipe, Lambda (fresh
+  metas or rigid annotations), Hint, Context (shared env rows). `require`
+  wraps a TypeMismatch in `Hinted problem (MissingArguments f k)` per §4's
+  provenance rules (the found expression's own node a partial `Call` or
+  `Construct`; expected type's head, under the state before the failure,
+  neither an arrow nor an unbound meta). Walk, Comparable, Coverage cover
+  the new nodes; a function scrutinee admits only `_` and binders (by
+  unification, unchanged Match). Check judges a printable `main` before any
+  body: E_ENTRY `Expected fn main() with a printable result type` when the
+  result contains an arrow directly or through declared fields
+  (Functional). Instantiation's `foldCalls` enters `Apply` and `Pipe`
+  (calls there are ordinary edges); value references and lambda bodies are
+  Task 5's. Specialize.Body returns `Internal "unlowered function"` for
+  each new node.
+- Decisions not dictated by the plan: (1) `a |> g(b1…bk)` with k = n is
+  the over-application `g(b1…bk, a)`: E_ARITY at the right operand's span
+  when g's result is not a function; any other right side is applied to
+  `a` (NotAFunction at `a`). `a |> f()` keeps `f()`'s own E_ARITY. (2) The
+  over-application E_ARITY is checked before arguments when the declared
+  result is Int, Bool or a declared type, so every pre-FN001 wrong count
+  keeps its order of errors. (3) Only a TypeMismatch is hinted (an occurs
+  failure never has a non-meta expected head). (4) The printable-entry
+  check lives in Features.Check (it needs Functional), not
+  Check.Signature, which is the coverage signature.
+- Changed rows (old → new):
+  - test/diagnostics.test.mjs `fn f(): P = Pair;`: E_ARITY 37-41 `Pair`
+    `Constructor Pair needs arguments` → E_TYPE 37-41 `Pair`
+    `Expected P, found Int -> Int -> P`.
+  - test/adt-types.test.mjs `fn main(): Int = Cons;`: E_ARITY at `Cons`
+    (58-62) `Constructor Cons needs arguments` → E_TYPE 58-62
+    `Expected Int, found Int -> IntList -> IntList`.
+  - `fn main(): Int = Cons(1);`: E_ARITY at `Cons(1)` (58-65) `Wrong number
+    of arguments` → E_TYPE 58-65 `Expected Int, found IntList -> IntList;
+    missing 1 argument to Cons?`.
+  - `fn helper(): Int = 1; fn main(): Int = helper;`: E_UNBOUND at the
+    second `helper` (80-86) `Unbound local helper` → E_ARITY 80-86
+    `Expected helper()`.
+  - test/adt-match.test.mjs `Cons(f, _) => f(1)`: E_NOT_CALLABLE at `f(1)`
+    `Local is not callable: f` → E_TYPE at `1` (128-129)
+    `Expected a function, found Int`.
+  The adt-types rows now also assert these messages. No other existing
+  assertion changed.
+- Tests seen failing first (log .build/fn001-task4-red.log): 81 tests in
+  test/fn-check.test.mjs, test/fn-hint.test.mjs, test/fn-rules.test.mjs;
+  74 failed, 7 passed on arrival (comparison of `Int -> Int` and
+  `Box(Int)`, three patterns on a function scrutinee and a redundant arm
+  after `_`, which Task 2's type passes already gave; kept as
+  characterization). Two markers were then corrected in the tests (an
+  earlier `= x` in the prelude) and one unhinted row rewritten to `g + 1`
+  so the found expression is the binder, not the match.
+- Mutants (isolated scratchpad copy, not committed), each failing new rows:
+  hint ignoring the expected type (2 rows: expected function), hint looking
+  through `Apply` (`add3(1)(2)`), over-application always E_ARITY (4
+  rows), partial application typed as the result (63), a non-function
+  bound to an arrow instead of NotAFunction (6).
+- Observed: one direct `node --test test/*.test.mjs` run failed
+  match-lift's 1.5 s ladder at 1,780 ms (load); evidence added to BACKLOG
+  T003. BACKLOG E003 counts updated.
+- GREEN: `rm -rf output && npm run verify` exit 0, 468 tests (387 + 81),
+  zero failures/skips, twelve regression proofs, bootstrap snapshots
+  unchanged; `twenty thousand parameters are checked in linear time`
+  passes unchanged (258 ms). Log .build/fn001-task4-verify.log.

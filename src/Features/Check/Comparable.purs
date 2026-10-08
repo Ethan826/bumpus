@@ -30,6 +30,10 @@ comparable functions env (Checked.Expr expression) = case expression.node of
   Checked.If condition yes no → traverse_ recur [ condition, yes, no ]
   Checked.Match scrutinee arms → traverse_ recur
     (Array.cons scrutinee (map armBody arms))
+  Checked.Apply callee arguments → traverse_ recur
+    (Array.cons callee arguments)
+  Checked.Lambda _ body → recur body
+  Checked.Pipe left right → traverse_ recur [ left, right ]
   _ → pure unit
   where
   recur = comparable functions env

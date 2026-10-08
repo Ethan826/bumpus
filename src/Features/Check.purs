@@ -3,15 +3,16 @@ module Features.Check (check) where
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Maybe (maybe)
+import Data.Maybe (maybe, maybe')
 import Data.Traversable (traverse)
 import Domain.Checked.Internal (rigid)
 import Domain.Checked.Internal as Checked
 import Domain.Resolved as Resolved
-import Domain.Syntax (Diagnostic)
+import Domain.Problem (EntryKind(..), Problem(..))
+import Domain.Syntax (Diagnostic, origin, problemAt)
 import Features.Check.Comparable (comparable)
 import Features.Check.Coverage (coverage)
-import Features.Check.Functional (Functional, functional)
+import Features.Check.Functional (Functional, containsFunction, functional)
 import Features.Check.Infer (Env, infer)
 import Features.Check.Instantiation (instantiationRule)
 import Features.Check.Require (require, tooDeepAt)
@@ -20,6 +21,7 @@ import Features.Check.Walk (retype)
 
 check ∷ Resolved.Program → Either Diagnostic Checked.Program
 check program = do
+  printableEntry holders program
   functions ← traverse checkDefinition program.functions
   let
     checked = Checked.Program
@@ -38,6 +40,21 @@ check program = do
   checkDefinition definition = checkFunction holders
     (environment program definition)
     definition
+
+-- `main`'s result is printed, so it may hold no function, directly or
+-- through a declared type's fields (FN001 design §3). Resolve has already
+-- made it ground; judged before any body, as Resolve judges `main` first.
+printableEntry ∷ Functional → Resolved.Program → Either Diagnostic Unit
+printableEntry holders program =
+  maybe' missing judged (Array.index program.functions (index program.entry))
+  where
+  index (Resolved.FunctionId entry) = entry
+  missing _ = Left (problemAt (Internal "Invalid entry") nowhere)
+  nowhere = { start: origin, end: origin }
+  judged main =
+    if containsFunction holders main.result then Left
+      (problemAt (EntryProblem EntryFunction) main.span)
+    else Right unit
 
 environment ∷ Resolved.Program → Resolved.FunctionDecl → Env
 environment program function =

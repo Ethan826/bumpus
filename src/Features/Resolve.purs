@@ -46,11 +46,14 @@ resolve program = do
 
 functionGlobal ∷ Int → Syntax.FunctionDecl → Global
 functionGlobal index function =
-  { name: function.name, ref: Resolved.FunctionRef (Resolved.FunctionId index) }
+  { name: function.name
+  , ref: Resolved.GlobalFunction (Resolved.FunctionId index)
+      (Array.length function.parameters)
+  }
 
 ctorGlobal ∷ Int → Resolved.CtorInfo → Global
 ctorGlobal index info =
-  { name: info.name, ref: Resolved.CtorRef (Resolved.CtorId index) }
+  { name: info.name, ref: Resolved.GlobalCtor (Resolved.CtorId index) }
 
 resolveSignature
   ∷ Array Resolved.TypeInfo

@@ -1,124 +1,136 @@
-module Features.Check.Call (checkCall, checkConstruct) where
+module Features.Check.Call (checkCall, checkConstruct, saturatedCall) where
 
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Maybe (maybe')
-import Domain.Checked.Internal (Open)
+import Data.Maybe (maybe)
 import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
-import Domain.Resolved (Ty(..), TypeId(..))
+import Domain.Resolved (CtorId(..), FunctionId(..))
 import Domain.Resolved as Resolved
 import Domain.Syntax (Diagnostic, Span, problemAt)
+import Domain.Type (arrows)
+import Features.Check.Apply (applyAll, functionLike)
+import Features.Check.Context (CheckEnv, Infer)
 import Features.Check.Require (require)
-import Features.Check.Scheme
-  ( Scheme
-  , State
-  , Threaded
-  , at
-  , instantiate
-  , threadAll
-  )
+import Features.Check.Scheme (State, Threaded, threadAll)
+import Features.Check.Use (Use, ctorUse, functionUse)
 
--- Open rows let Features.Check.Infer pass its own environment through.
-type CallEnv r =
-  { functions ∷ Array Resolved.FunctionDecl
-  , types ∷ Array Resolved.TypeInfo
-  , ctors ∷ Array Resolved.CtorInfo
-  , variables ∷ Array String
-  | r
-  }
+type Checked = Either Diagnostic (Threaded Checked.Expr)
 
--- Call's own row: Features.Check.Infer's `infer` reaches here with its
--- whole Env, of which calls need the declarations and the variables' names
--- (Arms.Infer has its own row for the same reason; neither module may
--- import Infer, which imports both).
-type Infer r =
-  CallEnv r
-  → State
-  → Resolved.Expr
-  → Either Diagnostic (Threaded Checked.Expr)
-
--- What a use of a scheme checks its arguments against and produces.
-type Use = { fields ∷ Array (Ty Open), result ∷ Ty Open, scheme ∷ Scheme }
+-- How a named callee's checked node is built from its instantiation and
+-- arguments.
+type Node = Checked.Instantiation → Array Checked.Expr → Checked.Node
 
 -- Each use instantiates the callee's variables afresh.
 checkCall
   ∷ ∀ r
   . Infer r
-  → CallEnv r
+  → CheckEnv r
   → State
   → Span
-  → Resolved.FunctionId
+  → FunctionId
   → Array Resolved.Expr
-  → Either Diagnostic (Threaded Checked.Expr)
-checkCall infer env state span id@(Resolved.FunctionId index) arguments =
-  maybe' missing found (Array.index env.functions index)
-  where
-  missing _ = Left (problemAt (Internal "Invalid resolved function") span)
-  found function = applied infer env span (Checked.Call id)
-    (use function (instantiate function.variables state))
-    arguments
-  use function scheme =
-    { value:
-        { fields: map (parameterType scheme.value) function.parameters
-        , result: at scheme.value function.result
-        , scheme: scheme.value
-        }
-    , state: scheme.state
-    }
-  parameterType scheme parameter = at scheme parameter.ty
+  → Checked
+checkCall infer env state span id arguments = do
+  use ← functionUse env state span id
+  named infer env span (Checked.Call id) use arguments
 
--- A constructor's scheme is its owner's parameters.
 checkConstruct
   ∷ ∀ r
   . Infer r
-  → CallEnv r
+  → CheckEnv r
   → State
   → Span
-  → Resolved.CtorId
+  → CtorId
   → Array Resolved.Expr
-  → Either Diagnostic (Threaded Checked.Expr)
-checkConstruct infer env state span id@(Resolved.CtorId index) arguments =
-  maybe' missing found (Array.index env.ctors index)
-  where
-  missing _ = Left
-    (problemAt (Internal "Invalid resolved constructor") span)
-  found ctor = maybe' missingType (owned ctor) (ownerOf ctor.owner)
-  missingType _ = Left (problemAt (Internal "Invalid resolved type") span)
-  ownerOf (TypeId owner) = Array.index env.types owner
-  owned ctor info = applied infer env span (Checked.Construct id)
-    (use ctor (instantiate info.parameters state))
-    arguments
-  use ctor scheme =
-    { value:
-        { fields: map (at scheme.value) ctor.fields
-        , result: TData ctor.owner scheme.value.arguments
-        , scheme: scheme.value
-        }
-    , state: scheme.state
-    }
+  → Checked
+checkConstruct infer env state span id arguments = do
+  use ← ctorUse env state span id
+  named infer env span (Checked.Construct id) use arguments
 
--- Arity is checked before any argument, as Stage 0 calls always did; then
--- every argument is inferred, then each is unified with its field.
-applied
+-- Whether a resolved expression is a named call or construction written
+-- with exactly its declared count of arguments (a bare nullary constructor
+-- is a value, not a call).
+saturatedCall ∷ ∀ r. CheckEnv r → Resolved.Expr → Boolean
+saturatedCall env = case _ of
+  Resolved.Call _ (FunctionId index) arguments → maybe false
+    (sameCount arguments <<< parameterCount)
+    (Array.index env.functions index)
+  Resolved.Construct _ (CtorId index) arguments
+    | not (Array.null arguments) → maybe false
+        (sameCount arguments <<< fieldCount)
+        (Array.index env.ctors index)
+  _ → false
+  where
+  sameCount arguments count = Array.length arguments == count
+  parameterCount function = Array.length function.parameters
+  fieldCount ctor = Array.length ctor.fields
+
+-- FN001 design §4: the declared arity n decides. With n arguments, or
+-- 0 < j < n, the arguments meet the fields (`supplied`); none for a callee
+-- with parameters is today's E_ARITY, checked before any argument; more
+-- than n is an over-application.
+named
   ∷ ∀ r
   . Infer r
-  → CallEnv r
+  → CheckEnv r
   → Span
-  → (Checked.Instantiation → Array Checked.Expr → Checked.Node)
+  → Node
   → Threaded Use
   → Array Resolved.Expr
-  → Either Diagnostic (Threaded Checked.Expr)
-applied infer env span node use arguments = do
-  when (Array.length arguments /= Array.length use.value.fields)
-    (Left (problemAt Arity span))
+  → Checked
+named infer env span node use arguments =
+  if count > arity then overApplied infer env span node use arguments
+  else if count == 0 && arity > 0 then arityAt span
+  else supplied infer env span node use arguments
+  where
+  arity = Array.length use.value.fields
+  count = Array.length arguments
+
+-- `f(a1…an)` runs, then its result is applied to the rest (design §3).
+-- A declared result that can never be a function is E_ARITY before any
+-- argument, as every wrong count was before FN001; so is an instantiated
+-- result that turns out not to be one once the n arguments are checked.
+overApplied
+  ∷ ∀ r
+  . Infer r
+  → CheckEnv r
+  → Span
+  → Node
+  → Threaded Use
+  → Array Resolved.Expr
+  → Checked
+overApplied infer env span node use arguments = do
+  unless (functionLike use.state use.value.result) (arityAt span)
+  called ← supplied infer env span node use (Array.take arity arguments)
+  unless (functionLike called.state (Checked.typeOf called.value))
+    (arityAt span)
+  applyAll infer env span called (Array.drop arity arguments)
+  where
+  arity = Array.length use.value.fields
+
+-- Every argument is inferred, then each is unified with its field, left to
+-- right. Fewer arguments than fields is a partial application, typed as
+-- the arrow of the remaining fields to the result; a saturated call drops
+-- none and builds no arrow.
+supplied
+  ∷ ∀ r
+  . Infer r
+  → CheckEnv r
+  → Span
+  → Node
+  → Threaded Use
+  → Array Resolved.Expr
+  → Checked
+supplied infer env span node use arguments = do
   checked ← threadAll (infer env) use.state arguments
   unified ← threadAll checkArgument checked.state
     (Array.zipWith argumentPair use.value.fields checked.value)
   pure
     { value: Checked.Expr
-        { ty: use.value.result
+        { ty: arrows (Array.drop (Array.length arguments) use.value.fields)
+            use.value.result
         , span
         , node: node use.value.scheme.arguments checked.value
         }
@@ -129,3 +141,6 @@ applied infer env span node use arguments = do
   checkArgument reached pair = threadedUnit <$> require env reached pair.ty
     pair.actual
   threadedUnit reached = { value: unit, state: reached }
+
+arityAt ∷ ∀ a. Span → Either Diagnostic a
+arityAt span = Left (problemAt Arity span)

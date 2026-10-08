@@ -1,6 +1,7 @@
 module Domain.Checked.Internal where
 
 import Prelude
+import Data.Maybe (Maybe)
 import Domain.Syntax (Operator, Span)
 import Domain.Resolved
   ( CtorId
@@ -22,8 +23,8 @@ data Open = Rigid VarId | Hole Int
 derive instance eqOpen ∷ Eq Open
 derive instance ordOpen ∷ Ord Open
 
--- The type arguments of a call or construction, in the callee's (or the
--- owner's) variable order; always empty until P001 adds type variables.
+-- The type arguments of a reference to a function or constructor, in the
+-- callee's (or the owner's) variable order.
 type Instantiation = Array (Ty Open)
 
 newtype Program = Program
@@ -45,16 +46,30 @@ type FunctionDecl =
 
 data Expr = Expr { ty ∷ Ty Open, span ∷ Span, node ∷ Node }
 
+-- FN001: `Call` and `Construct` hold 1 to n arguments, fewer than the
+-- declared n being a partial application (a construction of a nullary
+-- constructor holds none); `FunctionRef` and `CtorRef` are bare
+-- references; `Apply` applies any other function value, including an
+-- over-applied call's result; `Pipe` keeps its left operand first
+-- (design §5, §7).
 data Node
   = Integer Int
   | Boolean Boolean
   | Local LocalId
+  | FunctionRef FunctionId Instantiation
+  | CtorRef CtorId Instantiation
   | Call FunctionId Instantiation (Array Expr)
   | Construct CtorId Instantiation (Array Expr)
   | Add Expr Expr
   | Compare Operator Expr Expr
   | If Expr Expr Expr
   | Match Expr (Array Arm)
+  | Apply Expr (Array Expr)
+  | Lambda (Array Param) Expr
+  | Pipe Expr Expr
+
+-- A lambda parameter: a typed local, or a typed discard (`_`).
+type Param = { local ∷ Maybe LocalId, ty ∷ Ty Open }
 
 type Arm = { pattern ∷ Pattern, body ∷ Expr, span ∷ Span }
 

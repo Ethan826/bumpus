@@ -76,15 +76,20 @@ test('main may return a declared value', () => {
 
 test('construction expressions are rejected precisely', () => {
   const rows = [
-    ['fn main(): Int = Cons;', 'E_ARITY', 'Cons', 1],
+    // FN001 (design §9): constructor values, partial construction and
+    // bare zero-parameter functions reach their final outcomes.
+    ['fn main(): Int = Cons;', 'E_TYPE', 'Cons', 1,
+      'Expected Int, found Int -> IntList -> IntList'],
     ['fn main(): Int = Nil();', 'E_NOT_CALLABLE', 'Nil()'],
-    ['fn main(): Int = Cons(1);', 'E_ARITY', 'Cons(1)'],
+    ['fn main(): Int = Cons(1);', 'E_TYPE', 'Cons(1)', 0,
+      'Expected Int, found IntList -> IntList; missing 1 argument to Cons?'],
     ['fn main(): Int = Cons(true, Nil);', 'E_TYPE', 'true'],
     ['fn main(): Int = Foo(1);', 'E_UNBOUND', 'Foo(1)'],
-    ['fn helper(): Int = 1; fn main(): Int = helper;', 'E_UNBOUND',
-      'helper', 1]
+    ['fn helper(): Int = 1; fn main(): Int = helper;', 'E_ARITY',
+      'helper', 1, 'Expected helper()']
   ];
-  for (const [body, code, text, nth] of rows) {
-    rejectedAt(`${list} ${body}`, code, text, nth ?? 0);
+  for (const [body, code, text, nth, message] of rows) {
+    const diagnostic = rejectedAt(`${list} ${body}`, code, text, nth ?? 0);
+    if (message !== undefined) assert.equal(diagnostic.message, message);
   }
 });
