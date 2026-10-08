@@ -30,10 +30,22 @@ data Pattern
 
 type Arm = { pattern ∷ Pattern, body ∷ Expr, span ∷ Span }
 
-data TypeRef = IntRef Span | BoolRef Span | NamedRef Span String
+-- A lowercase name is a type variable; an applied type spans its head
+-- through its closing parenthesis.
+data TypeRef
+  = IntRef Span
+  | BoolRef Span
+  | VarRef Span String
+  | NamedRef Span String (Array TypeRef)
 
 type CtorDecl = { name ∷ String, fields ∷ Array TypeRef, span ∷ Span }
-type TypeDecl = { name ∷ String, ctors ∷ Array CtorDecl, span ∷ Span }
+type TypeParameter = { name ∷ String, span ∷ Span }
+type TypeDecl =
+  { name ∷ String
+  , parameters ∷ Array TypeParameter
+  , ctors ∷ Array CtorDecl
+  , span ∷ Span
+  }
 
 type Parameter = { name ∷ String, ty ∷ TypeRef, span ∷ Span }
 type FunctionDecl =
@@ -77,6 +89,13 @@ exprSpan = case _ of
   Compare span _ _ _ → span
   If span _ _ _ → span
   Match span _ _ → span
+
+typeRefSpan ∷ TypeRef → Span
+typeRefSpan = case _ of
+  IntRef span → span
+  BoolRef span → span
+  VarRef span _ → span
+  NamedRef span _ _ → span
 
 patternSpan ∷ Pattern → Span
 patternSpan = case _ of

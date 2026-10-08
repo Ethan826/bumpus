@@ -36,6 +36,7 @@ code = case _ of
   CtorNeedsArguments _ → Code.ArityMismatch
   Arity → Code.ArityMismatch
   FieldArity → Code.ArityMismatch
+  TypeArguments _ → Code.ArityMismatch
   TypeMismatch _ _ → Code.TypeMismatch
   RedundantArm → Code.Redundant
   NonExhaustive _ → Code.NonExhaustive
@@ -71,6 +72,7 @@ message = case _ of
   CtorNeedsArguments name → "Constructor " <> name <> " needs arguments"
   Arity → "Wrong number of arguments"
   FieldArity → "Wrong number of fields"
+  TypeArguments name → "Wrong number of type arguments for " <> name
   TypeMismatch expected found → "Expected " <> typeName expected
     <> ", found "
     <> typeName found
@@ -89,6 +91,7 @@ entryMessage ∷ EntryKind → String
 entryMessage = case _ of
   MissingEntry → "Expected fn main()"
   EntryParameters → "main must have no parameters"
+  EntryPolymorphic → "Expected fn main() with a concrete result type"
 
 duplicateWord ∷ DuplicateKind → String
 duplicateWord = case _ of
@@ -97,6 +100,7 @@ duplicateWord = case _ of
   DuplicateFunction → "function"
   DuplicateParameter → "parameter"
   DuplicateBinder → "binder"
+  DuplicateTypeParameter → "type parameter"
 
 unboundWord ∷ UnboundKind → String
 unboundWord = case _ of
@@ -104,12 +108,16 @@ unboundWord = case _ of
   UnboundFunction → "function"
   UnboundConstructor → "constructor"
   UnboundType → "type"
+  UnboundTypeVariable → "type variable"
 
 typeName ∷ TypeName → String
 typeName = case _ of
   IntName → "Int"
   BoolName → "Bool"
   DataName name → name
+  AppliedName name arguments → name <> listed (map typeName arguments)
+  VariableName name → name
+  HoleName → "_"
 
 -- Witnesses print as Bumpus patterns: `_`, literals, `Name(field, …)`.
 pattern ∷ Witness → String
@@ -117,9 +125,10 @@ pattern = case _ of
   WAny → "_"
   WInt value → show value
   WBool value → show value
-  WCtor name fields → name <> arguments fields
+  WCtor name fields → name <> listed (map pattern fields)
 
-arguments ∷ Array Witness → String
-arguments fields =
-  if Array.null fields then ""
-  else "(" <> joinWith ", " (map pattern fields) <> ")"
+-- `(a, b)`, or nothing for no items: `Nil`, not `Nil()`.
+listed ∷ Array String → String
+listed items =
+  if Array.null items then ""
+  else "(" <> joinWith ", " items <> ")"

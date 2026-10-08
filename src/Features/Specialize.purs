@@ -8,7 +8,7 @@ import Data.Traversable (traverse)
 import Domain.Checked.Internal as Checked
 import Domain.IR.Internal as IR
 import Domain.Problem (Problem(..))
-import Domain.Resolved (CtorInfo)
+import Domain.Resolved (CtorInfo, TypeInfo)
 import Domain.Syntax (Diagnostic, Span, problemAt)
 import Domain.Type (Ty(..), ground)
 
@@ -22,13 +22,22 @@ specialize (Checked.Program program) = do
   functions ← traverse function program.functions
   pure
     ( IR.Program
-        { types: program.types, ctors, functions, entry: program.entry }
+        { types: map typeInfo program.types
+        , ctors
+        , functions
+        , entry: program.entry
+        }
     )
+
+-- Parameters and field syntax are resolution data Go generation never reads.
+typeInfo ∷ TypeInfo → IR.TypeInfo
+typeInfo info = { name: info.name, ctors: info.ctors, span: info.span }
 
 ctorInfo ∷ CtorInfo → Either Diagnostic IR.CtorInfo
 ctorInfo ctor = withFields <$> traverse (monomorphic ctor.span) ctor.fields
   where
-  withFields fields = ctor { fields = fields }
+  withFields fields =
+    { name: ctor.name, owner: ctor.owner, fields, span: ctor.span }
 
 function ∷ Checked.FunctionDecl → Either Diagnostic IR.FunctionDecl
 function declaration = do

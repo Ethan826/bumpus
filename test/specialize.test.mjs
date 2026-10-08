@@ -34,6 +34,20 @@ const plain = (node, checked) => {
   return tag === 'Object' ? fields : { tag, fields: Object.values(fields) };
 };
 
+// Type parameters and field syntax are resolution data the monomorphic IR
+// does not carry: a monomorphic type has no parameters, and each field keeps
+// its one source reference. Both are checked, then dropped.
+const typeInfo = ({ parameters, ...info }) => {
+  assert.deepEqual(parameters, [], `${info.name} has parameters`);
+  return info;
+};
+const ctorInfo = ({ fieldSyntax, ...info }) => {
+  assert.equal(fieldSyntax.length, info.fields.length, info.name);
+  return info;
+};
+const withoutResolution = program => ({ ...program,
+  types: program.types.map(typeInfo), ctors: program.ctors.map(ctorInfo) });
+
 const identical = source => {
   const resolved = succeeded(resolve(succeeded(parse(source), source)), source);
   const program = succeeded(check(resolved), source);
@@ -41,7 +55,8 @@ const identical = source => {
   for (const table of ['types', 'ctors', 'functions']) {
     assert.equal(specialized[table].length, program[table].length, table);
   }
-  assert.deepEqual(plain(specialized, false), plain(program, true), source);
+  assert.deepEqual(plain(specialized, false),
+    plain(withoutResolution(program), true), source);
 };
 
 const examples = readdirSync('examples').filter(name => name.endsWith('.bumpus'))

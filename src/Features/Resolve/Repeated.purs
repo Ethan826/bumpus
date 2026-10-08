@@ -1,8 +1,9 @@
-module Features.Resolve.Repeated (repeated) where
+module Features.Resolve.Repeated (laterRepeat, repeated) where
 
 import Prelude
 import Data.Array as Array
-import Data.Maybe (maybe)
+import Data.Foldable (minimum)
+import Data.Maybe (Maybe(..), maybe)
 
 type Entry = { name ∷ String, position ∷ Int }
 type Marked = { position ∷ Int, repeats ∷ Boolean }
@@ -28,3 +29,16 @@ mark sorted index item =
   where
   sameAt neighbour = maybe false same (Array.index sorted neighbour)
   same other = other.name == item.name
+
+-- The position of the first name, in source order, that repeats an earlier
+-- one. The stable sort keeps each name's occurrences in source order, so
+-- every later occurrence directly follows another of its name.
+laterRepeat ∷ Array String → Maybe Int
+laterRepeat names = minimum
+  (Array.catMaybes (Array.zipWith repeatOf sorted (Array.drop 1 sorted)))
+  where
+  sorted = Array.sortWith byName (Array.mapWithIndex entry names)
+  entry position text = { name: text, position }
+  byName item = item.name
+  repeatOf earlier item =
+    if earlier.name == item.name then Just item.position else Nothing

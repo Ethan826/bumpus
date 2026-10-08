@@ -710,3 +710,61 @@ check >=> specialize`, then `emit`).
   proofs, bootstrap snapshots unchanged (.build/p001-task1-verify.log).
 - Phase reached: every test runs the full pipeline on monomorphic programs;
   the CLI does not compile polymorphic programs (none parse yet).
+
+### Task 2: type parameters and applied types, syntax and resolution (2026-10-08)
+
+Language change: `type List(a) = Nil | Cons(a, List(a));`, lowercase type
+variables, parenthesized application. Status: done.
+
+- Domain.Syntax: `TypeRef` gains `VarRef Span String`; `NamedRef` carries
+  its arguments and spans head through `)`; `TypeDecl.parameters ∷ Array
+  TypeParameter` (`{ name, span }`); `typeRefSpan`.
+- Format.Parse.Declaration: optional `(lower, …)` after a type name
+  (`type T() = A;` is E_SYNTAX `Expected a type parameter` at `)`); a type
+  is Int, Bool, a lowercase name, or an upper name with optional arguments,
+  each argument one `nested` level (ADR 006), so 129 deep is E_NESTING at
+  the 129th argument. `List()` fails at `)`; `Int(a)`/`a(Int)` at `(`.
+- Domain.Problem / Format.Diagnostic: `TypeArguments` (E_ARITY `Wrong
+  number of type arguments for <name>`), `UnboundTypeVariable`,
+  `DuplicateTypeParameter`, `EntryPolymorphic`; `TypeName` gains
+  `AppliedName`, `VariableName`, `HoleName` (rendered `List(Pair(Int, a))`,
+  `a`, `_`). Witness and type argument lists share one `listed` helper.
+- Domain.Resolved: `TypeInfo.parameters`, `CtorInfo.fieldSyntax` (the
+  field's source TypeRef, for Task 5's nested spans), `FunctionDecl.variables`.
+- Features.Resolve*: order is type names, the existing duplicate checks, then
+  every declaration's type parameters (reported at the repetition, via
+  Repeated `laterRepeat`, sort-based), then field types. In a declaration
+  `VarId i` is its i-th parameter; an unknown lowercase field type is
+  E_UNBOUND. A function's variables are every lowercase name in its
+  signature, first occurrence, parameters then result
+  (Features.Resolve.Variables `signatureVariables`). Arity is checked at the
+  whole reference before its arguments. `main` with a non-ground result is
+  E_ENTRY `EntryPolymorphic`, beside `EntryParameters`.
+- Features.Specialize: projects `TypeInfo` and `CtorInfo` explicitly, since
+  the monomorphic IR does not carry parameters or field syntax.
+- Tests: test/phases.mjs (`resolved`, `resolveRejectedAt`, `checkedPoly`,
+  `checkRejectedAt`); test/poly-syntax.test.mjs, 21 tests. test/specialize
+  `identical` now asserts each checked type has no parameters and each
+  constructor one syntax reference per field, then drops both before the
+  identity comparison (they are resolution data the IR does not hold).
+- RED: `node --test test/poly-syntax.test.mjs`: 19 of 20 failed (the one
+  pass, `Int(a)` at `(`, already held) (.build/p001-task2-red.log). GREEN:
+  20 of 20 (.build/p001-task2-green.log).
+- Conflict resolved by coordinator ruling: `fn main(): int = 1;` is now a
+  polymorphic `main` (E_ENTRY `EntryPolymorphic`, span 0–19), as design §1
+  requires, not E_SYNTAX at `int`. Only the inputs of two characterization
+  rows changed, each keeping its code, span and text:
+  test/diagnostics.test.mjs now uses `fn main(): 100 = 1;` (E_SYNTAX
+  `Expected a type`, 11–14) and test/adt-syntax.test.mjs
+  `fn main(): 1 = 1;`. poly-syntax pins the new `int` behavior (21 tests).
+  The specialize identity-helper edit above was accepted (adds assertions,
+  removes none).
+- GREEN: `rm -rf output && npm run verify` exit 0, 185 tests (164 + 21),
+  zero failures/skips, zero warnings, eight regression proofs
+  (.build/p001-task2-verify.log).
+- Phase reached: these tests reach Resolve only (rejections stop in Parse
+  or Resolve through `compile`). The CLI does not compile polymorphic
+  programs until Task 7: a use of a type variable or applied type stops in
+  Check (E_INTERNAL `Unnamed type variable`) or Specialize (E_INTERNAL
+  `unspecialized type`). A declaration whose parameters no field or
+  signature uses still compiles, as a monomorphic type.

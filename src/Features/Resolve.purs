@@ -3,18 +3,21 @@ module Features.Resolve (resolve) where
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Maybe (maybe')
+import Data.Maybe (Maybe(..), isNothing, maybe, maybe')
 import Data.Traversable (traverse)
 import Domain.Problem (EntryKind(..), Problem(..))
+import Domain.Type (ground)
 import Domain.Syntax as Syntax
 import Features.Resolve.Expression (expression)
 import Features.Resolve.Fresh (runFresh)
 import Features.Resolve.Types (resolveType, typeTable)
+import Features.Resolve.Variables (signatureVariables)
 import Domain.Resolved (Global)
 import Domain.Resolved as Resolved
 
 type Signature =
-  { parameters ∷ Array Resolved.Parameter
+  { variables ∷ Array String
+  , parameters ∷ Array Resolved.Parameter
   , result ∷ Resolved.Ty Resolved.VarId
   }
 
@@ -55,11 +58,14 @@ resolveSignature
   → Either Syntax.Diagnostic Signature
 resolveSignature types function = do
   parameters ← traverse resolveParameter function.parameters
-  result ← resolveType types function.result
-  pure { parameters, result }
+  result ← resolveType types variables function.result
+  pure { variables, parameters, result }
   where
+  variables = signatureVariables
+    (Array.snoc (map parameterType function.parameters) function.result)
+  parameterType parameter = parameter.ty
   resolveParameter parameter = withType parameter
-    <$> resolveType types parameter.ty
+    <$> resolveType types variables parameter.ty
   withType parameter ty = { name: parameter.name, ty, span: parameter.span }
 
 entryPoint
@@ -74,13 +80,20 @@ entryPoint definitions = maybe' absent checkEntry
     )
 
 checkEntry ∷ Definition → Either Syntax.Diagnostic Resolved.FunctionId
-checkEntry definition =
-  if not (Array.null definition.function.parameters) then invalid
-    EntryParameters
-  else pure (Resolved.FunctionId definition.index)
+checkEntry definition = maybe (pure (Resolved.FunctionId definition.index))
+  invalid
+  (entryProblem definition)
   where
   invalid kind = Left
     (Syntax.problemAt (EntryProblem kind) definition.function.span)
+
+-- `main` takes no parameters and returns a ground type: there is no caller
+-- to choose its type arguments.
+entryProblem ∷ Definition → Maybe EntryKind
+entryProblem definition
+  | not (Array.null definition.function.parameters) = Just EntryParameters
+  | isNothing (ground definition.signature.result) = Just EntryPolymorphic
+  | otherwise = Nothing
 
 resolveFunction
   ∷ Array Global
@@ -97,6 +110,7 @@ resolveFunction globals ctors definition = withBody <$> runFresh
     { name: parameter.name, id: Resolved.LocalId index }
   withBody body =
     { id: Resolved.FunctionId definition.index
+    , variables: definition.signature.variables
     , parameters: definition.signature.parameters
     , result: definition.signature.result
     , body

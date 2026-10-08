@@ -47,7 +47,7 @@ test('malformed type declarations are rejected at the offending token', () => {
 test('reserved words and bad types are syntax errors', () => {
   for (const source of [
     'fn type(): Int = 1;', 'fn f(match: Int): Int = 1;',
-    'fn f(_: Int): Int = 1;', 'fn main(): int = 1;'
+    'fn f(_: Int): Int = 1;', 'fn main(): 1 = 1;'
   ]) rejected(source, 'E_SYNTAX');
 });
 

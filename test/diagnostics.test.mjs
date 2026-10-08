@@ -14,7 +14,7 @@ const rows = [
   ['fn main: Int = 1;', 'E_SYNTAX', 7, 8, "Expected '('"],
   ['fn 1(): Int = 1;', 'E_SYNTAX', 3, 4, 'Expected an identifier'],
   ['type t = A;', 'E_SYNTAX', 5, 6, 'Expected a capitalized name'],
-  ['fn main(): int = 1;', 'E_SYNTAX', 11, 14, 'Expected a type'],
+  ['fn main(): 100 = 1;', 'E_SYNTAX', 11, 14, 'Expected a type'],
   ['fn main(): Int = match 1 { + => 1 };', 'E_SYNTAX', 27, 28,
     'Expected a pattern'],
   ['fn main(): Int = -true;', 'E_SYNTAX', 18, 22,
