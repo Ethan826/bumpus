@@ -1383,4 +1383,9 @@ reusing `fn` and `=>`, parameter annotations optional and inferred
 locally; `|>` included in FN001 (left-associative, below comparison),
 `>>`/`<<` wait for a Prelude; no local binding form in FN001 (separate
 item), so closures capture parameters and pattern variables by value.
-Next: FN001 design document (docs/plans/2026-10-08-functions-design.md).
+Design draft written the same day:
+docs/plans/2026-10-08-functions-design.md (syntax, names, typing, declared
+arity, evaluation, instantiation rule, canonical uncurried Go
+representation with adapters, tests and regression probes, deliberate
+diagnostic changes, four open questions). Not reviewed or approved; no
+plan, no code. Next: the user's review of the draft.

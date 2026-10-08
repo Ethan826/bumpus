@@ -1,6 +1,6 @@
 # Local backlog
 
-Current delivery: none in progress. P001 (rank-1 polymorphism) merged into main 2026-10-08 at dcb40fb; next is FN001; its direction was settled with the user 2026-10-08 and the design document is next.
+Current delivery: none in progress. P001 (rank-1 polymorphism) merged into main 2026-10-08 at dcb40fb; next is FN001; its direction was settled with the user 2026-10-08 and the design draft docs/plans/2026-10-08-functions-design.md awaits the user's review.
 A003, G001, E005 and T001 are merged into main. Plan and verification evidence
 are in docs/plans/bootstrap.md and docs/progress.md. No remote tracking.
 
