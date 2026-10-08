@@ -296,10 +296,10 @@ Check → Specialize → Go with no language change.
   `src/Format/Diagnostic.purs`, `scripts/regression.mjs` (`branch` needle)
 
 **Interfaces:**
-- Consumes: Task 3's `unify`, `apply`, `Flex`, `Subst`.
+- Consumes: Task 3's `unify`, `resolve`, `Flex`, `Subst`.
 - Produces: `Checked.Program` whose expression and pattern types are
   `Ty Open`; each `Call`/`Construct` carries its scheme's instantiation in
-  the callee's VarId order, after `apply`, with unsolved metas renamed to
+  the callee's VarId order, after `resolve`, with unsolved metas renamed to
   `Hole k` (k dense per function, first-occurrence order). Check state is a
   `Subst` and a meta counter threaded through `infer` (a small state record,
   not a monad transformer stack beyond what Data.Either gives).
