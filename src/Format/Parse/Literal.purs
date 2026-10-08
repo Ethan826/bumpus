@@ -1,7 +1,6 @@
 module Format.Parse.Literal (integerLiteral, integerStart) where
 
 import Prelude
-import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Int as Int
 import Data.Maybe (maybe')
@@ -49,7 +48,10 @@ inRange digits = maybe' outOfRange parsedInteger (Int.fromString digits.text)
   outOfRange _ = Left (problemAt IntegerOutOfRange digits.span)
   parsedInteger value = Right { value, span: digits.span }
 
+-- Counted in place: the primary dispatch asks this of every name token,
+-- and copying each into a character array was a measurable share of
+-- parsing (T003).
 decimalToken ∷ String → Boolean
-decimalToken text = Array.all isDigit (String.toCharArray text)
+decimalToken text = String.countPrefix isDigit text == String.length text
   where
   isDigit character = character >= '0' && character <= '9'

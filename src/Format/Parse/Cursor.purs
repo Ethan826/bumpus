@@ -38,9 +38,13 @@ import Format.Stack as Stack
 -- `lastEnd` is the end of the last consumed token; `spanned` ends there.
 -- `depth` is the nesting level being parsed and `peak` the deepest level
 -- reached since the enclosing nested position was entered (ADR 006).
+-- `upcoming` is the next token's text (`<end>` past the last), read once
+-- per token consumed: every dispatch and separator asks for it, and
+-- looking it up each time was a measurable share of parsing (T003).
 type State =
   { tokens ∷ Array Token
   , index ∷ Int
+  , upcoming ∷ String
   , eof ∷ Position
   , lastEnd ∷ Position
   , depth ∷ Int
@@ -62,17 +66,30 @@ type Chaining a = { items ∷ Stack a, peak ∷ Int, rest ∷ State }
 -- on every take, which made parsing quadratic (BACKLOG E002).
 initialState ∷ Array Token → Position → State
 initialState tokens eof =
-  { tokens, index: 0, eof, lastEnd: origin, depth: 0, peak: 0 }
+  { tokens
+  , index: 0
+  , upcoming: textAt tokens 0
+  , eof
+  , lastEnd: origin
+  , depth: 0
+  , peak: 0
+  }
 
 advance ∷ State → Token → State
-advance state consumed =
-  state { index = state.index + 1, lastEnd = consumed.span.end }
+advance state consumed = state
+  { index = state.index + 1
+  , upcoming = textAt state.tokens (state.index + 1)
+  , lastEnd = consumed.span.end
+  }
 
 skip ∷ State → State
 skip state = maybe state (advance state) (current state)
 
 peekText ∷ State → String
-peekText state = maybe "<end>" tokenText (current state)
+peekText state = state.upcoming
+
+textAt ∷ Array Token → Int → String
+textAt tokens index = maybe "<end>" tokenText (Array.index tokens index)
   where
   tokenText found = found.text
 

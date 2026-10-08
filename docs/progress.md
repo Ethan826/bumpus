@@ -1930,3 +1930,90 @@ value-edge, functional-fixpoint, arrow-key; 22 proofs); (c) the design
   regression proofs, snapshots unchanged; the ladder 1,497 ms, 3 ms
   under its bound (T003); `twenty thousand parameters` 241 ms (logs
   .build/fn001-task5-fix-verify.log, .build/fn001-task5-fix-verify2.log).
+
+### T003: match-ladder compile cost (2026-10-08)
+
+Goal (approved by the user before FN001 Task 6): make the 127-deep,
+50-arm ladder in test/match-lift.test.mjs substantially cheaper so its
+1.5 s bound has headroom inside verify's parallel run; the bound, the
+workload and the test's place in verify are unchanged. Acceptance was a
+2× drop in the isolated median, or, if that needs a design change, the
+profile and the options.
+
+Profile (c120d48, built in an isolated copy; scripts in the session
+scratchpad). Steady state per phase (median of 15, in-process): parse
+137 ms (lex 55), resolve 22, check 134 (infer 61, coverage 36,
+firstTooDeep 9, holes 8, instantiation rule 9, retype 7, comparable 5),
+specialize 24, Go emission 46. One cold compile (fresh process, the
+test file's small program first, as in the test) was ~500 ms: about
+1.4× the steady sum, from JIT warm-up and GC. The compile allocates about
+2.8 GB for the 150 KB source (`--trace-gc`: 149 scavenges, ~110 ms of
+GC). Hot spots: Format.Lex (per-character `tailRecM` steps over a copied
+character array, `Array.elem`, a fresh slice per two-character-token
+probe); `isName`/`decimalToken` copying each token into a character
+array; Format.Go.Capture's `union` (concat, sort, then `Array.nubBy`,
+which sorts again) at 26% of emission; coverage's per-arm redundancy
+query re-simplifying every earlier arm and `uncons`-copying every row a
+specialization drops (quadratic in arms by design, so the constant
+matters); `tooDeep`/`walk` entering their loops for Int, Bool and rigid
+types; `retype`/`holes` rebuilding a body that has no bound meta or
+hole. Everything else is a flat spread of combinator, Either and record
+overhead (no single function above 4% after these fixes).
+
+Changes (each keeps its semantics; no public formula is new):
+- Lex reads the source in place by code unit (`String.charAt`/`slice`),
+  skips a whitespace run in one step, tries two-character tokens only
+  after their first characters, and tests punctuation and reserved
+  words with `case` instead of `Array.elem`; `isName` and Literal's
+  `decimalToken` count in place.
+- Parse.Cursor's State carries `upcoming`, the next token's text, set
+  once per token consumed, so `peekText` is a field read.
+- Coverage simplifies each arm once per match; `useful` takes simplified
+  rows; Matrix's `specialize`/`defaults` judge a row by `Array.head`
+  before copying its rest.
+- `tooDeep` answers Int, Bool and rigid variables without converting;
+  Unify's `walk` enters its loop only for a meta.
+- Check skips `retype (resolved subst)` when the substitution is empty,
+  and `holes` keeps a body with no hole.
+- Capture's `union`/`armFree` keep the first of each id in one fold over
+  the sorted array instead of `Array.nubBy`.
+Tried and reverted: a loop in place of `Array.find` in Grammar's
+dispatch (no measurable gain, and Grammar would pass 250 lines); a
+`tailRecM` `threadAll` in place of the Thread applicative (no measurable
+gain; needed a new Foldable instance).
+
+After (steady, median of 15, load average 9-11, alternating with the
+baseline): parse 124 → 92, resolve 19 → 19, check 125 → 78 (infer
+53 → 35, coverage 31 → 26), specialize 21 → 21, emission 43 → 27;
+sum 332 → 237. Allocation (V8 `total_allocated_bytes`, per phase
+summed) 3.3 → 2.4 GB. Isolated cold compile, nine alternating rounds
+at load average 5.7 (18:29): baseline 543 504 507 517 502 495 514 512
+495, median 507 ms; T003 379 368 363 385 379 376 370 362 366, median
+370 ms: 1.37×, short of the 2× target. Cold phases: parse 176 → 125,
+check 193 → 131, emission 61 → 42.
+
+Verify (three consecutive `npm run verify`, every run reported): all
+exit 0, 486 tests, zero failures, twelve regression proofs, snapshots
+byte-identical. Ladder: 942 ms (load 8.9 after), 968 ms (14.7), 852 ms
+(12.0); logs .build/t003-verify{1,2,3}.log. Before T003 the same test
+took 1,345-1,732 ms inside verify. Two direct `node --test` runs during
+the work, while other projects' builds pushed the load average to
+16-30, failed it at 1,659 ms and 2,573 ms (.build/t003-tests1.log,
+.build/t003-tests2.log); the second also failed coverage-scale's
+5,000-field pattern (5.1 s) and fn-specialize's 5,000-parameter keys
+(2.7 s). Both pass alone (0.80 s and 3.2 s wall under load 27; baseline
+0.70 s and 2.7 s in the same minute) and neither path's timing changed
+in kind; these are T003's external-load symptom in other timing tests.
+
+Why not 2×: what remains is spread over the combinator parser (each
+argument passes about a dozen Either-threaded combinator layers),
+monadic threading in Infer, Resolve and Specialize, coverage's quadratic
+redundancy query, and GC. Options that would reach 2×, each a design
+change: (1) a direct token-level parser for expressions in place of the
+layered combinators (parse is now 35% of the cold compile); (2)
+redundancy for literal-only columns without one usefulness query per
+earlier arm; (3) fusing the checker's remaining whole-body passes
+(firstTooDeep, comparable, coverage roots, instantiation's two call
+folds) into one; (4) an allocation-light State/Parsed representation.
+BACKLOG T003 stays Open with these.
+

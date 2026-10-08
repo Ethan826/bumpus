@@ -71,20 +71,26 @@ specialize signature head rows = do
   mismatched count = case _ of
     Any → false
     Headed found fields → found == head && Array.length fields /= count
-  specializeRow count row = Array.uncons row >>= specializeSplit count
-  specializeSplit count split = case split.head of
-    Any → Just (wildcards count <> split.tail)
+  specializeRow count row = Array.head row >>= specializeFirst count row
+  specializeFirst count row = case _ of
+    Any → Just (wildcards count <> afterFirst row)
     Headed found fields
-      | found == head → Just (fields <> split.tail)
+      | found == head → Just (fields <> afterFirst row)
       | otherwise → Nothing
 
+-- Rows are judged by their first pattern before the rest is copied: an
+-- `uncons` per row copied every row a specialization or default drops,
+-- and a match's redundancy check drops nearly all of them (T003).
 defaults ∷ Array Vector → Array Vector
 defaults = Array.mapMaybe defaultRow
   where
-  defaultRow row = Array.uncons row >>= defaultSplit
-  defaultSplit split = case split.head of
-    Any → Just split.tail
+  defaultRow row = Array.head row >>= defaultFirst row
+  defaultFirst row = case _ of
+    Any → Just (afterFirst row)
     Headed _ _ → Nothing
+
+afterFirst ∷ Vector → Vector
+afterFirst = Array.drop 1
 
 headsOf ∷ Array Vector → Array Head
 headsOf = Array.mapMaybe firstHead

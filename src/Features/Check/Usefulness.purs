@@ -46,16 +46,18 @@ type State = { next ∷ Next, pending ∷ Stack Branch }
 -- stack no longer grows per column; recursion overflowed at about 1,600
 -- columns (G001 final review I1). Heads are tried in declaration order and
 -- the first useful one ends the search, as before.
+-- The rows come simplified (Matrix `simplifyRow`): a match's redundancy
+-- check asks this once per arm of every earlier arm, so the caller
+-- simplifies each arm once rather than once per later arm (T003).
 useful
   ∷ Signature
-  → Array (Array Checked.Pattern)
+  → Array Vector
   → Array Checked.Pattern
   → Lookup Boolean
 useful signature rows q = tailRecM (step signature)
   { next: Continue problem, pending: Bottom }
   where
-  problem =
-    { tys: map patternType q, rows: map simplifyRow rows, q: simplifyRow q }
+  problem = { tys: map patternType q, rows, q: simplifyRow q }
 
 step ∷ Signature → State → Lookup (Step State Boolean)
 step signature state = case state.next of

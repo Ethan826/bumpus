@@ -120,8 +120,15 @@ headOf state = case _ of
   TVar (Hole meta) → opened (walk state.subst (TVar (Unify.Meta meta)))
   ty → ty
 
+-- A type with no parts and no meta is one level deep whatever the
+-- substitution, so it is answered without converting it (T003): every
+-- expression's type is bounded, and most are Int, Bool or rigid.
 tooDeep ∷ Subst → Ty Open → Boolean
-tooDeep subst ty = exceedsLimit subst (flexible ty)
+tooDeep subst = case _ of
+  TInt → false
+  TBool → false
+  TVar (Checked.Rigid _) → false
+  ty → exceedsLimit subst (flexible ty)
 
 -- The span of the first type, in `foldTypes` order, that is too deep once
 -- resolved. A type checked when built can deepen as metas in it are bound
@@ -133,9 +140,11 @@ firstTooDeep subst = foldTypes judged Nothing
   fresh span ty _ = if tooDeep subst ty then Just span else Nothing
 
 -- Renumbers a finished body's unsolved metas as holes 0, 1, …, in the
--- order `foldTypes` first meets them.
+-- order `foldTypes` first meets them. A body with no hole is kept rather
+-- than rebuilt unchanged (T003).
 holes ∷ Checked.Expr → Checked.Expr
-holes body = retype renamed body
+holes body =
+  if Map.isEmpty numbering then body else retype renamed body
   where
   numbering = (foldTypes number { next: 0, seen: Map.empty } body).seen
   number found _ ty = foldHoles numberHole found ty

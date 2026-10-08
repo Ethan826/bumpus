@@ -14,6 +14,7 @@ import Domain.Syntax (Diagnostic, Span, problemAt)
 import Features.Check.Search (firstJust)
 import Features.Check.Signature (Signature, buildSignature)
 import Features.Check.Tables (Lookup)
+import Features.Check.Matrix (simplifyRow)
 import Features.Check.Missing (uncovered)
 import Features.Check.Usefulness (useful)
 import Features.Check.Walk (foldTypes)
@@ -67,7 +68,7 @@ redundancy signature span arms = do
   found ← located span (firstJust judge (Array.mapWithIndex earlier arms))
   maybe (pure unit) report found
   where
-  rows = map armRow arms
+  rows = map (simplifyRow <<< armRow) arms
   earlier index arm = { pattern: arm.pattern, rows: Array.take index rows }
   judge candidate = verdict candidate <$> useful signature candidate.rows
     [ candidate.pattern ]

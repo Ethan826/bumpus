@@ -3,6 +3,7 @@ module Features.Check (check) where
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Map as Map
 import Data.Maybe (maybe, maybe')
 import Data.Traversable (traverse)
 import Domain.Checked.Internal (rigid)
@@ -17,6 +18,7 @@ import Features.Check.Infer (Env, infer)
 import Features.Check.Instantiation (instantiationRule)
 import Features.Check.Require (require, tooDeepAt)
 import Features.Check.Scheme (firstTooDeep, holes, resolved, start)
+import Features.Check.Unify (Subst(..))
 import Features.Check.Walk (retype)
 
 check ∷ Resolved.Program → Either Diagnostic Checked.Program
@@ -81,7 +83,7 @@ checkFunction holders env function = do
   body ← infer env start function.body
   finished ← require env body.state (rigid function.result) body.value
   maybe (Right unit) tooDeepAt (firstTooDeep finished.subst body.value)
-  let settled = retype (resolved finished.subst) body.value
+  let settled = settle finished.subst body.value
   comparable holders env settled
   pure
     { id: function.id
@@ -93,3 +95,10 @@ checkFunction holders env function = do
     }
   where
   parameterType parameter = rigid parameter.ty
+
+-- Every type in the body, resolved. An empty substitution resolves each
+-- type to itself, so a body that bound no meta (every monomorphic one) is
+-- kept rather than rebuilt (T003).
+settle ∷ Subst → Checked.Expr → Checked.Expr
+settle subst@(Subst bindings) body =
+  if Map.isEmpty bindings then body else retype (resolved subst) body

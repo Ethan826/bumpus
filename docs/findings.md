@@ -301,6 +301,12 @@ resource/cancellation semantics. Documentation only; no feature implemented.
   2.9 s workload under a 5 s bound failed once in three reviewer runs and
   every time with three suites at once; the fix was the workload (Expand's
   deep `Ord` key comparisons), not the bound or a rerun.
+- A single cold compile costs about 1.4× the steady-state sum of its
+  phases (JIT warm-up and GC), and the PureScript pipeline allocates
+  about 15 KB per source byte (2.8 GB for the 150 KB match ladder before
+  T003). Measure a timing test's workload as the test runs it, in a
+  fresh process: T003's steady-state per-phase sum fell 332 → 237 ms,
+  and the cold compile the test times 507 → 370 ms.
 - `go build` is superlinear in the size of one Go function or
   expression even when the generated text is linear (FN001 Task 1,
   design §13): an `n`-argument application chain in one function is

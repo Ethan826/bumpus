@@ -99,8 +99,12 @@ unify ∷ Subst → Ty Flex → Ty Flex → Either Failure Subst
 unify = unifyAt 1
 
 -- The type itself if it is not a bound meta, else the end of its chain.
+-- Only a meta enters the loop: most types walked are not one, and the
+-- loop's steps were a measurable share of checking a large body (T003).
 walk ∷ Subst → Ty Flex → Ty Flex
-walk (Subst bindings) start = tailRec step start
+walk (Subst bindings) start = case start of
+  TVar (Meta _) → tailRec step start
+  _ → start
   where
   step ty = case ty of
     TVar (Meta meta) → maybe (Done ty) Loop (Map.lookup meta bindings)

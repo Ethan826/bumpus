@@ -15,71 +15,119 @@ type Token = { text ∷ String, span ∷ Span }
 type Scan = { index ∷ Int, position ∷ Position, tokens ∷ Stack Token }
 type Scanned = Either Diagnostic (Step Scan (Array Token))
 
-punctuation ∷ Array Char
-punctuation =
-  [ '(', ')', ':', ',', '=', ';', '+', '-', '|', '{', '}', '<', '>' ]
+-- Membership is a `case`, which compiles to a chain of comparisons: the
+-- lexer asks it of each punctuation character and the parser asks
+-- `reserved` of each name it dispatches on, and Array.elem's closures were
+-- a measurable share of parsing (T003).
+punctuation ∷ Char → Boolean
+punctuation = case _ of
+  '(' → true
+  ')' → true
+  ':' → true
+  ',' → true
+  '=' → true
+  ';' → true
+  '+' → true
+  '-' → true
+  '|' → true
+  '{' → true
+  '}' → true
+  '<' → true
+  '>' → true
+  _ → false
 
-reserved ∷ Array String
-reserved =
-  [ "fn"
-  , "if"
-  , "then"
-  , "else"
-  , "true"
-  , "false"
-  , "Int"
-  , "Bool"
-  , "type"
-  , "match"
-  , "_"
-  ]
+reserved ∷ String → Boolean
+reserved = case _ of
+  "fn" → true
+  "if" → true
+  "then" → true
+  "else" → true
+  "true" → true
+  "false" → true
+  "Int" → true
+  "Bool" → true
+  "type" → true
+  "match" → true
+  "_" → true
+  _ → false
+
+-- The first characters of `twoCharacterTokens`.
+pairStart ∷ Char → Boolean
+pairStart = case _ of
+  '=' → true
+  '!' → true
+  '<' → true
+  '>' → true
+  '-' → true
+  '|' → true
+  _ → false
 
 lex ∷ String → Either Diagnostic (Array Token)
-lex source = tailRecM (scan (String.toCharArray source)) start
+lex source = tailRecM (scan source) start
   where
   start = { index: 0, position: origin, tokens: Stack.empty }
 
+-- The parser asks this of most tokens it dispatches on, so the text is
+-- read in place rather than copied into a character array (T003).
 isName ∷ String → Boolean
-isName text = maybe false validName (Array.uncons (String.toCharArray text))
+isName text = maybe false validName (String.charAt 0 text)
   where
-  validName { head, tail } = isLetter head && Array.all isNameChar tail && not
-    (Array.elem text reserved)
+  validName head = isLetter head
+    && wordEnd text isNameChar 1 == String.length text
+    && not (reserved text)
 
 endPosition ∷ String → Position
 endPosition = Array.foldl advance origin <<< String.toCharArray
 
--- One whitespace character or one token per step. tailRecM runs the steps as
+-- One run of whitespace or one token per step. tailRecM runs the steps as
 -- a loop, and indexing replaces Array.uncons, which copied the remaining
--- input per character (BACKLOG E002).
-scan ∷ Array Char → Scan → Scanned
-scan characters state = maybe' finished (scanAt characters state)
-  (Array.index characters state.index)
+-- input per character (BACKLOG E002). The source is read in place, by
+-- code unit: a token's text is a slice of it, not a rebuilt character
+-- array (T003).
+scan ∷ String → Scan → Scanned
+scan source state = maybe' finished (scanAt source state)
+  (String.charAt state.index source)
   where
   finished _ = Right (Done (Array.fromFoldable state.tokens))
 
-scanAt ∷ Array Char → Scan → Char → Scanned
-scanAt characters state head
-  | isSpace head = continue (skip state head)
-  | isLetter head = continue (word characters state isNameChar)
-  | isDigit head = continue (word characters state isDigit)
-  | Just text ← twoCharacter characters state.index = continue (emit text state)
-  | Array.elem head punctuation = continue (emit (String.singleton head) state)
+scanAt ∷ String → Scan → Char → Scanned
+scanAt source state head
+  | isSpace head = continue (spaces source state)
+  | isLetter head = continue (word source state isNameChar)
+  | isDigit head = continue (word source state isDigit)
+  | pairStart head, Just text ← twoCharacter source state.index =
+      continue (emit text state)
+  | punctuation head = continue (emit (String.singleton head) state)
   | otherwise = unexpected state.position head
 
 continue ∷ Scan → Scanned
 continue state = Right (Loop state)
 
-skip ∷ Scan → Char → Scan
-skip state character = state
-  { index = state.index + 1, position = advance state.position character }
+-- A whole run of whitespace is one step (T003): a step per character was
+-- most of lexing an indented source.
+spaces ∷ String → Scan → Scan
+spaces source state = state
+  { index = skipped.index, position = skipped.position }
+  where
+  skipped = spaceEnd source state.index state.position
+
+-- A self tail call, which purs compiles to a loop.
+spaceEnd
+  ∷ String → Int → Position → { index ∷ Int, position ∷ Position }
+spaceEnd source index position =
+  if maybe false isSpace (String.charAt index source) then
+    spaceEnd source (index + 1)
+      (maybe position (advance position) (String.charAt index source))
+  else { index, position }
 
 -- Two-character tokens win over their one-character prefixes: `->` over
--- the minus of a negative literal, `|>` over `|`.
-twoCharacter ∷ Array Char → Int → Maybe String
-twoCharacter characters index = Array.find matches twoCharacterTokens
+-- the minus of a negative literal, `|>` over `|`. The pair is built once
+-- and looked up, rather than each token's characters being compared with a
+-- fresh slice of the input (T003).
+twoCharacter ∷ String → Int → Maybe String
+twoCharacter source index = Array.find (eq pair) twoCharacterTokens
   where
-  matches text = String.toCharArray text == Array.slice index (index + 2)
-    characters
+  pair = String.slice index (index + 2) source
 
 twoCharacterTokens ∷ Array String
 twoCharacterTokens = [ "=>", "==", "!=", "<=", ">=", "->", "|>" ]
@@ -104,17 +152,17 @@ unexpected position character = Left (problemAt Lexical span)
   where
   span = { start: position, end: advance position character }
 
-word ∷ Array Char → Scan → (Char → Boolean) → Scan
-word characters state predicate = emit text state
+word ∷ String → Scan → (Char → Boolean) → Scan
+word source state predicate = emit text state
   where
-  end = wordEnd characters predicate state.index
-  text = String.fromCharArray (Array.slice state.index end characters)
+  end = wordEnd source predicate state.index
+  text = String.slice state.index end source
 
 -- A self tail call, which purs compiles to a loop.
-wordEnd ∷ Array Char → (Char → Boolean) → Int → Int
-wordEnd characters predicate index =
-  if maybe false predicate (Array.index characters index) then
-    wordEnd characters predicate (index + 1)
+wordEnd ∷ String → (Char → Boolean) → Int → Int
+wordEnd source predicate index =
+  if maybe false predicate (String.charAt index source) then
+    wordEnd source predicate (index + 1)
   else index
 
 advance ∷ Position → Char → Position
@@ -128,7 +176,9 @@ advance position character =
     { offset = position.offset + 1, column = position.column + 1 }
 
 isSpace ∷ Char → Boolean
-isSpace character = Array.elem character [ ' ', '\n', '\r', '\t' ]
+isSpace character = character == ' ' || character == '\n'
+  || character == '\r'
+  || character == '\t'
 
 isLetter ∷ Char → Boolean
 isLetter character = character >= 'a' && character <= 'z'
