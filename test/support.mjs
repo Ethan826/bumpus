@@ -9,7 +9,7 @@ import { wire } from '../output/Format.Diagnostic/index.js';
 
 export const checked = source => {
   const result = compile(source);
-  assert.ok(result instanceof Right, JSON.stringify(result));
+  if (!(result instanceof Right)) assert.fail(JSON.stringify(result));
   return result.value0;
 };
 

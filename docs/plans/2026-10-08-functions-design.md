@@ -285,14 +285,22 @@ Checked IR (Domain.Checked.Internal) gains:
   first (section 5).
 
 The monomorphic IR (Domain.IR.Internal) mirrors these, and its `Ty` gains
-`TFun Ty Ty`, nested exactly as in the source type. A function value of
+`TFun FunTypeId`: an arrow is a number into the program's `funTypes`
+table of `{ parameter, result }` entries, hash-consed so that each suffix
+of a spine is one entry and a result is numbered before the arrow holding
+it (Task 5 review clarification, 2026-10-08, replacing "`TFun Ty Ty`,
+nested exactly as in the source type": the review measured about
+40,050,000 arrow nodes in the expression types of the 5,000-parameter
+test's IR, which any pass re-walking them in Format would visit, against
+Global Constraint "Linear cost" and §13 rule 8). A function value of
 type `A -> B -> C` is a one-argument Go function returning a one-argument
 Go function: `func(A) func(B) C`. Each stage boundary is therefore an
 ordinary Go call boundary, and timing is preserved by construction; no
 runtime arity check exists or is needed.
 
-Go types. Each distinct ground function type in a program gets one named
-Go type, emitted with the data types, so the text of long arrow spines
+Go types. Each `funTypes` entry gets one named Go type,
+`bumpusFun<number>`, emitted after the data types in number order (Task
+5 review clarification; emitted since then), so the text of long arrow spines
 stays linear: `type bumpusFun1 func(int32) int32`, `type bumpusFun2
 func(int32) bumpusFun1`. Function literals are written with the named
 result type and are assignable to the named type.
@@ -447,6 +455,10 @@ Every rejection row asserts exact code, span and text.
   section 4's provenance rules.
 - Comparability: "every ground type is comparable" becomes "every ground
   type without a function in it".
+- Task 5 review clarification: E_SPECIALIZATION `Recursive call to f
+  changes its type arguments` also covers a bare value reference to `f`
+  at a changed instantiation inside its component (section 6), reported
+  at the reference; no new text.
 
 test/diagnostics.test.mjs and the adt rows that pin the old behavior are
 updated in the same change, each with the new expected code, span and

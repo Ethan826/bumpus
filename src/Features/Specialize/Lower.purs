@@ -6,11 +6,11 @@ import Data.Map as Map
 import Data.Maybe (maybe')
 import Data.Traversable (sequence, traverse)
 import Domain.Checked.Internal (Open(..))
+import Domain.IR.Internal as IR
 import Domain.Resolved (CtorId(..), CtorInfo)
 import Domain.Syntax (Span, TypeRef(..), typeRefSpan, typeRefSpine)
 import Domain.Type (Spine, Ty(..), TypeId(..), VarId(..), spine)
 import Features.Specialize.Copy (get, modify)
-import Features.Specialize.Intern (Lowered, bool, int, loweredType)
 import Features.Specialize.Keys
   ( Env
   , Specializing
@@ -25,10 +25,10 @@ import Features.Specialize.Keys
 -- are numbered before it, so each key refers only to earlier output types.
 -- An arrow's parameters and final result are lowered in order, along its
 -- spine, then its suffixes interned (FN001 Task 5): no recursion per arrow.
-lowerType ∷ Env → Array Lowered → Span → Ty Open → Specializing Lowered
+lowerType ∷ Env → Array IR.Ty → Span → Ty Open → Specializing IR.Ty
 lowerType env arguments span = case _ of
-  TInt → pure int
-  TBool → pure bool
+  TInt → pure IR.TInt
+  TBool → pure IR.TBool
   TData id parts → traverse recur parts >>= applied env span id
   TVar (Rigid (VarId index)) → argument span arguments index
   TVar (Hole _) → lowerType env [] span (map absurd env.representative)
@@ -38,7 +38,7 @@ lowerType env arguments span = case _ of
 
 -- Parameters left to right, then the result, then the interned arrow.
 lowerSpine
-  ∷ ∀ v. (Ty v → Specializing Lowered) → Spine v → Specializing Lowered
+  ∷ ∀ v. (Ty v → Specializing IR.Ty) → Spine v → Specializing IR.Ty
 lowerSpine lower found = do
   parameters ← traverse lower found.parameters
   result ← lower found.result
@@ -71,7 +71,7 @@ fillCtor env work (CtorId output) ctor = do
     { ctors = Map.insert output
         { name: ctor.name
         , owner: TypeId work.output
-        , fields: map loweredType fields
+        , fields
         , span: ctor.span
         }
         state.ctors
@@ -80,15 +80,15 @@ fillCtor env work (CtorId output) ctor = do
 -- A field's applications are created at their own references in the
 -- constructor's source, walked alongside it as Check.Nested does.
 lowerField
-  ∷ Env → Array Lowered → Ty VarId → TypeRef → Specializing Lowered
+  ∷ Env → Array IR.Ty → Ty VarId → TypeRef → Specializing IR.Ty
 lowerField env arguments ty syntax = case ty, syntax of
   TData id parts, NamedRef span _ references →
     paired span parts references (lowerField env arguments)
       >>= applied env span id
   TData _ _, _ → mismatch
   TVar (VarId index), _ → argument (typeRefSpan syntax) arguments index
-  TInt, _ → pure int
-  TBool, _ → pure bool
+  TInt, _ → pure IR.TInt
+  TBool, _ → pure IR.TBool
   TFun _ _, FunRef span _ _ → lowerWritten span (spine ty)
     (typeRefSpine syntax)
   TFun _ _, _ → mismatch
@@ -105,7 +105,7 @@ lowerField env arguments ty syntax = case ty, syntax of
 missingType ∷ ∀ a b. Work → a → Specializing b
 missingType work = internal "Invalid type id" work.span
 
-argument ∷ Span → Array Lowered → Int → Specializing Lowered
+argument ∷ Span → Array IR.Ty → Int → Specializing IR.Ty
 argument span arguments index =
   maybe' (internal "Invalid type variable" span) pure
     (Array.index arguments index)

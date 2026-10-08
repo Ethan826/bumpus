@@ -10,8 +10,10 @@ import { check } from '../output/Features.Check/index.js';
 import { wire } from '../output/Format.Diagnostic/index.js';
 import { spanAt } from './support.mjs';
 
+// The message is built only on failure: a successful checked IR can hold
+// a 20,000-long arrow, too deep for JSON.stringify.
 const succeeded = (result, source) => {
-  assert.ok(result instanceof Right, `${source}\n${JSON.stringify(result)}`);
+  if (!(result instanceof Right)) assert.fail(`${source}\n${JSON.stringify(result)}`);
   return result.value0;
 };
 

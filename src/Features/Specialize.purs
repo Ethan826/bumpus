@@ -23,7 +23,7 @@ import Domain.Syntax (Diagnostic, Span, origin, problemAt)
 import Domain.Type (Ty(..), TypeId(..), arrows)
 import Features.Specialize.Body (fillFunction)
 import Features.Specialize.Copy (run)
-import Features.Specialize.Intern (Lowered, loweredType)
+import Features.Specialize.Intern (funTypes)
 import Features.Specialize.Keys (Env, State, Work)
 import Features.Specialize.Lower (fillType)
 import Features.Specialize.Seeds (environment, seeded)
@@ -48,20 +48,24 @@ specializeWith representative checked = do
         { types: values finished.state.types
         , ctors: values finished.state.ctors
         , functions: values finished.state.functions
+        , funTypes: funTypes finished.state.arrows
         , entry: finished.entry
         }
     )
 
 -- Every key, types then functions, each in output-id order. A key's
 -- arguments name only earlier output types, so one pass rebuilds them; an
--- arrow is rebuilt along its spine by a loop.
+-- arrow is rebuilt along its spine through the table by a loop. This
+-- rebuilds whole types, for tests only; keys themselves are numbers.
 specializationKeys ∷ Checked.Program → Either Diagnostic (Array Key)
 specializationKeys checked = do
   finished ← specialized TInt checked
   let made = values finished.state.work
   let types = Array.filter isType made
-  grounds ← foldl groundOf (Right Map.empty) types
-  traverse (key grounds) (types <> Array.filter isFunction made)
+  let table = funTypes finished.state.arrows
+  typesSoFar ← foldl (groundOf table) (Right Map.empty) types
+  traverse (key { types: typesSoFar, table })
+    (types <> Array.filter isFunction made)
   where
   isType work = not work.function
   isFunction work = work.function
@@ -98,31 +102,35 @@ values table = map snd (Map.toUnfoldable table ∷ Array (Tuple Int v))
 functionIndex ∷ FunctionId → Int
 functionIndex (FunctionId index) = index
 
-type Grounds = Map Int (Ty Void)
+-- The ground type of each output type so far, and the arrow table.
+type Grounds = { types ∷ Map Int (Ty Void), table ∷ Array IR.FunType }
 
-groundOf ∷ Either Diagnostic Grounds → Work → Either Diagnostic Grounds
-groundOf found work = do
-  grounds ← found
-  arguments ← traverse (groundLowered grounds work.span) work.arguments
+groundOf
+  ∷ Array IR.FunType
+  → Either Diagnostic (Map Int (Ty Void))
+  → Work
+  → Either Diagnostic (Map Int (Ty Void))
+groundOf table found work = do
+  types ← found
+  arguments ← traverse (groundType { types, table } work.span)
+    work.arguments
   pure
-    (Map.insert work.output (TData (TypeId work.declaration) arguments) grounds)
+    (Map.insert work.output (TData (TypeId work.declaration) arguments) types)
 
 key ∷ Grounds → Work → Either Diagnostic Key
-key grounds work = made <$> traverse (groundLowered grounds work.span)
+key grounds work = made <$> traverse (groundType grounds work.span)
   work.arguments
   where
   made arguments =
     { declaration: work.declaration, function: work.function, arguments }
 
-groundLowered ∷ Grounds → Span → Lowered → Either Diagnostic (Ty Void)
-groundLowered grounds span = groundType grounds span <<< loweredType
-
 groundType ∷ Grounds → Span → IR.Ty → Either Diagnostic (Ty Void)
 groundType grounds span = case _ of
   IR.TInt → Right TInt
   IR.TBool → Right TBool
-  IR.TData (TypeId output) → maybe' missing Right (Map.lookup output grounds)
-  arrow@(IR.TFun _ _) → groundSpine (IR.spine arrow)
+  IR.TData (TypeId output) → maybe' missing Right
+    (Map.lookup output grounds.types)
+  arrow@(IR.TFun _) → groundSpine (IR.spine grounds.table arrow)
   where
   missing _ = Left (problemAt (Internal "Invalid type id") span)
   recur part = groundType grounds span part

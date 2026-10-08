@@ -1,5 +1,6 @@
 module Format.Go.Data
   ( declarations
+  , funTypeDeclarations
   , goType
   , ctorName
   , functionName
@@ -13,7 +14,7 @@ module Format.Go.Data
 import Prelude
 import Data.Array as Array
 import Data.String.Common (joinWith)
-import Domain.IR.Internal (Spine, Ty(..), spine)
+import Domain.IR.Internal (FunType, FunTypeId(..), Ty(..))
 import Domain.Resolved (CtorId(..), FunctionId(..), LocalId(..), TypeId(..))
 import Format.Go.Layout (Declared, Layout, Member)
 
@@ -29,16 +30,22 @@ goType = case _ of
   TInt → "int32"
   TBool → "bool"
   TData (TypeId index) → "bumpusTy" <> show index
-  arrow@(TFun _ _) → inlineFunction (spine arrow)
+  TFun (FunTypeId index) → "bumpusFun" <> show index
 
--- FN001 Task 5: unreachable behind Features.Specialize.Unlowered; Task 6
--- replaces it with one named Go type per interned arrow (design §13 rule
--- 8). Spelled along the spine, `func(A) func(B) R`, by a loop.
-inlineFunction ∷ Spine → String
-inlineFunction found = joinWith "" (map stage found.parameters)
-  <> goType found.result
+-- One named Go type per interned arrow, in number order (design §13 rule
+-- 8): each names its result's type by number, so the text is linear in
+-- the number of distinct suffixes. A program without arrows emits none,
+-- so existing output is unchanged; a phantom arrow (a type argument no
+-- field holds) still gets its unused declaration.
+funTypeDeclarations ∷ Array FunType → String
+funTypeDeclarations table = joinWith "" (Array.mapWithIndex declared table)
   where
-  stage parameter = "func(" <> goType parameter <> ") "
+  declared index arrow = "type " <> goType (TFun (FunTypeId index))
+    <> " func("
+    <> goType arrow.parameter
+    <> ") "
+    <> goType arrow.result
+    <> "\n\n"
 
 ctorName ∷ CtorId → String
 ctorName (CtorId index) = "bumpusCtor" <> show index

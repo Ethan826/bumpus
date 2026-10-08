@@ -5,7 +5,13 @@ import Data.Array as Array
 import Data.String.Common (joinWith)
 import Domain.IR.Internal as IR
 import Format.Go.Compare (boolHelper, compareHelpers)
-import Format.Go.Data (declarations, functionName, goType, localName)
+import Format.Go.Data
+  ( declarations
+  , funTypeDeclarations
+  , functionName
+  , goType
+  , localName
+  )
 import Format.Go.Expression (expression)
 import Format.Go.Layout (Layout, layout)
 import Format.Go.Show (printed, showHelpers)
@@ -19,6 +25,7 @@ emit (IR.Program program) =
     <> "func bumpusAdd(a int32, b int32) int32 { return a + b }\n\n"
     <> (if needsBoolHelper (IR.Program program) then boolHelper else "")
     <> declarations tables
+    <> funTypeDeclarations program.funTypes
     <> compareHelpers tables
     <> showHelpers tables
     <> joinWith "\n" (map (function tables) program.functions)

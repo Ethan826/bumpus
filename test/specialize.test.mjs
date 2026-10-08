@@ -51,7 +51,9 @@ const withoutResolution = program => ({ ...program,
 const identical = source => {
   const resolved = succeeded(resolve(succeeded(parse(source), source)), source);
   const program = succeeded(check(resolved), source);
-  const specialized = succeeded(specialize(program), source);
+  const { funTypes, ...specialized } = succeeded(specialize(program), source);
+  // A monomorphic program without arrows interns none (FN001 Task 5).
+  assert.deepEqual(funTypes, [], 'arrow table');
   for (const table of ['types', 'ctors', 'functions']) {
     assert.equal(specialized[table].length, program[table].length, table);
   }

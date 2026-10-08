@@ -1806,19 +1806,22 @@ every function program at the temporary guard after Specialize.
   comparison of an arrow field emits `malformed`; Usage walks the new
   nodes; Expression lowers them to `func() T { panic("bumpus: unlowered
   function") }()`. All unreachable behind the guard; Task 6 replaces them.
-- Decisions not dictated by the plan: (1) The guard rejects arrow types as
-  well as the new nodes (a constructor with an arrow field, at the
-  constructor; a signature holding an arrow, at the declaration; an
-  arrow-typed expression such as a partial call, at it), so the CLI still
-  emits no program using a function type (Global Constraints); before, a
-  constructor's arrow field was rejected at the field's type. (2)
+- Decisions not dictated by the plan: (1) The guard rejects any program
+  whose monomorphic IR holds an arrow type or a new node (a constructor
+  with an arrow field, at the constructor; a signature holding an arrow,
+  at the declaration; an arrow-typed expression such as a partial call,
+  at it); before, a constructor's arrow field was rejected at the field's
+  type. An arrow that is only a phantom type argument (`Proxy(Int ->
+  Int)`) is neither, and a generic function never instantiated is not
+  emitted, so such programs reach Go (worded so by the review, M1). (2)
   Constructors, called or bare, are no edges: they have no body, so they
   are in no component with a function. (3) A bare reference keeps the
   existing text `Recursive call to f changes its type arguments` (no new
   text is listed). (4) IR's `TFun` carries no number: plan and design say
   `TFun Ty Ty`. Task 6's named Go types (design §13 rule 8) must reach the
   numbers through Features.Specialize.Intern or carry them into the IR;
-  left to Task 6. (5) The generator's edge kinds come from a seeded stream
+  left to Task 6. (Superseded by the review fixes below: the numbers are
+  in the IR.) (5) The generator's edge kinds come from a seeded stream
   of their own, so P001's components are unchanged. (6) Representative
   independence is checked on the IR as a bisimulation: from both entries,
   the bodies agree node for node ignoring types and spans, constructors by
@@ -1879,3 +1882,51 @@ scripts/fn-milestone.mjs for the 20,000 tier, and Task 9 Step 1b
 promotes four scratchpad mutants to regression rows (block-order,
 value-edge, functional-fixpoint, arrow-key; 22 proofs); (c) the design
 §9 documentation of over-application diagnostic changes (Task 4 review).
+- Review fixes (follow-up commit; the review approved 5874482). I1: arrows
+  are numbers in the IR. `IR.Ty` is `TInt | TBool | TData TypeId | TFun
+  FunTypeId` with derived constant-time Eq/Ord (the hand-written spine
+  instances are gone), and `IR.Program` carries `funTypes ∷ Array {
+  parameter, result }` in interned-number order, from Intern's table
+  (`numbers` for lookup, `entries` by number). The review measured about
+  40,050,000 arrow nodes in the expression types of the 5,000-parameter
+  test's IR, which any pass re-walking them in Format would visit. With
+  numbered types the `Lowered` pair is gone (a lowered type is its own key
+  part), so Keys' `Key` is again `Tuple Int (Array IR.Ty)` and the
+  `spec-key` row is back to its P001 needle and mutant (one target; the
+  proof passes). `IR.spine` reads the table by two loops;
+  `specializationKeys` rebuilds arrows through it (tests only). A
+  construction's or constructor value's owner is now the owner type at
+  its instantiation (`applied`), not the end of its type's spine. Format.Go
+  already emits the named types: `type bumpusFun<N> func(P) R` per entry,
+  after the data types, and `goType (TFun n)` is `bumpusFun<N>` (no
+  re-walking); a program without arrows emits none, so snapshots are
+  unchanged. Design §7 and plan Task 5 Interfaces and Task 6 (number
+  order, not first-use order) are amended as Task 5 review
+  clarifications. M1: plan Global Constraints and decision (1) above say
+  the guard judges the monomorphic IR; `a phantom arrow argument compiles
+  and runs` pins `Proxy(Int -> Int)` printing 0 and its unused
+  `bumpusFun0` declaration (written after the code; not run against
+  5874482, where the guard already let it through by reading). M2:
+  plan Task 6 Step 3 replaces the two temporary catch-all arms. M3:
+  docs/architecture.md names Intern, Values, Unlowered and the numbered
+  `TFun`; the full FN001 update stays Task 9's. M4: test/phases.mjs (and
+  support.mjs, poly-keys.mjs and the two new test files) build failure
+  messages only on failure; `checkedPoly succeeds on a 20,000-parameter
+  function value` failed first with a RangeError from `JSON.stringify`
+  (.build/fn001-task5-fix-red.log; a plain 20,000-parameter program did
+  not reproduce it, since only a value reference puts the long arrow in
+  the checked IR). Design §9 notes that the `Recursive call` text covers
+  value references. New test `arrow types in the IR are interned table
+  entries` (different ids for the two 5,000-parameter types, equal ids
+  for equal types, each spine read through the table, at most 2 × 5,000
+  entries); a parameter-blind interning mutant (scratchpad) fails it and
+  the distinctness row. Timing of the 5,000-parameter specialization
+  (`specializationKeys`, alone): 0.23 s before, 0.26 s after (three runs
+  each). test/specialize.test.mjs now checks that a monomorphic program's
+  `funTypes` is empty before comparing the rest; the first verify of
+  these fixes failed it on the new field, and the match ladder at
+  1,732 ms (BACKLOG T003). GREEN on the next run: `rm -rf output && npm
+  run verify` exit 0, 486 tests (483 + 3), zero failures/skips, twelve
+  regression proofs, snapshots unchanged; the ladder 1,497 ms, 3 ms
+  under its bound (T003); `twenty thousand parameters` 241 ms (logs
+  .build/fn001-task5-fix-verify.log, .build/fn001-task5-fix-verify2.log).

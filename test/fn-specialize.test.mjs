@@ -4,6 +4,8 @@ import { Right } from '../output/Data.Either/index.js';
 import {
   specialize, specializationKeys
 } from '../output/Features.Specialize/index.js';
+import { compile } from '../output/Program.Compile/index.js';
+import { runGoBatch } from './go-batch.mjs';
 import { checkedPoly } from './phases.mjs';
 import { keyTexts } from './poly-keys.mjs';
 
@@ -15,9 +17,11 @@ const prelude = 'type List(a) = Nil | Cons(a, List(a)); type Box(a) = Box(a); '
 const mapping = 'fn map(f: a -> b, xs: List(a)): List(b) = match xs {'
   + ' Nil => Nil, Cons(h, t) => Cons(f(h), map(f, t)) }; ';
 
+// The failure message is built only on failure: a large program's IR is
+// too deep for JSON.stringify.
 const specialized = source => {
   const result = specialize(checkedPoly(source));
-  assert.ok(result instanceof Right, `${source}\n${JSON.stringify(result)}`);
+  if (!(result instanceof Right)) assert.fail(JSON.stringify(result));
   return result.value0;
 };
 
@@ -96,7 +100,7 @@ test('5,000-parameter function types key by number, kept distinct', () => {
   const started = performance.now();
   const result = specializationKeys(checked);
   const seconds = (performance.now() - started) / 1000;
-  assert.ok(result instanceof Right, JSON.stringify(result));
+  if (!(result instanceof Right)) assert.fail(JSON.stringify(result));
   assert.ok(seconds < secondsLimit, `specializing took ${seconds} s`);
   const keys = keyTexts(wide);
   assert.equal(new Set(keys).size, keys.length, 'keys are unique');
@@ -107,4 +111,64 @@ test('5,000-parameter function types key by number, kept distinct', () => {
       assert.ok(keys.includes(key), key.slice(0, 40));
     }
   }
+});
+
+// Review I1: arrows are numbers in the IR. The two 5,000-parameter types
+// get different FunTypeIds, every use of one type the same id, and the
+// table spells each spine once: suffix by suffix, a result numbered before
+// the arrow holding it.
+test('arrow types in the IR are interned table entries', () => {
+  const program = specialized(wide);
+  const parameterOf = name => named(program, name).map(definition =>
+    definition.parameters[0]);
+  const ids = parameterOf('id');
+  assert.equal(ids.length, 2);
+  assert.ok(ids.every(ty => ty.constructor.name === 'TFun'));
+  assert.notEqual(ids[0].value0, ids[1].value0);
+  const probes = parameterOf('probe').map(ty => ty.value0);
+  assert.deepEqual(probes.sort(), ids.map(ty => ty.value0).sort());
+  const spineOf = id => {
+    const parameters = [];
+    let ty = { constructor: { name: 'TFun' }, value0: id };
+    while (ty.constructor.name === 'TFun') {
+      assert.ok(ty.value0 < id || ty.value0 === id);
+      const arrow = program.funTypes[ty.value0];
+      parameters.push(arrow.parameter.constructor.name);
+      ty = arrow.result;
+    }
+    return parameters;
+  };
+  for (const ty of ids) {
+    const spine = spineOf(ty.value0);
+    assert.equal(spine.length, width);
+    assert.ok(['TInt', 'TBool'].includes(spine[width - 1]));
+  }
+  // Two spines sharing every suffix but the outermost parts: 2 × 5,000
+  // entries at most, never a copy per use.
+  assert.ok(program.funTypes.length <= 2 * width, program.funTypes.length);
+});
+
+// Review M4: test/phases.mjs builds its failure message only on failure;
+// stringifying a successful result whose checked IR holds a 20,000-long
+// arrow (the type of the value `f`) overflowed the stack.
+test('checkedPoly succeeds on a 20,000-parameter function value', () => {
+  const parameters = Array.from({ length: 20000 }, (_, index) =>
+    `p${index}: Int`).join(', ');
+  const program = checkedPoly(`fn f(${parameters}): Int = 0; `
+    + 'fn keep(x: a): Int = 0; fn main(): Int = keep(f);');
+  assert.equal(program.functions.length, 3);
+});
+
+// Review M1: the guard judges the monomorphic IR. An arrow that is only a
+// phantom type argument is no value, function type or node there, so the
+// program reaches Go, with the arrow's named type declared and unused.
+const phantom = 'type Proxy(a) = P; fn keep(x: Proxy(a)): Int = 0;'
+  + ' fn mk(): Proxy(Int -> Int) = P; fn main(): Int = keep(mk());';
+const batch = runGoBatch(import.meta.url, [['phantom', phantom]]);
+
+test('a phantom arrow argument compiles and runs', () => {
+  const result = compile(phantom);
+  if (!(result instanceof Right)) assert.fail(JSON.stringify(result));
+  assert.ok(result.value0.includes('type bumpusFun0 func(int32) int32\n'));
+  assert.equal(batch.run('phantom'), '0\n');
 });

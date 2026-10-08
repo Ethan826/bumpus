@@ -91,8 +91,11 @@ test runner, Go 1.26.4. No new dependency.
   returns `Internal "unlowered function"` for an arrow. In Task 5
   Specialize copies everything, and Program.Compile calls a temporary
   guard, `Features.Specialize.Unlowered.reject`, that returns the same
-  Internal for any program containing the new IR nodes; Task 6 deletes the
-  guard. Task 3 tests through Parse → Resolve, Task 4 through Check, Task
+  Internal for any program whose monomorphic IR holds an arrow type or a
+  new node (Task 5 review clarification: an arrow that is only a phantom
+  type argument, `Proxy(Int -> Int)`, is neither, so that program reaches
+  Go; a generic function never instantiated is not emitted); Task 6
+  deletes the guard. Task 3 tests through Parse → Resolve, Task 4 through Check, Task
   5 through Specialize (calling `specialize` directly); execution starts
   in Task 6. Each progress entry states how far its tests reach.
 - No existing row is reworded to an interim outcome: every resolution
@@ -338,8 +341,12 @@ arrows directly.
   `src/Features/Specialize/Intern.purs` (the arrow table, as built),
   `test/fn-specialize.test.mjs`, `test/fn-representative.test.mjs`
 
-**Interfaces:** `IR.Ty`'s `Eq`/`Ord` are hand-written like Task 2's
-(spine loop). Specialize.Keys interns arrows as hash-consed nodes
+**Interfaces:** (Task 5 review clarification, 2026-10-08: `IR.Ty` is
+`TInt | TBool | TData TypeId | TFun FunTypeId` with derived constant-time
+`Eq`/`Ord`, and `IR.Program` carries `funTypes ∷ Array { parameter ∷ Ty,
+result ∷ Ty }` in interned-number order, emitted from Specialize's arrow
+table; this replaces the hand-written spine-loop instances first built.)
+Specialize.Keys interns arrows as hash-consed nodes
 (parameter number, result number), as ruling R15 interns applications,
 so every suffix of a spine is numbered once and a key is compared by
 numbers, never by spelling or by walking a whole type: total work linear
@@ -369,7 +376,9 @@ in the size of all key types.
 
 **Files:**
 - Modify: `src/Format/Go/Data.purs` (named function types, emitted with
-  the data types, one per distinct ground `TFun`, in first-use order),
+  the data types, one per `IR.funTypes` entry in interned-number order;
+  Task 5 review clarification, replacing first-use order; Task 5's review
+  fixes already emit them),
   `src/Format/Go/Layout.purs`, `src/Format/Go/Expression.purs`,
   `src/Format/Go/Capture.purs` (a lambda's named parameters are bound in
   its body), `src/Format/Go/Usage.purs`, `src/Format/Go.purs`,
@@ -425,7 +434,10 @@ spelling a type.
   `foldLeft`, `compose` written as a two-parameter function returning a
   lambda, a partial application, a pipe chain; snapshot
   bootstrap/functions.go asserted byte-equal by test/compiler.test.mjs
-  alongside the others.
+  alongside the others. Replace Task 5's temporary catch-all arms with
+  explicit exhaustive ones: src/Format/Go/Expression.purs `_ → leaf next
+  (unlowered …)` and src/Format/Go/Compare.purs `TFun _ → malformed`
+  (Task 5 review, M2).
 - [ ] **Step 3a: Re-measure** ADR 006's margin for the FN001 forms with
   scripts/depth-probe.mjs after lowering (`functionForms` in
   scripts/depth-forms.mjs, named on the command line), then move them

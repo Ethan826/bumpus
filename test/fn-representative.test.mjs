@@ -33,7 +33,7 @@ const withLambdas = source => source.split('; ').map((declaration, index) => {
 
 const specialized = (source, representative) => {
   const result = specializeWith(representative)(checkedPoly(source));
-  assert.ok(result instanceof Right, `${source}\n${JSON.stringify(result)}`);
+  if (!(result instanceof Right)) assert.fail(`${source}\n${JSON.stringify(result)}`);
   return result.value0;
 };
 

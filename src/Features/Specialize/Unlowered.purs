@@ -42,7 +42,7 @@ expressionSpan (IR.Expr expression)
 
 isArrow ∷ IR.Ty → Boolean
 isArrow = case _ of
-  IR.TFun _ _ → true
+  IR.TFun _ → true
   _ → false
 
 isNew ∷ IR.Node → Boolean

@@ -36,7 +36,7 @@ const groundText = (program, type) => {
 export const namedKeys = source => {
   const program = checkedPoly(source);
   const result = specializationKeys(program);
-  assert.ok(result instanceof Right, `${source}\n${JSON.stringify(result)}`);
+  if (!(result instanceof Right)) assert.fail(`${source}\n${JSON.stringify(result)}`);
   return result.value0.map(key => {
     const name = (key.function ? program.functions : program.types)[
       key.declaration].name;

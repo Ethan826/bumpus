@@ -27,14 +27,7 @@ import Domain.Resolved (CtorId(..), CtorInfo, FunctionId(..), TypeInfo)
 import Domain.Syntax (Span, problemAt)
 import Domain.Type (Ty, TypeId(..))
 import Features.Specialize.Copy (Copy, failWith, get, modify)
-import Features.Specialize.Intern
-  ( Arrows
-  , Interned
-  , Lowered
-  , dataType
-  , internSpine
-  , keyOf
-  )
+import Features.Specialize.Intern (Arrows, dataType, internSpine)
 
 -- The checked program's tables and what Specialize computed from them
 -- once: the output id of each monomorphic type and function, each
@@ -53,14 +46,14 @@ type Env =
 -- already numbered as an output type or an interned arrow
 -- (Features.Specialize.Intern), so comparing two keys costs their arity,
 -- never the size of the types they stand for.
-type Key = Tuple Int (Array Interned)
+type Key = Tuple Int (Array IR.Ty)
 
 -- One output declaration to fill, in creation order, with the span of the
 -- reference that created it (a seed's own declaration).
 type Work =
   { output ∷ Int
   , declaration ∷ Int
-  , arguments ∷ Array Lowered
+  , arguments ∷ Array IR.Ty
   , function ∷ Boolean
   , span ∷ Span
   }
@@ -96,38 +89,38 @@ enqueue item state = state
 
 -- The output type of a declared type at ground arguments, created on
 -- first reference at `span`.
-applied ∷ Env → Span → TypeId → Array Lowered → Specializing Lowered
+applied ∷ Env → Span → TypeId → Array IR.Ty → Specializing IR.Ty
 applied env span (TypeId declaration) arguments
   | Array.null arguments = maybe' (internal "Invalid type id" span)
       (pure <<< dataType)
       (join (Array.index env.monoTypes declaration))
   | otherwise = get >>= remembered
       where
-      key = Tuple declaration (map keyOf arguments)
-      remembered state = maybe' (newType env span key arguments)
+      key = Tuple declaration arguments
+      remembered state = maybe' (newType env span key)
         (pure <<< dataType)
         (Map.lookup key state.typeKeys)
 
 -- The arrow of `parameters` to `result`, every suffix interned once.
-arrowOf ∷ Array Lowered → Lowered → Specializing Lowered
+arrowOf ∷ Array IR.Ty → IR.Ty → Specializing IR.Ty
 arrowOf parameters result = do
   state ← get
   let spun = internSpine parameters result state.arrows
   modify (withArrows spun.arrows)
-  pure spun.lowered
+  pure spun.ty
   where
   withArrows arrows state = state { arrows = arrows }
 
 -- The output function for a call at ground arguments.
-called ∷ Env → Span → FunctionId → Array Lowered → Specializing FunctionId
+called ∷ Env → Span → FunctionId → Array IR.Ty → Specializing FunctionId
 called env span (FunctionId declaration) arguments
   | Array.null arguments = maybe' (internal "Invalid function id" span)
       (pure <<< FunctionId)
       (join (Array.index env.monoFunctions declaration))
   | otherwise = get >>= remembered
       where
-      key = Tuple declaration (map keyOf arguments)
-      remembered state = maybe' (newFunction span key arguments)
+      key = Tuple declaration arguments
+      remembered state = maybe' (newFunction span key)
         (pure <<< FunctionId)
         (Map.lookup key state.functionKeys)
 
@@ -151,9 +144,8 @@ outputCtor state owner position = case owner of
 -- A type key takes the next output id and a block of constructor ids, one
 -- per declared constructor in order; its fields are filled when its work
 -- item is reached.
-newType
-  ∷ Env → Span → Key → Array Lowered → Unit → Specializing Lowered
-newType env span key@(Tuple declaration _) arguments _ = do
+newType ∷ Env → Span → Key → Unit → Specializing IR.Ty
+newType env span key@(Tuple declaration arguments) _ = do
   claim span
   info ← maybe' (internal "Invalid type id" span) pure
     (Array.index env.types declaration)
@@ -183,9 +175,8 @@ newType env span key@(Tuple declaration _) arguments _ = do
     }
   offset base index _ = CtorId (base + index)
 
-newFunction
-  ∷ Span → Key → Array Lowered → Unit → Specializing FunctionId
-newFunction span key@(Tuple declaration _) arguments _ = do
+newFunction ∷ Span → Key → Unit → Specializing FunctionId
+newFunction span key@(Tuple declaration arguments) _ = do
   claim span
   modify created
   state ← get

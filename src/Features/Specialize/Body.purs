@@ -10,7 +10,7 @@ import Domain.IR.Internal as IR
 import Domain.Resolved (FunctionId(..))
 import Domain.Syntax (Span)
 import Features.Specialize.Copy (modify)
-import Features.Specialize.Keys (Env, Specializing, Work, internal)
+import Features.Specialize.Keys (Env, Specializing, Work, ctorAt, internal)
 import Features.Specialize.Values
   ( Scope
   , callee
@@ -52,22 +52,21 @@ fillFunction env work = maybe'
 expression ∷ Scope → Checked.Expr → Specializing IR.Expr
 expression scope (Checked.Expr checked) = do
   ty ← typed scope checked.span checked.ty
-  node ← copyNode scope checked.span ty checked.node
+  node ← copyNode scope checked.span checked.node
   pure (IR.Expr { ty, span: checked.span, node })
 
--- A construction's instantiation is its own type's arguments, numbered
--- with that type just before, so only a function reference lowers its
--- instantiation. Every arm delegates (BACKLOG E003).
-copyNode ∷ Scope → Span → IR.Ty → Checked.Node → Specializing IR.Node
-copyNode scope span ty = case _ of
+-- A construction's instantiation is its owner's arguments, numbered with
+-- the expression's type just before. Every arm delegates (BACKLOG E003).
+copyNode ∷ Scope → Span → Checked.Node → Specializing IR.Node
+copyNode scope span = case _ of
   Checked.Integer value → pure (IR.Integer value)
   Checked.Boolean value → pure (IR.Boolean value)
   Checked.Local id → pure (IR.Local id)
   Checked.Call id instantiation arguments → IR.Call
     <$> callee scope span id instantiation
     <*> each arguments
-  Checked.Construct id _ arguments → IR.Construct
-    <$> ownerCtor scope span ty id
+  Checked.Construct id instantiation arguments → IR.Construct
+    <$> ownerCtor scope span id instantiation
     <*> each arguments
   Checked.Add left right → IR.Add <$> recur left <*> recur right
   Checked.Compare operator left right → IR.Compare operator <$> recur left
@@ -78,7 +77,8 @@ copyNode scope span ty = case _ of
     <*> traverse (arm scope) arms
   Checked.FunctionRef id instantiation → IR.FunctionRef
     <$> callee scope span id instantiation
-  Checked.CtorRef id _ → IR.CtorRef <$> ownerCtor scope span ty id
+  Checked.CtorRef id instantiation → IR.CtorRef
+    <$> ownerCtor scope span id instantiation
   Checked.Apply applied arguments → IR.Apply <$> recur applied
     <*> each arguments
   Checked.Lambda parameters body → lambda scope recur span parameters body
@@ -105,5 +105,5 @@ copyShape scope span ty = case _ of
   Checked.Bind id → pure (IR.Bind id)
   Checked.IntLit value → pure (IR.IntLit value)
   Checked.BoolLit value → pure (IR.BoolLit value)
-  Checked.Ctor id fields → IR.Ctor <$> ownerCtor scope span ty id
+  Checked.Ctor id fields → IR.Ctor <$> ctorAt scope.env span ty id
     <*> traverse (copyPattern scope) fields
