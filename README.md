@@ -11,7 +11,10 @@ Stage 0 is implemented in PureScript. This repository implements one checked
 vertical slice plus closed algebraic data types with exhaustive nested
 `match` (A001), structural comparison operators `== != < <= > >=` on every
 type, and printing of whatever `main` returns (A003, in final review).
-Polymorphism, HKTs, classes, and rows are planned.
+On branch p001 (P001, pending final review), rank-1 polymorphism:
+parameterized types and generic functions, lowered by whole-program
+specialization ([ADR 007](docs/adr/007-specialization.md),
+examples/lists.bumpus). HKTs, classes, and rows are planned.
 
 ## Prerequisites and fresh checkout
 
@@ -79,7 +82,8 @@ PureScript modules, not yet a native Go compiler executable.
   [ADR 001](docs/adr/001-slice.md),
   [ADR 002](docs/adr/002-polymorphic-lowering.md),
   [ADR 005](docs/adr/005-structural-order.md),
-  [ADR 006](docs/adr/006-nesting-limit.md)
+  [ADR 006](docs/adr/006-nesting-limit.md),
+  [ADR 007](docs/adr/007-specialization.md)
 - [Engineering rules and gate coverage](docs/engineering.md)
 - [Reference provenance](docs/provenance.md)
 - [Self-hosting chain](docs/bootstrap.md)

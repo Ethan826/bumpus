@@ -6,10 +6,12 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { polyProbes } from './regression-poly.mjs';
 const [compilerPath, outputDir, probe] = process.argv.slice(2);
 const { compile } = await import(pathToFileURL(resolve(compilerPath)));
 const load = name => import(pathToFileURL(resolve(outputDir, name, 'index.js')));
 const { Left, Right } = await load('Data.Either');
+const { wire } = await load('Format.Diagnostic');
 const goTestTimeoutMs = 120_000;
 
 const branch = () => {
@@ -143,5 +145,8 @@ const probes = {
     'Cons(1, Cons(2, Nil))\n', 'printed value lost fields'),
   'state-thread': stateThread, capture
 };
+const context = { compile, Left, wire, printed, probe };
+const poly = name => () => polyProbes[name](context);
+for (const name of Object.keys(polyProbes)) probes[name] = poly(name);
 assert.ok(probe in probes, `unknown probe: ${probe}`);
 probes[probe]();

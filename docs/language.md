@@ -1,4 +1,4 @@
-# Bumpus language specification (stage 0, closed ADTs, comparison)
+# Bumpus language specification (stage 0, closed ADTs, comparison, polymorphism)
 
 Provisional name. A file is one program: type declarations and functions in
 any order, with required function signatures. Behavioral claims below name
@@ -15,13 +15,15 @@ Comments and strings do not exist.
 ```ebnf
 program     = { declaration } ;
 declaration = typedecl | function ;
-typedecl    = "type", upper, "=", ctor, { "|", ctor }, ";" ;
+typedecl    = "type", upper, [ "(", lower, { ",", lower }, ")" ], "=",
+              ctor, { "|", ctor }, ";" ;
 ctor        = upper, [ "(", type, { ",", type }, ")" ] ;
 function    = "fn", identifier, "(", [ parameters ], ")", ":", type,
               "=", expression, ";" ;
 parameters  = parameter, { ",", parameter } ;
 parameter   = identifier, ":", type ;
-type        = "Int" | "Bool" | upper ;
+type        = "Int" | "Bool" | lower
+            | upper, [ "(", type, { ",", type }, ")" ] ;
 expression  = "if", expression, "then", expression, "else", expression
             | "match", expression, "{", arm, { ",", arm }, [ "," ], "}"
             | comparison ;
@@ -48,13 +50,23 @@ trailing comma is accepted (adt-match). Minus belongs only to integer literals
 (may be separated by whitespace); leading zeroes are decimal; values must fit
 int32 (E_INTEGER). Integer patterns use the same syntax.
 
+Types (P001, ADR 007). A lowercase name in a type is a type variable; there
+is no new reserved word, so `fn main(): int = 1;` declares a variable
+`int`, not a misspelled `Int` (it is then E_ENTRY, below). `type T() =
+A;` is E_SYNTAX `Expected a type parameter`, `List()` is E_SYNTAX
+`Expected a type` at `)`, and `Int(a)` and `a(Int)` are E_SYNTAX at `(`.
+Each type argument is one nesting level (ADR 006). An applied type spans
+its head through its closing parenthesis (test/poly-syntax.test.mjs).
+
 ## Semantics
 
-Types: `Int`, `Bool`, and declared types (monomorphic, closed, recursive,
-mutually recursive in any declaration order; adt-types). No coercions.
+Types: `Int`, `Bool`, declared types (closed, recursive, mutually recursive
+in any declaration order; adt-types), applied types such as `List(Int)` or
+`Pair(a, List(b))`, and type variables. No coercions.
 Addition needs Int operands. A comparison infers its left then right operand,
 and the right must have the left's type, else E_TYPE at the right operand;
-its result is Bool. Every type is comparable, including uninhabited ones.
+its result is Bool. Every ground type is comparable, including uninhabited
+ones; a type containing a variable is not (Polymorphism, below).
 `if` needs a Bool condition and equal branch types; calls need exact arity
 and types. Every function is checked, including unused ones and unreachable
 arms.
@@ -71,7 +83,7 @@ a function is E_NOT_CALLABLE. Duplicate types, globals, parameters or binders
 declaration in source order, whatever its kind (`fn A(): Int = 1; type T = A;`
 reports the function). A missing `main` is E_ENTRY with message
 `Expected fn main()`, and so is a `main` with parameters; `main` may return
-any type (adt-print). Rejection fixtures: test/diagnostics.test.mjs,
+any ground type (adt-print). Rejection fixtures: test/diagnostics.test.mjs,
 adt-types, adt-match.
 
 Patterns. `_` matches anything; a lowercase name binds; an uppercase name is a
@@ -121,6 +133,78 @@ value` when a comparison or print visits a nil field pointer or unknown tag;
 comparison stops at the first difference, so later malformed fields can go
 unnoticed; total order is claimed only for well-formed values.
 Foreign (Go) values are not validated: Proposed, with I001.
+
+Polymorphism (P001; ADR 007; spec docs/plans/2026-10-08-polymorphism-design.md).
+
+- Scoping. A type declaration's parameters scope over its own
+  constructors; a field naming any other lowercase name is E_UNBOUND
+  `Unbound type variable b`, and a repeated parameter is E_DUPLICATE
+  `Duplicate type parameter a` at the repetition. Phantom parameters are
+  allowed. A declared type used with the wrong number of arguments,
+  including none where it has parameters (`List`), is E_ARITY `Wrong
+  number of type arguments for List` at the reference. A function's type
+  variables are every lowercase name in its signature, implicitly
+  quantified over the whole signature; one may appear only in the result
+  (`fn loop(): a = loop();`). `main` must have a result without type
+  variables: otherwise E_ENTRY `Expected fn main() with a concrete result
+  type` (poly-syntax).
+- Rigid and flexible variables. Inside its own function a signature's
+  variable is rigid: it equals only itself, so `fn f(x: a): Int = x;` is
+  E_TYPE `Expected Int, found a`, and `fn g(x: a, y: b): a = y;` is E_TYPE.
+  Constructors are polymorphic (`Nil : List(a)`). Each use of a function
+  or constructor instantiates its variables afresh, so
+  `pair(id(1), id(true))` is `Pair(Int, Bool)`. Unification never makes a
+  type contain itself: in `match Nil { Cons(h, t) => same(h, t), Nil => 0 }`
+  with `fn same(x: a, y: a): Int` the call is E_TYPE `Infinite type: _
+  occurs in List(_)`. Messages name whole types, `_` for an undetermined
+  part (`Expected Pair(Int, Int), found Pair(Int, Bool)`) (poly-check,
+  unify; regression rows `occurs`, `rigid`, `instantiate`).
+- Holes. A type argument nothing determines (the element type in
+  `length(Nil)`) stays undetermined; there is no typing default.
+  It does not change the program's meaning: compilation picks one fixed
+  representative (Int) for such holes, which is valid because no
+  comparison, `main` result or other operation depends on them
+  (poly-run, poly-properties representative independence).
+- Comparison groundness. A comparison's operand type, once the function is
+  checked, must have no variable: a signature variable is E_TYPE `Type a
+  is not comparable` (also `Type List(a) is not comparable`), and an
+  undetermined one is E_TYPE `Ambiguous type List(_) in comparison`
+  (`Nil == Nil`), both at the left operand; the first is reported first
+  (poly-check). Comparing `List(Int)` values inside a generic function is
+  fine (poly-run).
+- Patterns and coverage. On a scrutinee whose type is a variable, only `_`
+  and binders fit; a constructor or literal pattern is E_TYPE. Coverage
+  treats variables and undetermined types as abstract and inhabited, and
+  checks each source match once, whatever its instantiations; a
+  constructor's field types are its declared ones with the arguments
+  substituted, so for an uninhabited `Void`, `Maybe(Void)` needs no `Just`
+  arm (poly-coverage).
+- The instantiation rule. Within a group of mutually recursive functions
+  (a strongly connected component of the call graph), every type argument
+  of a call to a member of the group must be a bare variable of the
+  calling function or contain no variable at all; likewise for type
+  declarations that refer to each other through constructor fields. So
+  `fn f(x: a): Int = f(Cons(x, Nil));` is E_SPECIALIZATION `Recursive call
+  to f changes its type arguments` and `type Nest(a) = Nil | Cons(a,
+  Nest(List(a)));` is E_SPECIALIZATION `Recursive use of Nest changes its
+  type arguments`. The rule guarantees that only finitely many
+  specializations exist (proof: spec §4.2); it also rejects some finite
+  programs, such as `f(a)` calling `g(List(a))` with `g(b)` calling
+  `f(Int)` (poly-termination).
+- Inferred-type depth. Composing generic calls can infer types far deeper
+  than any written one. A type deeper than 1,000 levels is E_NESTING
+  `Inferred type nesting exceeds 1000 levels` at the expression whose type
+  would exceed it, never a stack overflow (poly-depth; ADR 007).
+- Specialization limit. Each distinct use of a generic function at ground
+  type arguments, and each distinct ground application of a parameterized
+  type, is one specialization; monomorphic declarations do not count. More
+  than 10,000 in one program is E_SPECIALIZATION `More than 10000
+  specializations` at the reference that would create the 10,001st (for
+  one first created in a signature, the whole function declaration). A
+  generic declaration never used is checked but not emitted (poly-run).
+- Evaluation and printing are unchanged: a generic value prints with its
+  source constructor names and re-reads (`Cons(Pair(1, true), Nil)`;
+  poly-run, examples/lists.bumpus and bootstrap/lists.go).
 
 Nesting. One declaration body may nest at most 128 levels (ADR 006,
 Format.Parse.Grammar `nestingLimit`). A level is a parenthesized expression,

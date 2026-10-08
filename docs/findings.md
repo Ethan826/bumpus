@@ -244,3 +244,50 @@ docs/plans/2026-10-08-language-direction.md. "Hostable" was clarified to
 mean inspectable intermediate representations, so no embedding VM was
 selected. Rows simplify service requirements but do not decide runtime
 resource/cancellation semantics. Documentation only; no feature implemented.
+
+## P001 observations (2026-10-08)
+
+- A source nesting limit does not bound inferred types. Composing generic
+  calls multiplies depth (`fn deep(x: a): L^127(a)` nested 44 deep infers
+  about 5,600 levels within every source limit), and the unifier, resolve
+  and the occurs check recurse over type structure, so a legal program
+  crashed with a RangeError (Task 4). Ruling R7 added the inferred-type
+  bound (ADR 007), and it took three fix rounds to make it hold:
+  1. Fix 1 checked each expression's type when built, both operands
+     before each unification and each finished body. Review found that
+     metas bound earlier in the same unification chain into each other,
+     so two operands that were each within the bound unified as chains
+     about 1,780 deep and still overflowed. Fix 1 also stated a 5x margin
+     using resolve's overflow figure; unify, the binding limit, gives
+     about 1.5x.
+  2. Fix 2 threaded a level through unification (one per applied type
+     entered, which equals resolved depth) and failed past the limit.
+     Review then found six or more L^997 links bound in one unification
+     still overflowing, in `bindMeta`.
+  3. The cause: `bindMeta` named `resolved = resolve subst ty` in a
+     `where`, guarded by an `if exceedsLimit … then … else …` in the body.
+     PureScript `where` (and `let`) bindings are strict: the compiled
+     JavaScript evaluates every binding before the body runs, so the
+     resolve ran before the guard that was meant to prevent it. Fix 3
+     moved the resolve into `bindBounded`, a function called only after
+     the bound, and audited the compiled output of Features.Check* for
+     other strict bindings that recurse over a type (all run on bounded
+     types).
+  Lesson: in PureScript, a `where` binding is not lazy; anything a guard
+  must protect belongs in a helper function called from the guarded
+  branch (AGENTS.md's `maybe'` rule exists for the same reason). And a
+  bound is only as good as the deepest path that runs before it; review
+  each recursion, not each entry point.
+- Whole-type keys hide quadratic and exponential costs: Task 6's coverage
+  keys made a 3,000-type growing chain take 16.6 s, and argument-doubling
+  chains give exponentially large keys. Specialize therefore hash-conses
+  its keys (R15), numbering each ground application once; Expand still
+  uses whole-type keys (BACKLOG E008).
+- Regression mutants must change one thing the probe can see. The
+  `spec-key` mutant keys only the data-type arguments of a type
+  application, without their identity, so `List(List(Int))` and
+  `List(List(Bool))` collide; the Go build then fails on mismatched
+  struct types. Removing the occurs check does not loop forever: the
+  cyclic binding is caught by the inferred-type bound (E_NESTING), so the
+  `occurs` probe requires the exact E_TYPE text rather than any
+  rejection.

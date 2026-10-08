@@ -66,8 +66,9 @@ adding a bypass allowlist.
   brute-force coverage oracle with brute-forced inhabitedness over generated
   type systems (test/coverage.test.mjs), and fake-host command tests
   (test/program.test.mjs);
-- `npm run verify` runs every test/*.test.mjs file (29 files, 247 tests at
-  P001 Task 5, no skips; the list is read from the directory, never hand-kept) and then
+- `npm run verify` runs every test/*.test.mjs file (32 files, 302 tests at
+  P001 Task 9, no skips; the list is read from the directory, never
+  hand-kept) and then
   scripts/regression.mjs, a table of isolated-copy mutations, each of which
   must pass on the healthy build and fail on its mutant: `branch`
   (Features.Check.Infer branch type), `nil-guard` (Format.Go.Match drops the `!= nil`
@@ -80,7 +81,19 @@ adding a bypass allowlist.
   compile to bootstrap/answer.go) and `capture` (Format.Go.Match drops a
   match's scrutinee from its free locals, so an enclosing lifted match
   misses a local read only there; probe builds and runs test/match-lift's
-  capture program); the A003 order and print tests also use an independent value
+  capture program), and since P001 four more, whose probes live in
+  test/regression-poly.mjs (imported by test/regression.mjs): `occurs`
+  (Features.Check.Unify `bindBounded` skips the occurs check; probe
+  requires E_TYPE `Infinite type: _ occurs in List(_)`), `rigid` (a rigid
+  variable unifies with any type; probe requires `fn f(x: a): Int = x;`
+  to be E_TYPE `Expected Int, found a`), `instantiate`
+  (Features.Check.Scheme `instantiate` does not advance the meta counter,
+  so uses of a scheme share metas; probe requires `pair(id(1), id(true))`
+  to print `Pair(1, true)`) and `spec-key` (Features.Specialize.Keys keys
+  a type application's data-type arguments without their identity, so
+  `List(List(Int))` and `List(List(Bool))` share one Go type; probe
+  requires a program using both to build and print `Pair(1, 2)`): twelve
+  `Regression proof (…)` lines in all; the A003 order and print tests also use an independent value
   oracle (test/value-oracle.mjs);
 - Go execution in tests is batched per test file (T001, test/go-batch.mjs):
   `runGoBatch(import.meta.url, cases, label?)` takes an array of

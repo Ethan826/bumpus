@@ -1239,3 +1239,72 @@ Language change: none (tests only). Status: done.
 - Phase reached: the whole pipeline (`compile`, `specializeWith`,
   `specializationKeys`) and Go for the generated programs; the
   components through Specialize only.
+
+### Task 9: regression proofs and documentation (2026-10-08)
+
+Language change: none (regression rows and documentation). Status: done.
+
+- Four regression rows in scripts/regression.mjs, each one needle in the
+  current code, probes in test/regression-poly.mjs (imported by
+  test/regression.mjs, which stays at 152 lines; each probe uses only the
+  compiler it is given):
+  - `occurs`: Features.Check.Unify `bindBounded`, `if mentions meta
+    resolved then` → `if false then`. Healthy: E_TYPE `Infinite type: _
+    occurs in List(_)`. Mutant: the cyclic binding is caught later by the
+    depth bound, E_NESTING `Inferred type nesting exceeds 1000 levels`, so
+    the probe fails `occurs check missing`.
+  - `rigid`: Unify `unifyHeads`, the rigid-with-same-rigid arm →
+    `TVar (Rigid _), _ → Right subst` plus `_, TVar (Rigid _) → Right
+    subst`. Healthy: `fn f(x: a): Int = x;` is E_TYPE `Expected Int, found
+    a`. Mutant: accepted (`rigid variable unified with Int: null`).
+  - `instantiate`: Features.Check.Scheme `instantiate` no longer advances
+    the meta counter (`, state: state { next = … }` → `, state: state`), so
+    later uses reuse the same metas. Healthy: `pair(id(1), id(true))`
+    prints `Pair(1, true)`. Mutant: rejected (`scheme metas shared across
+    uses: probe program was rejected`).
+  - `spec-key`: Features.Specialize.Keys `applied` keys each data-type
+    argument as `TData (TypeId 0)` (Int and Bool kept). Healthy: the
+    `length` program over `List(List(Int))` and `List(List(Bool))` prints
+    `Pair(1, 2)`. Mutant: Go build fails (`cannot use … (value of struct
+    type bumpusTy1) as bumpusTy0 value`), probe fails `nested
+    specialization keys collided`.
+  Evidence: .build/p001-task9-mutants.log (each probe exit 0 on the healthy
+  build, exit 1 with its message on its mutant).
+- RED/GREEN for the rows is the regression script itself: each row asserts
+  the healthy compiler passes and the isolated mutant fails with the row's
+  message. `node scripts/regression.mjs`: twelve `Regression proof (…)`
+  lines, 43.5 s wall.
+- Docs: docs/adr/007-specialization.md (new: phases, typing, holes and the
+  representative with the four validity conditions, opaque variables and
+  comparison groundness, the instantiation rule with the §4.2 proof and
+  §4.3 conservatism, the inferred-type depth bound with measured margins
+  and the default-stack assumption, hash-consed keys, the limit's
+  accounting, the R18 span deviation); docs/language.md (grammar, types,
+  a Polymorphism section: scoping, rigid/flexible, holes, groundness,
+  patterns and coverage, the rule, depth bound, limit; lowercase `int` is
+  a variable); docs/architecture.md (final pipeline and phase list, depth
+  bound, P001 test files, new rows); docs/engineering.md (test count, the
+  four rows); BACKLOG.md (P001 Done on p001; E006 and E007 updated; new
+  E008 Expand keys, E009 `did you mean Int?` hint, E010 `_` in mismatch
+  messages, E011 near-limit diagnostic elision); docs/findings.md (P001
+  observations); README.md (ADR 007 link); docs/next-session.md.
+- GREEN: `rm -rf output && npm run verify` exit 0, 85.3 s wall, zero
+  warnings, 32 test files, 302 tests, zero failures/skips, twelve
+  regression proofs (.build/p001-task9-verify.log).
+
+### P001 summary
+
+Rank-1 polymorphism is implemented on branch p001 (Tasks 1-9, commits
+959a7d1 onward). Parameterized types and generic functions type-check with
+rigid signature variables, fresh metas per use and occurs-checked
+unification; comparisons need ground operand types; unsolved metas are
+holes that Specialize fills with Int; the instantiation rule makes the set
+of specializations finite; coverage works over applied types; inferred
+types are bounded at 1,000 levels (E_NESTING, never a crash); a pure
+Specialize phase produces the variable-free monomorphic IR with
+hash-consed keys and a 10,000-key limit. Monomorphic programs emit
+byte-identical Go. Tests grew from 162 to 302 and regression proofs from
+eight to twelve. ADR 007 records the decisions (rulings R1-R19 in the
+plan's ledger). Open follow-ups: BACKLOG E006-E011. Pending: final
+whole-branch review and the user's approval to merge; FN001's currying
+direction is to be discussed with the user before its design.

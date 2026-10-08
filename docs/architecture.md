@@ -17,10 +17,16 @@ Domain, Features and Format are pure (core library allowlist, no Effect).
 ## Pipeline
 
 ```text
-String -> Lex/Parse -> Syntax -> Resolve -> Resolved -> Check -> checked IR
-       -> Instantiation rule -> Coverage (Either Diagnostic) -> Specialize
-       -> IR -> Go text
+String -> Lex/Parse -> Syntax -> Resolve -> Resolved
+       -> Check: typing per function (unification, comparison groundness,
+          inferred-type depth bound) -> checked IR
+          -> instantiation rule -> coverage
+       -> Specialize -> monomorphic IR -> Go text
 ```
+
+Every arrow is `Either Diagnostic`. Phase list (P001 final; ADR 007):
+Parse, Resolve, Check (typing, instantiation rule, coverage), Specialize,
+Go.
 
 Program.Compile composes the phases; Program.Command runs emit/build/run over
 the `Domain.Host` ports (records over an abstract monad), so
@@ -62,7 +68,9 @@ Format.Wire.
   `Ty VarId` in resolved syntax, `Ty Open` (rigid variable or hole) in the
   checked IR. Its `Monad` bind is substitution. The monomorphic IR has its
   own variable-free `Ty`, so no type variable can reach Go by construction.
-  Until P001 Task 2 nothing produces a variable or a type argument.
+  Resolve produces variables and type arguments from source (P001 Task 2;
+  `VarId i` is a declaration's i-th parameter or a signature's i-th
+  variable).
 - **Check** produces the checked IR, Domain.Checked.Internal (`Construct
   CtorId`, `Match`, `Pattern`; each call and construction records its
   instantiation), and is the only producer of `Checked.Program`. Since
@@ -72,7 +80,10 @@ Format.Wire.
   instantiates its scheme with fresh metas, every type equality is a
   unification (Features.Check.Require, whose messages name the whole
   resolved types), comparisons must be ground (Features.Check.Comparable),
-  and unsolved metas become holes numbered per function. Since P001
+  and unsolved metas become holes numbered per function. Every inferred
+  type is bounded at 1,000 levels (Unify `inferredTypeLimit`, ruling R7,
+  E_NESTING) by an explicit-stack test before anything recurses over it,
+  so composed generic calls cannot overflow the stack. Since P001
   Task 5 the instantiation rule (Features.Check.Instantiation, Nested,
   Components; design §4.1) then runs over the whole typed program: inside
   each strongly connected component of the call graph and of the type
@@ -106,6 +117,17 @@ Format.Wire.
   (test/specialize.test.mjs). Modules: Specialize (API, worklist loop),
   Specialize.Seeds, .Keys (memo tables, limit), .Lower (types, constructor
   fields), .Body (function bodies), .Copy (state-and-failure applicative).
+- **P001 tests** (one file per concern): poly-syntax (grammar,
+  resolution), unify (+ unify-oracle, union-find reference), poly-check
+  (typing), poly-depth (inferred-type bound), poly-termination
+  (+ poly-components; instantiation rule), poly-coverage, poly-run
+  (end to end, limit), poly-properties (+ poly-parse, poly-oracle,
+  poly-types, poly-expressions, poly-programs, poly-keys; execution oracle,
+  uniqueness, determinism, representative independence, §4.2 bound),
+  specialize (identity), large-source (3,000 instantiations); phases.mjs
+  runs a program through a prefix of the pipeline. Regression rows
+  `occurs`, `rigid`, `instantiate` and `spec-key` (test/regression-poly.mjs)
+  join the eight earlier ones (docs/engineering.md).
 - **Compare** is one expression form, `Compare Operator Expr Expr`, through
   every phase (Operator is a closed Domain ADT); the checker requires equal
   operand types and yields Bool. No target detail enters IR.
@@ -151,8 +173,8 @@ Elaborated IR -> lowered Go IR -> emitted Go. A target-neutral
 `Features.Lower` is deferred until decision-tree match compilation gives it a
 target-neutral job (BACKLOG A002). Foreign values (FFI) need full-value
 validation of tag and payload consistency before they become closed sums
-(I001). No fake stages for absent features. See ADR 002 for the planned
-polymorphism strategy.
+(I001). No fake stages for absent features. ADR 002 set the polymorphism
+strategy; ADR 007 records the implemented specialization.
 
 ## Known leak
 

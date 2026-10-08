@@ -56,6 +56,43 @@ const rows = [
     needle: 'free: union [ subject.free, signature.captured ]',
     replacement: 'free: signature.captured',
     probe: 'capture', message: /captured local lost/
+  },
+  {
+    // P001: a meta must not bind to a type that properly contains it.
+    name: 'occurs', file: 'src/Features/Check/Unify.purs',
+    needle: 'if mentions meta resolved then',
+    replacement: 'if false then',
+    probe: 'occurs', message: /occurs check missing/
+  },
+  {
+    // P001: a signature's variable is fixed inside its function.
+    name: 'rigid', file: 'src/Features/Check/Unify.purs',
+    needle: 'TVar (Rigid one), TVar (Rigid other) | one == other'
+      + ' → Right subst',
+    replacement: 'TVar (Rigid _), _ → Right subst\n'
+      + '  _, TVar (Rigid _) → Right subst',
+    probe: 'rigid', message: /rigid variable unified with Int/
+  },
+  {
+    // P001: every use of a scheme gets fresh metas.
+    name: 'instantiate', file: 'src/Features/Check/Scheme.purs',
+    needle: ', state: state { next = state.next + Array.length variables }',
+    replacement: ', state: state',
+    probe: 'instantiate', message: /scheme metas shared across uses/
+  },
+  {
+    // P001 (R15): a key's arguments are numbered output types. Dropping
+    // which type an argument is (keeping only that it is a data type)
+    // merges List(List(Int)) and List(List(Bool)) into one Go type.
+    name: 'spec-key', file: 'src/Features/Specialize/Keys.purs',
+    needle: '      key = Tuple declaration arguments\n'
+      + '      remembered state = maybe\' (newType',
+    replacement: '      key = Tuple declaration (map outermost arguments)\n'
+      + '      outermost = case _ of\n'
+      + '        IR.TData _ → IR.TData (TypeId 0)\n'
+      + '        ground → ground\n'
+      + '      remembered state = maybe\' (newType',
+    probe: 'spec-key', message: /nested specialization keys collided/
   }
 ];
 const base = '.build/regression';
