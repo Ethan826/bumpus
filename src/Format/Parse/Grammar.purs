@@ -18,10 +18,13 @@ module Format.Parse.Grammar
   , sepByTrailing1
   , commaList
   , chainLeft1
+  , chainRight
+  , manyOn
   , spanned
   , nested
   , rooted
   , infixed
+  , grouped
   , run
   ) where
 
@@ -39,10 +42,13 @@ import Format.Parse.Cursor
   , advance
   , current
   , failAt
+  , groupedAt
   , infixedAt
+  , leading
   , nestedAt
   , nextSpan
   , peekText
+  , rightAt
   , separated
   , shifting
   , rootedAt
@@ -134,6 +140,15 @@ chainLeft1 operator combine item = Parser
       (run (nested item))
   )
 
+-- `a -> b -> c`: the items before each operator, one level deeper, and the
+-- last, which is not (Cursor `rightAt`); the caller folds them right.
+chainRight ∷ ∀ a. String → Parser a → Parser { init ∷ Array a, last ∷ a }
+chainRight operator item = Parser (rightAt nestingLimit operator (run item))
+
+-- Zero or more items, each beginning with `text` (which the item reads).
+manyOn ∷ ∀ a. String → Parser a → Parser (Array a)
+manyOn text item = dispatch [ on text (collect (leading text) item) ] (pure [])
+
 -- From the first to the last consumed token; an empty span at the next
 -- token's start if nothing was consumed.
 spanned ∷ ∀ a b. (Span → a → b) → Parser a → Parser b
@@ -152,6 +167,10 @@ rooted parser = Parser (rootedAt (run parser))
 -- nested position becomes its left operand, one level deeper.
 infixed ∷ ∀ a. Parser a → Parser a
 infixed parser = Parser (infixedAt nestingLimit (run parser))
+
+-- Parentheses in a type (Cursor `groupedAt`).
+grouped ∷ ∀ a. Parser a → Parser a
+grouped parser = Parser (groupedAt nestingLimit (run parser))
 
 -- Runs a whole production from a state; the declaration loop steps with it.
 run ∷ ∀ a. Parser a → Run a

@@ -33,7 +33,7 @@ resolve program = do
       (Array.zipWith pair functions signatures)
   entry ← entryPoint definitions
   -- Applied once, so the globals are built once rather than per function.
-  bodies ← traverse (resolveFunction (globals tables.ctors) tables.ctors)
+  bodies ← traverse (resolveFunction (globals tables.ctors) tables)
     definitions
   pure { types: tables.types, ctors: tables.ctors, functions: bodies, entry }
   where
@@ -97,14 +97,20 @@ entryProblem definition
 
 resolveFunction
   ∷ Array Global
-  → Array Resolved.CtorInfo
+  → Resolved.Tables
   → Definition
   → Either Syntax.Diagnostic Resolved.FunctionDecl
-resolveFunction globals ctors definition = withBody <$> runFresh
+resolveFunction globals tables definition = withBody <$> runFresh
   (Array.length locals)
   (expression scope definition.function.body)
   where
-  scope = { globals, ctors, locals }
+  scope =
+    { globals
+    , ctors: tables.ctors
+    , locals
+    , types: tables.types
+    , variables: definition.signature.variables
+    }
   locals = Array.mapWithIndex parameterLocal definition.signature.parameters
   parameterLocal index parameter =
     { name: parameter.name, id: Resolved.LocalId index }

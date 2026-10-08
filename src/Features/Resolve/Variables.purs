@@ -39,3 +39,7 @@ occurrences = case _ of
   Syntax.BoolRef _ → []
   Syntax.VarRef _ name → [ name ]
   Syntax.NamedRef _ _ arguments → Array.concatMap occurrences arguments
+  arrow@(Syntax.FunRef _ _ _) → spineOccurrences (Syntax.typeRefSpine arrow)
+  where
+  spineOccurrences found = Array.concatMap occurrences
+    (Array.snoc found.parameters found.result)

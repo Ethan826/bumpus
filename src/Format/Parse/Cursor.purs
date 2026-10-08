@@ -13,19 +13,24 @@ module Format.Parse.Cursor
   , nestedAt
   , rootedAt
   , infixedAt
+  , groupedAt
+  , rightAt
   , separated
+  , leading
   , trailing
   , shifting
   ) where
 
 import Prelude
-import Control.Monad.Rec.Class (Step(..))
+import Control.Monad.Rec.Class (Step(..), tailRecM)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe, maybe, maybe')
 import Domain.Problem (Problem(..))
 import Domain.Syntax (Diagnostic, Position, Span, origin, problemAt)
 import Format.Lex (Token)
+import Format.Stack (Stack)
+import Format.Stack as Stack
 
 -- The token cursor beneath Format.Parse.Grammar: reading the next token and
 -- moving past it. Grammar is the only importer.
@@ -49,6 +54,9 @@ type Run a = State → Either Diagnostic (Parsed a)
 
 -- After a list item: resume (Loop) at the next item, end (Done) or fail.
 type Continue = State → Either Diagnostic (Step State State)
+
+-- Items so far, and the deepest level they reach as measured in the chain.
+type Chaining a = { items ∷ Stack a, peak ∷ Int, rest ∷ State }
 
 -- The parser reads tokens by index: Array.uncons copied the remaining tokens
 -- on every take, which made parsing quadratic (BACKLOG E002).
@@ -96,6 +104,40 @@ infixedAt limit parser state
   | state.peak >= limit = tooDeep limit state
   | otherwise = parser (deepen state)
 
+-- Parentheses around a type: one level deeper while parsed, so parsing
+-- never recurses past the limit, but no level of their own once closed:
+-- the type inside counts where the parentheses stand (FN001 design §1).
+groupedAt ∷ ∀ a. Int → Run a → Run a
+groupedAt limit parser state
+  | state.depth >= limit = tooDeep limit state
+  | otherwise = map closed (parser (enter state))
+      where
+      closed parsed = parsed { rest = ungroup state parsed.rest }
+
+-- Each item is measured from the chain's depth; one followed by `operator`
+-- is a parameter, one level deeper, checked at the operator once parsed;
+-- the last is the result and is not (FN001 design §1). A loop, so a chain
+-- of any length costs no recursion.
+rightAt ∷ ∀ a. Int → String → Run a → Run { init ∷ Array a, last ∷ a }
+rightAt limit operator item state =
+  tailRecM step { items: Stack.empty, peak: state.peak, rest: state }
+  where
+  step chain = item (chain.rest { peak = chain.rest.depth })
+    >>= after chain
+  after chain parsed
+    | peekText parsed.rest /= operator = Right (Done (finish chain parsed))
+    | parsed.rest.peak >= limit = tooDeep limit parsed.rest
+    | otherwise = Right (Loop (parameter chain parsed))
+  parameter chain parsed =
+    { items: Stack.push parsed.value chain.items
+    , peak: max chain.peak (parsed.rest.peak + 1)
+    , rest: skip parsed.rest
+    }
+  finish chain parsed =
+    { value: { init: Array.fromFoldable chain.items, last: parsed.value }
+    , rest: parsed.rest { peak = max chain.peak parsed.rest.peak }
+    }
+
 -- One level deeper, with its own peak; the caller checks the limit.
 enter ∷ State → State
 enter state = state { depth = state.depth + 1, peak = state.depth + 1 }
@@ -104,6 +146,10 @@ enter state = state { depth = state.depth + 1, peak = state.depth + 1 }
 leave ∷ State → State → State
 leave outer inner =
   inner { depth = outer.depth, peak = max outer.peak inner.peak }
+
+ungroup ∷ State → State → State
+ungroup outer inner =
+  inner { depth = outer.depth, peak = max outer.peak (inner.peak - 1) }
 
 -- An infix operator makes everything parsed since the enclosing nested
 -- position its left operand, one level deeper.
@@ -118,6 +164,11 @@ separated ∷ String → Continue
 separated separator state =
   Right
     (if peekText state == separator then Loop (skip state) else Done state)
+
+-- Items that each begin with `text`, which the item itself consumes.
+leading ∷ String → Continue
+leading text state =
+  Right (if peekText state == text then Loop state else Done state)
 
 trailing ∷ String → String → Continue
 trailing separator close state

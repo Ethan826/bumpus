@@ -4,6 +4,7 @@ module Domain.Resolved
   ) where
 
 import Prelude
+import Data.Maybe (Maybe)
 import Domain.Syntax (Operator, Span, TypeRef)
 import Domain.Type (Ty(..), TypeId(..), VarId(..))
 
@@ -62,6 +63,13 @@ data Expr
   | Compare Span Operator Expr Expr
   | If Span Expr Expr Expr
   | Match Span Expr (Array Arm)
+  | Lambda Span (Array Param) Expr
+  | Apply Span Expr (Array Expr)
+  | Pipe Span Expr Expr
+
+-- A lambda parameter: a local, or `_` (Nothing), which binds nothing. Its
+-- annotation names only the enclosing signature's variables.
+type Param = { local ∷ Maybe LocalId, ty ∷ Maybe (Ty VarId), span ∷ Span }
 
 type Parameter = { name ∷ String, ty ∷ Ty VarId, span ∷ Span }
 
@@ -95,3 +103,6 @@ exprSpan expression = case expression of
   Compare span _ _ _ → span
   If span _ _ _ → span
   Match span _ _ → span
+  Lambda span _ _ → span
+  Apply span _ _ → span
+  Pipe span _ _ → span

@@ -9,7 +9,15 @@ import Data.Traversable (traverse)
 import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
 import Domain.Resolved (CtorId(..), CtorInfo, TypeInfo)
-import Domain.Syntax (Diagnostic, Span, TypeRef(..), problemAt, typeRefSpan)
+import Domain.Syntax
+  ( Diagnostic
+  , RefSpine
+  , Span
+  , TypeRef(..)
+  , problemAt
+  , typeRefSpan
+  , typeRefSpine
+  )
 import Domain.Type (Ty(..), TypeId(..), VarId, children)
 import Features.Check.Components (components)
 
@@ -53,7 +61,9 @@ judgeType types component owned = traverse_ judgeCtor owned.ctors
     == Array.index component owned.index
 
 -- Pre-order: a reference is judged before the references in its
--- arguments, so the outermost offending one is reported.
+-- arguments, so the outermost offending one is reported. An arrow's
+-- parameters and final result are walked beside its written spine, in
+-- source order, by a loop along the spine (`children`, `typeRefSpine`).
 judgeField
   ∷ Array TypeInfo
   → (TypeId → Boolean)
@@ -65,8 +75,9 @@ judgeField types inside ty syntax = case ty, syntax of
     arguments
     references
   TData _ _, _ → Left (mismatch (typeRefSpan syntax))
-  -- No field syntax writes an arrow until FN001 Task 3, so a resolved
-  -- arrow here has no source beside it.
+  TFun _ _, FunRef span _ _ → paired span (children ty)
+    (spineParts (typeRefSpine syntax))
+    (judgeField types inside)
   TFun _ _, _ → Left (mismatch (typeRefSpan syntax))
   _, _ → Right unit
   where
@@ -93,6 +104,9 @@ paired span left right judge
   | Array.length left == Array.length right = sequence_
       (Array.zipWith judge left right)
   | otherwise = Left (mismatch span)
+
+spineParts ∷ RefSpine → Array TypeRef
+spineParts found = Array.snoc found.parameters found.result
 
 mismatch ∷ Span → Diagnostic
 mismatch = problemAt (Internal "Field syntax mismatch")

@@ -1,6 +1,11 @@
 module Domain.Syntax where
 
 import Prelude
+import Control.Monad.Rec.Class (Step(..), tailRec)
+import Data.Array as Array
+import Data.Maybe (Maybe(..))
+import Data.Traversable (mapAccumL)
+import Data.Tuple (Tuple(..))
 import Domain.Problem (Problem)
 
 type Position = { offset ∷ Int, line ∷ Int, column ∷ Int }
@@ -20,6 +25,12 @@ data Expr
   | Compare Span Operator Expr Expr
   | If Span Expr Expr Expr
   | Match Span Expr (Array Arm)
+  | Lambda Span (Array LambdaParam) Expr
+  | Apply Span Expr (Array Expr)
+  | Pipe Span Expr Expr
+
+-- A lambda parameter spans its name; `_` (no name) binds nothing.
+type LambdaParam = { name ∷ Maybe String, ty ∷ Maybe TypeRef, span ∷ Span }
 
 data Pattern
   = PWildcard Span
@@ -31,12 +42,17 @@ data Pattern
 type Arm = { pattern ∷ Pattern, body ∷ Expr, span ∷ Span }
 
 -- A lowercase name is a type variable; an applied type spans its head
--- through its closing parenthesis.
+-- through its closing parenthesis. `FunRef` is one arrow, parameter then
+-- result; `(A, B) -> C` is written notation for `A -> B -> C`.
 data TypeRef
   = IntRef Span
   | BoolRef Span
   | VarRef Span String
   | NamedRef Span String (Array TypeRef)
+  | FunRef Span TypeRef TypeRef
+
+-- An arrow's parameters along its result side, and the final result.
+type RefSpine = { parameters ∷ Array TypeRef, result ∷ TypeRef }
 
 type CtorDecl = { name ∷ String, fields ∷ Array TypeRef, span ∷ Span }
 type TypeParameter = { name ∷ String, span ∷ Span }
@@ -90,6 +106,9 @@ exprSpan = case _ of
   Compare span _ _ _ → span
   If span _ _ _ → span
   Match span _ _ → span
+  Lambda span _ _ → span
+  Apply span _ _ → span
+  Pipe span _ _ → span
 
 typeRefSpan ∷ TypeRef → Span
 typeRefSpan = case _ of
@@ -97,6 +116,23 @@ typeRefSpan = case _ of
   BoolRef span → span
   VarRef span _ → span
   NamedRef span _ _ → span
+  FunRef span _ _ → span
+
+-- A written spine can be thousands of arrows long, so it is walked by
+-- loops, never by one recursion per arrow: one counts the arrows, one takes
+-- their parameters (as Domain.Type `spineThrough` does).
+typeRefSpine ∷ TypeRef → RefSpine
+typeRefSpine reference =
+  { parameters: Array.catMaybes taken.value, result: taken.accum }
+  where
+  count = tailRec counted (Tuple 0 reference)
+  counted (Tuple found rest) = case rest of
+    FunRef _ _ more → Loop (Tuple (found + 1) more)
+    _ → Done found
+  taken = mapAccumL take reference (Array.replicate count unit)
+  take rest _ = case rest of
+    FunRef _ parameter more → { accum: more, value: Just parameter }
+    settled → { accum: settled, value: Nothing }
 
 patternSpan ∷ Pattern → Span
 patternSpan = case _ of

@@ -1,6 +1,7 @@
 # First-Class Functions Implementation Plan (FN001)
 
-Status: Task 2 complete 2026-10-08 (arrow type; docs/progress.md).
+Status: Task 3 complete 2026-10-08 (syntax and resolution;
+docs/progress.md). Task 2 complete 2026-10-08 (arrow type).
 Task 1 complete 2026-10-08 (three measurement rounds; design §13
 records the adopted convention and the scale rule, both approved by the
 user, adoption conditional on round 3, which passed). Nine-task
@@ -243,7 +244,7 @@ arrows directly.
   variables must be the enclosing signature's (E_UNBOUND `Unbound type
   variable b`).
 
-- [ ] **Step 1: Write failing tests** in test/fn-syntax.test.mjs: each
+- [x] **Step 1: Write failing tests** in test/fn-syntax.test.mjs: each
   E_SYNTAX form of §1 with span and text; `(A, B) -> C` and `A -> B -> C`
   resolve equal; precedence of lambda, `|>` and comparison; postfix
   chains `f(1)(2)` and `(g)(x)`; `->`/`|>` lexing beside `-1` and `|`;
@@ -251,10 +252,10 @@ arrows directly.
   parameter positions rejected with E_NESTING); each §2 table row,
   shadowing, `_` repetition, duplicate and unbound annotation rows. Reach:
   Parse → Resolve (test/phases.mjs).
-- [ ] **Step 2: Run** `node --test test/fn-syntax.test.mjs`. Expected: FAIL.
-- [ ] **Step 3: Implement.** No existing row changes in this task.
-- [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0.
-- [ ] **Step 5: Commit** `feat: function types, lambdas, application and
+- [x] **Step 2: Run** `node --test test/fn-syntax.test.mjs`. Expected: FAIL.
+- [x] **Step 3: Implement.** No existing row changes in this task.
+- [x] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0.
+- [x] **Step 5: Commit** `feat: function types, lambdas, application and
   pipe syntax (FN001)`.
 
 ### Task 4: Checking

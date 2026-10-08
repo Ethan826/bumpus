@@ -126,3 +126,28 @@ Every form, including match-arm and compare-matches, builds and runs at the
 limit since E005 lowered each match to a named Go function (ADR 003 item
 6); before that, nested match closures made `go build` exponential and
 those two forms ran only at depth 16.
+
+## Functions (FN001 Task 3, 2026-10-08)
+
+Function syntax extends what counts, with the measure of the FN001 design
+(docs/plans/2026-10-08-functions-design.md section 1); the limit is
+unchanged. Tests: test/fn-syntax.test.mjs, through Parse and Resolve.
+
+- Types: an arrow's parameter side is one level deeper than the arrow, its
+  result side is not, so `Int -> … -> Int` of any length is one level and
+  `(Int -> Int) -> Int` two. An arrow chain is read by a loop (Grammar
+  `chainRight`, Cursor `rightAt`): each item is measured from the chain's
+  depth, and when `->` follows one, its peak plus one must be within the
+  limit, else E_NESTING at that `->`. 128 nested parameter positions
+  resolve; 129 are E_NESTING.
+- Parentheses around types add nothing to the measure but are one level
+  deeper while parsed (Cursor `groupedAt`), so parsing never recurses past
+  the limit: more than 128 nested parentheses are E_NESTING even where
+  they are redundant (`Int -> ((…(Int)…))`), the only departure from the
+  design's measure.
+- Expressions: a lambda body is a nested position; `|>` operands count as
+  `+` operands do (`chainLeft1`); each postfix application after a
+  primary or call (`g(1)(2)`, `(g)(x)`) pushes its callee one level
+  deeper, as an infix operator does (`infixed`), so after `g(1)` 127
+  further applications parse and 128 are E_NESTING. A name call `g(1)`
+  counts as before.

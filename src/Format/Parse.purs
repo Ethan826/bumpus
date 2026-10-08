@@ -13,7 +13,8 @@ import Domain.Syntax
   , TypeDecl
   )
 import Format.Lex (Token, endPosition, lex)
-import Format.Parse.Declaration (typeDeclaration, typeRef)
+import Format.Parse.Declaration (typeDeclaration)
+import Format.Parse.Type (typeRef)
 import Format.Parse.Expression (expression)
 import Format.Parse.Grammar
   ( Parser

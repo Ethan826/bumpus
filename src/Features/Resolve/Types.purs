@@ -9,6 +9,7 @@ import Data.Traversable (traverse)
 import Domain.Problem (DuplicateKind(..), Problem(..), UnboundKind(..))
 import Domain.Syntax as Syntax
 import Domain.Resolved as Resolved
+import Domain.Type (arrows)
 import Features.Resolve.Repeated (repeated)
 import Features.Resolve.Variables (uniqueTypeParameters)
 
@@ -57,6 +58,10 @@ resolveType types variables = resolved
       (unbound UnboundType span name)
       (applied span name arguments)
       (Array.findIndex (named name) types)
+    arrow@(Syntax.FunRef _ _ _) → spine (Syntax.typeRefSpine arrow)
+  -- A long written spine is resolved by a loop, not one call per arrow.
+  spine found = arrows <$> traverse resolved found.parameters
+    <*> resolved found.result
   variable index = pure (Resolved.TVar (Resolved.VarId index))
   named name info = info.name == name
   applied span name arguments index

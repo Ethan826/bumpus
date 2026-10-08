@@ -1561,3 +1561,66 @@ Branch fn001. Behavior-preserving: no syntax produces an arrow yet.
   can no longer file a result as a parameter (its unreachable arm adds
   none); a redundant Inhabited arm removed; a unify-arrow test renamed;
   headroom figures above reworded as approximate.
+
+### FN001 Task 3: syntax and resolution (2026-10-08)
+
+Branch fn001. No existing row changes; bare names and calls of locals keep
+their P001 resolution until Task 4.
+
+- What changed: Format.Lex lexes `->` and `|>` longest first. Domain.Syntax
+  gains `FunRef`, `Lambda`, `Apply`, `Pipe`, `LambdaParam` and
+  `typeRefSpine` (a loop). The type parser moved to the new
+  Format.Parse.Type: an arrow chain is read as a list (Grammar
+  `chainRight`, Cursor `rightAt`, a `tailRecM` loop) and folded right;
+  `(A, B) -> C` flattens to `A -> B -> C`; a list of two or more types not
+  followed by `->` is `Expected ->`, `()` is `Expected a type` at `)`.
+  Nesting follows design §1 (parameter side +1, checked at its `->`;
+  result side +0); type parentheses are one level while parsed (Cursor
+  `groupedAt`) and none once closed, recorded in ADR 006's new FN001
+  section. Format.Parse.Lambda parses `fn(x, _: T) => body` (`Expected a
+  parameter`); Format.Parse.Expression adds `|>` (a `chainLeft1` over
+  comparisons) and postfix application (Grammar `manyOn`), each further
+  `(…)` an infix-like level; a name call stays `Call`. Domain.Resolved
+  gains `Lambda` (with `Param = { local, ty, span }`), `Apply` and `Pipe`;
+  Features.Resolve.Lambda resolves parameters (E_DUPLICATE `Duplicate
+  parameter x` at the first repeated name, as for functions; `_` gets no
+  LocalId; annotations against the signature's variables, E_UNBOUND
+  `Unbound type variable b`); `resolveType` and `occurrences` walk
+  written spines by loops. Check.Infer returns `Internal "unchecked
+  function"` for the three new nodes. Check.Nested replaces Task 2's
+  placeholder: an arrow field is judged beside its written spine
+  (parameters and final result, paired by a loop), so a nested reference
+  inside an arrow is reported at its own span. test/poly-parse.mjs (the
+  oracle's own parser) reads arrow types, lambdas, postfix application and
+  pipes, independently. Style gate: Format.Parse.Type and
+  Format.Parse.Lambda join the applicative production modules. BACKLOG
+  E003 notes two dispatches now over the branch target.
+- Not added: Resolved `FunctionRef`/`CtorRef` expression constructors.
+  Domain.Resolved's `GlobalRef` already has constructors of those names,
+  so adding them needs that rename, which belongs with Task 4's bare-name
+  resolution.
+- Tests seen failing first (before any code): test/fn-syntax.test.mjs and
+  test/fn-names.test.mjs, 43 tests, 42 failing and one passing (`1 +
+  fn(y) => y` is `Expected an expression` at `fn` before and after, kept
+  as a characterization row); test/fn-oracle-syntax.test.mjs, 2 tests,
+  both failing. Added after the code, each shown to bite by an isolated
+  mutant (scratchpad copy, not committed): `a parameter inside a
+  parameter counts both levels` (mutant: a parameter contributes no level
+  in `rightAt`), the `(Int -> L^127(Int)) -> Int` row (mutant: a result
+  contributes a level), `127 further applications parse; one more is
+  E_NESTING` (mutant: postfix application without `infixed`). Further
+  mutants, each failing the named rows: type parentheses keeping their
+  level (`128 nested parameter positions resolve`); no lambda duplicate
+  check (both E_DUPLICATE rows); Nested arrow arm restored to a mismatch
+  (all four arrow-field rows); no `Expected ->` lookahead (both rows).
+- Plan Step 1's "each §2 table row" is covered for lambda parameters
+  (bare local, shadowing a parameter, a function and by a match binder,
+  `_`, duplicates, rigid and unbound annotations). The rows for bare
+  function and constructor names and calls of locals change in Task 4
+  (plan Global Constraints), so no interim outcome is pinned here.
+- Reach: Parse → Resolve (test/phases.mjs); the Nested arrow-field rows
+  run Check (`checkRejectedAt`, `checkedPoly`), whose programs contain no
+  lambda, application or pipe.
+- GREEN: `rm -rf output && npm run verify` exit 0, 380 tests (333 + 47),
+  zero failures/skips, twelve regression proofs; bootstrap snapshots
+  unchanged. Log .build/fn001-task3-verify.log.

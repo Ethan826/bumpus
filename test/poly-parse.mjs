@@ -1,10 +1,12 @@
 // The surface syntax for the reference interpreter (test/poly-oracle.mjs),
-// type parameters and applied types included. Types are read and dropped:
-// the interpreter evaluates without them. Shares no code with the compiler.
+// type parameters, applied and function types, lambdas, postfix
+// application and pipes included (FN001). Types are read and dropped: the
+// interpreter evaluates without them. Shares no code with the compiler.
 
 // An integer (a minus belongs to its literal), a word, or punctuation.
 const token = new RegExp(String.raw`\s*(?:(-\s*\d+|\d+)|`
-  + String.raw`([A-Za-z_][A-Za-z0-9_]*)|(=>|==|!=|<=|>=|[<>(){},;:=+|]))`, 'y');
+  + String.raw`([A-Za-z_][A-Za-z0-9_]*)|`
+  + String.raw`(=>|==|!=|<=|>=|->|\|>|[<>(){},;:=+|]))`, 'y');
 
 const tokenize = source => {
   const tokens = [];
@@ -43,9 +45,14 @@ export const parseProgram = source => {
     take(close);
     return items;
   };
-  const skipType = () => {
-    take();
+  // An operand, or a parenthesized list, then any further `-> operand`.
+  const skipOperand = () => {
+    if (!peek('(')) take();
     if (peek('(')) { take('('); list(skipType, ')'); }
+  };
+  const skipType = () => {
+    skipOperand();
+    while (peek('->')) { take('->'); skipOperand(); }
   };
   const pattern = () => {
     const next = take();
@@ -63,7 +70,30 @@ export const parseProgram = source => {
     take('=>');
     return { pattern: matched, body: expression() };
   };
+  // `_` discards its argument: null in the parameter list.
+  const lambdaParameter = () => {
+    const name = take().text;
+    if (peek(':')) { take(':'); skipType(); }
+    return name === '_' ? null : name;
+  };
+  const lambda = () => {
+    take('fn');
+    take('(');
+    const parameters = list(lambdaParameter, ')');
+    take('=>');
+    return { tag: 'lambda', parameters, body: expression() };
+  };
+  // A name directly followed by `(` is a call; each further `(…)` applies
+  // the value before it.
   const atom = () => {
+    let node = primary();
+    while (peek('(')) {
+      take('(');
+      node = { tag: 'applyValue', callee: node, args: list(expression, ')') };
+    }
+    return node;
+  };
+  const primary = () => {
     const next = take();
     if (next.kind === 'int') return { tag: 'value', value: next.value };
     if (next.text === 'true' || next.text === 'false') {
@@ -93,7 +123,16 @@ export const parseProgram = source => {
     const operator = take().text;
     return { tag: 'compare', operator, left, right: addition() };
   };
+  const pipeline = () => {
+    let left = comparison();
+    while (peek('|>')) {
+      take('|>');
+      left = { tag: 'pipe', left, right: comparison() };
+    }
+    return left;
+  };
   const expression = () => {
+    if (peek('fn')) return lambda();
     if (peek('if')) {
       take('if');
       const condition = expression();
@@ -102,7 +141,7 @@ export const parseProgram = source => {
       take('else');
       return { tag: 'if', condition, yes, no: expression() };
     }
-    if (!peek('match')) return comparison();
+    if (!peek('match')) return pipeline();
     take('match');
     const scrutinee = expression();
     take('{');

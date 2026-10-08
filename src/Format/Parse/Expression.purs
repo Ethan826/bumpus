@@ -1,6 +1,7 @@
 module Format.Parse.Expression (expression) where
 
 import Prelude
+import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe, maybe)
 import Domain.Problem (Problem(..))
@@ -8,6 +9,7 @@ import Domain.Syntax
   ( Diagnostic
   , Expr(..)
   , Operator(..)
+  , Position
   , Span
   , exprSpan
   , problemAt
@@ -23,19 +25,25 @@ import Format.Parse.Grammar
   , expect
   , failWith
   , infixed
+  , manyOn
   , name
   , nested
   , on
   , onWhen
   , optionalOn
   , refine
+  , sepBy1
   , spanned
   , token
   )
+import Format.Parse.Lambda (lambda)
 import Format.Parse.Literal (integerLiteral, integerStart)
 import Format.Parse.Pattern (arms)
 
 type Comparison = { text ∷ String, operator ∷ Operator }
+
+-- One postfix `(arguments)` and where its `)` ends.
+type Application = { arguments ∷ Array Expr, end ∷ Position }
 
 comparisons ∷ Array Comparison
 comparisons =
@@ -51,14 +59,24 @@ comparisons =
 -- reaches `expression` lazily, rather than naming `expression` themselves.
 -- Every use of `inner` is a nested position (ADR 006): a parenthesized
 -- expression, an `if` condition or branch, a `match` scrutinee or arm body,
--- or a call or constructor argument.
+-- a call or constructor argument, or a lambda body.
 expression ∷ Parser Expr
 expression = dispatch
-  [ on "if" (conditional inner), on "match" (matchExpression inner) ]
-  (comparison inner)
+  [ on "if" (conditional inner)
+  , on "match" (matchExpression inner)
+  , on "fn" (lambda inner)
+  ]
+  (pipeline inner)
   where
   inner = nested (defer later)
   later _ = expression
+
+-- `a |> f |> g` is `(a |> f) |> g`, looser than comparison; an `if`,
+-- `match` or lambda operand needs parentheses (FN001 design §1).
+pipeline ∷ Parser Expr → Parser Expr
+pipeline inner = chainLeft1 "|>" pipe (comparison inner)
+  where
+  pipe left right = Pipe (spanBetween left right) left right
 
 -- Comparison is non-associative: one operator between two additions, and
 -- E_SYNTAX at a second operator. Both operands are one level deeper.
@@ -106,9 +124,28 @@ matchExpression inner = matchOf <$> expect "match" <*> inner <* expect "{"
   matchOf keyword scrutinee matched close =
     Match { start: keyword.span.start, end: close.span.end } scrutinee matched
 
--- Parentheses return the inner expression with its own span.
+-- A primary, then any number of postfix applications, folded left:
+-- `g(1)(2)` applies `g(1)` to 2. Each pushes its callee one level deeper,
+-- like an infix operator (ADR 006), and takes at least one argument.
 atom ∷ Parser Expr → Parser Expr
-atom inner = dispatch
+atom inner = Array.foldl applied <$> primary inner
+  <*> manyOn "(" (application inner)
+  where
+  applied callee found = Apply
+    { start: (exprSpan callee).start, end: found.end }
+    callee
+    found.arguments
+
+application ∷ Parser Expr → Parser Application
+application inner = applicationOf <$ infixed (expect "(")
+  <*> sepBy1 "," inner
+  <*> expect ")"
+  where
+  applicationOf arguments close = { arguments, end: close.span.end }
+
+-- Parentheses return the inner expression with its own span.
+primary ∷ Parser Expr → Parser Expr
+primary inner = dispatch
   [ on "(" (expect "(" *> inner <* expect ")")
   , on "true" (boolean true <$> token)
   , on "false" (boolean false <$> token)

@@ -8,18 +8,25 @@ import Data.Traversable (traverse)
 import Domain.Problem (Problem(..), UnboundKind(..))
 import Domain.Syntax as Syntax
 import Features.Resolve.Fresh (Fresh, failure, liftEither)
+import Features.Resolve.Lambda (lambda)
 import Features.Resolve.Pattern (resolvePattern)
 import Domain.Resolved (Global)
 import Domain.Resolved as Resolved
 
+-- `types` and `variables` (the enclosing signature's) are what a lambda
+-- annotation may name.
 type Scope =
   { globals ∷ Array Global
   , ctors ∷ Array Resolved.CtorInfo
   , locals ∷ Array Resolved.Local
+  , types ∷ Array Resolved.TypeInfo
+  , variables ∷ Array String
   }
 
--- Binders are numbered in source pre-order: scrutinee before arms, and each
--- arm's pattern before its body.
+-- Binders are numbered in source pre-order: scrutinee before arms, each
+-- arm's pattern before its body, a lambda's parameters before its body.
+-- Bare names and calls of locals keep their P001 resolution until FN001
+-- Task 4. A flat exhaustive dispatch (BACKLOG E003).
 expression ∷ Scope → Syntax.Expr → Fresh Resolved.Expr
 expression scope = case _ of
   Syntax.Integer span value → pure (Resolved.Integer span value)
@@ -37,6 +44,12 @@ expression scope = case _ of
   Syntax.Match span scrutinee arms → Resolved.Match span
     <$> nested scrutinee
     <*> traverse (resolveArm scope) arms
+  Syntax.Lambda span parameters body → lambda scope span parameters
+    (withLocals scope body)
+  Syntax.Apply span callee arguments → Resolved.Apply span <$> nested callee
+    <*> traverse nested arguments
+  Syntax.Pipe span left right → Resolved.Pipe span <$> nested left
+    <*> nested right
   where
   -- Eta-expanded: a point-free `expression scope` would recurse at once.
   nested syntax = expression scope syntax
@@ -45,10 +58,14 @@ expression scope = case _ of
 resolveArm ∷ Scope → Syntax.Arm → Fresh Resolved.Arm
 resolveArm scope arm = do
   matched ← resolvePattern scope.globals scope.ctors arm.pattern
-  body ← expression (inner matched.binders) arm.body
+  body ← withLocals scope arm.body matched.binders
   pure { pattern: matched.pattern, body, span: arm.span }
-  where
-  inner binders = scope { locals = scope.locals <> binders }
+
+-- Later locals shadow earlier ones (findLocal searches from the end).
+withLocals
+  ∷ Scope → Syntax.Expr → Array Resolved.Local → Fresh Resolved.Expr
+withLocals scope body locals =
+  expression (scope { locals = scope.locals <> locals }) body
 
 -- A local wins, then a nullary constructor. Functions are not values.
 bareName

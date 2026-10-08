@@ -73,7 +73,8 @@ skip ∷ Scan → Char → Scan
 skip state character = state
   { index = state.index + 1, position = advance state.position character }
 
--- Two-character tokens win over their one-character prefixes.
+-- Two-character tokens win over their one-character prefixes: `->` over
+-- the minus of a negative literal, `|>` over `|`.
 twoCharacter ∷ Array Char → Int → Maybe String
 twoCharacter characters index = Array.find matches twoCharacterTokens
   where
@@ -81,7 +82,7 @@ twoCharacter characters index = Array.find matches twoCharacterTokens
     characters
 
 twoCharacterTokens ∷ Array String
-twoCharacterTokens = [ "=>", "==", "!=", "<=", ">=" ]
+twoCharacterTokens = [ "=>", "==", "!=", "<=", ">=", "->", "|>" ]
 
 -- Tokens never contain a newline, so a token only moves the column.
 emit ∷ String → Scan → Scan

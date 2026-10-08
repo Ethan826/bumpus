@@ -38,6 +38,8 @@ infer env state expression = do
 
 -- Every type equality is a unification, in the order monomorphic checking
 -- compared types, so a monomorphic program's first error is unchanged.
+-- Functions, lambdas and pipes are typed from FN001 Task 4. A flat
+-- exhaustive dispatch (BACKLOG E003).
 inferNode ∷ Env → State → Resolved.Expr → Inferred
 inferNode env state expression = case expression of
   Resolved.Integer span value → typed state span TInt (Checked.Integer value)
@@ -60,6 +62,12 @@ inferNode env state expression = case expression of
   Resolved.Match span scrutinee arms → checkMatch infer env state span
     scrutinee
     arms
+  Resolved.Lambda span _ _ → unchecked span
+  Resolved.Apply span _ _ → unchecked span
+  Resolved.Pipe span _ _ → unchecked span
+
+unchecked ∷ Span → Inferred
+unchecked = Left <<< problemAt (Internal "unchecked function")
 
 typed ∷ State → Span → Ty Open → Checked.Node → Inferred
 typed state span ty node = pure

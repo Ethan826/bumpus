@@ -45,11 +45,13 @@ Format.Wire.
   `apply` is the only place the remaining input is threaded (the
   `state-thread` regression row restores the defect); Format.Parse.Cursor
   holds the token state and its primitive steps. Every list (`sepBy1`,
-  `sepByTrailing1`, `commaList`, `chainLeft1`) is a `tailRecM` loop, so
-  breadth costs no stack. `nested`, `infixed` and `rooted` count nesting,
-  and depth past `nestingLimit` (128) is E_NESTING. Productions
-  (Format.Parse and Format.Parse.{Literal, Pattern, Expression,
-  Declaration}) may not use `do`, `bind` or the Kleisli operators, and only
+  `sepByTrailing1`, `commaList`, `chainLeft1`, `chainRight`, `manyOn`) is
+  a `tailRecM` loop, so breadth costs no stack; an arrow type's chain is
+  read by `chainRight` and folded right (FN001). `nested`, `infixed`,
+  `grouped`, `chainRight` and `rooted` count nesting, and depth past
+  `nestingLimit` (128) is E_NESTING. Productions (Format.Parse and
+  Format.Parse.{Literal, Pattern, Expression, Declaration, Type, Lambda})
+  may not use `do`, `bind` or the Kleisli operators, and only
   Format.Parse imports `run` and `initialState` (CST gate,
   docs/engineering.md).
 - **Resolve** has two type passes (register names, assign TypeId/CtorId in
