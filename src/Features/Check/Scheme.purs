@@ -25,7 +25,7 @@ import Data.Traversable (traverse)
 import Domain.Checked.Internal (Open(..))
 import Domain.Checked.Internal as Checked
 import Domain.Syntax (Diagnostic, Span)
-import Domain.Type (Ty(..), VarId(..))
+import Domain.Type (Ty(..), VarId(..), children)
 import Features.Check.Unify (Flex, Subst, exceedsLimit, resolve)
 import Features.Check.Unify as Unify
 import Features.Check.Walk (foldTypes, retype)
@@ -142,5 +142,4 @@ numberHole found meta =
 foldHoles ∷ ∀ b. (b → Int → b) → b → Ty Open → b
 foldHoles step found = case _ of
   TVar (Hole meta) → step found meta
-  TData _ arguments → foldl (foldHoles step) found arguments
-  _ → found
+  ty → foldl (foldHoles step) found (children ty)

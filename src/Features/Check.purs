@@ -11,6 +11,7 @@ import Domain.Resolved as Resolved
 import Domain.Syntax (Diagnostic)
 import Features.Check.Comparable (comparable)
 import Features.Check.Coverage (coverage)
+import Features.Check.Functional (Functional, functional)
 import Features.Check.Infer (Env, infer)
 import Features.Check.Instantiation (instantiationRule)
 import Features.Check.Require (require, tooDeepAt)
@@ -33,7 +34,9 @@ check program = do
   coverage checked
   pure checked
   where
-  checkDefinition definition = checkFunction (environment program definition)
+  holders = functional program.ctors
+  checkDefinition definition = checkFunction holders
+    (environment program definition)
     definition
 
 environment ∷ Resolved.Program → Resolved.FunctionDecl → Env
@@ -53,13 +56,16 @@ environment program function =
 -- when built deepens as its metas are bound); then the body's comparisons
 -- must be ground; then the metas still unsolved become holes.
 checkFunction
-  ∷ Env → Resolved.FunctionDecl → Either Diagnostic Checked.FunctionDecl
-checkFunction env function = do
+  ∷ Functional
+  → Env
+  → Resolved.FunctionDecl
+  → Either Diagnostic Checked.FunctionDecl
+checkFunction holders env function = do
   body ← infer env start function.body
   finished ← require env body.state (rigid function.result) body.value
   maybe (Right unit) tooDeepAt (firstTooDeep finished.subst body.value)
   let settled = retype (resolved finished.subst) body.value
-  comparable env settled
+  comparable holders env settled
   pure
     { id: function.id
     , name: function.name

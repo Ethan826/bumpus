@@ -20,7 +20,7 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Domain.Checked.Internal (Open)
 import Domain.Problem (Problem(..))
 import Domain.Resolved (CtorId(..), CtorInfo, TypeId(..), TypeInfo)
-import Domain.Type (Ty(..), VarId(..), ground)
+import Domain.Type (Ty(..), VarId(..), arrows, children, ground, spine)
 import Features.Check.Tables (Lookup, ctorInfo, typeInfo)
 
 -- An application with its variables forgotten: rigid variables and holes
@@ -32,8 +32,9 @@ type Key = Ty Unit
 -- fields, numbered by its spelling; finite by the instantiation rule
 -- (design §4.2). The n-th entry of `types` is application n, listing its
 -- own constructors in the declared order; their fields name applications as
--- `TData (TypeId n) []` and the abstract type as Int, which is all
--- Inhabited reads: inhabited and never a data type.
+-- `TData (TypeId n) []` and the abstract type and every arrow as Int, which
+-- is all Inhabited reads: inhabited and never a data type (an arrow is
+-- always inhabited, design §3, so its parts are never unfolded).
 type Expansion =
   { numbers ∷ Map String Int
   , types ∷ Array TypeInfo
@@ -79,8 +80,12 @@ substitute arguments = case _ of
   TBool → Right TBool
   TData id inner → TData id <$> traverse (substitute arguments) inner
   TVar (VarId index) → maybe' missing Right (Array.index arguments index)
+  arrow@(TFun _ _) → substituteSpine (spine arrow)
   where
   missing _ = Left (Internal "Invalid type argument")
+  substituteSpine found = arrows
+    <$> traverse (substitute arguments) found.parameters
+    <*> substitute arguments found.result
 
 key ∷ Ty Open → Key
 key = map forget
@@ -90,7 +95,9 @@ key = map forget
 -- A key's canonical text, the map key for its number. Comparing two
 -- spellings is one native string comparison; comparing two keys walked
 -- both through Ord dictionaries, and with applications nested a thousand
--- deep that comparison was nearly all of checking (P001 final fix).
+-- deep that comparison was nearly all of checking (P001 final fix). An
+-- arrow is `f(` its parameters and final result `)`, which no data
+-- application's spelling (a number first) can be.
 spelling ∷ Key → String
 spelling = case _ of
   TInt → "i"
@@ -98,6 +105,8 @@ spelling = case _ of
   TVar _ → "v"
   TData (TypeId id) arguments → show id <> "("
     <> joinWith "," (map spelling arguments)
+    <> ")"
+  arrow@(TFun _ _) → "f(" <> joinWith "," (map spelling (children arrow))
     <> ")"
 
 closedKey ∷ Array CtorInfo → Tuple Int TypeInfo → Lookup (Maybe Key)
@@ -183,6 +192,7 @@ field numbers = case _ of
   TInt → Right TInt
   TBool → Right TBool
   TVar _ → Right TInt
+  TFun _ _ → Right TInt
   found@(TData _ _) → maybe' unexpanded (Right <<< applied)
     (Map.lookup (spelling found) numbers)
   where

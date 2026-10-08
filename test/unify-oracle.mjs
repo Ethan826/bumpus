@@ -1,7 +1,10 @@
 // An independent reference unifier for test/unify.test.mjs: union-find over
 // plain JS types, written from the rules alone, not from Unify.purs.
 // Types: { k: 'int' } | { k: 'bool' } | { k: 'data', id, args }
+//      | { k: 'fun', args: [parameter, result] }
 //      | { k: 'rigid', n } | { k: 'meta', n }.
+// An arrow is one more two-argument constructor here: the oracle has no
+// depth bound, so it needs no parameter/result distinction.
 // Each meta is a node; a class of metas has one root, which may hold a type.
 
 const metaKey = n => `m${n}`;
@@ -27,7 +30,7 @@ const occurs = (state, key, type) => {
   while (pending.length > 0) {
     const current = head(state, pending.pop());
     if (current.k === 'meta' && metaKey(current.n) === key) return true;
-    if (current.k === 'data') pending.push(...current.args);
+    if (current.args) pending.push(...current.args);
   }
   return false;
 };
@@ -51,10 +54,10 @@ const unifyInto = (state, left, right) => {
     if (r.k === 'meta') { if (!bindMeta(state, r, l)) return false; continue; }
     if (l.k !== r.k) return false;
     if (l.k === 'rigid' && l.n !== r.n) return false;
-    if (l.k === 'data') {
-      if (l.id !== r.id || l.args.length !== r.args.length) return false;
-      l.args.forEach((arg, index) => pending.push([arg, r.args[index]]));
+    if (l.k === 'data' && (l.id !== r.id || l.args.length !== r.args.length)) {
+      return false;
     }
+    if (l.args) l.args.forEach((arg, index) => pending.push([arg, r.args[index]]));
   }
   return true;
 };
@@ -62,7 +65,7 @@ const unifyInto = (state, left, right) => {
 // The fully substituted type under the current classes.
 const settle = (state, type) => {
   const current = head(state, type);
-  if (current.k !== 'data') return current;
+  if (!current.args) return current;
   return { ...current, args: current.args.map(arg => settle(state, arg)) };
 };
 
@@ -82,6 +85,6 @@ export const canonical = (types, names = new Map()) => types.map(type => {
     if (!names.has(type.n)) names.set(type.n, names.size);
     return { k: 'meta', n: names.get(type.n) };
   }
-  if (type.k !== 'data') return type;
+  if (!type.args) return type;
   return { ...type, args: canonical(type.args, names) };
 });

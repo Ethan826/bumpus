@@ -46,14 +46,16 @@ buildSignature types ctors roots = do
 
 -- Heads whose presence makes a column complete, in declaration order.
 -- A type with no inhabited constructor has none, so it is vacuously
--- complete. A rigid variable or a hole is abstract (design §5): it has no
--- heads, and `complete` never reads it as complete.
+-- complete. A rigid variable or a hole is abstract (design §5), and so is
+-- an arrow, which only `_` and binders match (FN001 design §3): none has
+-- heads, and `complete` never reads one as complete.
 candidates ∷ Signature → Ty Open → Lookup (Array Head)
 candidates tables ty = case ty of
   TInt → Right []
   TBool → Right [ HBool true, HBool false ]
   TData id _ → applied tables id ty
   TVar _ → Right []
+  TFun _ _ → Right []
 
 -- The declared constructors whose expanded counterparts are inhabited.
 applied ∷ Signature → TypeId → Ty Open → Lookup (Array Head)

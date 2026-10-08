@@ -88,11 +88,14 @@ grouped count edges = map members
   members = Array.mapMaybe present <<< NonEmpty.toArray
   present edge = if edge.value == noValue then Nothing else Just edge.value
 
+-- Every arrow is inhabited (a diverging function exists at every type,
+-- FN001 design §3), so like Int it is no constructor's need.
 dataFields ∷ CtorInfo → Array Int
 dataFields ctor = Array.mapMaybe dataIndex ctor.fields
   where
   dataIndex = case _ of
     TData (TypeId index) _ → Just index
+    TFun _ _ → Nothing
     _ → Nothing
 
 start ∷ Graph → Round

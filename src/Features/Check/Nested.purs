@@ -1,4 +1,4 @@
-module Features.Check.Nested (nestedTypes, admissible) where
+module Features.Check.Nested (nestedTypes, admissible, referenced) where
 
 import Prelude
 import Data.Array as Array
@@ -10,7 +10,7 @@ import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
 import Domain.Resolved (CtorId(..), CtorInfo, TypeInfo)
 import Domain.Syntax (Diagnostic, Span, TypeRef(..), problemAt, typeRefSpan)
-import Domain.Type (Ty(..), TypeId(..), VarId)
+import Domain.Type (Ty(..), TypeId(..), VarId, children)
 import Features.Check.Components (components)
 
 -- The instantiation rule over the reference graph of type declarations
@@ -65,6 +65,9 @@ judgeField types inside ty syntax = case ty, syntax of
     arguments
     references
   TData _ _, _ → Left (mismatch (typeRefSpan syntax))
+  -- No field syntax writes an arrow until FN001 Task 3, so a resolved
+  -- arrow here has no source beside it.
+  TFun _ _, _ → Left (mismatch (typeRefSpan syntax))
   _, _ → Right unit
   where
   reference span id arguments references = offending span id arguments
@@ -94,14 +97,15 @@ paired span left right judge
 mismatch ∷ Span → Diagnostic
 mismatch = problemAt (Internal "Field syntax mismatch")
 
+-- An arrow is a constructor of two arguments to the reference graph: the
+-- types its parameters and result mention are referenced.
 referenced ∷ ∀ v. Ty v → Array Int
 referenced = case _ of
   TData (TypeId index) arguments → Array.cons index
     (Array.concatMap referenced arguments)
-  _ → []
+  ty → Array.concatMap referenced (children ty)
 
 mentions ∷ ∀ v. (v → Boolean) → Ty v → Boolean
 mentions variable = case _ of
   TVar each → variable each
-  TData _ arguments → Array.any (mentions variable) arguments
-  _ → false
+  ty → Array.any (mentions variable) (children ty)

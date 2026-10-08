@@ -1,55 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Left, Right } from '../output/Data.Either/index.js';
-import { insert, toUnfoldable } from '../output/Data.Map.Internal/index.js';
-import { ordInt } from '../output/Data.Ord/index.js';
-import { unfoldableArray } from '../output/Data.Unfoldable/index.js';
-import { TBool, TData, TInt, TVar } from '../output/Domain.Type/index.js';
 import * as problem from '../output/Domain.Problem/index.js';
 import { wire } from '../output/Format.Diagnostic/index.js';
 import * as unifier from '../output/Features.Check.Unify/index.js';
 import { choose, generator } from './coverage-oracle.mjs';
 import { canonical, oracleUnify } from './unify-oracle.mjs';
+import {
+  bindingsOf, bool, fromTy, fun, int, list, meta, pair, resolve, rigid,
+  substOf, substitute, unify
+} from './unify-support.mjs';
 
-// Plain types, as in test/unify-oracle.mjs; type 0 is List(a), 1 Pair(a, b).
-const int = { k: 'int' };
-const bool = { k: 'bool' };
-const rigid = n => ({ k: 'rigid', n });
-const meta = n => ({ k: 'meta', n });
-const list = t => ({ k: 'data', id: 0, args: [t] });
-const pair = (a, b) => ({ k: 'data', id: 1, args: [a, b] });
 const cases = 500;
 const metaCount = 4;
 
-const toTy = t => {
-  if (t.k === 'int') return TInt.value;
-  if (t.k === 'bool') return TBool.value;
-  if (t.k === 'data') return TData.create(t.id)(t.args.map(toTy));
-  return TVar.create((t.k === 'rigid' ? unifier.Rigid : unifier.Meta).create(t.n));
-};
-const fromTy = ty => {
-  const tag = ty.constructor.name;
-  if (tag === 'TInt') return int;
-  if (tag === 'TBool') return bool;
-  if (tag === 'TData') return { k: 'data', id: ty.value0, args: ty.value1.map(fromTy) };
-  return (ty.value0.constructor.name === 'Rigid' ? rigid : meta)(ty.value0.value0);
-};
-const substOf = bindings => [...bindings].reduce((map, [n, t]) =>
-  insert(ordInt)(n)(toTy(t))(map), unifier.empty);
-const bindingsOf = subst => new Map(toUnfoldable(unfoldableArray)(subst)
-  .map(entry => [entry.value0, fromTy(entry.value1)]));
-const substitute = (s, t) => fromTy(unifier.substitute(substOf(s))(toTy(t)));
-const resolve = (s, t) => fromTy(unifier.resolve(substOf(s))(toTy(t)));
-const unify = (s, l, r) => {
-  const result = unifier.unify(substOf(s))(toTy(l))(toTy(r));
-  return result instanceof Right ? bindingsOf(result.value0) : result.value0;
-};
-
 // Reference readings of the brief's definitions, over plain types.
-const mapType = (t, leaf) => t.k === 'data'
+// Data types and arrows both carry their parts in `args`.
+const mapType = (t, leaf) => t.args
   ? { ...t, args: t.args.map(arg => mapType(arg, leaf)) } : leaf(t);
 const once = (s, t) => mapType(t, v => v.k === 'meta' && s.has(v.n) ? s.get(v.n) : v);
-const metasOf = t => t.k === 'data' ? t.args.flatMap(metasOf) : t.k === 'meta' ? [t.n] : [];
+const metasOf = t => t.args ? t.args.flatMap(metasOf) : t.k === 'meta' ? [t.n] : [];
 const acyclic = s => {
   const reaches = (from, seen) => metasOf(s.get(from) ?? int).some(n =>
     seen.has(n) || reaches(n, new Set([...seen, n])));
@@ -61,10 +30,11 @@ const leafType = (next, metas) => {
   return leaves[choose(next, leaves.length)];
 };
 const genType = (next, depth, metas = [0, 1, 2, 3]) => {
-  const shape = depth === 0 ? 0 : choose(next, 3);
+  const shape = depth === 0 ? 0 : choose(next, 4);
   if (shape === 0) return leafType(next, metas);
   if (shape === 1) return list(genType(next, depth - 1, metas));
-  return pair(genType(next, depth - 1, metas), genType(next, depth - 1, metas));
+  const two = shape === 2 ? pair : fun;
+  return two(genType(next, depth - 1, metas), genType(next, depth - 1, metas));
 };
 const maximumDepth = 4;
 // Each meta's binding is drawn before deciding whether to keep it: drawing
@@ -84,7 +54,7 @@ const abstracted = (next, t, sigma) => {
     if (known) return meta(known[0]);
     if (sigma.size < metaCount) { sigma.set(sigma.size, t); return meta(sigma.size - 1); }
   }
-  return t.k === 'data' ? { ...t, args: t.args.map(arg => abstracted(next, arg, sigma)) } : t;
+  return t.args ? { ...t, args: t.args.map(arg => abstracted(next, arg, sigma)) } : t;
 };
 const sigmaPair = next => {
   const ground = genType(next, maximumDepth, []);

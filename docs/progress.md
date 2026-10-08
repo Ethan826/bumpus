@@ -1500,3 +1500,54 @@ hold; convention adopted and written as design §13 rules 1-8; plan Task 6
 interfaces and tests updated; conclusions narrowed ("tested large
 bodies", not "no representation"). The 20,000 / 1,000-type build uses
 80% of its bound. Next: Task 2.
+
+### FN001 Task 2: the arrow type (2026-10-08)
+
+Branch fn001. Behavior-preserving: no syntax produces an arrow yet.
+
+- What changed: `Domain.Type.Ty` gains `TFun (Ty v) (Ty v)` with spine
+  helpers (`spine`, `spineThrough`, `arrows`, `children`; a loop each, in
+  Domain.Type itself since the instances need them). Eq, Ord and Functor
+  are hand-written: arrow spines are walked in step by a loop, applications
+  compare inline (the first version, through helpers, overflowed
+  test/poly-depth `an inferred type exactly 1000 deep checks` in verify;
+  fixed: at 1,000 levels `compare` leaves the derived instance's stack
+  headroom, `==` about 8,700 of its 10,000 frames, far above `compare`'s).
+  Bind (substitution) and `ground` walk spines by a loop. Unify: arrow
+  against arrow unifies parameters at level + 1 and results at the same
+  level in a `tailRec` loop entered only when both heads are arrows (list
+  nesting stack headroom unchanged, measured); `resolve`, `exceedsLimit`
+  and the occurs check follow the same measure. `Problem.FunctionName`,
+  rendered right-associatively by a loop with function parameters
+  parenthesized. Comparable: rigid, then hole, then a new function check
+  through the new Features.Check.Functional (declared types whose fields
+  reach an arrow, settled once per program over the reverse reference
+  graph; a program with no arrow field builds no graph). Signature and
+  Matrix treat an arrow column as abstract; Inhabited and Expand treat
+  every arrow as inhabited and never unfold it; Expand spells arrows
+  `f(…)`; Nested's reference graph enters arrows, and a resolved arrow
+  field is an Internal field-syntax mismatch until Task 3 adds the
+  syntax. Specialize.Lower: `Internal "unlowered function"`.
+- Tests seen failing first (all three files failed to import `TFun` before
+  the code): test/unify-arrow.test.mjs (7 tests: arrow against arrow;
+  mismatch inside a parameter and a result; meta against an arrow and
+  occurs through one; rigid against an arrow; a 5,000-long spine unifies
+  and resolves; 1,001-deep parameter nesting is TooDeep while a 5,000-long
+  spine is not; a meta bound through a spine), test/type-order.test.mjs (5
+  tests: Eq/compare on equal and last-parameter-differing 20,000-long
+  spines; substitution and `ground` on one; agreement with the derived
+  order on 2,000 generated arrow-free pairs, whose reference was first run
+  against the old derived instance and passed; arrow name rendering; a
+  20,000-long name). test/unify.test.mjs and the independent oracle
+  test/unify-oracle.mjs generate arrows; shared helpers moved to
+  test/unify-support.mjs.
+- Mutants (isolated copies in the scratchpad, not committed): result side
+  counted +1 in `exceedsLimit`; parameters unified at the same level;
+  recursive arrow equality; recursive, unparenthesized name rendering.
+  Each fails at least one new test.
+- Reach: unit level only (Domain.Type, Unify, Format.Diagnostic). The
+  Comparable, Inhabited, Expand, Nested and Lower cases are covered by the
+  checker identity until Task 4 can produce arrows.
+- GREEN: `rm -rf output && npm run verify` exit 0, 330 tests (318 + 12),
+  zero failures/skips, twelve regression proofs; bootstrap snapshots
+  unchanged.

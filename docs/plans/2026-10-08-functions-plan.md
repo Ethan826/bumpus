@@ -1,6 +1,7 @@
 # First-Class Functions Implementation Plan (FN001)
 
-Status: Task 1 complete 2026-10-08 (three measurement rounds; design §13
+Status: Task 2 complete 2026-10-08 (arrow type; docs/progress.md).
+Task 1 complete 2026-10-08 (three measurement rounds; design §13
 records the adopted convention and the scale rule, both approved by the
 user, adoption conditional on round 3, which passed). Nine-task
 structure approved by the user 2026-10-08 with three changes, applied
@@ -186,7 +187,7 @@ arrows directly.
 - Expand and the type-reference graph treat `TFun` as a constructor of
   two arguments; `Key` renders arrows distinctly from data types.
 
-- [ ] **Step 1: Write failing unifier tests:** arrow against arrow;
+- [x] **Step 1: Write failing unifier tests:** arrow against arrow;
   mismatch inside a parameter and inside a result names the first
   differing subterms; meta against an arrow; occurs through an arrow
   (`α` against `α -> Int`); rigid against an arrow fails; a 5,000-long
@@ -196,14 +197,14 @@ arrows directly.
   parameter terminate without stack failure, and `compare` agrees with
   the derived order on generated arrow-free types. Extend the generated
   property tests and the independent oracle with arrows.
-- [ ] **Step 2: Run** `node --test test/unify.test.mjs`. Expected: FAIL.
-- [ ] **Step 3: Implement.** Comparable, Inhabited and Expand cases get
+- [x] **Step 2: Run** `node --test test/unify.test.mjs`. Expected: FAIL.
+- [x] **Step 3: Implement.** Comparable, Inhabited and Expand cases get
   unit tests through `checkedPoly` only once Task 4 can produce arrows;
   here their new cases are total and covered by the checker identity
   (all existing tests pass unchanged).
-- [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0,
+- [x] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0,
   snapshots byte-identical, twelve regression proofs.
-- [ ] **Step 5: Commit** `feat: arrow type in unification and type passes
+- [x] **Step 5: Commit** `feat: arrow type in unification and type passes
   (FN001)`.
 
 ### Task 3: Syntax and resolution

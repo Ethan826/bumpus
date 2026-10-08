@@ -3,7 +3,8 @@ module Domain.Problem where
 -- What went wrong, as data. Features never write diagnostic text; Format
 -- renders it, so a change of surface syntax changes only Format.
 
--- `HoleName` is a type checking left open, rendered `_`.
+-- `HoleName` is a type checking left open, rendered `_`. `FunctionName`
+-- is one arrow, parameter then result, curried like `Ty`'s.
 data TypeName
   = IntName
   | BoolName
@@ -11,6 +12,7 @@ data TypeName
   | AppliedName String (Array TypeName)
   | VariableName String
   | HoleName
+  | FunctionName TypeName TypeName
 
 -- A missing value, with constructor names already resolved.
 data Witness = WAny | WCtor String (Array Witness) | WInt Int | WBool Boolean

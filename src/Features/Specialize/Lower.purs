@@ -23,6 +23,7 @@ lowerType env arguments span = case _ of
   TData id parts → traverse recur parts >>= applied env span id
   TVar (Rigid (VarId index)) → argument span arguments index
   TVar (Hole _) → lowerType env [] span (map absurd env.representative)
+  TFun _ _ → unlowered span
   where
   recur part = lowerType env arguments span part
 
@@ -66,8 +67,13 @@ lowerField env arguments ty syntax = case ty, syntax of
   TVar (VarId index), _ → argument (typeRefSpan syntax) arguments index
   TInt, _ → pure IR.TInt
   TBool, _ → pure IR.TBool
+  TFun _ _, _ → unlowered (typeRefSpan syntax)
   where
   mismatch = internal "Field syntax mismatch" (typeRefSpan syntax) unit
+
+-- The monomorphic IR has no arrow until FN001 Task 5.
+unlowered ∷ ∀ a. Span → Specializing a
+unlowered span = internal "unlowered function" span unit
 
 missingType ∷ ∀ a b. Work → a → Specializing b
 missingType work = internal "Invalid type id" work.span

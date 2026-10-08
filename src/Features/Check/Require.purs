@@ -17,7 +17,7 @@ import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..), TypeName(..))
 import Domain.Resolved (TypeInfo)
 import Domain.Syntax (Diagnostic, Span, problemAt)
-import Domain.Type (Ty(..), TypeId(..), VarId(..))
+import Domain.Type (Ty(..), TypeId(..), VarId(..), spine)
 import Features.Check.Scheme (State, flexible, opened, resolved, tooDeep)
 import Features.Check.Unify (Failure(..), inferredTypeLimit, unify)
 
@@ -74,7 +74,8 @@ bounded state ty span =
 tooDeepAt ∷ ∀ a. Span → Either Diagnostic a
 tooDeepAt span = Left (problemAt (TypeTooDeep inferredTypeLimit) span)
 
--- Names appear only in diagnostics, never in generated Go.
+-- Names appear only in diagnostics, never in generated Go. An arrow's
+-- spine is named parameter by parameter, by a loop (Array.foldr).
 typeName ∷ ∀ r. Names r → Span → Ty Open → Either Diagnostic TypeName
 typeName env span = case _ of
   TInt → Right IntName
@@ -84,6 +85,7 @@ typeName env span = case _ of
   TVar (Rigid (VarId index)) → maybe' unnamed (Right <<< VariableName)
     (Array.index env.variables index)
   TVar (Hole _) → Right HoleName
+  arrow@(TFun _ _) → arrowName (spine arrow)
   where
   missing _ = Left (problemAt (Internal "Invalid resolved type") span)
   unnamed _ = Left (problemAt (Internal "Unnamed type variable") span)
@@ -91,3 +93,6 @@ typeName env span = case _ of
     | Array.null arguments = Right (DataName info.name)
     | otherwise = AppliedName info.name <$> traverse (typeName env span)
         arguments
+  arrowName found = curried <$> traverse (typeName env span) found.parameters
+    <*> typeName env span found.result
+  curried parameters result = Array.foldr FunctionName result parameters
