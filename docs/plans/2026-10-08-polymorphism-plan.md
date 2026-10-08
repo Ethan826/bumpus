@@ -1,7 +1,12 @@
 # Rank-1 Polymorphism Implementation Plan (P001)
 
-Status: written 2026-10-08; awaiting the user's review and choice of
-execution method. Nothing is implemented.
+Status: approved 2026-10-08 for subagent-driven execution (fresh
+implementer and reviewer per task, then whole-branch review), after four
+review corrections: phase boundaries for intermediate tests, substitution
+application separated from normalization, declaration-order keys compared
+up to renumbering, and the limit's accounting. Dependency change
+(ordered-collections, tuples; Data.Map, Data.Set, Data.Tuple only)
+approved.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -50,8 +55,21 @@ runner, Go 1.26.4; adds the `ordered-collections` and `tuples` packages
   - `SpecializationLimit n` → `More than <n> specializations`
   - Type names render `Int`, `Bool`, `a`, `_` (hole/meta), `List(Pair(Int, a))`.
 - New wire code: `E_SPECIALIZATION` (ErrorCode `SpecializationError`).
-- Specialization limit: `specializationLimit = 10000`, global, functions
-  plus types (§6); representative for holes: `TInt` (§6).
+- Specialization limit: `specializationLimit = 10000`, global. It counts
+  only keys created from polymorphic declarations: each instantiation of a
+  function that has type variables, plus each ground application of a type
+  that has parameters. Monomorphic functions and types (the seeds and
+  every existing program's declarations) never count, so existing large
+  monomorphic programs are unaffected. Representative for holes: `TInt`.
+- Phase boundaries for tests. Until Task 7 the full `compile` pipeline
+  cannot emit a program containing a type variable or an applied type
+  (Task 1's Specialize returns `Internal "unspecialized type"`). So:
+  rejections that stop in Parse or Resolve may use `compile` (`rejectedAt`);
+  positive cases in Task 2 run through Parse → Resolve only; Tasks 4–6 run
+  positive and checker-level cases through Parse → Resolve → Check only;
+  end-to-end polymorphic compilation and execution start in Task 7. Each
+  task's progress entry states which phase its tests reach, and that the
+  CLI does not yet compile polymorphic programs.
 - A regression row (scripts/regression.mjs) whose needle a task rewrites is
   updated in the same task so it still has exactly one target.
 - Every task: each new behavioral test is seen failing before its code;
@@ -165,8 +183,15 @@ Check → Specialize → Go with no language change.
   `TypeName` gains `AppliedName String (Array TypeName)`, `VariableName
   String`, `HoleName`.
 
-- [ ] **Step 1: Write failing rows** (exact code, span via `rejectedAt`,
-  message) in test/poly-syntax.test.mjs:
+- Produces, test/phases.mjs: `resolved(source)` (parse then resolve;
+  asserts `Right`, returns the resolved program); `resolveRejectedAt(source,
+  code, text, nth)`; `checkedPoly(source)` (parse, resolve, check; asserts
+  `Right`, returns the checked program); `checkRejectedAt(source, code,
+  text, nth)`. Tasks 4–6 use the `check` forms.
+
+- [ ] **Step 1: Write failing rows** (exact code, span, message) in
+  test/poly-syntax.test.mjs; rejections through `rejectedAt` (they stop in
+  Parse or Resolve), positives through `resolved`:
   - E_SYNTAX: `type T() = A;` at `)`; `fn f(x: List()): Int = 0;` at `)`;
     `fn f(x: Int(a)): Int = 0;` at `(`; `fn f(x: a(Int)): Int = 0;` at `(`.
   - `type T(a, a) = A(a);` E_DUPLICATE at the second `a`,
@@ -178,18 +203,19 @@ Check → Specialize → Go with no language change.
     with `type B = B(List);` likewise.
   - `fn main(): List(a) = Nil;` E_ENTRY span of the declaration,
     `Expected fn main() with a concrete result type`.
-  - Positive: `type List(a) = …; type Pair(a, b) = Pair(a, b); type
-    Proxy(a) = Proxy; fn main(): Int = 0;` compiles; `type variables do not
-    collide with value names`: `fn a(a: a): a = a; fn main(): Int = 0;`
-    compiles.
+  - Positive, through `resolved`: `type List(a) = …; type Pair(a, b) =
+    Pair(a, b); type Proxy(a) = Proxy; fn main(): Int = 0;` resolves, with
+    `Cons`'s fields `[TVar (VarId 0), TData List [TVar (VarId 0)]]`;
+    `type variables do not collide with value names`: `fn a(a: a): a = a;
+    fn main(): Int = 0;` resolves with `variables: ["a"]`.
   - Nesting: a type argument nested 129 deep is E_NESTING (ADR 006 limit).
 - [ ] **Step 2: Run** `node --test test/poly-syntax.test.mjs`. Expected: FAIL.
 - [ ] **Step 3: Implement** parser and resolver. Resolution order: type
   names, duplicates (existing order), then each declaration's parameters,
   then field types; unknown lowercase in a field is UnboundTypeVariable;
-  `EntryPolymorphic` is checked where `EntryParameters` is. Constructors
-  using a parameter fail checking with E_TYPE until Task 4 (record this
-  intermediate limit in docs/progress.md).
+  `EntryPolymorphic` is checked where `EntryParameters` is. Record in
+  docs/progress.md that these tests reach Resolve only and that the CLI
+  rejects polymorphic programs until Task 7.
 - [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0.
 - [ ] **Step 5: Commit** `feat: parse and resolve type parameters (P001)`.
 
@@ -206,14 +232,23 @@ Check → Specialize → Go with no language change.
 **Interfaces:**
 - Produces, Features.Check.Unify:
   - `data Flex = Rigid VarId | Meta Int` (`Eq`, `Ord`);
-  - `newtype Subst = Subst (Map Int (Ty Flex))`; `empty ∷ Subst`;
-    `apply ∷ Subst → Ty Flex → Ty Flex` (fully resolving);
-    `compose ∷ Subst → Subst → Subst` (`apply (compose s2 s1) t = apply s2
-    (apply s1 t)`);
+  - `newtype Subst = Subst (Map Int (Ty Flex))`, triangular: a binding's
+    type may mention other bound metas; `empty ∷ Subst`.
+  - `substitute ∷ Subst → Ty Flex → Ty Flex`: one pass, replacing each
+    bound meta by its binding without revisiting the result. Defined for
+    every substitution. `compose ∷ Subst → Subst → Subst` is `substitute
+    s2` mapped over s1's bindings, united with s2's bindings for metas s1
+    does not bind; law: `substitute (compose s2 s1) t = substitute s2
+    (substitute s1 t)` for all s1, s2, t.
+  - `resolve ∷ Subst → Ty Flex → Ty Flex`: recursive normalization,
+    following bindings until no bound meta remains. Defined only on acyclic
+    substitutions (no meta reaches itself through bindings); `unify`
+    produces only acyclic substitutions (occurs check), and the checker
+    calls only `resolve`.
   - `data Failure = Mismatch (Ty Flex) (Ty Flex) | Occurs Int (Ty Flex)`;
   - `unify ∷ Subst → Ty Flex → Ty Flex → Either Failure Subst`.
   - Rules: rigid unifies only with the same rigid; a meta binds to any type
-    not properly containing it (after `apply`); `TData` unifies
+    not properly containing it (after `resolve`); `TData` unifies
     argument-wise left to right, stopping at the first failure.
 - Produces, Domain.Problem: `InfiniteType TypeName TypeName` (E_TYPE).
 
@@ -225,18 +260,26 @@ Check → Specialize → Go with no language change.
     ~ rigid a succeeds with empty substitution; meta ~ Int, meta ~ rigid a,
     meta ~ `List(a)` succeed; meta m ~ `List(m)` fails `Occurs`; meta m ~ m
     succeeds.
-  - properties over 500 generated pairs (types of depth ≤ 4 over Int, Bool,
+  - the distinction, explicitly: with s = {m0 ↦ List(m1), m1 ↦ Int},
+    `substitute s m0` is `List(m1)` and `resolve s m0` is `List(Int)`.
+  - properties over 500 generated cases (types of depth ≤ 4 over Int, Bool,
     two generated constructors of arity 1 and 2, rigid 0..1, metas 0..3):
-    soundness `apply s l = apply s r`; idempotence `apply s (apply s t) =
-    apply s t`; composition law on generated substitutions; most-general:
-    pairs built as `(t1, t2)` with `σ t1 = σ t2` for a generated σ succeed,
-    and `apply σ (apply s t) = apply σ t` for both sides.
+    - composition law for `substitute`, over arbitrary generated s1, s2
+      (cycles and overlapping domains allowed);
+    - for `resolve`, over generated acyclic substitutions (meta i binds
+      only to types whose metas are all greater than i): idempotence
+      `resolve s (resolve s t) = resolve s t`, and the result mentions no
+      bound meta;
+    - every `unify` result is acyclic; soundness `resolve s l = resolve s
+      r`; most-general: pairs built as `(t1, t2)` with `σ t1 = σ t2` for a
+      generated ground-range σ succeed, and `σ (resolve s t) = σ t` for both
+      sides.
   - reference: test/unify-oracle.mjs (union-find, written without reading
     Unify.purs) agrees on success for every generated pair, and on the
     unified type up to renaming of metas.
 - [ ] **Step 3: Run** `node --test test/unify.test.mjs`. Expected: FAIL
   (module missing).
-- [ ] **Step 4: Implement**; the occurs check and `apply` must be stack-safe
+- [ ] **Step 4: Implement**; the occurs check and `resolve` must be stack-safe
   for types nested 128 deep (E_NESTING bounds source types) and for
   substitution chains of 10,000 metas (`tailRecM` or iterative resolution).
 - [ ] **Step 5: Run** `rm -rf output && npm run verify`. Expected: exit 0.
@@ -267,7 +310,9 @@ Check → Specialize → Go with no language change.
   compared types; then the result unifies; then comparison groundness
   (§3) over the body's comparisons in source order; then holes.
 
-- [ ] **Step 1: Write failing rows** in test/poly-check.test.mjs, with
+- [ ] **Step 1: Write failing rows** in test/poly-check.test.mjs, through
+  `checkedPoly` / `checkRejectedAt` (test/phases.mjs; Check is the last
+  phase reached), with
   `List`, `Pair`, `Maybe` declared:
   - `fn f(x: a): Int = x;` E_TYPE at `x` (body), `Expected Int, found a`.
   - `fn g(x: a, y: b): a = y;` E_TYPE at `y`, `Expected a, found b`.
@@ -399,10 +444,14 @@ Check → Specialize → Go with no language change.
     `List(Int)` and `List(Bool)`) both run.
   - `length(Nil)` prints `0` and shares the `List(Int)` key
     (`specializationKeys` has one `length` key).
-  - limit (compile only, no Go build): a generated program with 10,000
-    keys compiles; with 10,001,
+  - limit (compile only, no Go build), counting per the Global
+    Constraints: a program with 6,000 polymorphic-function keys and 4,000
+    parameterized-type keys (plus 500 monomorphic functions and types that
+    do not count) compiles; adding one function key, and separately one
+    type key, fails with
     E_SPECIALIZATION `More than 10000 specializations` at the reference
-    creating key 10,001.
+    creating key 10,001. test/large-source.test.mjs's existing monomorphic
+    programs (20,000 declarations) still compile unchanged.
   - large-source: 3,000 distinct instantiations compile within 5 s.
 - [ ] **Step 2: Run** `node --test test/poly-run.test.mjs`. Expected: FAIL.
 - [ ] **Step 3: Implement**; the worklist loop uses `tailRecM`.
@@ -431,7 +480,12 @@ Check → Specialize → Go with no language change.
   - uniqueness: no two keys equal in `specializationKeys`, over the same
     programs;
   - determinism: compiling twice gives equal Go; reversing declaration
-    order gives the same printed output and the same key set;
+    order gives the same printed output and the same key set up to
+    renumbering. Keys are normalized before comparison: the declaration id
+    becomes its source name (function and type names are unique), and every
+    `TData id` inside the arguments becomes the type's source name, so a
+    normalized key reads like `length[List(Int)]`; the two runs' normalized
+    key sets, as sorted arrays, must be equal;
   - representative independence: 30 programs with holes print the same
     under `specializeWith TInt` and `specializeWith TBool`;
   - termination bound: for Task 5's 200 accepted components at random entry

@@ -247,10 +247,12 @@ monomorphic IR.
      the argument alone.
   `length(Nil)` thus specializes to the same key as `length` at Int.
 - Limit: Specialize fails with E_SPECIALIZATION, Problem
-  `SpecializationLimit Int`, when the total number of specialized
-  functions plus specialized types in the program would exceed 10,000 (a
-  named constant, global, measured against the large-source tests before
-  it is fixed). The span is the reference (call, construction or type
+  `SpecializationLimit Int`, when the number of keys created from
+  polymorphic declarations would exceed 10,000 (a named constant, global).
+  Counted: each instantiation of a function with type variables and each
+  ground application of a type with parameters, together. Not counted:
+  monomorphic functions and types, so existing large monomorphic programs
+  are unaffected. Plan review 2026-10-08 fixed this accounting. The span is the reference (call, construction or type
   reference) that would create the first key over the limit.
 - Go names stay numeric (`bumpusTy7`, `bumpusFn12`, `bumpusFn12Match1`).
   Printed values use source constructor names, so `Cons(1, Nil)` prints and

@@ -1,6 +1,6 @@
 # Local backlog
 
-Current delivery: P001 (rank-1 polymorphism), in design.
+Current delivery: P001 (rank-1 polymorphism), executing the approved plan on branch p001 (.worktrees/p001), subagent-driven.
 A003, G001, E005 and T001 are merged into main. Plan and verification evidence
 are in docs/plans/bootstrap.md and docs/progress.md. No remote tracking.
 
@@ -8,7 +8,7 @@ are in docs/plans/bootstrap.md and docs/progress.md. No remote tracking.
 |---|---|---|
 | V001 | Done | Documentation/style audit closed after fresh review found no blockers; final closure verification is recorded in docs/progress.md. |
 | A001 | Done | Closed ADTs, nested match with nil-guarded Go, Maranget coverage with inhabitedness, five layers, structured diagnostics, capability ports. ADRs 003 and 004; evidence in docs/progress.md and .build/a001-final.log (clean-output verify: 64 tests, 0 skips, three regression proofs). Final whole-branch review pending with the controller. |
-| P001 | Design | Design written 2026-10-08, revised for the first review (section 12), approved 2026-10-08: docs/plans/2026-10-08-polymorphism-design.md. Implementation plan docs/plans/2026-10-08-polymorphism-plan.md awaits review and an execution method. Rank-1 schemes, substitution and occurs-checked unification; mandatory signatures, no polymorphic recursion; meaningful composition/idempotence/occurs-check properties and reference comparisons. |
+| P001 | In progress | Design written 2026-10-08, revised for the first review (section 12), approved 2026-10-08: docs/plans/2026-10-08-polymorphism-design.md. Implementation plan docs/plans/2026-10-08-polymorphism-plan.md approved 2026-10-08 with four corrections; subagent-driven execution. Rank-1 schemes, substitution and occurs-checked unification; mandatory signatures, no polymorphic recursion; meaningful composition/idempotence/occurs-check properties and reference comparisons. |
 | K001 | Planned | Explicit kind IR/checker, constructor arities, Type/Row/arrow kinds, HKTs restricted to first-order constructor application; reject ill-kinded programs before type solving. |
 | C001 | Planned | Classes and non-overlapping coherent instances, terminating resolution, ambiguity errors, dictionary elaboration; negative overlap/coherence cases. User direction 2026-10-08 (P001 brainstorm): no built-in comparison constraint in P001 (type variables are opaque; comparing one is E_TYPE). C001 brings a Bumpus Prelude in which Eq/Ord are ordinary classes; `derive` exists; default Ord instances come from the Prelude and can be opted out of (hiding imports or similar); several instances per type are allowed, in the fp-ts style, without Haskell newtypes. The user dropped the one-instance-per-type (global coherence) requirement on 2026-10-08. C001's ADR supersedes ADR 002's non-overlapping/unique-ownership clause and must say how a value built under one instance (for example, a tree ordered by one Ord) is kept from being used under another. |
 | R002 | Done | Renamed the language from Sprig to Bumpus (name collided with Masterminds/sprig and Hack Club Sprig): sources, generated Go identifiers and panic texts, packages, npm script, examples. Snapshots equal the old bytes under the name substitution (docs/progress.md). |
