@@ -1389,3 +1389,22 @@ arity, evaluation, instantiation rule, canonical uncurried Go
 representation with adapters, tests and regression probes, deliberate
 diagnostic changes, four open questions). Not reviewed or approved; no
 plan, no code. Next: the user's review of the draft.
+
+## FN001 design revised after the user's review (2026-10-08)
+
+The user's review of the first draft: revise before approving. The
+canonical uncurried representation (`A -> B -> C` as `func(A, B) C` with
+adapters) lost declared-arity timing: with `fn stuck(n: Int): Int -> Int
+= stuck(n);` and `use(f) = drop1(f(1))`, `use(stuck)` must diverge but
+the adapter made `f(1)` a partial application returning 0; lambda
+eta-expansion delayed bodies the same way, and the draft's "delays
+nothing observable" claim was wrong. Revision: nested Go function values
+`func(A) func(B) C`, staged wrappers for named functions and constructors
+used as values, direct saturated calls unchanged; declared arity is a
+stage boundary; pipe evaluates its left operand first (kept as a `Pipe`
+IR node); constructors are curried values; `_` discards lambda
+arguments; the under-application hint is narrow with provenance rules;
+timing tests use instrumented bounded panics, never stack exhaustion;
+arrow spines are depth-flat, traversed iteratively, named Go function
+types keep text linear, scale tests at 5,000 parameters. Section 12 of
+the design maps each finding. Not yet approved; no plan, no code.

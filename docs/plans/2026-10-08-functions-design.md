@@ -2,8 +2,12 @@
 
 Status: direction settled with the user 2026-10-08 (curried semantics with
 Algol-like multi-argument syntax; lambdas `fn(x) => body`; `|>` in scope;
-no local binding form). This document is a draft awaiting the user's
-review. Nothing is implemented; no plan exists yet.
+no local binding form). First draft reviewed by the user 2026-10-08:
+revise before approval (canonical uncurried representation lost
+evaluation timing); this revision replaces it with staged nested function
+values and records the user's answers to the open questions (section 12
+maps each finding to its resolution). Awaiting approval. Nothing is
+implemented; no plan exists yet.
 
 ## Goal and non-goals
 
@@ -22,17 +26,19 @@ fn main(): List(Int) = Cons(1, Cons(2, Nil)) |> map(fn(x) => x + 10);
 
 Non-goals: a local binding form (its own backlog item); a Unit type and
 zero-parameter lambdas; result-type annotations on lambdas; `_` as a
-lambda or function parameter; placeholder holes such as `take(_, xs)`;
-default, variadic, overloaded-by-arity or named parameters; `>>`/`<<`
-(Prelude functions once a Prelude exists, C001); rank-2 or polymorphic
-lambdas and polymorphic fields; foreign Go functions (I001); comparing or
-printing functions.
+named function's parameter; placeholder application such as
+`take(_, xs)`; default, variadic, overloaded-by-arity or named parameters;
+`>>`/`<<` (Prelude functions once a Prelude exists, C001); rank-2 or
+polymorphic lambdas and polymorphic fields; foreign Go functions (I001);
+comparing or printing functions; optimizing saturated application of
+function values (section 7).
 
 Preserved: phase boundaries and both IR allowlists; strict evaluation; the
 structural order and print format of ADR 005; every existing diagnostic
 not listed in section 9. A program that uses no function type, lambda,
 function value, partial application or `|>` emits byte-identical Go
-(bootstrap/*.go unchanged).
+(bootstrap/*.go unchanged), and saturated direct calls of named
+functions keep today's Go in every program.
 
 ## 1. Syntax
 
@@ -47,7 +53,7 @@ expression  = "if", expression, "then", expression, "else", expression
             | "match", expression, "{", arm, { ",", arm }, [ "," ], "}"
             | "fn", "(", lparam, { ",", lparam }, ")", "=>", expression
             | pipeline ;
-lparam      = lower, [ ":", type ] ;
+lparam      = ( lower | "_" ), [ ":", type ] ;
 pipeline    = comparison, { "|>", comparison } ;
 atom        = primary, { "(", [ arguments ], ")" } ;
 primary     = integer | "true" | "false" | identifier
@@ -63,8 +69,12 @@ primary     = integer | "true" | "false" | identifier
   for `A -> B -> C`, exactly; `(A) -> B` is `A -> B`. A parenthesized list
   of two or more types not followed by `->` is E_SYNTAX `Expected ->`;
   `() -> A` is E_SYNTAX `Expected a type` at `)`.
-- Each `->` is one type nesting level for E_NESTING (ADR 006), as each
-  type argument is.
+- Nesting (ADR 006, E_NESTING): an arrow's parameter side is one level
+  deeper than the arrow; its result side is not. So `(Int -> Int) -> Int`
+  nests two levels and `Int -> Int -> … -> Int` of any length one level.
+  The same measure applies to the inferred-type bound (section 3), so a
+  declaration's parameter count never counts as depth. An arrow chain is
+  parsed iteratively, not by one recursion per `->`.
 - A lambda, like `if` and `match`, extends as far right as possible and
   must be parenthesized as an operand: `f(fn(x) => x)` needs none (an
   argument is an expression), `(fn(x) => x)(1)` does.
@@ -73,7 +83,7 @@ primary     = integer | "true" | "false" | identifier
   operand may be an unparenthesized `if`, `match` or lambda.
 - Application is postfix and repeatable on any primary: `f(1)(2)`,
   `(g)(x)`, `make()(x)`. `f()` with no arguments is allowed only on a
-  named zero-parameter function (section 3).
+  named zero-parameter function (section 4).
 - A function's span is unchanged; a lambda spans `fn` through its body;
   a pipeline spans its left operand through its right; an application
   spans its callee through its closing parenthesis.
@@ -91,10 +101,13 @@ The bare-name rules of docs/language.md change as follows; the rest stay.
 | nullary constructor | a value (unchanged) | E_NOT_CALLABLE (unchanged) |
 
 - Locals shadow globals, as today. A lambda parameter shadows anything of
-  the same name in the lambda body. Lambda parameters must be distinct
-  (E_DUPLICATE `Duplicate parameter x`); a match binder inside a lambda
-  shadows the lambda's parameter within its arm, as binders shadow
+  the same name in the lambda body. Named lambda parameters must be
+  distinct (E_DUPLICATE `Duplicate parameter x`); a match binder inside a
+  lambda shadows the lambda's parameter within its arm, as binders shadow
   function parameters today.
+- `_` as a lambda parameter discards its argument: it binds nothing, any
+  number of `_` parameters may appear, and it may carry an annotation
+  (`fn(_: Int, _) => 0`). It is unrelated to placeholder application.
 - A lambda annotation's lowercase names are the enclosing function's
   signature variables (rigid); any other lowercase name is E_UNBOUND
   `Unbound type variable b`. Lambdas are monomorphic: there is no
@@ -108,20 +121,22 @@ The bare-name rules of docs/language.md change as follows; the rest stay.
 function declared `fn f(p1: T1, …, pn: Tn): R` has scheme
 `∀vs. T1 -> … -> Tn -> R`; a constructor `C(F1, …, Fn)` of `T(vs)` has
 `∀vs. F1 -> … -> Fn -> T(vs)`. Unification, the occurs check, rigid and
-flexible variables, the depth bound and holes extend structurally to
-`TFun`. Inference stays per function with explicit state (P001).
+flexible variables, holes and the inferred-type depth bound (with the
+section 1 measure) extend to `TFun`. Inference stays per function with
+explicit state (P001).
 
 - Lambda: each parameter gets its annotation (rigid variables allowed) or
-  a fresh meta; the body is inferred with those locals in scope; the
-  lambda's type is the curried arrow. A meta left unbound becomes a hole
-  as in P001 (`fn(x) => 1` used nowhere: `_ -> Int`).
-- Application `e(a1, …, aj)`, `j ≥ 1`, applies one argument at a time:
-  infer `e`, then for each argument unify the current type with
-  `α -> β` (fresh metas), check the argument against `α`, continue with
-  `β`. A current type that is Int, Bool, a declared type or a rigid
-  variable is E_TYPE `Expected a function, found Int` at the first
-  argument that does not fit (for a named callee see section 4).
-- `a |> e` is checked as `e(a)` after the rewrite of section 5.
+  a fresh meta; the body is inferred with the named parameters in scope;
+  `fn(x, y) => e` has type `X -> Y -> E` and means `fn(x) => fn(y) => e`
+  (section 5). A meta left unbound becomes a hole as in P001
+  (`fn(x) => 1` used nowhere: `_ -> Int`).
+- Application `e(a1, …, aj)`, `j ≥ 1`, is `e(a1)…(aj)`: for each argument
+  unify the current type with `α -> β` (fresh metas), check the argument
+  against `α`, continue with `β`. A current type that is Int, Bool, a
+  declared type or a rigid variable is E_TYPE `Expected a function,
+  found Int` at the first argument that does not fit (for a named callee
+  see section 4).
+- `a |> e` is checked as the application of section 5.
 - Comparison: a type containing `->`, directly or through the fields of
   a declared type it applies (`Box(Int)` with `type Box(a) = Box(a ->
   a)`), is not comparable: E_TYPE `Type Int -> Int is not comparable`
@@ -140,73 +155,109 @@ flexible variables, the depth bound and holes extend structurally to
 - Type names in messages render curried with right-associative arrows,
   parenthesizing a function argument: `(Int -> Int) -> List(Int) ->
   List(Int)`; holes stay `_`.
+- Long arrow spines: unification, substitution, the occurs check, depth
+  measurement, rendering, specialization keys and Go type emission walk
+  an arrow's result side iteratively (as a parameter array and a final
+  result), so a 5,000-parameter declaration costs no recursion depth
+  proportional to its parameter count (section 8, scale).
 
 ## 4. Named callees: arity is part of the declaration
 
 A named function's declared parameter count `n` (a constructor's field
-count) decides when its body runs. For `f(a1, …, aj)`:
+count) is its stage boundary: its body runs when its `n`th argument is
+applied, and not before. For `f(a1, …, aj)`:
 
 - `j = n`: a call (today's semantics and Go).
 - `0 < j < n`: partial application. `a1 … aj` are evaluated now, left to
-  right; the result is a function of the remaining `n - j` arguments;
-  the body runs when it is saturated.
-- `j > n`: over-application: call with the first `n` and apply the result
-  to the rest, one application per the rule of section 3. If the
-  instantiated result type is Int, Bool, a declared type or a rigid
-  variable, this is E_ARITY `Expected n argument(s)` at the call, as
-  today's over-application.
-- `n = 0`: only `f()`; `f(x)` is over-application of its result.
-- Under-application is no longer E_ARITY: `take(3)` is a value of type
-  `List(a) -> List(a)`. When such a partial application of a named
-  function or constructor meets a non-function expected type, the
-  E_TYPE message gains a hint: `Expected Int, found List(Int) ->
-  List(Int); missing 1 argument to take?` (section 9 lists the rows that
-  change).
+  right; the result is a function value awaiting argument `j + 1`.
+- `j > n`: over-application: `f(a1…an)` runs the body and its result is
+  applied to the rest. If the instantiated result type is Int, Bool, a
+  declared type or a rigid variable, this is E_ARITY `Expected n
+  argument(s)` at the call, as today's over-application.
+- `n = 0`: only `f()`; `f()(x)` applies its result.
 
-A function whose declared result is itself a function (`fn adder(n: Int):
-Int -> Int = fn(x) => x + n;`) has arity 1: `adder(1)` runs the body and
-returns the lambda; `adder(1, 2)` is over-application. Its scheme is
-`Int -> Int -> Int`, the same type as a two-parameter function's; only
-evaluation timing differs, and with no effects and only divergence
-observable that difference is visible only as which call fails to
-terminate. FX001 inherits this rule (effects run when the declared arity
-is reached).
+The boundary is a property of the declaration, not of the type, and it
+survives every use as a value. Two functions with the same type
+`Int -> Int -> Int` can differ in timing:
+
+```
+fn add(x: Int, y: Int): Int = x + y;           -- body after 2 arguments
+fn stuck(n: Int): Int -> Int = stuck(n);        -- body after 1 argument
+fn drop1(f: Int -> Int): Int = 0;
+fn use(f: Int -> Int -> Int): Int = drop1(f(1));
+```
+
+`use(add)` returns 0; `use(stuck)` diverges, because `f(1)` saturates
+`stuck`. No representation may erase this difference (section 7).
+
+Under-application is no longer E_ARITY: `take(3)` is a value of type
+`List(a) -> List(a)`. Its misuse gets a hint under these provenance
+rules:
+
+- The hint is attached only to an E_TYPE that checking reports anyway; it
+  never changes that diagnostic's code, span, or expected and found
+  types, and it is computed from the checked expression after the failure,
+  without further unification.
+- It fires only when the expression whose type was found is, through
+  parentheses only, a direct partial application `f(a1…aj)` with
+  `0 < j < n` of a named function or constructor `f`, and the expected
+  type at the failure is not a function type or a meta.
+- It names that `f` and `n - j`: `Expected Int, found List(Int) ->
+  List(Int); missing 1 argument to take?`. A partial application
+  reached through a local, a lambda, a pipe or another call gets no hint.
 
 ## 5. Evaluation
 
-Strict, left to right (ADR 001), with these additions:
+Strict, left to right (ADR 001). Every application is staged:
+`e(a1, …, aj)` means `e(a1)(a2)…(aj)`, and each single application of a
+function value to one argument runs that value's body exactly when it
+completes a stage boundary.
 
-- An application `e(a1, …, aj)` evaluates `e`, then `a1 … aj` left to
-  right, then applies. With a named callee there is no `e` to evaluate.
-- Over-application `f(a1, …, aj)` with `j > n` evaluates `a1 … an`,
-  calls `f`, then evaluates the remaining arguments and applies:
-  `f(a, b)(c)` and `f(a, b, c)` mean the same.
-- A lambda evaluates to a closure; nothing in its body runs until it is
-  applied. Closures capture the values of the locals they read; every
-  local is immutable, so capture by value and by reference agree.
-- `a |> e` is syntax: when `e` is a call or application `g(b1, …, bk)`,
-  it is `g(b1, …, bk, a)`; otherwise it is `e(a)`. So `xs |> take(3)` is
-  `take(3, xs)` and evaluates `3` before `xs`. This is unobservable
-  today; FX001 must revisit it before effects can be ordered by a pipe.
+- Evaluation order of `e(a1, …, aj)`: `e`, then `a1`, then apply, then
+  `a2`, then apply, and so on. Before a boundary, applying only records
+  the argument, so for a saturated call `f(a1…an)` this is the familiar
+  "all arguments left to right, then the body".
+- Stage boundaries: a named function or constructor at its declared
+  arity (section 4); a lambda at its last parameter (`fn(x, y) => e`
+  runs `e` when `y` is applied, `fn(x) => fn(y) => e` likewise, and a
+  lambda whose body returns a function runs that body on its last
+  parameter, without waiting for more).
+- Partial application `f(a1…aj)` evaluates `a1…aj` immediately; nothing
+  is re-evaluated when the value is later applied (strict, once).
+- Over-application `f(a, b, c)` with `f` of arity 2 is `f(a, b)(c)`:
+  `a`, `b`, the body of `f`, then `c`, then the application.
+- A lambda evaluates to a closure; nothing in its body runs until its
+  last parameter is applied. Closures capture the values of the locals
+  they read; every local is immutable, so capture by value and by
+  reference agree.
+- Pipe: `a |> e` evaluates the left operand `a` to a value `v` first,
+  then evaluates the right side and applies. If `e` is `g(b1…bk)`, it is
+  `g`, `b1…bk` and `v` applied in that order, with the stage boundaries
+  of `g(b1…bk, v)`: `xs |> take(3)` evaluates `xs`, then `3`, then runs
+  `take`'s body. Otherwise `e` is evaluated and applied to `v`. Divergence
+  makes this order observable today; FX001 inherits it.
 
 ## 6. The instantiation rule and specialization
 
 - Every reference to a named function or constructor, called or used as
-  a value, carries its instantiation in the checked IR. Value references
-  are edges of the call graph exactly as calls are, so section 4 of the
-  P001 spec applies unchanged: a value reference inside a component must
-  instantiate with bare caller variables or ground types. Applying a
-  local function value creates no edge and no specialization.
+  a value, carries its instantiation in the checked IR, wherever it
+  occurs: function bodies, match arms, and lambda bodies at any depth.
+  Value references are edges of the call graph exactly as calls are, so
+  section 4 of the P001 spec applies unchanged: a reference inside a
+  component must instantiate with bare caller variables or ground types.
+  Applying a local function value creates no edge and no specialization.
 - In the type-reference graph `->` is a type constructor like any other:
   `type T(a) = C(a -> T(List(a)));` is E_SPECIALIZATION.
 - The proof of finiteness (P001 §4.2) needs no change: specialization
   keys are still (named declaration, ground argument vector), lambdas
   have no type parameters of their own, and an applied function value is
-  already specialized where it was created.
+  already specialized where it was created. Lambda bodies are checked
+  inside their enclosing function, so their references belong to that
+  function's node in the graph.
 - The hole representative stays valid: condition 4 of ADR 007 (no
   operation depends on a type argument) still holds, because lowering of
-  closures, adapters and application is uniform in the argument and
-  result types.
+  closures, staged wrappers and application is uniform in the argument
+  and result types.
 
 ## 7. IR and Go representation
 
@@ -217,42 +268,61 @@ Checked IR (Domain.Checked.Internal) gains:
 - `Call` and `Construct` accept 1 to n arguments (partial when fewer);
 - `Apply Expr (Array Expr)` for application of a non-named callee and for
   over-application's surplus;
-- `Lambda (Array { id ∷ LocalId, ty ∷ Ty Open }) Expr`.
+- `Lambda (Array Param) Expr`, a `Param` being a typed local or a typed
+  discard;
+- `Pipe Expr Expr`, kept distinct so lowering can order the left operand
+  first (section 5).
 
 The monomorphic IR (Domain.IR.Internal) mirrors these, and its `Ty` gains
-`TFun (Array Ty) Ty`, the canonical uncurried form: Specialize flattens
-every arrow chain, so a ground `A -> B -> C` is `TFun [A, B] C` and its
-result is never a `TFun`. There is one Go representation per type:
-`func(A, B) C`. No runtime arity check exists or is needed.
+`TFun Ty Ty`, nested exactly as in the source type. A function value of
+type `A -> B -> C` is a one-argument Go function returning a one-argument
+Go function: `func(A) func(B) C`. Each stage boundary is therefore an
+ordinary Go call boundary, and timing is preserved by construction; no
+runtime arity check exists or is needed.
 
-Lowering, with `F` a named function of declared arity `n` whose
-canonical value type has `k ≥ n` parameters:
+Go types. Each distinct ground function type in a program gets one named
+Go type, emitted with the data types, so the text of long arrow spines
+stays linear: `type bumpusFun1 func(int32) int32`, `type bumpusFun2
+func(int32) bumpusFun1`. Function literals are written with the named
+result type and are assignable to the named type.
+
+Lowering, with `F` a named function of declared arity `n`:
 
 | Source | Go |
 |---|---|
 | `f(a1…an)` | `F(a1, …, an)` (unchanged) |
-| bare `f`, `k = n` | `F` |
-| bare `f`, `k > n` | adapter `func(p1…pk) R { return F(p1…pn)(pn+1…pk) }` |
-| partial `f(a1…aj)` | IIFE binding `a1…aj` to temps, returning a closure over the rest |
-| over-application | `F(a1…an)` then the canonical application of the rest |
-| value `h` of `TFun [T1…Tk] R` applied to `j` | `j = k`: `h(…)`; `j < k`: IIFE closure; `j > k`: apply `k`, then the rest |
-| lambda `fn(x, y) => e` of canonical `TFun [X, Y, Z] R` | `func(x X, y Y, z Z) R { return (e)(z) }` (eta-expanded to the canonical arity) |
-| `CtorRef` | the existing constructor function, or an adapter as above |
+| bare `f`, `n = 1` | `F` (already `func(A) R`) |
+| bare `f`, `n > 1` | `FValue`, a generated staged wrapper (below) |
+| partial `f(a1…aj)` | `FValue(a1)(a2)…(aj)` |
+| over-application `f(a1…an, b…)` | `F(a1, …, an)(b1)…` |
+| value `h` applied to `a1…aj` | `h(a1)(a2)…(aj)` |
+| lambda `fn(x, y) => e` | `func(x X) bumpusFunN { return func(y Y) R { return e } }` |
+| `a \|> e` | `func() R { v := a; return <e applied to v> }()` |
+| `CtorRef` | the constructor function or its staged wrapper |
 
-- Partial application's IIFE gives the strictness of section 5 (Go
-  would otherwise defer argument evaluation into the closure).
-- Eta-expanding a lambda body that returns a function delays nothing
-  observable: a lambda's body runs only when the lambda is applied, so
-  binding the extra canonical parameters cannot run any effect earlier.
-  A named function is never eta-expanded (section 4).
+- The staged wrapper of `F`, generated once per specialization of a
+  function used as a value, is nested closures that collect the
+  arguments and call `F` at the last stage:
+  `func FValue(p1 A) bumpusFun7 { return func(p2 B) R { return F(p1,
+  p2) } }`. A declaration whose result is a function needs nothing extra:
+  `F`'s Go result type is already the nested function type.
+- Go evaluates `h(a1)(a2)` by calling `h(a1)` before any call inside
+  `a2` (calls run in lexical order; locals and literals have no
+  effects), which is section 5's order. Partial application is strict
+  because Go evaluates call arguments before the call.
+- The pipe's temporary is omitted when the left operand is a literal or
+  a local, whose evaluation has no effect and cannot diverge.
+- Cost: applying a function value to `k` arguments allocates up to
+  `k - 1` intermediate closures. Direct named calls are unaffected. A
+  saturation optimization is deferred until measured (non-goal).
 - Lambda bodies lower as expressions, so a match inside one is lifted as
-  today; Format.Go.Capture removes a lambda's parameters from its body's
-  free set, so a lifted match takes the lambda's parameters it reads as
-  ordinary parameters.
+  today; Format.Go.Capture removes a lambda's named parameters from its
+  body's free set, so a lifted match takes the lambda parameters it reads
+  as ordinary parameters. A discarded parameter lowers to Go `_`.
 - Comparison and printing helpers are generated by usage (Format.Go.Usage)
   and section 3 forbids both at function types, so no helper ever meets a
-  Go `func` field. A declared type with a function field lowers its field
-  as the Go `func` type, without the pointer used for recursive fields
+  Go `func` field. A declared type with a function field lowers it as the
+  named Go function type, without the pointer used for recursive fields
   (a Go func value is already a reference).
 - `scripts/structure.mjs` and the IR allowlists are unchanged; new nodes
   stay behind the existing internal modules.
@@ -263,51 +333,70 @@ Every rejection row asserts exact code, span and text.
 
 - Syntax: arrow precedence and associativity; `(A, B) -> C` and
   `A -> B -> C` resolve to the same type; each E_SYNTAX form of section
-  1; lambda and `|>` precedence; postfix application chains; `->` and
-  `|>` lexing next to negative literals and `|`.
+  1; the nesting measure (a long spine is one level, a nested parameter
+  is not); lambda, `_` parameter and `|>` precedence; postfix
+  application chains; `->` and `|>` lexing next to negative literals and
+  `|`.
 - Names: each row of the section 2 table; lambda shadowing of a function
-  and of a parameter; duplicate lambda parameters; an unbound type
-  variable in a lambda annotation; a rigid one in a lambda annotation.
+  and of a parameter; duplicate named lambda parameters; repeated `_`
+  accepted; an unbound and a rigid type variable in a lambda annotation.
 - Typing: partial, saturated and over-application of functions,
   constructors and locals; application of a non-function; occurs check
   through an arrow (`fn(f) => f(f)` is E_TYPE `Infinite type`);
   comparison of a function and of a type with a function field; patterns
-  on a function scrutinee; non-printable `main`; the hint.
+  on a function scrutinee; non-printable `main`.
+- Hint provenance: the hint on a direct partial application of a
+  function and of a constructor, inside parentheses; no hint through a
+  local, a lambda, a pipe or another call; no hint when the expected type
+  is a function or a meta; with and without the hint the diagnostic's
+  code, span and expected/found text are equal.
 - Unifier properties (test/unify.test.mjs and its independent oracle)
   extended to generated types containing arrows.
 - Specialization: distinct instantiations of a generic function used as
   a value (`map(id, …)` at Int and Bool); a value reference creating
-  polymorphic recursion is E_SPECIALIZATION; the finite-component
-  generator gains value-reference edges; the representative-independence
-  property gains lambdas with unused parameters.
+  polymorphic recursion is E_SPECIALIZATION, including one inside a
+  lambda inside a match arm; the finite-component generator gains
+  value-reference edges, some inside lambdas; the representative-
+  independence property gains lambdas with unused parameters.
 - Execution: closures capturing parameters and match binders; returning
-  closures; partial application evaluating its arguments once
-  (observable only as divergence: with `fn k3(a: Int, b: Int, c: Int):
-  Int = a;` and `fn ignore(f: Int -> Int -> Int): Int = 0;`,
-  `ignore(k3(loop()))` must not terminate); over-application;
-  eta-adapters for `adder`; constructor values (`map(Just, xs)`); a
-  lifted match inside a lambda reading the lambda's parameter; `|>` chains.
-- Oracle: the reference interpreter (test/) gains closures, curried
-  application and `|>`; the generated-program oracle gains higher-order
-  functions, lambdas and partial application, run in Go and compared.
+  closures; partial application evaluating its arguments once;
+  over-application; constructor values and partial constructors
+  (`map(Just, xs)`, `Cons(1)`); a lifted match inside a lambda reading
+  the lambda's parameter; `|>` chains; the `add`/`stuck` pair of
+  section 4 as non-divergent outcomes where possible.
+- Timing probes, bounded: a test post-processes the emitted Go of a
+  probe program so that entering a chosen function panics with a
+  distinctive message (`bumpus-probe: <name>`), builds and runs it, and
+  asserts that message. No probe exhausts Go's stack. Probes:
+  `use(stuck)` with `stuck` a named function value (healthy: panics in
+  `stuck`); the same with `fn(x) => stuck(x)` passed as a lambda;
+  partial application strictness (`ignore(k3(probe(1)))` panics in
+  `probe`); pipe order (`probe1(1) |> g(probe2(2))` panics in `probe1`).
+- Oracle: the reference interpreter (test/) gains closures, staged
+  application with declared arity, and `|>` with left-first order; the
+  generated-program oracle gains higher-order functions, lambdas, partial
+  and over-application, run in Go and compared.
 - Identity: existing programs specialize and emit byte-identically
   (bootstrap snapshots unchanged); a new example examples/functions.bumpus
   with snapshot bootstrap/functions.go.
 - Regression rows (scripts/regression.mjs), each with a probe that passes
-  healthy and fails on its mutant: `partial-strict` (partial application
-  defers argument evaluation into the closure); `declared-arity` (a named
-  function returning a function is eta-expanded, so with `fn stuck(n:
-  Int): Int -> Int = loop(n);` and `fn drop1(f: Int -> Int): Int = 0;`,
-  `drop1(stuck(1))` stops diverging); `lambda-capture` (Capture keeps a lambda
-  parameter free, so the lifted match reads a stale or missing local and
-  Go compilation fails); `fun-compare` (comparison groundness ignores
-  arrows).
-- Divergence probes need a bounded harness: Go reports unbounded
-  recursion as a fatal stack overflow, so these tests assert that fatal
-  exit within a time bound, against a mutant that prints. No existing
-  test does this; the plan must cost it.
-- Scale: large-source gains a chain of 1,000 partial applications and a
-  1,000-parameter function used as a value, with time bounds.
+  healthy and fails on its mutant, each probe being one of the bounded
+  timing probes above where timing is the defect: `stage-value` (a named
+  function value is lowered uncurried with an eta adapter, so
+  `use(stuck)` returns instead of reaching `stuck`); `stage-lambda` (a
+  lambda is eta-expanded to the arity of its type); `partial-strict`
+  (partial application defers its arguments into the closure);
+  `pipe-order` (the pipe is rewritten into the call, evaluating its left
+  operand last); `lambda-capture` (Capture keeps a lambda parameter
+  free, so a lifted match reads a missing local and Go compilation
+  fails); `fun-compare` (comparison ignores arrows).
+- Scale, with time bounds in large-source: a declaration with 5,000
+  parameters called directly, used as a value and partially applied
+  (checking, specialization, Go emission and `go build`); a chain of
+  1,000 partial applications; a source arrow type of 1,000 parameters
+  (one nesting level). The plan must also confirm that `go build`
+  accepts a staged wrapper 5,000 closures deep, or bound the parameter
+  count with a diagnostic if it does not.
 
 ## 9. Diagnostics that change deliberately
 
@@ -317,8 +406,8 @@ Every rejection row asserts exact code, span and text.
 - Calling a local or a binder: E_NOT_CALLABLE becomes application,
   E_TYPE `Expected a function, found T` when its type is not a function.
 - Under-application of a function or constructor: E_ARITY becomes a
-  function value, typically E_TYPE with the `missing N argument(s)` hint
-  where it is used.
+  function value, typically E_TYPE where it is used, with the hint under
+  section 4's provenance rules.
 - Comparability: "every ground type is comparable" becomes "every ground
   type without a function in it".
 
@@ -330,29 +419,38 @@ text.
 
 1. Curried semantics, Algol-like multi-argument syntax; `(A, B) -> C` is
    `A -> B -> C` (user, 2026-10-08).
-2. Lambdas `fn(x) => e`, annotations optional, monomorphic (user).
-3. `|>` in FN001, syntactic, looser than comparison, left-associative
-   (user); `>>`/`<<` wait for a Prelude.
+2. Lambdas `fn(x) => e`, annotations optional, monomorphic; `_`
+   discards (user).
+3. `|>` in FN001, looser than comparison, left-associative, left operand
+   evaluated first (user).
 4. No local binding form in FN001 (user).
-5. Declared arity decides when a named function's body runs; over- and
-   partial application follow from it; named functions are never
-   eta-expanded.
-6. One canonical uncurried Go representation per ground function type,
-   with adapters at value-use sites; no runtime arity checks.
+5. Declared arity is a stage boundary that survives use as a value; no
+   function or lambda is ever eta-expanded (user review).
+6. Nested Go function values, `func(A) func(B) C`, with staged wrappers
+   for named functions and constructors used as values; direct saturated
+   calls keep today's n-ary Go (user review).
 7. Functions are neither comparable nor printable; function types are
    inhabited.
-8. Constructors are curried functions like any other.
+8. Constructors are curried functions with the same staging (user).
+9. The under-application hint is narrow and provenance-based (user).
+10. Arrow spines do not count as nesting depth and are traversed
+    iteratively.
 
-## 11. Open questions for review
+## 11. Open questions
 
-1. Constructors as function values and partial constructors (decision
-   8): included for uniformity (`map(Just, xs)`), or deferred?
-2. Pipe evaluation order (section 5): the syntactic rewrite evaluates the
-   left operand last. Accept now and let FX001 revisit, or evaluate the
-   left operand first (costs a Go temporary per pipe stage)?
-3. `_` as a lambda parameter (`fn(_) => 0`) is common and cheap; include,
-   or leave with the deferred placeholder work?
-4. The under-application hint fires only for a partial application of a
-   named callee meeting a non-function expected type. Wider (any
-   function-typed value whose final result would fit) needs a trial
-   unification; worth it?
+None blocking. The plan must measure the `go build` depth question of
+section 8 and decide whether a parameter-count bound is needed.
+
+## 12. Review resolutions (2026-10-08)
+
+| Finding | Resolution |
+|---|---|
+| Canonical uncurried representation loses timing (`use(stuck)` returns 0 instead of diverging) | Section 7 replaced: nested `func(A) func(B) C` values; staged wrappers; declared arity is a stage boundary (section 4 example). |
+| Lambda eta-expansion delays the body; "delays nothing observable" was wrong | Lambdas are staged at their own last parameter and never eta-expanded (sections 5, 7); claim removed. |
+| Q1 constructor values | Included, same staging (decision 8). |
+| Q2 pipe order | Left operand first, then callee, then explicit arguments, keeping `g(b…, v)`'s boundaries (section 5); `Pipe` stays distinct in the IR; regression row `pipe-order`. |
+| Q3 `_` lambda parameter | Discards, no binding, repeatable, separate from placeholder application (sections 1, 2). |
+| Q4 hint | Narrow, with explicit provenance rules; never changes the underlying diagnostic (section 4); tests in section 8. |
+| Divergence tests exhausted the stack | Bounded timing probes via instrumented emitted Go, named-value and lambda cases (section 8). |
+| Generated depth of long declarations | Spine-flat nesting measure, iterative spine traversal, named Go function types for linear text, 5,000-parameter scale tests (sections 1, 3, 7, 8). |
+| References in lambda bodies | Stated: every reference at any depth is a graph edge of the enclosing function (section 6); tests include one inside a lambda inside an arm. |
