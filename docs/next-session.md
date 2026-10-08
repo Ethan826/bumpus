@@ -20,9 +20,11 @@ Next steps, in order:
 1. FN001 (first-class functions, lambdas, closures). Direction settled
    with the user 2026-10-08 (curried, `fn(x) => body`, `|>` in scope, no
    let; see BACKLOG and progress). The design draft is
-   docs/plans/2026-10-08-functions-design.md; revised after the user's
-   first review (staged nested function values; section 12 maps the
-   findings) and awaits approval. Then write the plan. FN001 precedes C001, R001 and
+   docs/plans/2026-10-08-functions-design.md; approved 2026-10-08;
+   Amendment A1 (section 13, linear staged lowering, from a go build
+   measurement) awaits the user's confirmation. The plan
+   docs/plans/2026-10-08-functions-plan.md awaits review; execution is
+   subagent-driven on branch fn001 in .worktrees/fn001. FN001 precedes C001, R001 and
    FX001; review C001/R001 jointly and decide whether instances are
    ordinary records.
 

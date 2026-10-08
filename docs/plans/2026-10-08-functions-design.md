@@ -6,8 +6,11 @@ no local binding form). First draft reviewed by the user 2026-10-08:
 revise before approval (canonical uncurried representation lost
 evaluation timing); this revision replaces it with staged nested function
 values and records the user's answers to the open questions (section 12
-maps each finding to its resolution). Awaiting approval. Nothing is
-implemented; no plan exists yet.
+maps each finding to its resolution). Approved by the user 2026-10-08.
+Nothing is implemented. Amendment A1 (section 13,
+from a measurement made while writing the plan) changes how staged
+values are lowered, not what they mean, and needs the user's
+confirmation; the plan is docs/plans/2026-10-08-functions-plan.md.
 
 ## Goal and non-goals
 
@@ -438,8 +441,8 @@ text.
 
 ## 11. Open questions
 
-None blocking. The plan must measure the `go build` depth question of
-section 8 and decide whether a parameter-count bound is needed.
+None blocking. The `go build` depth question of section 8 was measured
+while writing the plan; see Amendment A1 (section 13).
 
 ## 12. Review resolutions (2026-10-08)
 
@@ -454,3 +457,41 @@ section 8 and decide whether a parameter-count bound is needed.
 | Divergence tests exhausted the stack | Bounded timing probes via instrumented emitted Go, named-value and lambda cases (section 8). |
 | Generated depth of long declarations | Spine-flat nesting measure, iterative spine traversal, named Go function types for linear text, 5,000-parameter scale tests (sections 1, 3, 7, 8). |
 | References in lambda bodies | Stated: every reference at any depth is a graph edge of the enclosing function (section 6); tests include one inside a lambda inside an arm. |
+
+## 13. Amendment A1: linear staged lowering (2026-10-08, proposed)
+
+Measured with Go 1.26.4 on hand-written Go of section 7's shape (a
+named function of `n` Int parameters, its staged wrapper as nested
+closures, named function types, called through all `n` stages):
+`go build` took 1.3 s at n = 50, 2.6 s at 100, 13.9 s at 200 and 221 s
+at 300; at 1,000 it had not finished after 10 minutes. Each nested
+closure captures every outer parameter, so the compiler's work grows far
+faster than the text. test/large-source.test.mjs already checks a
+20,000-parameter declaration, so a parameter bound would have to apply
+only to value use, an arbitrary rule. Rejected.
+
+Replacement, keeping section 7's types and every rule of sections 4-5:
+no Go closure literal is nested inside another. Each staged value is a
+chain of top-level Go stage functions, each returning one closure that
+captures a single environment value:
+
+- A staged wrapper of `F` (arity `n ≥ 2`) has `n - 1` stage functions;
+  stage `k` receives the environment of arguments `1…k-1` and returns
+  the closure taking argument `k`, which extends the environment and
+  calls stage `k + 1`, or `F` with every argument at the last stage.
+- Every lambda is lifted the way matches are (E005): a top-level stage
+  chain whose initial environment holds the lambda's free locals
+  (Format.Go.Capture) and whose last stage binds the free locals and
+  parameters the body reads, then evaluates the body. A one-parameter
+  lambda is a one-stage chain. Nested lambdas are separate chains.
+- Environments are immutable once built (a stage builds a new one), so
+  a shared partial application is never disturbed by a later
+  application.
+
+Same hand-written measurement with an environment struct copied per
+stage: 1.1 s at n = 300, 1.1 s at 1,000, 12.8 s at 5,000. Copying the
+whole struct costs O(n) per stage, O(n²) per full application; the plan
+uses a linked environment (each stage allocates one node holding its
+argument and a pointer to the previous node; the last stage reads the
+chain once), O(1) per stage and O(n) text, and re-measures it as its
+first task before any lowering code is written.

@@ -1408,3 +1408,25 @@ timing tests use instrumented bounded panics, never stack exhaustion;
 arrow spines are depth-flat, traversed iteratively, named Go function
 types keep text linear, scale tests at 5,000 parameters. Section 12 of
 the design maps each finding. Not yet approved; no plan, no code.
+
+## FN001 design approved; plan drafted (2026-10-08)
+
+The user approved the revised design and asked for the plan. While
+writing it, the section 8 `go build` question was measured on
+hand-written Go (scratchpad, Go 1.26.4): nested-closure staged wrappers
+took 1.3 s at 50 parameters, 2.6 s at 100, 13.9 s at 200, 221 s at 300,
+and did not finish within 10 minutes at 1,000; an environment struct
+copied per stage took 1.1 s at 300 and 1,000 and 12.8 s at 5,000. A
+parameter bound is not viable (large-source already checks a
+20,000-parameter declaration). Recorded as design Amendment A1 (section
+13, proposed): no nested Go closures; staged wrappers and every lambda
+lifted to top-level stage chains over linked environments; meaning and
+types unchanged. Plan: docs/plans/2026-10-08-functions-plan.md (nine
+tasks; Task 1 re-measures the linked environment before any lowering
+code). Awaiting the user's confirmation of A1 and review of the plan.
+No code.
+Verify for this docs change: first run failed one timing test (match
+ladder 1,830 ms over its 1.5 s bound under external load, 471 ms alone;
+.build/fn001-plan-verify.log), recorded as BACKLOG T003 before
+re-running; second run exit 0, 318 tests, twelve regression proofs, the
+ladder at 752 ms (.build/fn001-plan-verify-2.log).
