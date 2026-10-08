@@ -1448,3 +1448,22 @@ generated comparisons. Accepted diagnostic adjustments now in the design
 (§2, §4, §9): over-application past a non-function and `f()` keep
 E_ARITY `Wrong number of arguments`; `x()` and `N()` keep E_NOT_CALLABLE.
 Task 1 (measurement only) authorized in .worktrees/fn001.
+
+## FN001 Task 1: linked-environment measurement (2026-10-08)
+
+Branch fn001 (.worktrees/fn001). Added scripts/stage-shapes.mjs (Go
+generator: linked, copied, nested; attribution baselines direct, bare,
+idle, chain; remedy candidates shared, packed) and
+scripts/stage-probe.mjs (explicit build/run timeouts, repeated
+applications with every argument consumed, checksums recomputed in
+JavaScript, growth-exponent verdict). Every run's checksum matched. The
+first verdict line ("linear") was wrong: its ratio bound admitted a 16×
+build for 4× n; replaced by the exponent bound before any decision. Result
+(design §13 "A1 measurement"): the linked environment fails the build
+bound (k = 1.92 with the statement driver, 1.74 without applying it);
+run time is linear. Attribution: the last stage's `n`-local unpack and
+`n`-argument call; a packed calling convention fixes the staged value
+(k = 1.23 including a k = 1.52 floor of types and `f`). Applying a value
+to `n` arguments in one Go function is k ≈ 2 in every shape. Stopped per
+the user's ruling: no representation adopted; decision returned to the
+user. No compiler change.

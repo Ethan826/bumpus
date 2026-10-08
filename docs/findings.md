@@ -301,3 +301,12 @@ resource/cancellation semantics. Documentation only; no feature implemented.
   2.9 s workload under a 5 s bound failed once in three reviewer runs and
   every time with three suites at once; the fix was the workload (Expand's
   deep `Ord` key comparisons), not the bound or a rerun.
+- `go build` is superlinear in the size of one Go function or
+  expression even when the generated text is linear (FN001 Task 1,
+  design §13): an `n`-argument application chain in one function is
+  k ≈ 2 at n = 5,000 to 20,000, and a stage that unpacks `n` locals and
+  makes an `n`-argument call is the superlinear part of the linked
+  environment. Linear text is necessary, not sufficient; measure the Go
+  build at the largest size a test claims, and judge growth by the
+  exponent, not by a ratio bound (a "within 5 × 4" bound passed a 16.4×
+  quadratic build).

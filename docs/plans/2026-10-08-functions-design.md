@@ -514,3 +514,33 @@ the representation is reconsidered with the user.
 Status: architecture approved by the user 2026-10-08 (top-level stages,
 immutable environments); the linked representation awaits Task 1's
 measurement.
+
+### A1 measurement (plan Task 1, 2026-10-08; not adopted)
+
+scripts/stage-probe.mjs and scripts/stage-shapes.mjs, Go 1.26.4, raw logs
+.build/fn001-task1/run{1,2,3}-*.log. Build seconds at n = 5,000 and
+20,000 and the growth exponent k (t(20,000)/t(5,000) = 4^k; 1 linear, 2
+quadratic, the plan's bound 1.25):
+
+| Program | 5,000 | 20,000 | k |
+|---|---|---|---|
+| floor: n function types and `f` only | 0.53 | 4.33 | 1.52 |
+| direct calls of `f`, no staged value | 0.60 | 5.05 | 1.54 |
+| linked chain, value never applied | 2.65 | 29.7 | 1.74 |
+| linked, one node type per stage replaced by one shared type | 4.20 | 61.5 | 1.93 |
+| packed: shared node type, last stage passes the chain to `F` | 1.67 | 9.17 | 1.23 |
+| linked, applied by 20,000 statements | 11.2 | 161 | 1.92 |
+| linked, applied by one chained expression | 18.0 | >300 (timeout) | ≥2.1 |
+| packed, applied by one chained expression | 16.8 | 287 | 2.05 |
+
+Run time per full application is linear for every chain shape (linked
+k = 1.10). Findings: (1) the linked environment as specified fails the
+build bound; its last stage, which unpacks `n` locals and makes an
+`n`-argument call, is the superlinear part: removing it (`packed`) brings
+the staged value's own cost above the floor to k ≈ 1.04 (1.14 s to
+4.84 s). (2) Applying a value to `n` arguments inside one Go function is
+superlinear for `go build` whatever the representation (k ≈ 2), as
+statements or as one expression. (3) The floor itself is k ≈ 1.5: `n`
+named function types plus an `n`-parameter function; not yet split.
+Per the user's ruling no shape is adopted; the representation is to be
+reconsidered with the user.
