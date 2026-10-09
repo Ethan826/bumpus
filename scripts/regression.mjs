@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { fnRows } from './regression-fn.mjs';
 // Each row restores one defect in its own isolated copy of the sources.
 const rows = [
   {
@@ -96,11 +97,15 @@ const rows = [
     probe: 'spec-key', message: /nested specialization keys collided/
   }
 ];
+// `node scripts/regression.mjs [name…]` proves only the named rows.
+const chosen = process.argv.slice(2);
+const proved = [...rows, ...fnRows]
+  .filter(row => chosen.length === 0 || chosen.includes(row.name));
 const base = '.build/regression';
 const commandTimeoutMs = 180_000;
 const run = (command, args) => spawnSync(command, args, { encoding: 'utf8', timeout: commandTimeoutMs });
 rmSync(base, { recursive: true, force: true });
-for (const row of rows) {
+for (const row of proved) {
   const root = `${base}/${row.name}`;
   mkdirSync(root, { recursive: true });
   cpSync('src', `${root}/src`, { recursive: true });

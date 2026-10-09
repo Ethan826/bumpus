@@ -1,6 +1,8 @@
 # First-Class Functions Implementation Plan (FN001)
 
-Status: Task 6 complete 2026-10-08 (Go lowering; docs/progress.md).
+Status: all tasks complete on branch fn001. Task 9 complete 2026-10-09
+(regression proofs and documentation; ADR 008; docs/progress.md).
+Task 6 complete 2026-10-08 (Go lowering; docs/progress.md).
 Task 5 complete 2026-10-08 (instantiation rule and
 specialization; docs/progress.md). Task 4 complete 2026-10-08 (checking;
 docs/progress.md).
@@ -547,7 +549,7 @@ limited it; nested closures were not rerun here.
   application, saturation optimization, I001 wrapper arity),
   `docs/progress.md`, `docs/findings.md`, `docs/next-session.md`, README
 
-- [ ] **Step 1: Add six rows**, each with one exact needle and a probe
+- [x] **Step 1: Add six rows**, each with one exact needle and a probe
   that passes healthy and fails on its mutant: `stage-value` (a named
   function value lowered uncurried with an eta adapter; probe:
   `use(stuck)` must panic in `stuck`); `stage-lambda` (a lambda stage
@@ -559,7 +561,7 @@ limited it; nested closures were not rerun here.
   `fun-compare` (Comparable ignores arrows; probe: `Type Int -> Int is
   not comparable`). Each needle's surrounding code is shaped so the
   mutant compiles.
-- [ ] **Step 1b: Promote four scratchpad mutants** from Tasks 2-6 to rows
+- [x] **Step 1b: Promote four scratchpad mutants** from Tasks 2-6 to rows
   (durability, approved by the user 2026-10-08): `block-order` (an
   application helper evaluates its block's arguments before applying
   any; probe: a 65-argument application through a declared-arity
@@ -572,13 +574,21 @@ limited it; nested closures were not rerun here.
   not comparable); `arrow-key` (arrows interned without their
   parameter; probe: `id` at two function types differing in a parameter
   specializes twice and prints both).
-- [ ] **Step 2: Run** `node scripts/regression.mjs`. Expected: twenty-two
+- [x] **Step 2: Run** `node scripts/regression.mjs`. Expected: twenty-two
   `Regression proof (…)` lines.
-- [ ] **Step 3: Write** ADR 008 (staging by declared arity, nested
+- [x] **Step 3: Write** ADR 008 (staging by declared arity, nested
   values, A1 lowering with Task 1's numbers, pipe order, hint
   provenance) and the language.md grammar, names, typing, evaluation and
   diagnostics sections, each claim naming its test file.
-- [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0,
+- [x] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0,
   twenty-two proofs; record wall time and test count.
-- [ ] **Step 5: Commit** `docs: FN001 ADR 008, language and regression
+- [x] **Step 5: Commit** `docs: FN001 ADR 008, language and regression
   proofs`.
+
+Executed 2026-10-09 (docs/progress.md "FN001 Task 9"): the rows are in
+scripts/regression-fn.mjs, the probes in test/regression-fn.mjs. As
+built there is no uncurried representation to restore, so `stage-value`
+and `stage-lambda` restore the defect's effect: an eta adapter at the
+type's full arity. The Task 8 Step 2 derived `Eq`/`Ord` gap was not a
+gap: test/type-order.test.mjs (Task 2) fails on that mutant; no
+pipeline phase compares long source arrows with `Eq`/`Ord`.

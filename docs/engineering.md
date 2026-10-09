@@ -100,8 +100,21 @@ adding a bypass allowlist.
   to print `Pair(1, true)`) and `spec-key` (Features.Specialize.Keys keys
   a type application's data-type arguments without their identity, so
   `List(List(Int))` and `List(List(Bool))` share one Go type; probe
-  requires a program using both to build and print `Pair(1, 2)`): twelve
-  `Regression proof (…)` lines in all; the A003 order and print tests also use an independent value
+  requires a program using both to build and print `Pair(1, 2)`), and
+  since FN001 ten more, rows in scripts/regression-fn.mjs and probes in
+  test/regression-fn.mjs (ADR 008): `stage-value` and `stage-lambda` (a
+  named value or a lambda eta-expanded to its type's arity; timing probe
+  `use(stuck)` must enter `stuck`, via test/support.mjs `panicOnEntry`),
+  `partial-strict` (partial arguments evaluated inside the closure),
+  `pipe-order` (every pipe lowered as the rewritten call), `block-order`
+  (an application helper evaluates its 64 arguments before applying any),
+  `lambda-capture` (Format.Go.Capture leaves a lambda's parameters free),
+  `fun-compare` (Comparable ignores arrows), `functional-fixpoint`
+  (Functional stops at its seeds), `value-edge` (bare references and
+  lambda bodies are no instantiation edges) and `arrow-key` (arrows
+  interned without their parameter): twenty-two `Regression proof (…)`
+  lines in all (`node scripts/regression.mjs name…` proves only the named
+  rows); the A003 order and print tests also use an independent value
   oracle (test/value-oracle.mjs);
 - Go execution in tests is batched per test file (T001, test/go-batch.mjs):
   `runGoBatch(import.meta.url, cases, label?)` takes an array of

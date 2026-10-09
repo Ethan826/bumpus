@@ -2324,3 +2324,56 @@ that read six parameters (first and last three, mixed kinds).
   5.77 after; .build/fn001-task7-verify.log): parallel phase 541 tests,
   serial phase 12, zero failures
   or skips.
+
+### FN001 Task 9: regression proofs and documentation (2026-10-09)
+
+- Ten regression rows (scripts/regression-fn.mjs, imported by
+  scripts/regression.mjs; probes in test/regression-fn.mjs, imported by
+  test/regression.mjs, whose `printed` now runs through a shared `ran`):
+  `stage-value` (Format.Go.Expression: a bare arity-1 function whose type
+  has two or more parameters lowered as a two-level eta adapter; probe
+  `use(stuck)` must panic in `stuck`), `stage-lambda` (Format.Go.Lambda:
+  the same adapter around a one-parameter lambda's lifted function),
+  `partial-strict` (Format.Go.Value: a partial application wrapped in a
+  closure awaiting its next argument, so its arguments run late),
+  `pipe-order` (Format.Go.Pipe: every pipe spliced as the call),
+  `lambda-capture` (Format.Go.Capture `lambdaFree` keeps parameters),
+  `fun-compare` (Check.Comparable drops the function test),
+  `block-order` (Format.Go.Apply: a helper binds its block's arguments to
+  variables before applying), `value-edge` (Check.Instantiation: bare
+  references and lambda bodies are no edges; mutant outcome `More than
+  10000 specializations`), `functional-fixpoint` (Check.Functional
+  returns its seeds), `arrow-key` (Specialize.Intern keys an arrow by
+  `TInt` and its result). Timing probes use test/support.mjs
+  `panicOnEntry`. Deviation: as built there is no uncurried value
+  representation, so `stage-value`/`stage-lambda` restore the defect's
+  effect (eta expansion to the type's arity) instead. The lowering
+  mutants' Go builds, so those probes fail on behavior (`0` printed, or
+  the wrong probe label); `lambda-capture` and `arrow-key` fail at Go
+  build, inherent to those defects. `node scripts/regression.mjs
+  name…` now proves only the named rows.
+- Task 8 Step 2 gap (derived `Eq`/`Ord` on Domain.Type `Ty`): rebuilt in
+  a scratchpad copy with both instances derived; test/type-order.test.mjs
+  (Task 2) fails 2 of 5 (RangeError on 20,000-long spines), so verify
+  already catches it; Task 8 had run five other files only. No pipeline
+  phase compares long source arrows with `Eq`/`Ord`: the same mutant
+  compiles a program unifying two 20,000-parameter written arrows with a
+  20,000-parameter function (and `same(h, h)`) correctly. No new test
+  added, since no pipeline test can observe that defect.
+- Nested-closures mutant (Format.Go.Stage `wrapperCode` emitting the
+  wrapper as nested Go closures, no nodes or entry) against
+  test/fn-scale.serial.test.mjs, once (load 2.5 before, 2.9 after): the
+  5,000-parameter value and the 5,000-parameter generic function type
+  fail, `go build` killed at the 120 s timeout (bound 10 s); the
+  1,000-partial chain (9,315 ms) and the 1,000-long arrow (6,325 ms)
+  pass, against 542 and 575 ms healthy in the verify below.
+- Docs: docs/adr/008-functions.md; docs/language.md (grammar, names,
+  typing, evaluation, diagnostics, nesting; each claim names its test
+  file; the Task 4 "pending" note removed); docs/architecture.md,
+  docs/engineering.md (twenty-two rows), README (ADR 008), BACKLOG (FN001
+  Done pending merge; FN002-FN005), docs/findings.md, docs/next-session.md.
+- `rm -rf output && npm run verify` exit 0 in 150 s (load average 2.39
+  before, 8.44 after; .build/fn001-task9-verify.log): parallel phase 541
+  tests, serial phase 12, zero failures or skips; twenty-two `Regression
+  proof (…)` lines; serial 5,000-parameter build 4,423 ms; match ladder
+  640 ms.

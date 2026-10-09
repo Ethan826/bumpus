@@ -324,3 +324,14 @@ resource/cancellation semantics. Documentation only; no feature implemented.
   bodies (this does not show that no representation could); bound Go
   builds by measured times at stated sizes, and keep linearity claims
   for Bumpus's own phases.
+- A mutant's survival is a claim about the tests run, not about the
+  suite (FN001 Task 9): Task 8 recorded that derived `Eq`/`Ord` on
+  `Domain.Type.Ty` "survives all Task 8 tests" after running five files,
+  and the gap was carried forward; test/type-order.test.mjs (Task 2)
+  fails on it with RangeError. Name the files a mutant was run against,
+  and run the whole parallel phase before calling a defect uncaught.
+- A lowering mutant should still emit Go that builds, so its probe fails
+  on behavior (which body runs first, what prints), not on a Go type
+  error; when the built code no longer has the representation a plan
+  names (an uncurried value), restore the defect's effect (an eta
+  adapter at the type's arity) and say so.

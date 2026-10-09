@@ -7,7 +7,7 @@ an earlier layer; scripts/structure.mjs enforces it from `purs graph`.
 | Layer | Modules (src/) | Role |
 |---|---|---|
 | Domain | Syntax, Type, Resolved, Problem, Host, Checked.Internal, IR.Internal | syntax trees, spans, `Ty v`, resolved syntax, checked IR, monomorphic IR, `Problem` data, capability-port types |
-| Features | Resolve, Resolve.{Expression,Types,Pattern,Repeated,Fresh}, Check, Check.{Infer,Call,Arms,Match,Require,Scheme,Walk,Comparable,Instantiation,Nested,Components,Unify,Tables,Inhabited,Signature,Matrix,Usefulness,Missing,Coverage,Search}, Specialize, Specialize.{Seeds,Keys,Lower,Body,Copy,Intern,Values} | resolution, checking, coverage, specialization; report `Problem` data, never text |
+| Features | Resolve, Resolve.{Expression,Types,Pattern,Repeated,Fresh,Lambda}, Check, Check.{Infer,Call,Apply,Lambda,Pipe,Use,Context,Hint,Functional,Arms,Match,Require,Scheme,Walk,Comparable,Instantiation,Nested,Components,Unify,Tables,Inhabited,Signature,Matrix,Usefulness,Missing,Coverage,Search}, Specialize, Specialize.{Seeds,Keys,Lower,Body,Copy,Intern,Values} | resolution, checking, coverage, specialization; report `Problem` data, never text |
 | Format | Lex, Parse, Parse.*, Stack, Go, Go.{Layout,Data,Lowered,Expression,Match,Capture,Value,Apply,Lambda,Pipe,Stage,Entry,Compare,Show,Usage}, Diagnostic, Wire, Arguments | text in (tokens, parser, reserved words, uppercase rule); Go out; diagnostic text, `E_*` names, wire records, usage text |
 | Runtime | Node (+ Node.js) | port implementations, argv/stdout/stderr/exit, JSON; the only FFI |
 | Program | Compile, Command, Main | pure `compile`, commands over any `Host`, entry point |
@@ -123,7 +123,19 @@ Format.Wire.
   table; `IR.Ty`'s `TFun FunTypeId` is a number), .Values (function
   references, constructor owners, lambdas); its temporary guard
   .Unlowered was deleted in FN001 Task 6, when Go lowered function values.
-  The full FN001 update is Task 9's.
+- **FN001 (ADR 008)**: function types are `TFun` in Domain.Type (curried,
+  spines walked by loops) and interned `TFun FunTypeId` numbers in the
+  monomorphic IR. Format.Parse adds .Type and .Lambda, Resolve .Lambda;
+  Check adds .Apply, .Lambda, .Pipe, .Use, .Context, .Hint and
+  .Functional (types that can hold a function), and value references are
+  instantiation edges; Specialize adds .Intern and .Values; Format.Go
+  adds .Value, .Stage, .Entry, .Lambda, .Apply and .Pipe (design §13
+  rules 1-8).
+  Tests: fn-syntax, fn-names, fn-depth (through Resolve), fn-check,
+  fn-rules, fn-hint (Check), fn-specialize, fn-run, fn-timing,
+  fn-oracle (+ poly-oracle's staging; generated programs against Go),
+  fn-linear, fn-scale.serial; regression rows in
+  scripts/regression-fn.mjs with probes in test/regression-fn.mjs.
 - **P001 tests** (one file per concern): poly-syntax (grammar,
   resolution), unify (+ unify-oracle, union-find reference), poly-check
   (typing), poly-depth (inferred-type bound), poly-termination
@@ -190,7 +202,8 @@ Elaborated IR -> lowered Go IR -> emitted Go. A target-neutral
 target-neutral job (BACKLOG A002). Foreign values (FFI) need full-value
 validation of tag and payload consistency before they become closed sums
 (I001). No fake stages for absent features. ADR 002 set the polymorphism
-strategy; ADR 007 records the implemented specialization.
+strategy; ADR 007 records the implemented specialization; ADR 008 the
+function values and their staged lowering.
 
 ## Known leak
 

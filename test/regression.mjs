@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { polyProbes } from './regression-poly.mjs';
+import { fnProbes } from './regression-fn.mjs';
 const [compilerPath, outputDir, probe] = process.argv.slice(2);
 const { compile } = await import(pathToFileURL(resolve(compilerPath)));
 const load = name => import(pathToFileURL(resolve(outputDir, name, 'index.js')));
@@ -71,22 +72,28 @@ const exhaustive = () => {
 // directory sits under .build/regression, which scripts/regression.mjs
 // clears before each run, so an interrupted probe leaves nothing in $TMPDIR.
 const list = 'type L = Nil | Cons(Int, L);';
-const printed = source => {
-  const result = compile(source);
-  assert.ok(result instanceof Right, 'probe program was rejected');
+// `go run` of generated Go source; the status and everything printed.
+const ran = goSource => {
   const work = resolve('.build/regression', probe, 'go-work');
   rmSync(work, { recursive: true, force: true });
   mkdirSync(work, { recursive: true });
   try {
-    writeFileSync(join(work, 'main.go'), result.value0);
+    writeFileSync(join(work, 'main.go'), goSource);
     const run = spawnSync('go', ['run', 'main.go'], {
       encoding: 'utf8', timeout: goTestTimeoutMs, cwd: work,
       env: { ...process.env, GOCACHE: resolve('.build/go-cache') }
     });
     assert.ifError(run.error);
-    assert.equal(run.status, 0, run.stdout + run.stderr);
-    return run.stdout;
+    return { status: run.status, output: run.stdout + run.stderr,
+      stdout: run.stdout };
   } finally { rmSync(work, { recursive: true, force: true }); }
+};
+const printed = source => {
+  const result = compile(source);
+  assert.ok(result instanceof Right, 'probe program was rejected');
+  const run = ran(result.value0);
+  assert.equal(run.status, 0, run.output);
+  return run.stdout;
 };
 
 const prints = (source, expected, message) => () => {
@@ -145,8 +152,9 @@ const probes = {
     'Cons(1, Cons(2, Nil))\n', 'printed value lost fields'),
   'state-thread': stateThread, capture
 };
-const context = { compile, Left, wire, printed, probe };
-const poly = name => () => polyProbes[name](context);
-for (const name of Object.keys(polyProbes)) probes[name] = poly(name);
+const context = { compile, Left, Right, wire, printed, ran, probe };
+const external = { ...polyProbes, ...fnProbes };
+const delegated = name => () => external[name](context);
+for (const name of Object.keys(external)) probes[name] = delegated(name);
 assert.ok(probe in probes, `unknown probe: ${probe}`);
 probes[probe]();

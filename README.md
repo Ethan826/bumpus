@@ -14,7 +14,10 @@ type, and printing of whatever `main` returns (A003, in final review).
 P001 implements rank-1 polymorphism: parameterized types and generic
 functions, lowered by whole-program specialization
 ([ADR 007](docs/adr/007-specialization.md),
-examples/lists.bumpus). HKTs, classes, and rows are planned.
+examples/lists.bumpus). FN001 adds first-class functions: function types,
+partial application, lambdas, closures and `|>`, staged by declared arity
+([ADR 008](docs/adr/008-functions.md)). HKTs, classes, and rows are
+planned.
 
 ## Prerequisites and fresh checkout
 
@@ -83,7 +86,8 @@ PureScript modules, not yet a native Go compiler executable.
   [ADR 002](docs/adr/002-polymorphic-lowering.md),
   [ADR 005](docs/adr/005-structural-order.md),
   [ADR 006](docs/adr/006-nesting-limit.md),
-  [ADR 007](docs/adr/007-specialization.md)
+  [ADR 007](docs/adr/007-specialization.md),
+  [ADR 008](docs/adr/008-functions.md)
 - [Engineering rules and gate coverage](docs/engineering.md)
 - [Reference provenance](docs/provenance.md)
 - [Self-hosting chain](docs/bootstrap.md)
