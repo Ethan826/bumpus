@@ -169,10 +169,11 @@ const rows = [
     message: /deferred Fail capability: wrong diagnostic code/
   },
   {
-    name: 'handler-metadata', file: 'src/Features/Check/Unlowered.purs',
-    needle: 'ctorSpecial ctor = firstArray (map (typeAt ctor.span) ctor.fields)',
-    replacement: 'ctorSpecial ctor = firstTypeAt (Array.head ctor.fields)'
-      + ' ctor.span',
+    // FX001 Task 6: the guard after Specialize stops a handler type held
+    // only by a constructor field through its effect layout.
+    name: 'handler-metadata', file: 'src/Features/Specialize/Unlowered.purs',
+    needle: 'map layoutSpan program.effects',
+    replacement: 'map layoutSpan (Array.take 0 program.effects)',
     probe: 'handler-metadata',
     message: /handler type in later constructor field:/
   },

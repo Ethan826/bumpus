@@ -63,10 +63,11 @@ const rejectedCases = [
 for (const [name, source, code, message] of rejectedCases) {
   test(name, () => rejected(source, code, message));
 }
-test('user effects stop at the explicit pre-specialization guard', () => {
+// FX001 Task 6 moved the guard after Specialize, over the emitted IR: a
+// declared effect nothing uses leaves no effect node and reaches Go.
+test('unused user effects pass the post-specialization guard', () => {
   const result = compile(clock + 'fn main(): Int = 1;');
-  assert.ok(result instanceof Left);
-  assert.equal(wire(result.value0).message, 'unlowered effect');
+  assert.ok(result instanceof Right, JSON.stringify(result));
 });
 
 test('row variables erase from instantiations even before type variables', () => {
