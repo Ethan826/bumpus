@@ -19,6 +19,7 @@ printable
   → Either Diagnostic Unit
 printable holders env (Checked.Expr expression) = case expression.node of
   Checked.Print value → judge value *> recur value
+  Checked.Crash value → judge value *> recur value
   Checked.Call _ _ arguments → each arguments
   Checked.Perform _ _ _ arguments → each arguments
   Checked.Handler _ _ clauses → each (map handlerBody clauses)

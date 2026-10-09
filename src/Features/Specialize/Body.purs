@@ -86,6 +86,7 @@ copyNode scope span = case _ of
   Checked.Pipe left right → IR.Pipe <$> recur left <*> recur right
   Checked.UnitValue → pure IR.UnitValue
   Checked.Print value → IR.Print <$> recur value
+  Checked.Crash value → IR.Crash <$> recur value
   Checked.OperationRef effect index instantiation → Handlers.operationRef
     scope
     span
@@ -118,6 +119,7 @@ copyNode scope span = case _ of
 item ∷ Scope → Checked.Item → Specializing IR.Item
 item scope = case _ of
   Checked.Let local value → IR.Let local <$> expression scope value
+  Checked.Defer value → IR.Defer <$> expression scope value
   Checked.Discard value → IR.Discard <$> expression scope value
 
 arm ∷ Scope → Checked.Arm → Specializing IR.Arm

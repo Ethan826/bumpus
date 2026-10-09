@@ -38,7 +38,9 @@ const plain = (node, checked) => {
 
 // Type parameters and field syntax are resolution data the monomorphic IR
 // does not carry: a monomorphic type has no parameters, and each field keeps
-// its one source reference. Both are checked, then dropped.
+// its one source reference. Both are checked, then dropped. The IR instead
+// carries the arguments its key was made at (FX001 Task 8, the defect
+// report names a payload type by them): none for a monomorphic type.
 const typeInfo = ({ parameters, rowParameters, sorts, sourceSorts, variables,
   ...info }) => {
   assert.deepEqual(parameters, [], `${info.name} has parameters`);
@@ -46,7 +48,7 @@ const typeInfo = ({ parameters, rowParameters, sorts, sourceSorts, variables,
   assert.deepEqual(sorts, [], `${info.name} has sorts`);
   assert.deepEqual(sourceSorts, [], `${info.name} has source sorts`);
   assert.deepEqual(variables, [], `${info.name} has variables`);
-  return info;
+  return { ...info, arguments: [] };
 };
 const ctorInfo = ({ fieldSyntax, ...info }) => {
   assert.equal(fieldSyntax.length, info.fields.length, info.name);

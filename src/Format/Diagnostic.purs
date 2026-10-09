@@ -3,6 +3,7 @@ module Format.Diagnostic
   , code
   , codeName
   , message
+  , typeName
   , wire
   ) where
 
@@ -59,6 +60,7 @@ code = case _ of
   RowEquality _ _ _ → Code.EffectError
   RowSort _ → Code.TypeMismatch
   NotPrintable _ → Code.TypeMismatch
+  DeferMayFail _ → Code.EffectError
   HandlerMissing _ → Code.HandlerError
   HandlerDuplicate _ → Code.HandlerError
   HandlerOperation _ _ → Code.HandlerError
@@ -126,6 +128,7 @@ message = case _ of
   RowSort true → "Expected an effect row, found a type"
   RowSort false → "Expected a type, found an effect row"
   NotPrintable ty → "Expected a printable value, found " <> typeName ty
+  DeferMayFail label → "defer must not fail, but it performs " <> label
   RowEquality left right tail → left <> " and " <> right
     <> " cannot be made equal: both end in ..."
     <> tail

@@ -88,6 +88,7 @@ ownedBy env ctor = isJust (join (Array.index env.monoTypes (owner ctor.owner)))
 outputType ∷ Array (Maybe Int) → TypeInfo → IR.TypeInfo
 outputType monoCtors info =
   { name: info.name
+  , arguments: []
   , ctors: Array.mapMaybe renumbered info.ctors
   , span: info.span
   }

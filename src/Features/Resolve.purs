@@ -46,7 +46,10 @@ resolve program = do
   bodies ← traverse
     ( resolveFunction
         ( globals tables.ctors <> Effect.globals effects
-            <> [ { name: "print", ref: Resolved.BuiltinPrint } ]
+            <>
+              [ { name: "print", ref: Resolved.BuiltinPrint }
+              , { name: "crash", ref: Resolved.BuiltinCrash }
+              ]
         )
         tables
         (Effect.summaries program.effects)

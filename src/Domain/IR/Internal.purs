@@ -68,7 +68,10 @@ spine table ty =
     TFun (FunTypeId index) → Array.index table index
     _ → Nothing
 
-type TypeInfo = { name ∷ String, ctors ∷ Array CtorId, span ∷ Span }
+-- `arguments` are the type arguments of the key the type was made at, which
+-- the defect report names a payload type by (FX001 design §5).
+type TypeInfo =
+  { name ∷ String, arguments ∷ Array Ty, ctors ∷ Array CtorId, span ∷ Span }
 
 type CtorInfo =
   { name ∷ String, owner ∷ TypeId, fields ∷ Array Ty, span ∷ Span }
@@ -128,6 +131,7 @@ data Node
   | UnitValue
   | Block (Array Item) Expr
   | Print Expr
+  | Crash Expr
   | OperationRef EffectKey Int
   | Perform EffectKey Int (Array Expr)
   | HandlerValue EffectKey (Array Clause)
@@ -152,7 +156,7 @@ type FailClause =
   }
 
 -- Mirrors the checked IR's block items (FX001).
-data Item = Let (Maybe LocalId) Expr | Discard Expr
+data Item = Let (Maybe LocalId) Expr | Defer Expr | Discard Expr
 
 -- Mirrors the checked IR (FN001): `Call` and `Construct` may be partial;
 -- a lambda parameter is a typed local or a typed discard.
@@ -179,6 +183,7 @@ spanOf (Expr expression) = expression.span
 itemValue ∷ Item → Expr
 itemValue = case _ of
   Let _ value → value
+  Defer value → value
   Discard value → value
 
 -- A block's expressions in evaluation order: its items', then its value.

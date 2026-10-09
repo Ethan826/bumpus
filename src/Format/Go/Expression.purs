@@ -26,6 +26,7 @@ import Format.Go.Lowered
   )
 import Format.Go.Match (lowerMatch)
 import Format.Go.Pipe (lowerPipe)
+import Format.Go.Report (lowerCrash)
 import Format.Go.Show (printed)
 import Format.Go.Value (applyValue, named, reference)
 
@@ -57,6 +58,7 @@ expression scope next whole@(IR.Expr term) = case term.node of
   IR.Pipe left right → lowerPipe scope lower next whole left right
   IR.UnitValue → leaf next "struct{}{}"
   IR.Print value → printedValue (IR.typeOf value) (lower next value)
+  IR.Crash value → lowerCrash lower next term.ty value
   IR.Block items value → lowerBlock scope lower next term.ty items value
   IR.OperationRef key position →
     reference next (operationWrapper scope.shape key position)
@@ -67,7 +69,7 @@ expression scope next whole@(IR.Expr term) = case term.node of
   IR.Install handler body →
     lowerInstall scope lower next term.ty handler body
   IR.Handle body clauses → lowerHandle scope lower next term.ty body clauses
-  IR.Abort family value → lowerAbort lower next term.ty family value
+  IR.Abort family value → lowerAbort scope lower next term.ty family value
   where
   lower = expression scope
   each = several lower next

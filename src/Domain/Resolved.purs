@@ -53,6 +53,7 @@ data GlobalRef
   | GlobalCtor CtorId
   | Operation EffectId Int Int
   | BuiltinPrint
+  | BuiltinCrash
 
 -- Functions and constructors share one global namespace.
 type Global = { name ∷ String, ref ∷ GlobalRef }
@@ -87,6 +88,8 @@ data Expr
   | Perform Span EffectId Int (Array Expr)
   | PrintRef Span
   | Print Span (Array Expr)
+  | CrashRef Span
+  | Crash Span (Array Expr)
   | Handler Span (Label (Ty VarId)) (Array HandlerClause)
   | With Span Expr Expr
   | Handle Span Expr (Array FailClause)
@@ -109,8 +112,9 @@ type FailClause =
   }
 
 -- A block item: `let` binds a local, or `_` (Nothing); a discarded item's
--- value is evaluated and dropped (FX001 design §1).
-data Item = Let Span (Maybe LocalId) Expr | Discard Expr
+-- value is evaluated and dropped; `defer` registers its expression, whose
+-- span is the item's, for the block's exit (FX001 design §1).
+data Item = Let Span (Maybe LocalId) Expr | Defer Span Expr | Discard Expr
 
 -- A lambda parameter: a local, or `_` (Nothing), which binds nothing. Its
 -- annotation names only the enclosing signature's variables.
@@ -179,6 +183,8 @@ exprSpan expression = case expression of
   Perform span _ _ _ → span
   PrintRef span → span
   Print span _ → span
+  CrashRef span → span
+  Crash span _ → span
   Handler span _ _ → span
   With span _ _ → span
   Handle span _ _ → span

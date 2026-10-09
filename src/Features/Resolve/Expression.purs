@@ -98,6 +98,7 @@ bareName scope span name = maybe' otherwise found (findLocal scope name)
         (Syntax.problemAt (FunctionNeedsCall name) span)
       else pure (Resolved.OperationRef span effect index)
     Resolved.BuiltinPrint → pure (Resolved.PrintRef span)
+    Resolved.BuiltinCrash → pure (Resolved.CrashRef span)
 
 bareFunction
   ∷ Syntax.Span
@@ -144,6 +145,7 @@ callName scope span name arguments = maybe' globalCall localCall
     Resolved.Operation effect index _ → Resolved.Perform span effect index
       <$> resolved
     Resolved.BuiltinPrint → Resolved.Print span <$> resolved
+    Resolved.BuiltinCrash → Resolved.Crash span <$> resolved
   resolved = traverse (expression scope) arguments
 
 constructorCall

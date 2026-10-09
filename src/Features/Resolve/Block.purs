@@ -17,10 +17,11 @@ type Resolving r = { | Scoped r } → Syntax.Expr → Fresh Resolved.Expr
 
 type Step r = { value ∷ Resolved.Item, state ∷ { | Scoped r } }
 
--- FX001 design §1: the items in order, then the value. A `let` is in
--- scope for the items after it and for the value, never for its own
--- expression, and shadows as a match binder does. Its LocalId is taken
--- before its expression's binders (source pre-order); `_` takes none.
+-- FX001 design §1: the items in order, then the value. A `defer` binds
+-- nothing. A `let` is in scope for the items after it and for the value,
+-- never for its own expression, and shadows as a match binder does. Its
+-- LocalId is taken before its expression's binders (source pre-order); `_`
+-- takes none.
 block
   ∷ ∀ r
   . Resolving r
@@ -38,7 +39,9 @@ item expression scope = case _ of
   Syntax.Discard value → discarded <$> expression scope value
   Syntax.Let span name value → bound span name <$> traverse issue name
     <*> expression scope value
+  Syntax.Defer span value → deferred span <$> expression scope value
   where
+  deferred span resolved = { value: Resolved.Defer span resolved, state: scope }
   discarded resolved = { value: Resolved.Discard resolved, state: scope }
   issue _ = fresh
   bound span name id resolved =

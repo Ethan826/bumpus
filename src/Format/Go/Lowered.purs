@@ -34,6 +34,7 @@ import Domain.IR.Internal
   )
 import Domain.Resolved (CtorId(..), FunctionId(..), LocalId)
 import Format.Go.Capture (Free, none, read, union)
+import Format.Go.Cleanup (usesDefects)
 import Format.Go.Context (effectKey, usesContext)
 import Format.Go.Data (ctorName, functionName, performName)
 import Format.Go.Layout (Layout)
@@ -43,14 +44,19 @@ import Format.Go.Layout (Layout)
 -- interned arrows, as a table and by (parameter, result), so a stage's Go
 -- type is found by number, never by spelling a type (design §13 rule 8).
 -- `context` is the program's mode (Format.Go.Context) and `effects` holds
--- each effect layout's runtime key and operations, by EffectKey.
+-- each effect layout's runtime key and operations, by EffectKey. `defects`
+-- is whether `defer` or `crash` occurs (Format.Go.Cleanup); the report
+-- names a payload type by `types` and `effectInfos`.
 type Shape =
   { signatures ∷ Array Wrapper
   , ctors ∷ Array Wrapper
   , funTypes ∷ Array FunType
   , arrows ∷ Map (Tuple Ty Ty) FunTypeId
   , context ∷ Boolean
+  , defects ∷ Boolean
   , effects ∷ Array EffectShape
+  , types ∷ Array IR.TypeInfo
+  , effectInfos ∷ Array IR.EffectInfo
   }
 
 -- An effect layout: its runtime key, and each operation as the n-ary
@@ -97,7 +103,10 @@ shapeOf program'@(IR.Program program) =
   , funTypes: program.funTypes
   , arrows: Map.fromFoldable (Array.mapWithIndex numbered program.funTypes)
   , context: usesContext program'
+  , defects: usesDefects program'
   , effects: Array.mapWithIndex layout program.effects
+  , types: program.types
+  , effectInfos: program.effects
   }
   where
   signature definition =

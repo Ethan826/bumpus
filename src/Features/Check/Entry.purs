@@ -56,6 +56,7 @@ origin effect whole@(Checked.Expr expression) = case expression.node of
   Checked.Handle body clauses → first
     (Array.cons body (map failureBody clauses))
   Checked.Fail value → origin effect value
+  Checked.Crash value → origin effect value
   Checked.Block items value → first (Checked.blockParts items value)
   Checked.Call _ _ arguments → first arguments
   Checked.Apply callee arguments → first (Array.cons callee arguments)

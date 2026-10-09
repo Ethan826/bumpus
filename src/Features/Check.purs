@@ -25,6 +25,7 @@ import Features.Check.Require (require, tooDeepAt)
 import Features.Check.Scheme (firstTooDeep, holes, resolved, start)
 import Features.Check.Unify (Subst, isEmpty)
 import Features.Check.Walk (retype)
+import Features.Check.Defer (rejectDeferred)
 import Features.Check.Failure (settleKeys)
 
 check ∷ Resolved.Program → Either Diagnostic Checked.Program
@@ -96,6 +97,7 @@ checkFunction holders env function = do
   finished ← require env body.state (rigid function.result) body.value
   maybe (Right unit) tooDeepAt (firstTooDeep finished.subst body.value)
   settledSubst ← settleKeys env finished.subst body.value
+  rejectDeferred env settledSubst finished.deferrals
   let settled = settle settledSubst body.value
   comparable holders env settled
   printable holders env settled

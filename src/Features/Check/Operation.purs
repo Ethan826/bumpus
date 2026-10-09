@@ -3,6 +3,8 @@ module Features.Check.Operation
   , operationRef
   , printCall
   , printRef
+  , crashCall
+  , crashRef
   ) where
 
 import Prelude
@@ -14,7 +16,7 @@ import Domain.Checked.Internal as Checked
 import Domain.Ids (EffectId(..))
 import Domain.Problem (Problem(..))
 import Domain.Resolved as Resolved
-import Domain.Row (EffectRef(..), Label(..), Row(..))
+import Domain.Row (EffectRef(..), Label(..), Row(..), openRow)
 import Domain.Syntax (Diagnostic, Span, Sort(..), problemAt)
 import Domain.Type (Ty(..), TyRow, VarId(..))
 import Features.Check.Call (named)
@@ -87,6 +89,46 @@ printRef _ state span = Right
   parameter = TVar (Hole state.next)
   local = Resolved.LocalId (-1)
   body = Checked.Expr { ty: TUnit, span, node: Checked.Print value }
+  value = Checked.Expr { ty: parameter, span, node: Checked.Local local }
+
+-- `crash(value)` performs nothing and never returns, so its result is a
+-- fresh type; `with pure` promises neither (FX001 design §3). Its argument
+-- is judged printable after the body's other constraints, with `print`'s.
+crashCall
+  ∷ ∀ r. Infer r → CheckEnv r → State → Span → Array Resolved.Expr → Result
+crashCall infer env state span arguments = maybe' arity found
+  (Array.head arguments)
+  where
+  arity _ = Left (problemAt Arity span)
+  found argument
+    | Array.length arguments /= 1 = arity unit
+    | otherwise = do
+        checked ← infer env state argument
+        pure
+          { value: Checked.Expr
+              { ty: TVar (Hole checked.state.next)
+              , span
+              , node: Checked.Crash checked.value
+              }
+          , state: checked.state { next = checked.state.next + 1 }
+          }
+
+-- Bare `crash` is a monomorphic lambda at each use, as `print` is, over a
+-- fresh parameter, result and row.
+crashRef ∷ ∀ r. CheckEnv r → State → Span → Result
+crashRef _ state span = Right
+  { value: Checked.Expr
+      { ty: TFun parameter (openRow (Hole (state.next + 2))) result
+      , span
+      , node: Checked.Lambda [ { local: Just local, ty: parameter } ] body
+      }
+  , state: state { next = state.next + 3 }
+  }
+  where
+  parameter = TVar (Hole state.next)
+  result = TVar (Hole (state.next + 1))
+  local = Resolved.LocalId (-1)
+  body = Checked.Expr { ty: result, span, node: Checked.Crash value }
   value = Checked.Expr { ty: parameter, span, node: Checked.Local local }
 
 console ∷ TyRow Open

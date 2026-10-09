@@ -11,6 +11,7 @@ import Domain.Resolved as Resolved
 import Domain.Syntax (Diagnostic, Span)
 import Domain.Type (Ty)
 import Features.Check.Context (CheckEnv, Infer, Locals)
+import Features.Check.Defer (checkDefer)
 import Features.Check.Scheme (State, Threaded, threadAll)
 
 type BlockEnv r = CheckEnv (locals ∷ Locals | r)
@@ -24,8 +25,9 @@ type Checked a = Either Diagnostic a
 -- FX001 design §2: the items in order, then the value, whose type is the
 -- block's. `let x = e` binds x at e's type, monomorphically: nothing is
 -- generalized, so a let-bound lambda's metas are fixed by its uses. A
--- discarded item may have any type. The threading is Scheme `threadAll`,
--- so a block of 20,000 items costs no frame per item.
+-- discarded item may have any type; a deferred one is Unit and cannot fail
+-- (Features.Check.Defer). The threading is Scheme `threadAll`, so a block
+-- of 20,000 items costs no frame per item.
 checkBlock
   ∷ ∀ r
   . Infer (locals ∷ Locals | r)
@@ -58,7 +60,16 @@ item
 item infer env scope = case _ of
   Resolved.Discard value → discarded <$> inferred value
   Resolved.Let _ local value → bound local <$> inferred value
+  Resolved.Defer span value → deferred <$> checkDefer infer
+    (env { locals = scope.locals })
+    scope.state
+    span
+    value
   where
+  deferred checked =
+    { value: Checked.Defer checked.value
+    , state: scope { state = checked.state }
+    }
   inferred = infer (env { locals = scope.locals }) scope.state
   discarded checked =
     { value: Checked.Discard checked.value

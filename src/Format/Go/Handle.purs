@@ -26,6 +26,7 @@ import Domain.Row (TypeHead)
 import Format.Go.Capture (Free, union, without)
 import Format.Go.Context (contextParameter, failKey)
 import Format.Go.Data (functionName, goType, localName, malformed)
+import Format.Go.Report (abortReport)
 import Format.Go.Lowered
   ( Lowered
   , Lowering
@@ -163,12 +164,14 @@ capturedName local = localName local.id
 parameter ∷ ∀ r. { id ∷ LocalId, ty ∷ Ty | r } → String
 parameter local = localName local.id <> " " <> goType local.ty
 
-lowerAbort ∷ Lowering → Int → Ty → TypeHead → IR.Expr → Lowered
-lowerAbort lower next result head value = payload
+lowerAbort ∷ Scope → Lowering → Int → Ty → TypeHead → IR.Expr → Lowered
+lowerAbort scope lower next result head value = payload
   { code = "waxwingFail[" <> goType result <> "](ctx, "
       <> show (failKey head)
       <> ", "
       <> payload.code
+      <> ", "
+      <> abortReport scope (IR.typeOf value)
       <> ")"
   }
   where

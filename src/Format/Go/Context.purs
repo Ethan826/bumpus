@@ -6,6 +6,7 @@
 -- nothing changes and no runtime text is emitted.
 module Format.Go.Context
   ( usesContext
+  , children
   , runtime
   , contextParameter
   , declared
@@ -53,6 +54,7 @@ children = case _ of
   IR.Lambda _ body → [ body ]
   IR.Pipe left right → [ left, right ]
   IR.Print value → [ value ]
+  IR.Crash value → [ value ]
   IR.Block items value → IR.blockParts items value
   _ → []
   where
@@ -110,6 +112,7 @@ runtime =
     , "type waxwingAbort struct {"
     , "\ttarget  *waxwingMarker"
     , "\tpayload any"
+    , "\treport  func(any) string"
     , "}"
     , "type waxwingCtx struct {"
     , "\tkey     int"
@@ -138,9 +141,11 @@ runtime =
     , "\treturn ctx"
     , "}"
     , ""
-    , "func waxwingFail[R any](ctx *waxwingCtx, key int, payload any) R {"
+    , "func waxwingFail[R any](ctx *waxwingCtx, key int, payload any,"
+    , "\treport func(any) string) R {"
     , "\tframe := waxwingFind(ctx, key, \"Fail\")"
-    , "\tpanic(&waxwingAbort{target: frame.marker, payload: payload})"
+    , "\tpanic(&waxwingAbort{target: frame.marker, payload: payload,"
+    , "\t\treport: report})"
     , "}"
     , ""
     , "func waxwingOwns(markers []*waxwingMarker, target *waxwingMarker) bool {"

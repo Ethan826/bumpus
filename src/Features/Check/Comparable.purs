@@ -41,6 +41,7 @@ comparable functions env (Checked.Expr expression) = case expression.node of
   Checked.Lambda _ body → recur body
   Checked.Pipe left right → traverse_ recur [ left, right ]
   Checked.Print value → recur value
+  Checked.Crash value → recur value
   Checked.Perform _ _ _ arguments → traverse_ recur arguments
   Checked.Handler _ _ clauses → traverse_ (recur <<< handlerBody) clauses
   Checked.With handler body → traverse_ recur [ handler, body ]

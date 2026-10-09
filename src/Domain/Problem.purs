@@ -80,6 +80,7 @@ data Problem
   | MustBePure String
   | RowSort Boolean
   | NotPrintable TypeName
+  | DeferMayFail String
   | RowEquality String String String
   | HandlerMissing String
   | HandlerDuplicate String

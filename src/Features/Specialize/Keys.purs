@@ -194,6 +194,7 @@ newType env span key@(Tuple declaration arguments) _ = do
       }
   output info state =
     { name: info.name
+    , arguments
     , ctors: Array.mapWithIndex (offset state.counts.ctors) info.ctors
     , span: info.span
     }

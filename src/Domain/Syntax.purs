@@ -39,10 +39,11 @@ data Expr
   | Fail Span Expr
 
 -- A block item (FX001 design §1): `let name = e`, `let _ = e` (Nothing)
--- spanning `let` through `e`, or `e`, whose value is discarded. A block
--- whose items end in `;` has the value `UnitValue` at its closing `}`;
--- no written value ends where the block does, so that span marks it.
-data Item = Let Span (Maybe String) Expr | Discard Expr
+-- spanning `let` through `e`, `defer e` spanning `defer` through `e`, or
+-- `e`, whose value is discarded. A block whose items end in `;` has the
+-- value `UnitValue` at its closing `}`; no written value ends where the
+-- block does, so that span marks it.
+data Item = Let Span (Maybe String) Expr | Defer Span Expr | Discard Expr
 
 -- A lambda parameter spans its name; `_` (no name) binds nothing.
 type LambdaParam = { name ∷ Maybe String, ty ∷ Maybe TypeRef, span ∷ Span }

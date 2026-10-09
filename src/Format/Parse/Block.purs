@@ -38,9 +38,10 @@ type Listed = { items ∷ Array Ended, end ∷ Int }
 type Grouped = { value ∷ Expr, start ∷ Position }
 
 -- FX001 design §1: `{}` is `()`; otherwise items separated by `;`, each
--- `let name = e`, `let _ = e` or `e`. The last item is the value, unless
--- a `;` follows it, which discards it and makes the value `()` at the
--- closing `}` (Domain.Syntax `Item`); a `let` must be followed by `;`.
+-- `let name = e`, `let _ = e`, `defer e` or `e`. The last item is the value,
+-- unless a `;` follows it, which discards it and makes the value `()` at
+-- the closing `}` (Domain.Syntax `Item`); a `let` or `defer` must be
+-- followed by `;`.
 -- Every expression is nested, as an `if` branch is (ADR 006).
 block ∷ Parser Expr → Parser Expr
 block inner = refine identity
@@ -70,7 +71,14 @@ listed inner = spanned listOf (sepByTrailing1 ";" "}" (spanned ended one))
   listOf span items = { items, end: span.end.offset }
 
 item ∷ Parser Expr → Parser Item
-item inner = dispatch [ on "let" (letItem inner) ] (Discard <$> inner)
+item inner = dispatch
+  [ on "let" (letItem inner), on "defer" (deferItem inner) ]
+  (Discard <$> inner)
+
+-- The item spans `defer` through the last token of its expression, a
+-- closing parenthesis included, which the expression's own span may omit.
+deferItem ∷ Parser Expr → Parser Item
+deferItem inner = spanned Defer (expect "defer" *> inner)
 
 letItem ∷ Parser Expr → Parser Item
 letItem inner = letOf <$> expect "let" <*> binder <* expect "=" <*> inner
@@ -106,3 +114,4 @@ valued ∷ Span → Token → Array Item → Item → Either Diagnostic Expr
 valued span close items = case _ of
   Discard value → Right (Block span items value)
   Let _ _ _ → Left (problemAt (Syntax "Expected ;") close.span)
+  Defer _ _ → Left (problemAt (Syntax "Expected ;") close.span)

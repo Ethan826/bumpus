@@ -37,6 +37,7 @@ usesBoolOrdering (IR.Expr expression) = case expression.node of
   IR.Pipe left right → anyOf [ left, right ]
   IR.UnitValue → false
   IR.Print value → usesBoolOrdering value
+  IR.Crash value → usesBoolOrdering value
   IR.Block items value → anyOf (IR.blockParts items value)
   IR.OperationRef _ _ → false
   IR.Perform _ _ _ → effects
@@ -49,6 +50,8 @@ usesBoolOrdering (IR.Expr expression) = case expression.node of
   effects = anyOf (IR.effectParts expression.node)
   armUses arm = usesBoolOrdering arm.body
 
+-- Whether fmt is used: by a print, and by a crash, which renders its value
+-- as a print does (Format.Go.Report).
 needsPrint ∷ IR.Program → Boolean
 needsPrint (IR.Program program) = Array.any inFunction program.functions
   where
@@ -57,6 +60,7 @@ needsPrint (IR.Program program) = Array.any inFunction program.functions
 prints ∷ IR.Expr → Boolean
 prints (IR.Expr expression) = case expression.node of
   IR.Print _ → true
+  IR.Crash _ → true
   IR.Integer _ → false
   IR.Boolean _ → false
   IR.Local _ → false

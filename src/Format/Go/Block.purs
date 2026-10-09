@@ -7,7 +7,10 @@
 -- `let` as a typed `var` (also discarded, so Go never reports an unused
 -- variable), `let _` and discarded items as `_ = e`, and returns the
 -- value. The `var` is typed because an arity-one function value is the
--- lifted function itself, whose Go type is unnamed.
+-- lifted function itself, whose Go type is unnamed. A `defer e` registers
+-- a closure of the whole expression, run at exit with the context the
+-- block was entered in (Format.Go.Cleanup); only a block with one has the
+-- Go `defer` that runs them.
 module Format.Go.Block (lowerBlock) where
 
 import Prelude
@@ -40,17 +43,26 @@ lowerBlock scope lower next result items value =
   captured = withoutAll (Array.mapMaybe letLocal items) (union parts.frees)
   capturedName local = localName local.id
   lifted = blockFunction context name captured result
+    (Array.any isDefer items)
     (Array.zipWith statement items parts.codes)
     (fromMaybe "" (Array.last parts.codes))
 
 blockFunction
-  ∷ Boolean → String → Array Captured → Ty → Array String → String → String
-blockFunction context name captured result statements value =
+  ∷ Boolean
+  → String
+  → Array Captured
+  → Ty
+  → Boolean
+  → Array String
+  → String
+  → String
+blockFunction context name captured result deferring statements value =
   "func " <> name <> "("
     <> joinWith ", " (declared context (map parameter captured))
     <> ") "
     <> goType result
     <> " {\n"
+    <> (if deferring then registry else "")
     <> joinWith "" statements
     <> "return "
     <> value
@@ -58,8 +70,20 @@ blockFunction context name captured result statements value =
   where
   parameter local = localName local.id <> " " <> goType local.ty
 
+registry ∷ String
+registry =
+  "var waxwingCleanups []func()\ndefer waxwingCleanup(&waxwingCleanups)\n"
+
+isDefer ∷ IR.Item → Boolean
+isDefer = case _ of
+  IR.Defer _ → true
+  _ → false
+
 statement ∷ IR.Item → String → String
 statement item code = case item of
+  IR.Defer _ → "waxwingCleanups = append(waxwingCleanups, func() { _ = "
+    <> code
+    <> " })\n"
   IR.Let (Just id) bound → "var " <> localName id <> " "
     <> goType (IR.typeOf bound)
     <> " = "
@@ -72,4 +96,5 @@ statement item code = case item of
 letLocal ∷ IR.Item → Maybe LocalId
 letLocal = case _ of
   IR.Let local _ → local
+  IR.Defer _ → Nothing
   IR.Discard _ → Nothing

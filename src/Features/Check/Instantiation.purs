@@ -98,6 +98,7 @@ foldCalls step found (Checked.Expr expression) = case expression.node of
     step found expression.span id instantiation
   Checked.Lambda _ body → recur found body
   Checked.Print value → recur found value
+  Checked.Crash value → recur found value
   Checked.Perform _ _ _ arguments → foldl recur found arguments
   Checked.Handler _ _ clauses → foldl handlerClause found clauses
   Checked.With handler body → foldl recur found [ handler, body ]

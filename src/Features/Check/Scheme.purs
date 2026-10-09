@@ -1,5 +1,6 @@
 module Features.Check.Scheme
   ( State
+  , Deferral
   , Threaded
   , Scheme
   , start
@@ -37,7 +38,12 @@ import Features.Check.Walk (foldTypes, retype)
 -- One function's checking state: its substitution and next fresh meta.
 -- While a function is checked, a checked-IR type's `Hole m` is the meta m;
 -- `holes` renumbers the ones still unsolved once the function is done.
-type State = { subst ∷ Subst, next ∷ Int }
+-- `deferrals` are the `defer`s whose Fail label had no settled key when
+-- they were checked, for Features.Check.Defer to judge once it is.
+type State =
+  { subst ∷ Subst, next ∷ Int, deferrals ∷ Array Deferral }
+
+type Deferral = { span ∷ Span, payload ∷ Ty Open }
 
 type Threaded a = { value ∷ a, state ∷ State }
 
@@ -69,7 +75,7 @@ instance applicativeThread ∷ Applicative (Thread s) where
     threaded state = Right { value, state }
 
 start ∷ State
-start = { subst: Unify.empty, next: 0 }
+start = { subst: Unify.empty, next: 0, deferrals: [] }
 
 threadAll
   ∷ ∀ s a b

@@ -16,6 +16,8 @@ import Features.Check.Operation
   , operationRef
   , printCall
   , printRef
+  , crashCall
+  , crashRef
   )
 import Features.Check.Apply (checkApply)
 import Features.Check.Arms (checkMatch)
@@ -94,6 +96,8 @@ inferNode env state expression = case expression of
     operationCall infer env state span effect index arguments
   Resolved.PrintRef span → printRef env state span
   Resolved.Print span arguments → printCall infer env state span arguments
+  Resolved.CrashRef span → crashRef env state span
+  Resolved.Crash span arguments → crashCall infer env state span arguments
   Resolved.Block span items value → checkBlock infer env state span items
     value
   Resolved.Handler span label clauses → Handler.handler infer env state span
