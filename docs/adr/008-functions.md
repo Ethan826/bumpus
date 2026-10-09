@@ -136,7 +136,11 @@ first; a non-printable `main` is E_ENTRY `Expected fn main() with a
 printable result type`. Over-application past a non-function result and
 `f()` on a function with parameters keep E_ARITY `Wrong number of
 arguments` (user decision). Each changed row is listed with old and new
-code, span and text in its task's progress entry.
+code, span and text in its task's progress entry. The §1 grammar also
+changes the diagnostics of some sources that were already invalid:
+`fn f(): (Int, Bool) = 1;` was `Expected a type` at `(` and is now
+`Expected ->`, and `1(2)` now parses as an application and is rejected
+by checking rather than by the parser (whole-branch review, M6).
 
 ## Consequences
 

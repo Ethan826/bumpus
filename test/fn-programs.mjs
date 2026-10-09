@@ -162,7 +162,8 @@ const composites = {
     () => lambda(s, ['_', x(s)], INT),
     () => lambda(s, [x(s)], F1),
     () => `flip(${e(s, F2)})`,
-    () => mark(s, 'constructor', `compose(adder, ${e(s, F1)})`)
+    // A partial `compose` taking the function `adder` (not a constructor).
+    () => mark(s, 'partial', `compose(adder, ${e(s, F1)})`)
   ]
 };
 

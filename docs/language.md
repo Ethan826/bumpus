@@ -270,8 +270,9 @@ Functions (FN001; ADR 008; spec docs/plans/2026-10-08-functions-design.md).
   `fun-compare`, `functional-fixpoint`).
 - Hint. When an E_TYPE is reported anyway, the found expression is,
   through parentheses only, a direct partial application of a named
-  function or constructor, and the expected type is not a function or a
-  variable, the message adds `; missing 1 argument to take?` (`missing 2
+  function or constructor, and the expected type is not a function or an
+  unsolved type variable (a signature's own variable does qualify), the
+  message adds `; missing 1 argument to take?` (`missing 2
   arguments to …`); code, span and types are unchanged (fn-hint).
 - Evaluation. Strict, left to right: `e(a1, …, aj)` evaluates `e`, `a1`,
   applies, `a2`, applies, and so on; a value's body runs exactly when an

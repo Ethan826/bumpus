@@ -2377,3 +2377,18 @@ that read six parameters (first and last three, mixed kinds).
   tests, serial phase 12, zero failures or skips; twenty-two `Regression
   proof (…)` lines; serial 5,000-parameter build 4,423 ms; match ladder
   640 ms.
+
+## FN001 whole-branch review (2026-10-09)
+
+Fresh reviewer, whole diff 2a61a2b..e2a6735: ready to merge, no Critical
+or Important findings. Verify in an isolated copy: exit 0, 541 + 12
+tests, 22 proofs. Six adversarial cross-task programs matched the
+interpreter including entry order; 2,300 extra generator seeds matched;
+~46,000 sources against a main build: 0 Go differences among sources
+main accepts, none newly rejected, every non-syntax diagnostic change a
+design §9 row. Minors fixed: language.md hint condition (M1), generator
+label (M3), ADR 008 note on syntax diagnostics of invalid sources (M6),
+BACKLOG T004 for the unidentified harvest failure (M5); deferred to
+BACKLOG FN006: interpreter zero-argument calls (M2), splitting the
+value-edge row (M4), fn-linear bounds in the parallel phase (M7).
+Awaiting the user's merge decision.
