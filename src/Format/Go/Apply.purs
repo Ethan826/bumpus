@@ -21,19 +21,19 @@ import Domain.IR.Internal (FunType, FunTypeId(..), Ty(..))
 import Format.Go.Capture (Free, union)
 import Format.Go.Data (functionName, goType, localName)
 import Format.Go.Lowered (Lowered, Lowering, Scope, Wrapper, several)
+import Format.Stack (Stack)
+import Format.Stack as Stack
 
 -- A lowered head and, only if helpers need them, the Go types of the
 -- value after 0…j arguments.
 type Chain = { head ∷ Lowered, types ∷ Unit → Array String }
 
--- Threaded through the blocks: the code so far and what blocks added.
-type Blocks =
-  { code ∷ String
-  , next ∷ Int
-  , lifted ∷ Array String
-  , frees ∷ Array Free
-  , wrappers ∷ Array Wrapper
-  }
+-- What one helper (or the head) adds besides its code.
+type Piece = { lifted ∷ Array String, free ∷ Free, wrappers ∷ Array Wrapper }
+
+-- Threaded through the blocks: the code so far and the pieces, pushed
+-- onto a stack and concatenated once, so the blocks cost no copy each.
+type Blocks = { code ∷ String, next ∷ Int, pieces ∷ Stack Piece }
 
 -- design §13 rule 6.
 blockSize ∷ Int
@@ -73,11 +73,15 @@ blocked ∷ Scope → Lowering → Chain → Array IR.Expr → Lowered
 blocked scope lower chain arguments =
   { code: done.code
   , next: done.next
-  , lifted: done.lifted
-  , free: union done.frees
-  , wrappers: done.wrappers
+  , lifted: Array.concatMap liftedOf pieces
+  , free: union (map freeOf pieces)
+  , wrappers: Array.concatMap wrappersOf pieces
   }
   where
+  pieces = Array.fromFoldable done.pieces
+  liftedOf piece = piece.lifted
+  freeOf piece = piece.free
+  wrappersOf piece = piece.wrappers
   types = chain.types unit
   starts = map (mul blockSize)
     (Array.range 0 ((Array.length arguments - 1) / blockSize))
@@ -85,9 +89,12 @@ blocked scope lower chain arguments =
   start =
     { code: chain.head.code
     , next: chain.head.next
-    , lifted: chain.head.lifted
-    , frees: [ chain.head.free ]
-    , wrappers: chain.head.wrappers
+    , pieces: Stack.push
+        { lifted: chain.head.lifted
+        , free: chain.head.free
+        , wrappers: chain.head.wrappers
+        }
+        Stack.empty
     }
 
 -- One helper: its number, then its arguments' lifted functions.
@@ -103,9 +110,9 @@ block scope lower types arguments so first =
   { code: name <> "(" <> joinWith ", " ([ so.code ] <> map captured free)
       <> ")"
   , next: parts.next
-  , lifted: so.lifted <> [ helper ] <> parts.lifted
-  , frees: so.frees <> [ free ]
-  , wrappers: so.wrappers <> parts.wrappers
+  , pieces: Stack.push
+      { lifted: [ helper ] <> parts.lifted, free, wrappers: parts.wrappers }
+      so.pieces
   }
   where
   name = functionName scope.owner <> "Apply" <> show so.next

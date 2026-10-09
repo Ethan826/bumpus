@@ -77,7 +77,7 @@ export const panicOnEntry = (goSource, functionIndex, label) => {
     found => `${found}panic("bumpus-probe: ${label}")\n`);
 };
 
-export const goTest =(source, testGo, transform = go => go) => {
+export const goTest = (source, testGo, transform = go => go) => {
   const work = mkdtempSync(join(tmpdir(), 'bumpus-gotest-'));
   try {
     writeFileSync(join(work, 'main.go'), transform(checked(source)));

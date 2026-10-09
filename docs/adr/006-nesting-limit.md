@@ -196,8 +196,8 @@ isolated build of 97740c6 (before Task 6), same machine and minute:
 | if-branch | 1,067 | 1,067 |
 | match-scrutinee | 799 | 798 |
 | match-arm | 775 | 775 |
-| call-argument | 315 | 315 |
-| constructor-argument | **274** | **276** |
+| call-argument | 315 | 315 (326 after the review fix) |
+| constructor-argument | **274** | **276** (283 after the review fix) |
 | constructor-pattern | 371 | 372 |
 | plus-chain | 1,564 | 1,564 |
 | if-left-of-sum | 1,396 | 1,396 |
@@ -208,7 +208,31 @@ No anomalies. The lowering changes no old form's capacity (differences
 of up to 5 are run-to-run variation near the boundary); the decreases
 since the G001 Task 3 table above (parens 648 → 522, call-argument
 369 → 315, constructor-argument 304 → 274, plus-chain 2,928 → 1,564)
-predate FN001 Task 6 (present at 97740c6; not attributed further here).
-The margin over twice the limit (256) is now 18 levels. The smallest FN001
+predate FN001 Task 6 (present at 97740c6). The Task 6 review bisected
+them with this probe: constructor-argument was 304 through c4e9ed1 and
+14ad3a4, 280 at ceb52c2 (FN001 Task 3: the postfix `atom` layer
+`applyTo <$> primary <*> dispatch …` and the `pipeline` layer
+`chainLeft1 "|>"` add frames per nested level; parens 648 → 521,
+call-argument 369 → 326), 284 at 3a4868d and 0a49dfd, 276 at 8045a4e
+(the Task 4 review fixes: `primary` returns a `Primary` record, and
+`bare <$> named inner` added a map layer per level; call-argument
+325 → 315), and 274-275 since. plus-chain fell 2,956 → 2,050 at 4ef13be
+and → 1,564 at ab81c68, in P001, before FN001.
+
+Partial recovery (Task 6 review fix): `named` builds its `Primary`
+itself, removing that map layer. Isolated copies of d2cf616 and of the
+fix, limit lifted, two alternating rounds each, identical results:
+
+| Form | d2cf616 | fix |
+|---|---|---|
+| constructor-argument | 275 | **283** |
+| call-argument | 315 | 326 |
+| parens | 522 | 522 |
+
+Behavior unchanged: scripts/differential.mjs, d2cf616 plus only this
+change against d2cf616, seed 6, count 10,000: 32,403 sources and 10,085
+isName probes, 0 differences. Minimum overflow now 283,
+27 levels above twice the limit; limit 128 unchanged. Recovering Task
+3's ~24 levels by merging the operator layers is BACKLOG G002. The smallest FN001
 form is annotation-types, 343. Rule: min 276, half 138, limit 128,
 unchanged.

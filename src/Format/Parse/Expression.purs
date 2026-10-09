@@ -164,7 +164,7 @@ primary inner = dispatch
   , on "true" (bare <<< boolean true <$> token)
   , on "false" (bare <<< boolean false <$> token)
   , onWhen integerStart (bare <<< integer <$> integerLiteral)
-  , onWhen isName (bare <$> named inner)
+  , onWhen isName (named inner)
   ]
   (bare <$> refine notAnExpression token)
   where
@@ -178,10 +178,13 @@ notAnExpression ∷ Token → Either Diagnostic Expr
 notAnExpression found =
   Left (problemAt (Syntax "Expected an expression") found.span)
 
--- A variable spans its name; a call runs through its `)`.
-named ∷ Parser Expr → Parser Expr
-named inner = spanned namedOf (parts <$> name <*> optionalOn "(" arguments)
+-- A variable spans its name; a call runs through its `)`. It builds its
+-- Primary itself: a separate `<$>` over it added a stack layer per nested
+-- call level (FN001 Task 6 review, ADR 006 "Functions emitted").
+named ∷ Parser Expr → Parser Primary
+named inner = spanned primaryOf (parts <$> name <*> optionalOn "(" arguments)
   where
+  primaryOf span found = { value: namedOf span found, start: span.start }
   parts identifier found = { identifier, arguments: found }
   arguments = expect "(" *> commaList inner <* expect ")"
 

@@ -2176,3 +2176,44 @@ compile, build and run. Design §13 rules 1-8 as adopted.
   records the margin); load average 1.79 before, 6.71 after
   (.build/fn001-task6-verify3.log; earlier green run
   .build/fn001-task6-verify2.log). Usage and Layout unchanged.
+- Review follow-up (2026-10-08; the independent review found the
+  lowering sound and accepted the deviations). Depth: the reviewer
+  bisected the margin loss (ADR 006 "Functions emitted" now attributes
+  it: FN001 Task 3's postfix and pipe layers, the Task 4 review's
+  `bare <$> named inner` map layer, P001 for plus-chain). Fix: `named`
+  builds its `Primary` itself (Format.Parse.Expression; productions stay
+  applicative). Isolated copies, limit lifted, two alternating rounds:
+  constructor-argument 275 → 283, call-argument 315 → 326, parens 522 →
+  522; minimum 283. Differential, d2cf616 plus only the parser change
+  against d2cf616 (seed 6, count 10,000): 32,403 sources and 10,085
+  probes, 0 differences (.build/fn001-task6-fix-differential-parser.log).
+  BACKLOG G002 tracks recovering Task 3's ~24 levels. Minors: Stage no
+  longer declares `{f}Arrow1`, which no stage names (only a helper's
+  signature can; it now spells `func(A1) <next>`); bootstrap/functions.go
+  loses its one unused `bumpusFn6Lambda0Arrow1` line. The full
+  differential against d2cf616 shows that change alone: harvested 235 of
+  2,374 sources differ, all at emit, and a scratch check finds every
+  candidate emission equal to the baseline's with the `Arrow1`
+  declarations removed and their uses spelled out (1,287 compiled, 0
+  unexplained); fuzz and matches 0 differences; mutations 4 (seed 1) and
+  32 (seed 6), the shown ones all at emit (.build/fn001-task6-fix-
+  differential{,-10k}.log). The `--regenerate` harvest's own test run
+  exited 1; differential.mjs discards its output, so the failing test is
+  unknown (it ran the full suite in parallel under the hook). Apply's
+  blocks push their lifted functions, frees and wrappers onto a stack and
+  concatenate once (was O(blocks × lifted)). test/fn-specialize's stale
+  guard comment and support.mjs's `goTest =(` spacing are fixed.
+- Scale, from the review (pending user decisions; nothing changed): the
+  reviewer's verify failed fn-scale, `go build 10584 ms, bound 10000`, at
+  load average 18.3 with only verify's own runner. The same mixed-body
+  program builds in 1.8 s at 2,500 parameters, 4.4 s at 5,000 (direct
+  call only 3.0 s), 17.9 s at 10,000 (direct only 11.2 s); at 20,000 the
+  Go compiler was killed at 7.4 GB RSS, with the direct call only too.
+  The cause is the n-ary body's 2n-term `bumpusAdd` tree in one Go
+  expression (the existing lowering of `+`), not Task 6's staging.
+  Recorded in BACKLOG T003.
+- GREEN (review follow-up): `rm -rf output && npm run verify` exit 0,
+  526 tests, zero failures or skips, twelve regression proofs; the
+  5,000-parameter `go build` 7,467 ms against 10 s; the match ladder
+  1,030 ms; load average 3.15 before, 5.34 after
+  (.build/fn001-task6-fix-verify.log). Run once.

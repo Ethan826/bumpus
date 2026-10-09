@@ -196,8 +196,6 @@ e = v.previous
 return bumpusFn0(a0[0], a0[1])
 }
 
-type bumpusFn6Lambda0Arrow1 func(bumpusFun2) bumpusFn6Lambda0Arrow2
-
 type bumpusFn6Lambda0Arrow2 func(bumpusFun2) bumpusFun2
 
 func bumpusFn6Lambda0Value(x bumpusFun2) bumpusFn6Lambda0Arrow2 { return bumpusFn6Lambda0Stage2(&bumpusNode1{x, nil}) }

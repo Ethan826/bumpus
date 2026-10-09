@@ -10,8 +10,8 @@ import { checkedPoly } from './phases.mjs';
 import { keyTexts } from './poly-keys.mjs';
 
 // FN001 Task 5: function values through Specialize, called directly
-// (design §6, §7). The CLI stops these programs at the unlowered guard
-// until Task 6 (test/fn-check.test.mjs).
+// (design §6, §7). Since Task 6 the CLI also emits and runs them
+// (test/fn-run.test.mjs).
 const prelude = 'type List(a) = Nil | Cons(a, List(a)); type Box(a) = Box(a); '
   + 'fn id(x: a): a = x; fn keep(x: a): Int = 0; ';
 const mapping = 'fn map(f: a -> b, xs: List(a)): List(b) = match xs {'

@@ -38,11 +38,14 @@ valueName wrapper = wrapper.name <> "Value"
 -- reach. Each is the interned arrow (design §13 rule 8) where Specialize
 -- interned it; a stage no source expression has (a prefix of a partial
 -- application, or of a lambda's free locals) gets the wrapper's own
--- `<name>Arrow<k>` (`own` below). A suffix of an interned arrow is
--- interned, so every use and the wrapper itself agree on each name.
+-- `<name>Arrow<k>` (`ownType` below), except the first: only an
+-- application helper's signature names that one (the wrapper's own
+-- stages never do), so it is spelled `func(A1) <next>` and no type goes
+-- unused. A suffix of an interned arrow is interned, so every use and
+-- the wrapper itself agree on each name.
 stageTypes ∷ Shape → String → Array Ty → Ty → Array String
 stageTypes shape name parameters after =
-  namedTypes name (interned shape parameters after)
+  namedTypes name parameters after (interned shape parameters after)
 
 -- Node types, then each wrapper once, in first-request order.
 staged ∷ Shape → Array Wrapper → { nodes ∷ String, code ∷ String }
@@ -68,10 +71,16 @@ interned shape parameters after =
   lookup ty result = map TFun (Map.lookup (Tuple ty result) shape.arrows)
   found arrow = { accum: arrow, value: arrow }
 
-namedTypes ∷ String → Array (Maybe Ty) → Array String
-namedTypes name = Array.mapWithIndex named
+namedTypes ∷ String → Array Ty → Ty → Array (Maybe Ty) → Array String
+namedTypes name parameters after known = Array.mapWithIndex named known
   where
-  named index = maybe (arrowName name (index + 1)) goType
+  named index = maybe (own index) goType
+  own index
+    | index == 0 = "func(" <> maybe "" goType (Array.head parameters) <> ") "
+        <> maybe (goType after) identity (Array.index names 1)
+    | otherwise = arrowName name (index + 1)
+  names = Array.mapWithIndex later known
+  later index = maybe (arrowName name (index + 1)) goType
 
 arrowName ∷ String → Int → String
 arrowName name position = name <> "Arrow" <> show position
@@ -95,20 +104,27 @@ wrapperCode shape nodes wrapper =
     <> entry nodes wrapper
   where
   known = interned shape wrapper.parameters wrapper.result
-  staging = { wrapper, types: namedTypes wrapper.name known, nodes }
+  staging =
+    { wrapper
+    , types: namedTypes wrapper.name wrapper.parameters wrapper.result known
+    , nodes
+    }
 
--- A stage value no interned arrow names gets its own type.
+-- A stage value no interned arrow names gets its own type; the first is
+-- spelled where it is used (`namedTypes`).
 ownType ∷ Staging → Int → Maybe Ty → Maybe String
-ownType staging index = maybe (Just declaration) none
-  where
-  position = index + 1
-  declaration = "\ntype " <> arrowName staging.wrapper.name position
-    <> " func("
-    <> parameter staging position
-    <> ") "
-    <> awaiting staging (position + 1)
-    <> "\n"
-  none _ = Nothing
+ownType staging index
+  | index == 0 = const Nothing
+  | otherwise = maybe (Just declaration) none
+      where
+      position = index + 1
+      declaration = "\ntype " <> arrowName staging.wrapper.name position
+        <> " func("
+        <> parameter staging position
+        <> ") "
+        <> awaiting staging (position + 1)
+        <> "\n"
+      none _ = Nothing
 
 firstStage ∷ Staging → String
 firstStage staging = "\nfunc " <> valueName staging.wrapper <> "(x "
