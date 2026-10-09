@@ -370,3 +370,38 @@ Go's build cache makes identical regenerated sources look 8x faster; vary
 the source per repetition when timing builds. Design reading to confirm in
 FX001 review: a cleanup failure of any kind while a typed abort is pending
 turns it into an uncatchable defect listing both causes.
+
+## Waxwing migration baseline (2026-10-09)
+
+The existing isolated FX001 worktree was clean at 3481468 (Tasks 1-3
+committed), while main remained at 2084638 with its pre-existing editor
+settings change. Rename work uses the FX001 checkpoint, not main.
+Before production edits, `npm run verify` exited 1: 638/640 parallel tests
+passed. fn-linear lambda took 1604.135291 ms against 1545 ms; mismatch
+819.499333 ms against 525 ms. Serial tests and regression proofs were not
+reached. Evidence `.build/waxwing-baseline-verify.log`; FN006 owns the
+existing parallel-timing exposure and next action, with no bounds changed.
+Historical findings and paths above remain unchanged by the rename.
+
+Concurrent FX001 checker edits appeared during rename validation, outside
+its source scope (Binding, Require, Subst, Unify, UnifyRow). Preserved their
+diff/hashes under .build/waxwing-concurrent-*; do not revert or attribute
+them to the rename. A later harvest smoke could not import Format.Parse
+because output was absent; this is not evidence of a hook defect. Require a
+paused worker and stable build before combined-tree validation. The rename
+verify's twenty-thousand-declaration timing failure is recorded in T004.
+
+The user confirmed the FX001 worker paused. Its eight modified files are
+preserved (the previous five plus Domain.Type.Parts, Features.Resolve and
+Features.Specialize.Seeds). Combined-tree verification builds cleanly but
+fails test/unify-row.test.mjs:57: deferred Fail now returns Subst rather
+than the test's RowMissing. R003 records the exact test and next action for
+FX001; no assertion was changed by the rename. Five fn-linear timing
+failures are recorded in FN006. An accidental extra combined-tree verify
+ran from the wrong working directory; its separate failure log is
+.build/waxwing-paused-extra-verify.log (636/640 pass). A subsequent log-move
+command used that same wrong relative-path assumption and failed; the log
+was then preserved at its correct path. These are execution mistakes, not
+additional compiler defects. Isolated rename validation uses the original
+3481468 versions of the eight worker files in a copy only, leaving live
+files intact (.build/waxwing-validation-scope.json).

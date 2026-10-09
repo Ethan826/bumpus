@@ -32,14 +32,14 @@ const recovering = `package main
 import ("fmt"; "testing")
 func TestNilField(t *testing.T) {
 defer func() { fmt.Println("recovered:", recover()) }()
-bumpusFn0(bumpusTy0{tag: 2})
+waxwingFn0(waxwingTy0{tag: 2})
 }
 `;
 
 const nilGuard = () => {
   const result = compile(second);
   assert.ok(result instanceof Right, 'nil-guard probe program was rejected');
-  const work = mkdtempSync(join(tmpdir(), 'bumpus-regression-'));
+  const work = mkdtempSync(join(tmpdir(), 'waxwing-regression-'));
   let output;
   let status;
   try {
@@ -53,7 +53,7 @@ const nilGuard = () => {
     output = run.stdout + run.stderr;
     status = run.status;
   } finally { rmSync(work, { recursive: true, force: true }); }
-  if (status !== 0 || !output.includes('recovered: bumpus: unmatched value')) {
+  if (status !== 0 || !output.includes('recovered: waxwing: unmatched value')) {
     console.error(`nil guard missing\n${output}`);
     process.exit(1);
   }
@@ -134,7 +134,7 @@ const capture = () => {
 // Grammar's apply is the only place the remaining input is threaded; if the
 // second parser restarts from the first's state, no program parses as written.
 const stateThread = () => {
-  const result = compile(readFileSync('examples/answer.bumpus', 'utf8'));
+  const result = compile(readFileSync('examples/answer.wxw', 'utf8'));
   const expected = readFileSync('bootstrap/answer.go', 'utf8');
   if (!(result instanceof Right) || result.value0 !== expected) {
     console.error(`parser state not threaded: ${JSON.stringify(result.value0)}`);

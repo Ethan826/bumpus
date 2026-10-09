@@ -1,3 +1,26 @@
+# Waxwing rename at FX001 Task 3 checkpoint
+
+Update 2026-10-09: the language name is settled as Waxwing, extension
+`.wxw` (ADR 009). Rename work is in `.worktrees/fx001`, based on 3481468;
+FX001 Tasks 1-3 are committed there. Eight additional worker source edits
+remain uncommitted and intact; finish their deferred-Fail-row tests and
+review fixes before Task 4 (R003 records the failing row assertion). The main checkout has not been merged or renamed.
+Current CLI: `npm run waxwing -- run examples/answer.wxw` after building.
+Current logo: assets/branding/waxwing-logo.png; editable SVG masters and
+supplied notes are alongside it. User confirmed the visible assets are final.
+Verification evidence is in docs/progress.md: combined tree has the
+unfinished row assertion and timing failures; isolated rename-only tree has
+only the known pipe timing failure, with 13 serial tests and 22 proofs passed.
+Bounded seven-phase differential against 3481468: zero differences
+(5,462 sources + 1,085 identifier probes; generated names normalized).
+Full corpus comparison interrupted and tracked as T006.
+Main has not been merged; rename and worker edits remain uncommitted.
+Commit the rename separately from the eight worker files before completing
+the Task 3 review fix; the supplied Claude handoff and SDD ledger detail
+its missing tests/oracle work. Keep model delegation small, using Luna for
+mechanical tasks and retaining independent compiler-semantics review.
+The Bumpus logo and historical documents remain archival evidence.
+
 # FN001 merged into main
 
 Workspace: /Users/ethan/Desktop/gofuncyourself, branch main (FN001 merged
@@ -54,7 +77,7 @@ future feature outside initial FX001; keep record-row constraints separate.
 
 Language-direction now also captures MileAhead's open error-row pattern
 from read-only ../trailmapper: family rows compose without wrappers, stay
-open until handling, and wrap only to add context. Candidate Bumpus error
+open until handling, and wrap only to add context. Candidate Waxwing error
 sums hide `Variant`/injection plumbing. FX001/R001 must resolve the open
 error-sum need against R001's deferred general variants before changing scope.
 
@@ -83,8 +106,8 @@ LLM skills/discovery, and exploratory LIT001 literate capabilities. Feed
 these into LA001 and focused subsystem designs; no tooling implementation
 is authorized or added to FN001. Existing compiler properties do not
 complete PBT001. Preserve the tentative status of literate capabilities.
-PKG001 extends that direction with portable Bumpus libraries, host FFI,
-service implementations/fakes and package management over both Bumpus and
+PKG001 extends that direction with portable Waxwing libraries, host FFI,
+service implementations/fakes and package management over both Waxwing and
 host dependencies. Review exports, source/type identity, target/runtime
 support, manifests/locks and host resolver integration with M001/I001/FX001.
 Effect Platform is conceptual influence; no package manager, ABI or provider

@@ -33,7 +33,7 @@ export const command = (name, args, options = {}) => {
 };
 
 export const runGo = source => {
-  const work = mkdtempSync(join(tmpdir(), 'bumpus-test-'));
+  const work = mkdtempSync(join(tmpdir(), 'waxwing-test-'));
   try {
     const go = join(work, 'main.go');
     const binary = join(work, 'program');
@@ -59,26 +59,26 @@ export const rejectedAt = (source, code, text, nth = 0) => {
   return diagnostic;
 };
 
-// Records each Bumpus function's entry in bumpusTrace, in call order.
+// Records each Waxwing function's entry in waxwingTrace, in call order.
 export const traceCalls = goSource => goSource.replace(
-  /func bumpusFn(\d+)\([^\n]*\) [^\n]* \{\n/g,
-  (header, index) => `${header}bumpusTrace = append(bumpusTrace, "${index}")\n`
+  /func waxwingFn(\d+)\([^\n]*\) [^\n]* \{\n/g,
+  (header, index) => `${header}waxwingTrace = append(waxwingTrace, "${index}")\n`
 );
 
-// FN001 timing probes: bumpusFn<index> panics with `bumpus-probe: <label>`
+// FN001 timing probes: waxwingFn<index> panics with `waxwing-probe: <label>`
 // as its first statement, so a run shows which probe its body entered
 // first. Exactly one header must match.
 export const panicOnEntry = (goSource, functionIndex, label) => {
-  const header = new RegExp(`^func bumpusFn${functionIndex}\\([^\\n]*\\) `
+  const header = new RegExp(`^func waxwingFn${functionIndex}\\([^\\n]*\\) `
     + '[^\\n]* \\{\\n', 'gm');
   assert.equal((goSource.match(header) ?? []).length, 1,
-    `one header for bumpusFn${functionIndex}`);
+    `one header for waxwingFn${functionIndex}`);
   return goSource.replace(header,
-    found => `${found}panic("bumpus-probe: ${label}")\n`);
+    found => `${found}panic("waxwing-probe: ${label}")\n`);
 };
 
 export const goTest = (source, testGo, transform = go => go) => {
-  const work = mkdtempSync(join(tmpdir(), 'bumpus-gotest-'));
+  const work = mkdtempSync(join(tmpdir(), 'waxwing-gotest-'));
   try {
     writeFileSync(join(work, 'main.go'), transform(checked(source)));
     writeFileSync(join(work, 'main_test.go'), testGo);

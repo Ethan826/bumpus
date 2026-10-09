@@ -9,7 +9,7 @@ import Format.Go.Data (fieldName, goType, malformed)
 import Format.Go.Layout (Declared, Layout, Member)
 
 showName ∷ TypeId → String
-showName (TypeId index) = "bumpusShow" <> show index
+showName (TypeId index) = "waxwingShow" <> show index
 
 -- One printer per declared type, in TypeId order, whether or not used.
 showHelpers ∷ Layout → String
@@ -52,7 +52,7 @@ showCase ∷ Member → String
 showCase member = "case " <> show member.tag <> ":\n"
   <> ctorBody member.id member.ctor
 
--- Printed values are Bumpus expressions: `Name` or `Name(f1, f2)`.
+-- Printed values are Waxwing expressions: `Name` or `Name(f1, f2)`.
 ctorBody ∷ CtorId → CtorInfo → String
 ctorBody id ctor
   | Array.null ctor.fields = "return " <> appendText ctor.name

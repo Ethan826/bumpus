@@ -1,4 +1,4 @@
-// An independent reference interpreter for Bumpus programs (P001 Task 8,
+// An independent reference interpreter for Waxwing programs (P001 Task 8,
 // design §8 execution oracle). It reads the source with its own parser
 // (test/poly-parse.mjs) and evaluates without types: a value is an Int (a
 // JS number kept in int32, so `+` wraps modulo 2^32), a Bool,

@@ -75,10 +75,10 @@ test('coverage reports in declaration order and pre-order', () => {
 });
 
 test('the CLI reports E_NON_EXHAUSTIVE on the wire', () => {
-  const file = 'negative/non-exhaustive.bumpus';
+  const file = 'negative/non-exhaustive.wxw';
   const diagnostic = rejected(readFileSync(file, 'utf8'), 'E_NON_EXHAUSTIVE');
   const result = spawnSync('node',
-    ['scripts/bumpus.mjs', 'emit', file, '.build/rejected.go'],
+    ['scripts/waxwing.mjs', 'emit', file, '.build/rejected.go'],
     { encoding: 'utf8' });
   assert.equal(result.status, 1);
   const wire = JSON.parse(result.stderr);

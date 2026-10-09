@@ -2715,3 +2715,136 @@ byte-identical (verify's snapshot tests).
   regression proofs, load 2.0-5.9 (log .build/fx001-task3-verify2.log; an
   earlier run, .build/fx001-task3-verify.log, failed only the `occurs`
   proof above).
+
+## R003 Waxwing rename (2026-10-09, verification in progress)
+
+User approved the Bumpus -> Waxwing / `.wxw` migration and subagent help.
+Work uses the existing isolated FX001 tree at 3481468 (Tasks 1-3), with
+main and its pre-existing editor setting untouched. Separate agents handled
+current documentation and test identity edits; a fresh read-only reviewer
+found only a stale `Provisional name` sentence, which was corrected.
+
+CLI is scripts/waxwing.mjs, npm script waxwing; packages are waxwing,
+waxwing-style and waxwing-bootstrap. Renamed nine example/negative sources;
+updated Go names/panics, temporary prefixes, harvest instrumentation,
+current documentation, active FX001 documents, backlog and handoff. Historical
+plans/progress/findings, prior naming evidence and branding provenance remain.
+ADR 009 records the decision. No semantics, verbs, aliases, extension-based
+rejection or final artwork were added.
+
+Evidence so far:
+- Before code edits, `npm run verify` exited 1: 638/640 parallel tests
+  passed; fn-linear lambda 1604.135291 ms > 1545 ms and mismatch
+  819.499333 ms > 525 ms. Serial tests/proofs not reached; FN006 owns the
+  recorded failure/next action. Log .build/waxwing-baseline-verify.log.
+- RED: renamed test/program.test.mjs against original compiled output
+  failed only the expected old usage text (8 pass, 1 fail),
+  .build/waxwing-usage-red.log. `npm run build` then passed with zero
+  warnings/errors, .build/waxwing-build.log.
+- All five examples emitted snapshots equal to the old bytes under only
+  Bumpus/Waxwing and bumpus/waxwing substitutions, then ran through
+  `npm run --silent waxwing -- run`: outputs saved in
+  .build/waxwing-examples.json. Program/compiler/shell tests: 21 passed,
+  no failures/skips, .build/waxwing-cli-green.log.
+- Isolated source restoration: copied the healthy source/tool/test/output
+  tree into .build/waxwing-name-regression, restored only Format.Arguments'
+  old usage text, rebuilt successfully, then test/program.test.mjs failed
+  only the usage assertion (8 pass, 1 fail). Logs
+  .build/waxwing-name-regression-{build,test}.log. Live source unchanged.
+- Post-rename `npm run verify` exited 1: 639/640 parallel tests passed;
+  `twenty thousand declarations compile and run` took 5.106579416 s > 5 s.
+  Serial tests/proofs not reached. Log .build/waxwing-verify.log; T004
+  records the timing failure rather than concealing it with a rerun.
+- During that validation, unrelated checker edits appeared in five files,
+  followed by missing output/Format.Parse/index.js in a harvest smoke
+  attempt (ERR_MODULE_NOT_FOUND; no hook behavior exercised). Concurrent
+  diff/hashes preserved in .build/waxwing-concurrent-{edits.patch,files.json};
+  smoke diagnosis .build/waxwing-harvest-race.log. Asked the user to pause
+  the other FX001 worker; combined-tree verification awaits a stable tree.
+
+No whole-suite success, merge, commit or push is claimed by this entry.
+
+## R003 paused-tree validation and supplied branding (2026-10-09)
+
+The user confirmed the other worker paused. Its eight changed source files
+remain byte-identical to .build/waxwing-paused-files.json; no worker edit
+was reverted or folded into the rename's semantic claims.
+
+- Combined paused tree: `npm run verify` builds with zero warnings/errors,
+  passes strict-rebuild/structural gates and 634/640 parallel tests. Five
+  fn-linear bounds fail (exact timings in FN006); unify-row's deferred-Fail
+  assertion expects RowMissing but receives Subst. R003 records the worker's
+  remaining test/settlement next action, without changing its assertion.
+  Log .build/waxwing-paused-verify.log. Serial tests/proofs not reached.
+- An accidental extra paused-tree verify ran while creating the isolated
+  validation tree because its working directory was wrong. Its log is
+  preserved as .build/waxwing-paused-extra-verify.log: 636/640 passed, three
+  fn-linear timing failures and the same row assertion. The mistaken
+  relative log-move command also failed before correction. Neither run is
+  isolated evidence or a hidden retry to claim a pass.
+- Isolated rename-only tree: .build/waxwing-validation has the renamed
+  code/tests/packages and the original 3481468 versions of the eight worker
+  files (.build/waxwing-validation-scope.json). `npm run verify` builds with
+  zero warnings/errors, passes strict-rebuild/structural gates and 639/640
+  parallel tests. Only pipe at 20,000 parameters exceeds its unchanged
+  750 ms bound (942.893 ms); .build/waxwing-isolated-verify.log. FN006 owns
+  this existing parallel-timing exposure. No whole-suite green is claimed.
+- Ran the remainder explicitly, without rerunning/omitting the failed
+  parallel tests: all test/*.serial.test.mjs via --test-concurrency=1,
+  13 passed, zero failures/skips (.build/waxwing-isolated-serial.log);
+  scripts/regression.mjs, all twenty-two healthy/mutant proofs passed
+  (.build/waxwing-isolated-regression.log). Statuses in
+  .build/waxwing-isolated-remaining-results.json.
+- The WAXWING_HARVEST/waxwingHarvest smoke passes on stable rebuilt live
+  output, recording its source exactly once (.build/waxwing-harvest-smoke.log).
+- User supplied the final flight-lines logo assets in main, then confirmed
+  the files visible there are right after discussing kerning. Copied all
+  five assets/notes byte-for-byte into fx001; hashes recorded in
+  .build/waxwing-branding-hashes.json. Inspected the white preview, parsed
+  both SVGs and confirmed no scripts/raster/external references. Transparent
+  logo PNG is 2048 x 1991; preview 530 x 515. README uses the logo PNG;
+  branding README links vector masters/notes and archived Bumpus provenance.
+  No artwork was generated or edited by this migration.
+- Fresh read-only review found no remaining rename blockers. The stale
+  provisional sentence and harvest-property abbreviation were corrected.
+  git diff --check passes. Current FX001 status/handoff distinguishes the
+  implemented rename from the incomplete worker review fixes.
+
+## R003 final rename evidence (2026-10-09)
+
+The original 3481468 compiler was rebuilt in .build/waxwing-baseline-compiled
+for a differential comparison. Its first scratch build failed because the
+copy omitted tools/style/src (.build/waxwing-original-build.log); supplying
+that unchanged directory fixed the setup, and the next build passed with
+zero warnings/errors (.build/waxwing-original-build-fixed.log).
+
+A scratch copy of scripts/differential.mjs normalizes only Bumpus/Waxwing
+and bumpus/waxwing in emitted-Go hashes; all seven phase comparisons and
+diagnostic comparisons remain. The full harvested corpus comparison was
+interrupted (status 130) after several minutes without a report; T006 owns
+the investigation. The bounded comparison used sources up to 20,000
+characters (2,433 captured sources, 53 stress sources outside this optional
+comparison only). It exited 0: 2,433 harvested, 1,029 fuzz, 1,000 match and
+1,000 mutation sources, plus 1,085 isName probes; zero differences. Log
+.build/waxwing-differential.log; scope .build/waxwing-differential-scope.json.
+The bounded run had already completed when an interrupt was requested.
+A redundant memoized-hash scratch experiment was then stopped (status 130)
+and is not validation evidence; the final scratch checker was restored to
+the successful version. No maintained differential check was weakened.
+
+Final smoke: live npm waxwing run examples/answer.wxw prints 42; all eight
+paused worker files still match their saved hashes; current branding assets
+match the user-supplied originals (.build/waxwing-final-smoke.log).
+The user confirmed the visible logo files are right. Read the supplied
+Claude continuation prompt and the local SDD ledger; they corroborate the
+paused Task 3 review-fix state. No further effects implementation was
+started by this rename task.
+
+Rename implementation is complete on fx001. Full verification is **not
+green**: the isolated rename tree has the recorded pipe timing failure,
+and the live combined tree also contains the unfinished deferred-row test
+mismatch plus timing failures. Serial continuation (13) and all twenty-two
+regression proofs pass; earlier failures remain recorded. The rename and
+eight preserved FX001 worker files remain uncommitted; main is unchanged.
+For the continuation, commit the rename separately from Task 3 review fixes;
+finish those fixes/tests and re-review before Task 4. No merge or push.

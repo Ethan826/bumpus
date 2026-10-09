@@ -4,7 +4,7 @@ import { compile } from '../output/Program.Compile/index.js';
 import { Right } from '../output/Data.Either/index.js';
 import { manyLets } from './fx-block-programs.mjs';
 
-// FX001 Task 2: a long block through a long Bumpus phase against a fixed
+// FX001 Task 2: a long block through a long Waxwing phase against a fixed
 // bound, so it runs serially, not under the parallel runner's load (as
 // test/fn-linear.serial.test.mjs; under that load it took 999 ms of 1,500).
 // 20,000 let items, each reading the one before, through the whole

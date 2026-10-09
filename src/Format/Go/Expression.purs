@@ -68,7 +68,7 @@ joined render parts =
   }
 
 addition ∷ String → String → String
-addition left right = "bumpusAdd(" <> left <> ", " <> right <> ")"
+addition left right = "waxwingAdd(" <> left <> ", " <> right <> ")"
 
 -- `if` keeps its immediately invoked closure; nested `if` branches build
 -- at the nesting limit (test/depth.test.mjs), unlike nested match closures.

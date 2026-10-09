@@ -17,11 +17,11 @@ func say(s string) { out = append(out, s) }
 
 func flush() { fmt.Println(strings.Join(out, "\n")) }
 
-func markers(f *bumpusCtx) []*bumpusMarker { return []*bumpusMarker{f.marker} }
+func markers(f *waxwingCtx) []*waxwingMarker { return []*waxwingMarker{f.marker} }
 
 func clauseMode() {
-	outer := bumpusInstall(nil, keyLog, &logHandler{func(c *bumpusCtx, s string) int { say("outer got " + s); return 10 }})
-	inner := bumpusInstall(outer, keyLog, &logHandler{func(c *bumpusCtx, s string) int {
+	outer := waxwingInstall(nil, keyLog, &logHandler{func(c *waxwingCtx, s string) int { say("outer got " + s); return 10 }})
+	inner := waxwingInstall(outer, keyLog, &logHandler{func(c *waxwingCtx, s string) int {
 		say("inner clause " + s)
 		return 1 + performLog(c, "fwd:"+s)
 	}})
@@ -29,65 +29,65 @@ func clauseMode() {
 }
 
 // A lifted block helper with two defers (registered d1 then d2).
-func block(ctx *bumpusCtx, body func()) {
-	var st bumpusPending
-	defer bumpusCleanup(&st, func() { say("d1") })
-	defer bumpusCleanup(&st, func() { say("d2") })
+func block(ctx *waxwingCtx, body func()) {
+	var st waxwingPending
+	defer waxwingCleanup(&st, func() { say("d1") })
+	defer waxwingCleanup(&st, func() { say("d2") })
 	body()
 }
 
 func abortMode() {
-	fa := bumpusFrame(nil, keyFail)
-	r, a := bumpusHandle(markers(fa), func() int {
-		fo := bumpusFrame(fa, keyOther)
-		bumpusHandle(markers(fo), func() int { bumpusFail(fo, keyFail, 7); return 0 })
+	fa := waxwingFrame(nil, keyFail)
+	r, a := waxwingHandle(markers(fa), func() int {
+		fo := waxwingFrame(fa, keyOther)
+		waxwingHandle(markers(fo), func() int { waxwingFail(fo, keyFail, 7); return 0 })
 		say("unreachable")
 		return 0
 	})
 	say(fmt.Sprint("A: ", r, " caught ", a.payload))
 	// the failing body targets the outer frame across an inner same-key handle
-	fb := bumpusFrame(fa, keyFail)
-	_, b := bumpusHandle(markers(fa), func() int {
-		bumpusHandle(markers(fb), func() int { bumpusFail(fb, keyFail, 8); return 0 }) // caught by fb
+	fb := waxwingFrame(fa, keyFail)
+	_, b := waxwingHandle(markers(fa), func() int {
+		waxwingHandle(markers(fb), func() int { waxwingFail(fb, keyFail, 8); return 0 }) // caught by fb
 		say("B: inner caught its own")
-		bumpusHandle(markers(fb), func() int { bumpusFail(fa, keyFail, 9); return 0 }) // aimed at fa
+		waxwingHandle(markers(fb), func() int { waxwingFail(fa, keyFail, 9); return 0 }) // aimed at fa
 		say("unreachable")
 		return 0
 	})
 	say(fmt.Sprint("B: outer caught ", b.payload))
 	// a clause installed outside an inner handle that fails is not caught by it
-	_, c := bumpusHandle(markers(fa), func() int {
-		_, inner := bumpusHandle(markers(fb), func() int { bumpusFail(fb, keyFail, 1); return 0 })
+	_, c := waxwingHandle(markers(fa), func() int {
+		_, inner := waxwingHandle(markers(fb), func() int { waxwingFail(fb, keyFail, 1); return 0 })
 		say("C: clause runs after helper")
-		bumpusFail(fb.outer, keyFail, inner.payload.(int)+98) // clause context = fb.outer
+		waxwingFail(fb.outer, keyFail, inner.payload.(int)+98) // clause context = fb.outer
 		return 0
 	})
 	say(fmt.Sprint("C: outer caught ", c.payload))
 	// two nested blocks unwind innermost first (d2 d1 per block)
-	_, d := bumpusHandle(markers(fa), func() int {
-		block(fa, func() { block(fa, func() { say("body"); bumpusFail(fa, keyFail, 5) }) })
+	_, d := waxwingHandle(markers(fa), func() int {
+		block(fa, func() { block(fa, func() { say("body"); waxwingFail(fa, keyFail, 5) }) })
 		return 0
 	})
 	say(fmt.Sprint("D: caught ", d.payload))
 	// cleanup handles a failure internally while an abort is pending
-	_, e := bumpusHandle(markers(fa), func() int {
-		var st bumpusPending
-		defer bumpusCleanup(&st, func() {
-			g := bumpusFrame(fa, keyFail)
-			_, h := bumpusHandle(markers(g), func() int { bumpusFail(g, keyFail, 3); return 0 })
+	_, e := waxwingHandle(markers(fa), func() int {
+		var st waxwingPending
+		defer waxwingCleanup(&st, func() {
+			g := waxwingFrame(fa, keyFail)
+			_, h := waxwingHandle(markers(g), func() int { waxwingFail(g, keyFail, 3); return 0 })
 			say(fmt.Sprint("E: cleanup handled ", h.payload))
 		})
-		bumpusFail(fa, keyFail, 4)
+		waxwingFail(fa, keyFail, 4)
 		return 0
 	})
 	say(fmt.Sprint("E: abort continued ", e.payload))
 }
 
 func markersMode() {
-	seen := map[*bumpusMarker]bool{}
-	var keep []*bumpusMarker
+	seen := map[*waxwingMarker]bool{}
+	var keep []*waxwingMarker
 	for i := 0; i < 1000; i++ {
-		m := bumpusFrame(nil, keyFail).marker
+		m := waxwingFrame(nil, keyFail).marker
 		keep = append(keep, m)
 		seen[m] = true
 	}
@@ -95,27 +95,27 @@ func markersMode() {
 }
 
 func reportMode() {
-	fa := bumpusFrame(nil, keyFail)
-	var st bumpusPending
-	defer bumpusCleanup(&st, func() { say("d1"); bumpusCrash("bad\nline") })
-	defer bumpusCleanup(&st, func() { say("d2"); bumpusFail(fa, keyFail, releaseError{}) })
+	fa := waxwingFrame(nil, keyFail)
+	var st waxwingPending
+	defer waxwingCleanup(&st, func() { say("d1"); waxwingCrash("bad\nline") })
+	defer waxwingCleanup(&st, func() { say("d2"); waxwingFail(fa, keyFail, releaseError{}) })
 	say("body")
-	bumpusFail(fa, keyFail, dbError{3})
+	waxwingFail(fa, keyFail, dbError{3})
 }
 
 func normalMode() {
-	var st bumpusPending
-	defer bumpusCleanup(&st, func() { say("d1"); bumpusCrash("b") })
-	defer bumpusCleanup(&st, func() { say("d2"); bumpusCrash("a") })
+	var st waxwingPending
+	defer waxwingCleanup(&st, func() { say("d1"); waxwingCrash("b") })
+	defer waxwingCleanup(&st, func() { say("d2"); waxwingCrash("a") })
 	say("body")
 }
 
 func defectMode() {
-	fa := bumpusFrame(nil, keyFail)
-	bumpusHandle(markers(fa), func() int {
-		var st bumpusPending
-		defer bumpusCleanup(&st, func() { say("cleanup ran") })
-		bumpusCrash("boom")
+	fa := waxwingFrame(nil, keyFail)
+	waxwingHandle(markers(fa), func() int {
+		var st waxwingPending
+		defer waxwingCleanup(&st, func() { say("cleanup ran") })
+		waxwingCrash("boom")
 		return 0
 	})
 	say("unreachable")
@@ -126,7 +126,7 @@ func guardMode() { performLog(nil, "x") }
 func main() {
 	modes := map[string]func(){"clause": clauseMode, "abort": abortMode, "markers": markersMode,
 		"report": reportMode, "normal": normalMode, "defect": defectMode, "guard": guardMode}
-	bumpusMain(func() { defer flush(); modes[os.Args[1]]() })
+	waxwingMain(func() { defer flush(); modes[os.Args[1]]() })
 }
 `;
 

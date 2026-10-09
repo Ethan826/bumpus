@@ -71,7 +71,7 @@ const recovering = call => `package main
 import ("fmt"; "testing")
 func TestMalformed(t *testing.T) {
   defer func() {
-    if got := fmt.Sprint(recover()); got != "bumpus: malformed value" {
+    if got := fmt.Sprint(recover()); got != "waxwing: malformed value" {
       t.Fatalf("recovered %q", got)
     }
   }()
@@ -83,9 +83,9 @@ func TestMalformed(t *testing.T) {
 test('printing a malformed value panics', () => {
   const source = `${list} fn main(): L = Nil;`;
   for (const call of [
-    'bumpusShow0(nil, bumpusTy0{tag: 2})',
-    'bumpusShow0(nil, bumpusTy0{tag: 3})',
-    'bumpusShow0(nil, bumpusTy0{})'
+    'waxwingShow0(nil, waxwingTy0{tag: 2})',
+    'waxwingShow0(nil, waxwingTy0{tag: 3})',
+    'waxwingShow0(nil, waxwingTy0{})'
   ]) {
     const result = goTest(source, recovering(call));
     assert.equal(result.status, 0, `${call}\n${result.output}`);
@@ -118,9 +118,9 @@ test('printed values recompile to the same value', () => {
 });
 
 test('tree example matches its snapshot and runs', () => {
-  const source = readFileSync('examples/tree.bumpus', 'utf8');
+  const source = readFileSync('examples/tree.wxw', 'utf8');
   assert.equal(checked(source), readFileSync('bootstrap/tree.go', 'utf8'));
-  assert.equal(command('node', ['scripts/bumpus.mjs', 'run',
-    'examples/tree.bumpus']),
+  assert.equal(command('node', ['scripts/waxwing.mjs', 'run',
+    'examples/tree.wxw']),
     'Node(Node(Node(Leaf, 1, Leaf), 3, Leaf), 5, Node(Leaf, 8, Leaf))\n');
 });

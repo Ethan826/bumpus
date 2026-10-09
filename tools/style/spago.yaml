@@ -1,5 +1,5 @@
 package:
-  name: bumpus-style
+  name: waxwing-style
   dependencies:
     - arrays
     - foldable-traversable

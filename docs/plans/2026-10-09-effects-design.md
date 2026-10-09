@@ -365,7 +365,7 @@ and then raises an uncatchable recoverable defect; its result type is
 unconstrained because it never returns. The report happens once, after
 cleanup, with no eager print. It requires no effect: `with pure` promises
 neither termination nor freedom from defects (documented). It serves as
-assertion/unreachable and makes defect cleanup testable in Bumpus. Tests:
+assertion/unreachable and makes defect cleanup testable in Waxwing. Tests:
 Fail handlers cannot catch it, cleanup runs LIFO, and cleanup defects keep
 the original cause. Injected runtime tests for foreign panics remain I001's.
 
@@ -475,7 +475,7 @@ emitted IR contains no operation invocation, handler construction or
 handler type, `fail`, `with` or `handle` threads no context. Required
 test: a pure `main` beside an unused effectful function emits `ctx` code
 that builds and runs. Changing dead-code emission is a separate choice. Otherwise every function, stage,
-lambda and function value takes `ctx *bumpusCtx` first, giving function
+lambda and function value takes `ctx *waxwingCtx` first, giving function
 values one calling convention regardless of latent effects. All new
 runtime support (context, cleanup helper, defect reporting and `main`'s
 recovery wrapper) is emitted only when used, so existing programs stay
@@ -485,7 +485,7 @@ PKG001 obligation: host-callable exports and separately consumed
 libraries need adapters whose public calling convention does not depend
 on whether the consuming application uses effects.
 
-**Context and operations.** `bumpusCtx{key, handler any, outer, marker}`
+**Context and operations.** `waxwingCtx{key, handler any, outer, marker}`
 is an immutable linked list; installing allocates a node, leaving needs no
 pop. `op(args)` calls the perform function for its effect key, which finds
 the innermost frame with the key and calls the clause with the frame's
@@ -497,7 +497,7 @@ measured in section 5, a cached index is a follow-up.
   identity: fresh allocations of a non-zero-sized marker type (Go permits
   distinct zero-sized variables to share an address), one per family
   frame; markers are compared only by pointer.
-- `fail(e)` panics with `&bumpusAbort{target, payload}` where `target` is
+- `fail(e)` panics with `&waxwingAbort{target, payload}` where `target` is
   the innermost frame's marker for e's key.
 - Recovery happens directly in a deferred function of the lifted `handle`
   helper, as Go requires; it consumes only aborts whose target is one of
@@ -505,7 +505,7 @@ measured in section 5, a cached index is a follow-up.
 - The helper returns `(result, abort)`; the matching clause runs after it
   returns, in the `handle`'s context, so clause failures and crashes
   propagate normally.
-- `bumpusCleanup` (Go `defer` in the lifted block helper, recovering
+- `waxwingCleanup` (Go `defer` in the lifted block helper, recovering
   directly) preserves the pending cause, runs remaining cleanup, records
   later causes in order and applies section 3's policy.
 Ordinary calls need no abort-result checks; handler installation,
@@ -514,7 +514,7 @@ Result-propagation lowering remains an alternative that would change Go,
 not semantics.
 
 **I001 obligation.** A foreign Go library could recover a panic raised by
-a Bumpus callback. I001 must define the permitted callback boundary
+a Waxwing callback. I001 must define the permitted callback boundary
 (e.g. aborts may not cross foreign frames, or adapters re-raise) before
 transparent abort propagation through host libraries is promised.
 
@@ -529,7 +529,7 @@ re-specialization.
 ## 5. Scope, testing, diagnostics and acceptance (revised after user review 2026-10-09)
 
 **Scope boundary (user decision (b), 2026-10-09).** FX001 has no mutable
-state: handler clauses are ordinary functions and Bumpus has no cells.
+state: handler clauses are ordinary functions and Waxwing has no cells.
 FX001 supports stateless fakes (fixed clock, canned results, prefixing
 loggers) and call traces observable through Console output. Recording
 databases and loggers are FX003 work (local state: encapsulation, escape

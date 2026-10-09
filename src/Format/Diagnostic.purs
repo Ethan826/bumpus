@@ -176,7 +176,7 @@ arrowName name = tailRec step { written: "", rest: name }
     parameter@(FunctionName _ _) → "(" <> arrowName parameter <> ")"
     parameter → typeName parameter
 
--- Witnesses print as Bumpus patterns: `_`, literals, `Name(field, …)`.
+-- Witnesses print as Waxwing patterns: `_`, literals, `Name(field, …)`.
 pattern ∷ Witness → String
 pattern = case _ of
   WAny → "_"

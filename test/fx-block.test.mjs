@@ -43,7 +43,7 @@ for (const [name, source, label] of orders) {
     assert.ifError(result.error);
     assert.notEqual(result.status, 0, `exit status: ${result.stdout}`);
     const output = result.stdout + result.stderr;
-    assert.deepEqual([...output.matchAll(/bumpus-probe: (\w+)/g)]
+    assert.deepEqual([...output.matchAll(/waxwing-probe: (\w+)/g)]
       .map(match => match[1]), [label], output);
     assert.equal(run(source, orderProbes.map(([, probe]) => probe)).probe,
       label);
@@ -138,7 +138,7 @@ test(`${nestingLimit} nested blocks build and run; one more is E_NESTING`,
 test('blocks are lifted and numbered with matches', () => {
   const go = checked('type Box(a) = Box(a); fn main(): Int = '
     + '{ let b = Box(1); match b { Box(n) => { let m = n; m } } };');
-  assert.match(go, /^func bumpusFn0Block0\(\) int32 \{$/m);
-  assert.match(go, /^func bumpusFn0Match1\(bumpusScrutinee bumpusTy0\) int32/m);
-  assert.match(go, /^func bumpusFn0Block2\(bumpusLocal1 int32\) int32 \{$/m);
+  assert.match(go, /^func waxwingFn0Block0\(\) int32 \{$/m);
+  assert.match(go, /^func waxwingFn0Match1\(waxwingScrutinee waxwingTy0\) int32/m);
+  assert.match(go, /^func waxwingFn0Block2\(waxwingLocal1 int32\) int32 \{$/m);
 });

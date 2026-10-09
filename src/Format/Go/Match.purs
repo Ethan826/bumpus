@@ -28,11 +28,11 @@ type Signature =
 
 -- Each match is lifted to a top-level function, not an immediately invoked
 -- closure: Go's inliner expands nested closures exponentially (E005). The
--- k-th match of bumpusFn{f}, numbered in pre-order with the scrutinee
--- before the arms, is bumpusFn{f}Match{k}. It takes the locals its arms
+-- k-th match of waxwingFn{f}, numbered in pre-order with the scrutinee
+-- before the arms, is waxwingFn{f}Match{k}. It takes the locals its arms
 -- capture, then the scrutinee, which the call site evaluates once, where the
 -- closure did. Arms are tested in order; the panic guards only malformed
--- values. Lifted functions follow their bumpusFn in number order. The
+-- values. Lifted functions follow their waxwingFn in number order. The
 -- match's own free locals, which an enclosing match must capture, are its
 -- scrutinee's and its captures (Format.Go.Capture).
 lowerMatch
@@ -66,7 +66,7 @@ matchName ∷ FunctionId → Int → String
 matchName owner number = functionName owner <> "Match" <> show number
 
 scrutineeName ∷ String
-scrutineeName = "bumpusScrutinee"
+scrutineeName = "waxwingScrutinee"
 
 matchFunction ∷ Signature → Array String → String
 matchFunction signature arms =
@@ -74,7 +74,7 @@ matchFunction signature arms =
     <> goType signature.result
     <> " {\n"
     <> joinWith "" arms
-    <> "panic(\"bumpus: unmatched value\")\n}\n"
+    <> "panic(\"waxwing: unmatched value\")\n}\n"
   where
   parameters = map parameter signature.captured
     <> [ scrutineeName <> " " <> goType signature.scrutinee ]

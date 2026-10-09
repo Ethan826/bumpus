@@ -6,7 +6,10 @@ phase boundaries, differential coverage and reproduction, two smaller
 corrections). Execution: subagent-driven (fresh implementer and reviewer
 per task, then a whole-branch review), on branch fx001 in
 .worktrees/fx001, chosen by the user 2026-10-09. Stop and report if
-Task 1's measurements reject a runtime shape. Nothing is implemented.
+Task 1's measurements reject a runtime shape. Tasks 1-3 are committed
+at 3481468. Additional row/entry/specialization review fixes are paused
+and uncommitted; finish their tests before Task 4. The Waxwing rename
+checkpoint and verification results are recorded in docs/progress.md (R003).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -56,7 +59,7 @@ direction decisions.
   1,000-label rows must unify and print without stack failure.
 - Existing diagnostic rows are unchanged. New reserved words (`effect
   handler handle with let defer Unit ctl resume`) collide with no
-  existing Bumpus test source (checked 2026-10-09). `pure` is contextual.
+  existing Waxwing test source (checked 2026-10-09). `pure` is contextual.
 - New wire codes: `E_EFFECT`, `E_HANDLER` (ErrorCode `EffectError`,
   `HandlerError`). Expanding declaration cycles reuse `E_SPECIALIZATION`.
 - New problem texts, exactly (§5, §6):
@@ -129,13 +132,13 @@ No compiler change. Confirms §4's Go runtime before lowering code exists.
 - Modify: `docs/findings.md`, `docs/progress.md`
 
 - [ ] **Step 1: Write** probes, each a Go program with a checked output:
-  (a) context list `bumpusCtx{key int; handler any; outer *bumpusCtx;
-  marker *bumpusMarker}` with a perform function that walks to the key,
+  (a) context list `waxwingCtx{key int; handler any; outer *waxwingCtx;
+  marker *waxwingMarker}` with a perform function that walks to the key,
   type-asserts the handler struct and calls the clause with `outer`;
-  (b) targeted abort: `bumpusMarker struct{ id uint64 }`, `bumpusAbort
-  {target *bumpusMarker; payload any}`, a lifted `handle` helper
-  returning `(result, *bumpusAbort)` that recovers only its own markers;
-  (c) `bumpusCleanup(state *bumpusPending, cleanup func())` implementing
+  (b) targeted abort: `waxwingMarker struct{ id uint64 }`, `waxwingAbort
+  {target *waxwingMarker; payload any}`, a lifted `handle` helper
+  returning `(result, *waxwingAbort)` that recovers only its own markers;
+  (c) `waxwingCleanup(state *waxwingPending, cleanup func())` implementing
   §3's policy; (d) a lifted block helper with two `defer`s.
 - [ ] **Step 2: Check semantics in Go:** a clause reaching the outer
   handler; an abort crossing an unrelated inner `handle` to its target;
@@ -155,7 +158,7 @@ No compiler change. Confirms §4's Go runtime before lowering code exists.
   and the median `go build` of the 4,000-helper program is at most 10 s
   (the scale rule's per-program build bound). Growth ratios between sizes
   are reported as observations, not as a linearity proof: the scale rule
-  claims linearity for Bumpus phases only, and Go builds have measured
+  claims linearity for Waxwing phases only, and Go builds have measured
   absolute bounds. Lookup, installation and unwinding costs are recorded,
   not bounded (FX005). If a semantic check fails or the bound is
   exceeded, stop and report to the user.
@@ -193,7 +196,7 @@ Pure; runs end to end. No rows yet.
 - Check: `let` is monomorphic; `Unit` comparable and printable (prints
   `()`); hint `Hinted (Mismatch …) TrailingSemicolon` when a trailing
   block's Unit fails against a non-Unit requirement.
-- Go: a block is a lifted helper `bumpusFn{f}Block{k}` (pre-order, shared
+- Go: a block is a lifted helper `waxwingFn{f}Block{k}` (pre-order, shared
   counter with Match), captures in LocalId order; `x := e`, `_ = e`,
   `return last`. Unit is Go `struct{}`.
 
@@ -466,10 +469,10 @@ programs at `Features.Check.Unlowered` (Global Constraints).
 - Mode (§4): `usesContext ∷ IR.Program → Boolean` over the emitted IR
   (operation, handler value or type, `with`, `handle`, `fail`). When
   true every function, stage, lambda and function value takes `ctx
-  *bumpusCtx` first; otherwise nothing changes.
-- Names: handler struct `bumpusEff{N}` (N = effect key index), perform
-  `bumpusEff{N}Op{k}`, helpers `bumpusFn{f}With{k}`,
-  `bumpusFn{f}Handle{k}`, clauses lifted as lambdas (pre-order, shared
+  *waxwingCtx` first; otherwise nothing changes.
+- Names: handler struct `waxwingEff{N}` (N = effect key index), perform
+  `waxwingEff{N}Op{k}`, helpers `waxwingFn{f}With{k}`,
+  `waxwingFn{f}Handle{k}`, clauses lifted as lambdas (pre-order, shared
   counter with Match and Block).
 - Runtime shapes are Task 1's adopted ones; markers non-zero-sized.
 
@@ -492,7 +495,7 @@ programs at `Features.Check.Unlowered` (Global Constraints).
 **Files:**
 - Modify: Block parser/checker/lowering (`Defer` item), `src/Domain/IR/
   Internal.purs` (`Defer`, `Crash`), `src/Format/Go/Context.purs`
-  (`bumpusCleanup`, `bumpusDefect`, main's recovery wrapper); `defer` and
+  (`waxwingCleanup`, `waxwingDefect`, main's recovery wrapper); `defer` and
   `crash` go through every phase in this task
 - Create: `src/Features/Check/Defer.purs`, `test/fx-cleanup.test.mjs`
 
@@ -599,7 +602,7 @@ programs at `Features.Check.Unlowered` (Global Constraints).
 ### Task 11: Scale and the acceptance scenario
 
 **Files:**
-- Create: `test/fx-scale.serial.test.mjs`, `examples/services.bumpus`,
+- Create: `test/fx-scale.serial.test.mjs`, `examples/services.wxw`,
   `bootstrap/services.go`
 
 - [ ] **Step 1: Write** the acceptance scenario (§5): services with

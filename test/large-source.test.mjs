@@ -119,11 +119,11 @@ test('ten thousand binding arguments resolve in source order', () => {
   let go = '';
   const seconds = secondsFor(() => { go = checked(source); });
   assert.ok(seconds < compileSecondsLimit, `compiling took ${seconds}s`);
-  const binders = Array.from(go.matchAll(/bumpusLocal(\d+) := /g),
+  const binders = Array.from(go.matchAll(/waxwingLocal(\d+) := /g),
     found => Number(found[1]));
   const inOrder = Array.from({ length: wideCount }, (_, index) => index);
   assert.deepEqual(binders, inOrder, 'one binder per argument, in order');
-  assert.ok(!go.includes(`bumpusLocal${wideCount} `), 'no extra binder');
+  assert.ok(!go.includes(`waxwingLocal${wideCount} `), 'no extra binder');
 });
 
 test('a five-thousand-arm integer match compiles', () => {
@@ -196,7 +196,7 @@ test('three thousand distinct instantiations compile in linear time', () => {
   let go = '';
   const seconds = secondsFor(() => { go = checked(source); });
   assert.ok(seconds < compileSecondsLimit, `compiling took ${seconds}s`);
-  const functions = go.match(/^func bumpusFn\d+\(/gm).length;
+  const functions = go.match(/^func waxwingFn\d+\(/gm).length;
   assert.equal(functions, 2 * instantiationCount + 1, 'one copy per key');
 });
 

@@ -63,7 +63,7 @@ turn the audit into an unbounded bibliography.
    Distinguish compiler features from libraries and ecosystem tools.
    Include PKG001: portable compiled libraries, host-callable exports,
    typed FFI, dependency-inverted service adapters and package management
-   spanning Bumpus and host dependencies. Review Effect Platform as a
+   spanning Waxwing and host dependencies. Review Effect Platform as a
    versioned precedent, separating targets from runtime capabilities.
 
 ### Diagnostic research cases (added 2026-10-09 for FX001)
@@ -86,12 +86,12 @@ Use these axes for comparable briefs; mark absent/not applicable topics
 explicitly. Bibliography size and matching feature names are not sufficient
 evidence of coverage or semantic compatibility.
 
-## Task 1: Freeze sources and Bumpus baseline
+## Task 1: Freeze sources and Waxwing baseline
 
 - [ ] Create docs/research/language-audit/sources.md with reference kind,
   edition/version/revision, exact sections/links, access date and reading
   status (unread, surveyed, deeply reviewed, unavailable).
-- [ ] Record existing Bumpus behavior against tests/ADRs separately from
+- [ ] Record existing Waxwing behavior against tests/ADRs separately from
   approved designs, direction-only proposals and missing features.
 - [ ] Index all relevant core/reference sections and record which are read,
   deferred as irrelevant, or blocked. Do not claim a whole spec was read
@@ -104,7 +104,7 @@ evidence of coverage or semantic compatibility.
   claims; update the section ledger and explain deliberate omissions.
 - [ ] Each brief states the problem solved, precise semantics/laws,
   strengths, tradeoffs, rejected/invalid examples, user experience and
-  relevance to Bumpus. Label source-backed facts versus our inferences.
+  relevance to Waxwing. Label source-backed facts versus our inferences.
 - [ ] Reproduce small disputed examples with the source toolchain when
   feasible; record version/results or the inability to run them. A reading
   claim is not an execution claim. Reference projects remain read-only;
@@ -113,7 +113,7 @@ evidence of coverage or semantic compatibility.
 ## Task 3: Build the feature and interaction matrix
 
 - [ ] Create docs/research/language-audit/matrix.md with feature/problem,
-  primary evidence, user scenario, current Bumpus state, proposed decision
+  primary evidence, user scenario, current Waxwing state, proposed decision
   (adopt/adapt/defer/reject), rationale, prerequisites, risks, backlog/ADR
   owner and a concrete future acceptance test/property.
 - [ ] Reconcile with FN001, K001, C001/R001, FX001, M001, D001, STD001,
@@ -141,7 +141,7 @@ evidence of coverage or semantic compatibility.
   doctest located in its document, a shrunk/replayed property failure, and
   discovery of a version-correct API/example by a coding agent. Evaluate
   literate authoring as an explicit optional decision, not a requirement.
-- [ ] Walk through a Bumpus library, a typed host SDK binding and a service
+- [ ] Walk through a Waxwing library, a typed host SDK binding and a service
   adapter/fake; review host-facing exports, provider conformance, package
   identity, locked transitive host dependencies, conflicts and fresh/offline
   builds. State portability limits and source-versus-binary linking choices.

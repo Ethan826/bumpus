@@ -11,9 +11,9 @@ export const frames = 1_000;
 export const caughtAborts = 100_000;
 
 const body = String.raw`
-type opHandler struct{ run func(ctx *bumpusCtx, x int) int }
+type opHandler struct{ run func(ctx *waxwingCtx, x int) int }
 
-var sinkCtx *bumpusCtx
+var sinkCtx *waxwingCtx
 var sinkCount int
 
 func timed(f func() int) {
@@ -23,10 +23,10 @@ func timed(f func() int) {
 }
 
 func install(n int) int {
-	base := &bumpusCtx{key: 1}
+	base := &waxwingCtx{key: 1}
 	sum := 0
 	for i := 0; i < n; i++ {
-		c := bumpusInstall(base, i&7, nil)
+		c := waxwingInstall(base, i&7, nil)
 		sinkCtx = c
 		sum += c.key
 	}
@@ -36,41 +36,41 @@ func install(n int) int {
 // A context of the given depth: the frame at depth d has key d, so a
 // perform with key d walks d links before calling its clause.
 func lookup(depth, n int) int {
-	var ctx *bumpusCtx
-	clause := &opHandler{func(c *bumpusCtx, x int) int { return x + 1 }}
+	var ctx *waxwingCtx
+	clause := &opHandler{func(c *waxwingCtx, x int) int { return x + 1 }}
 	for d := 10000; d >= 1; d-- {
-		ctx = bumpusInstall(ctx, d, clause)
+		ctx = waxwingInstall(ctx, d, clause)
 	}
 	sum := 0
 	for i := 0; i < n; i++ {
-		f := bumpusFind(ctx, depth)
+		f := waxwingFind(ctx, depth)
 		sum += f.handler.(*opHandler).run(f.outer, i) + f.key
 	}
 	return sum
 }
 
-func deepHandles(ctx *bumpusCtx, n int) int {
+func deepHandles(ctx *waxwingCtx, n int) int {
 	sinkCount++
 	if n == 0 {
-		bumpusFail(ctx, keyFail, 5)
+		waxwingFail(ctx, keyFail, 5)
 	}
-	fo := bumpusFrame(ctx, keyOther)
-	r, _ := bumpusHandle([]*bumpusMarker{fo.marker}, func() int { return deepHandles(fo, n-1) + 1 })
+	fo := waxwingFrame(ctx, keyOther)
+	r, _ := waxwingHandle([]*waxwingMarker{fo.marker}, func() int { return deepHandles(fo, n-1) + 1 })
 	return r
 }
 
-func deepCleanups(ctx *bumpusCtx, n int) int {
-	var st bumpusPending
-	defer bumpusCleanup(&st, func() { sinkCount++ })
+func deepCleanups(ctx *waxwingCtx, n int) int {
+	var st waxwingPending
+	defer waxwingCleanup(&st, func() { sinkCount++ })
 	if n == 0 {
-		bumpusFail(ctx, keyFail, 5)
+		waxwingFail(ctx, keyFail, 5)
 	}
 	return deepCleanups(ctx, n-1) + 1
 }
 
 func unwind(cleanups bool, n int) int {
-	fa := bumpusFrame(nil, keyFail)
-	_, a := bumpusHandle([]*bumpusMarker{fa.marker}, func() int {
+	fa := waxwingFrame(nil, keyFail)
+	_, a := waxwingHandle([]*waxwingMarker{fa.marker}, func() int {
 		if cleanups {
 			return deepCleanups(fa, n)
 		}
@@ -80,10 +80,10 @@ func unwind(cleanups bool, n int) int {
 }
 
 func caught(n int) int {
-	fa := bumpusFrame(nil, keyFail)
+	fa := waxwingFrame(nil, keyFail)
 	sum := 0
 	for i := 0; i < n; i++ {
-		_, a := bumpusHandle([]*bumpusMarker{fa.marker}, func() int { bumpusFail(fa, keyFail, i); return 0 })
+		_, a := waxwingHandle([]*waxwingMarker{fa.marker}, func() int { waxwingFail(fa, keyFail, i); return 0 })
 		sum += a.payload.(int)
 	}
 	return sum
@@ -125,14 +125,14 @@ export const expected = {
 // cleanup effects into one checksum. `seed` defeats Go's build cache so
 // every repetition recompiles.
 const helper = i => String.raw`
-func blk_${i}(ctx *bumpusCtx, x int) int {
-	var st bumpusPending
-	defer bumpusCleanup(&st, func() { bumpusSink += ${i} })
-	defer bumpusCleanup(&st, func() { bumpusSink += ${2 * i} })
-	f := bumpusFrame(ctx, keyFail)
-	r, a := bumpusHandle([]*bumpusMarker{f.marker}, func() int {
+func blk_${i}(ctx *waxwingCtx, x int) int {
+	var st waxwingPending
+	defer waxwingCleanup(&st, func() { waxwingSink += ${i} })
+	defer waxwingCleanup(&st, func() { waxwingSink += ${2 * i} })
+	f := waxwingFrame(ctx, keyFail)
+	r, a := waxwingHandle([]*waxwingMarker{f.marker}, func() int {
 		if x < 0 {
-			bumpusFail(f, keyFail, x)
+			waxwingFail(f, keyFail, x)
 		}
 		return performLog(f, "m") + x + ${i}
 	})
@@ -145,17 +145,17 @@ func blk_${i}(ctx *bumpusCtx, x int) int {
 
 export const helperProgram = (count, seed) => {
   const names = Array.from({ length: count }, (_, i) => `blk_${i},`);
-  return header + runtime + `\n// seed ${seed}\nvar bumpusSink int\n`
+  return header + runtime + `\n// seed ${seed}\nvar waxwingSink int\n`
     + Array.from({ length: count }, (_, i) => helper(i)).join('')
-    + `\nvar helpers = []func(*bumpusCtx, int) int{\n${names.join('\n')}\n}\n`
+    + `\nvar helpers = []func(*waxwingCtx, int) int{\n${names.join('\n')}\n}\n`
     + String.raw`
 func main() {
-	ctx := bumpusInstall(nil, keyLog, &logHandler{func(c *bumpusCtx, s string) int { return 1 }})
+	ctx := waxwingInstall(nil, keyLog, &logHandler{func(c *waxwingCtx, s string) int { return 1 }})
 	sum := 0
 	for i, h := range helpers {
 		sum += h(ctx, i%5-1)
 	}
-	fmt.Println(sum + bumpusSink)
+	fmt.Println(sum + waxwingSink)
 }
 `;
 };

@@ -19,12 +19,12 @@ decision; everything not named is proposed, not verified.
    laws. Regression rows `ctor-order` and `first-field` reintroduce each
    defect and must fail.
 2. **Helpers for every declared type.** Format.Go.Compare emits
-   `bumpusCmpN(a, b) int` and Format.Go.Show emits
-   `bumpusShowN(out, v) []byte` per type in TypeId order, used or not (Go
+   `waxwingCmpN(a, b) int` and Format.Go.Show emits
+   `waxwingShowN(out, v) []byte` per type in TypeId order, used or not (Go
    permits unused functions; the output stays simple and deterministic).
    Go `==` is never used on the structs: it would compare field pointers.
-   A comparison on a declared type lowers to `bumpusCmpN(l, r) OP 0`.
-3. **Bool helper on demand.** `bumpusCmpBool` is emitted only when a Bool
+   A comparison on a declared type lowers to `waxwingCmpN(l, r) OP 0`.
+3. **Bool helper on demand.** `waxwingCmpBool` is emitted only when a Bool
    ordering operator appears or a declared type has a Bool field
    (Format.Go.Usage), so programs without them keep their bytes:
    bootstrap/answer.go is unchanged by the milestone (tests: compare,
@@ -32,7 +32,7 @@ decision; everything not named is proposed, not verified.
 4. **Witness-format printing.** `main` may return any type; the executable
    prints it with LF. Int decimal with `-`, Bool `true`/`false`, declared
    values `Name` or `Name(f1, f2)`: the coverage-witness format without `_`.
-   Every printed value is a valid Bumpus expression under the same
+   Every printed value is a valid Waxwing expression under the same
    declarations; re-reading it is bounded by the nesting limit (ADR 006,
    G001): a printed list of more than 128 elements nests deeper than 128
    levels and is rejected with E_NESTING instead of recompiled (measured at
@@ -43,7 +43,7 @@ decision; everything not named is proposed, not verified.
    row, and bootstrap/tree.go. E_ENTRY now covers only a missing `main`
    (`Expected fn main()`) and `main` with parameters.
 5. **Malformed rule.** Comparing or printing panics with
-   `bumpus: malformed value` on a visited nil field pointer or unknown tag.
+   `waxwing: malformed value` on a visited nil field pointer or unknown tag.
    Comparison stops at the first difference, so later malformed fields may be
    unvisited; printing visits every field. Total order is claimed for
    well-formed values only; malformed values arise only from foreign code

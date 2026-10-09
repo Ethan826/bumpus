@@ -63,11 +63,11 @@ const identical = source => {
     plain(withoutResolution(program), true), source);
 };
 
-// examples/lists.bumpus is polymorphic (P001 Task 7), so specialization
+// examples/lists.wxw is polymorphic (P001 Task 7), so specialization
 // copies it rather than returning it; test/poly-run.test.mjs runs it. So
-// is examples/functions.bumpus (FN001 Task 6; test/compiler.test.mjs).
-const polymorphicExamples = new Set(['functions.bumpus', 'lists.bumpus']);
-const examples = readdirSync('examples').filter(name => name.endsWith('.bumpus'))
+// is examples/functions.wxw (FN001 Task 6; test/compiler.test.mjs).
+const polymorphicExamples = new Set(['functions.wxw', 'lists.wxw']);
+const examples = readdirSync('examples').filter(name => name.endsWith('.wxw'))
   .filter(name => !polymorphicExamples.has(name))
   .sort().map(name => readFileSync(join('examples', name), 'utf8'));
 

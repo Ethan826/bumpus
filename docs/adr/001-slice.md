@@ -4,6 +4,10 @@ Accepted 2026-10-07. Provisional language name Bumpus; workspace directory does
 not define the final language name. Initial syntax uses fn with inline typed
 parameters and a required result type, making a full top-level signature.
 
+Naming note (2026-10-09): this records the accepted decision's original
+context. The settled language name is Waxwing; see
+[ADR 009](009-waxwing-name.md).
+
 Choose Int/Bool, calls, wrapping addition, and if. This proves parsing,
 resolution, source typing, elaboration, lowering, and execution with little
 syntax. Parametric typing is the next extension after closed ADTs, not

@@ -1,7 +1,7 @@
 // Realistic bodies for the packed calling convention (FN001 Task 1, round
 // 2). Parameters cycle through three Go types (Int, Bool, a pointer to a
 // declared value), and the body reads every parameter twice in a scattered
-// order (access t reads parameter t × stride mod n), as an ordinary Bumpus
+// order (access t reads parameter t × stride mod n), as an ordinary Waxwing
 // body would. Three conventions share that body:
 // - `directMixed`: today's n-ary function, called directly;
 // - `packedArray`: the chain node has one field per Go type; the entry

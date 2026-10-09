@@ -1,6 +1,6 @@
 // FN001 Task 8 Step 4: the milestone tier of the scale rule (plan, Global
 // Constraints). Generates each Task 8 program at 20,000 parameters as
-// Bumpus source, compiles it with the CLI, builds the Go with `go build`
+// Waxwing source, compiles it with the CLI, builds the Go with `go build`
 // under an explicit 100 s timeout, runs it and checks its output. Prints
 // one line per program; exits non-zero on any failure. Not part of
 // verify (it takes minutes). Bodies are bounded (test/fn-scale-programs.mjs;
@@ -31,11 +31,11 @@ const programs = [['wide', wide(width)], ['chain', chain(width)],
 // The CLI's emit time, set by `emitted` for the line printed after it.
 let emitMs = 0;
 const emitted = (source, dir) => {
-  const input = join(dir, 'input.bumpus');
+  const input = join(dir, 'input.wxw');
   const go = join(dir, 'main.go');
   writeFileSync(input, source);
   const started = performance.now();
-  const result = spawnSync('node', ['scripts/bumpus.mjs', 'emit', input, go],
+  const result = spawnSync('node', ['scripts/waxwing.mjs', 'emit', input, go],
     { encoding: 'utf8', timeout: emitTimeoutMs });
   if (result.status !== 0) {
     throw new Error(`emit failed: ${result.error ?? result.stderr}`);

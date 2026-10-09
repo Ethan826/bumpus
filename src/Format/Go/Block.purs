@@ -1,9 +1,9 @@
 -- Blocks (FX001 design §4). Each block is lifted, as a match is (E005),
 -- to a top-level function of the locals its items and value read but do
 -- not bind (ascending LocalId, Format.Go.Capture). The k-th lifted
--- function of bumpusFn{f}, numbered in pre-order with the block before its
+-- function of waxwingFn{f}, numbered in pre-order with the block before its
 -- items, sharing the counter with matches, lambdas, pipes and application
--- helpers, is bumpusFn{f}Block{k}. Its body runs the items in order, a
+-- helpers, is waxwingFn{f}Block{k}. Its body runs the items in order, a
 -- `let` as a typed `var` (also discarded, so Go never reports an unused
 -- variable), `let _` and discarded items as `_ = e`, and returns the
 -- value. The `var` is typed because an arity-one function value is the

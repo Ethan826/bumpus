@@ -29,7 +29,7 @@ const enters = (source, pairs, label, failure) => context => {
   const go = pairs.reduce(
     (text, [index, name]) => panicOnEntry(text, index, name), result.value0);
   const run = context.ran(go);
-  const labels = [...run.output.matchAll(/bumpus-probe: (\w+)/g)]
+  const labels = [...run.output.matchAll(/waxwing-probe: (\w+)/g)]
     .map(match => match[1]);
   if (labels.join() !== label) fail(`${failure}: ${run.output}`);
   detected(context);

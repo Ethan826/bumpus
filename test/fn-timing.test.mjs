@@ -58,9 +58,9 @@ const sharing = 'fn probe(n: Int): Int = n; '
   + 'fn main(): Int = twice(k3(probe(10)));';
 const traced = go => traceCalls(go).replace(
   /^func main\(\) \{ fmt\.Println\((.*)\) \}$/m,
-  (line, call) => 'var bumpusTrace []string\n\n'
-    + 'func bumpusTraced() []string { return bumpusTrace }\n\n'
-    + `func main() { fmt.Println(${call}, bumpusTraced()) }`);
+  (line, call) => 'var waxwingTrace []string\n\n'
+    + 'func waxwingTraced() []string { return waxwingTrace }\n\n'
+    + `func main() { fmt.Println(${call}, waxwingTraced()) }`);
 
 const batch = runGoBatch(import.meta.url, [
   ...cases.map(([name, source, pairs]) =>
@@ -74,7 +74,7 @@ for (const [name, , , label] of cases) {
     assert.ifError(result.error);
     assert.notEqual(result.status, 0, `exit status: ${result.stdout}`);
     const output = result.stdout + result.stderr;
-    assert.deepEqual([...output.matchAll(/bumpus-probe: (\w+)/g)]
+    assert.deepEqual([...output.matchAll(/waxwing-probe: (\w+)/g)]
       .map(match => match[1]), [label], output);
   });
 }
@@ -90,7 +90,7 @@ for (const [name, source, pairs, label] of cases) {
   test(`interpreter agrees: ${name} enters ${label} first`, () => {
     const result = batch.result(name);
     const entered = (result.stdout + result.stderr)
-      .match(/bumpus-probe: (\w+)/)?.[1];
+      .match(/waxwing-probe: (\w+)/)?.[1];
     assert.equal(run(source, pairs.map(([, probe]) => probe)).probe,
       entered, label);
   });

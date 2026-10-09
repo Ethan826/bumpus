@@ -4,8 +4,8 @@
 -- its last argument (a saturated call stays a direct Go call). A literal
 -- or a local is that argument itself: evaluating it has no effect. Any
 -- other left operand is held in a temporary: the pipe is lifted, as a
--- match is (E005), to bumpusFn{f}Pipe{k}, taking the free locals of the
--- application and then the operand's value, `bumpusPipe`. The call site
+-- match is (E005), to waxwingFn{f}Pipe{k}, taking the free locals of the
+-- application and then the operand's value, `waxwingPipe`. The call site
 -- evaluates only locals before the operand, so the operand runs first; no
 -- closure is nested, however long a chain of pipes is.
 module Format.Go.Pipe (lowerPipe) where

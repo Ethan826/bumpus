@@ -153,21 +153,21 @@ Format.Wire.
 - **Go** (Format.Go*) emits one tagged struct per type, constructors, and
   sequential first-match lowering with nil guards. Format.Go.Expression
   threads a per-function match counter (Format.Go.Lowered) and
-  Format.Go.Match lifts each match to a top-level `bumpusFn{f}Match{k}` whose
+  Format.Go.Match lifts each match to a top-level `waxwingFn{f}Match{k}` whose
   parameters are its arms' free locals (computed bottom-up with the code;
   Format.Go.Capture), then the scrutinee; lifted functions follow their function in number order (ADR 003
   item 6, E005). Format.Go.Compare emits a
-  `bumpusCmpN` per declared type (and `bumpusCmpBool`, decided by
-  Format.Go.Usage), Format.Go.Show a `bumpusShowN` per type; `main` prints
+  `waxwingCmpN` per declared type (and `waxwingCmpBool`, decided by
+  Format.Go.Usage), Format.Go.Show a `waxwingShowN` per type; `main` prints
   through the latter for declared results (ADR 005). FN001 Task 6 lowers
   function values (design §13 rules 1-8): saturated calls stay n-ary
   (Format.Go.Value); a value of arity n ≥ 2 is a staged wrapper
-  `{f}Value`/`{f}Stage{k}` over linked `bumpusNode{N}` environments ending
+  `{f}Value`/`{f}Stage{k}` over linked `waxwingNode{N}` environments ending
   in `{f}Entry`, one n-ary call (Format.Go.Stage, .Entry); lambdas are
-  lifted to `bumpusFn{f}Lambda{k}` of their free locals then parameters
+  lifted to `waxwingFn{f}Lambda{k}` of their free locals then parameters
   (Format.Go.Lambda); applications beyond 64 arguments are split into
-  `bumpusFn{f}Apply{k}` helpers (Format.Go.Apply); a pipe whose left
-  operand is not a literal or local is lifted to `bumpusFn{f}Pipe{k}`
+  `waxwingFn{f}Apply{k}` helpers (Format.Go.Apply); a pipe whose left
+  operand is not a literal or local is lifted to `waxwingFn{f}Pipe{k}`
   (Format.Go.Pipe). Matches, lambdas, pipes and helpers share one counter
   per function. Go representation decisions live here, not in Features.
 

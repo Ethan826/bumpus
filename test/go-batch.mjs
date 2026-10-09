@@ -2,7 +2,7 @@
 // of a synthetic module under .build/go-batches/<id>/, a dispatcher main
 // imports them all, and each case then runs as its own process: the shared
 // binary invoked with the case's package name. Failure contract
-// (docs/engineering.md): a Bumpus rejection fails only its own case, with
+// (docs/engineering.md): a Waxwing rejection fails only its own case, with
 // runGo's message; anything wrong with the generated Go (unexpected shape,
 // compile error) fails every case of the batch, naming the offending case
 // when Go's output identifies it.
@@ -13,7 +13,7 @@ import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checked, command } from './support.mjs';
 
-const modulePath = 'bumpusbatch';
+const modulePath = 'waxwingbatch';
 const buildTimeoutMs = 300_000;
 // The module's language version is the pinned toolchain's, as a
 // command-line build of main.go would use.
@@ -77,7 +77,7 @@ const batchFailure = (id, reason, offending, detail) =>
 // Names the cases whose packages Go's output blames.
 const blamed = (output, names) => {
   const idents = new Set([...output.matchAll(
-    /(?:^# bumpusbatch\/|(?:^|[\s/])(?=c\d+\/))(c\d+)/gm)].map(m => m[1]));
+    /(?:^# waxwingbatch\/|(?:^|[\s/])(?=c\d+\/))(c\d+)/gm)].map(m => m[1]));
   const found = [...idents].filter(ident => names.has(ident))
     .map(ident => JSON.stringify(names.get(ident)));
   return found.length ? found.join(', ') : 'not identified';

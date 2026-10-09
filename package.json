@@ -1,12 +1,12 @@
 {
-  "name": "bumpus-bootstrap",
+  "name": "waxwing-bootstrap",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
     "verify": "node scripts/verify.mjs",
-    "bumpus": "node scripts/bumpus.mjs"
+    "waxwing": "node scripts/waxwing.mjs"
   },
   "engines": {
     "node": ">=22.5.0"

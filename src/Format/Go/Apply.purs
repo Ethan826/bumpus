@@ -123,10 +123,10 @@ block scope lower types arguments so first =
   parameter local = localName local.id <> " " <> goType local.ty
   typeAt position = maybe "" identity (Array.index types position)
   helper = "func " <> name <> "("
-    <> joinWith ", " ([ "bumpusValue " <> typeAt first ] <> map parameter free)
+    <> joinWith ", " ([ "waxwingValue " <> typeAt first ] <> map parameter free)
     <> ") "
     <> typeAt (first + Array.length parts.codes)
-    <> " {\nreturn bumpusValue"
+    <> " {\nreturn waxwingValue"
     <> joinWith "" (map parenthesized parts.codes)
     <> "\n}\n"
 

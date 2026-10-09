@@ -44,7 +44,7 @@ with adapters (loses the timing above; regression row `stage-value`).
 
 ### Nested function values
 
-A value of `A -> B -> C` is `func(A) bumpusFunN` with `bumpusFunN` the
+A value of `A -> B -> C` is `func(A) waxwingFunN` with `waxwingFunN` the
 named `func(B) C`; each stage boundary is an ordinary Go call boundary,
 so Go's left-to-right call order is the source order and no runtime
 arity check exists. In the monomorphic IR an arrow is a number,
@@ -89,7 +89,7 @@ completed twice), total `go build` seconds: 3.4 at 5,000 and 52.1 at
 
 ### Scale rule
 
-Linearity is claimed for Bumpus phases only (test/fn-linear.test.mjs:
+Linearity is claimed for Waxwing phases only (test/fn-linear.test.mjs:
 eight value forms at 20,000 parameters under three times their measured
 time, and at 80,000 without stack failure). Generated Go is held to total
 `go build` bounds per program: 10 s at 5,000 parameters in `npm run

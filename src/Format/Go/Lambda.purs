@@ -4,9 +4,9 @@
 -- value is that function's staged wrapper applied to the free locals when
 -- the lambda is evaluated, so its body runs exactly when its last
 -- parameter is applied. With no free local and one parameter the value is
--- the lifted function itself. The k-th lifted function of bumpusFn{f},
+-- the lifted function itself. The k-th lifted function of waxwingFn{f},
 -- numbered in pre-order with the lambda before its body, is
--- bumpusFn{f}Lambda{k}; a discarded parameter is Go's `_`.
+-- waxwingFn{f}Lambda{k}; a discarded parameter is Go's `_`.
 module Format.Go.Lambda (lowerLambda) where
 
 import Prelude

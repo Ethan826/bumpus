@@ -130,7 +130,7 @@ for (const [name, , expected] of cases) {
 }
 
 const count = (go, pattern) => (go.match(pattern) ?? []).length;
-const helpers = /^func bumpusFn\d+Apply\d+\(/gm;
+const helpers = /^func waxwingFn\d+Apply\d+\(/gm;
 
 test('an application longer than 64 arguments is split into helpers', () => {
   assert.equal(count(checked(applied(64)), helpers), 0);
@@ -143,11 +143,11 @@ test('a function used as a value and called directly has one body', () => {
   const go = checked(source);
   // Monomorphic functions first (add 0, pick 1), then length's copy; the
   // entry calls pick's one body.
-  assert.equal(count(go, /^func bumpusFn1\(/gm), 1);
-  assert.equal(count(go, /^func bumpusFn1Entry\(e any\) int32 \{$/gm), 1);
-  assert.equal(count(go, /^return bumpusFn1\(a0\[0\], a1\[0\], a2\[0\]\)$/gm),
+  assert.equal(count(go, /^func waxwingFn1\(/gm), 1);
+  assert.equal(count(go, /^func waxwingFn1Entry\(e any\) int32 \{$/gm), 1);
+  assert.equal(count(go, /^return waxwingFn1\(a0\[0\], a1\[0\], a2\[0\]\)$/gm),
     1);
-  assert.equal(count(go, /^type bumpusNode\d+ struct/gm), 3);
+  assert.equal(count(go, /^type waxwingNode\d+ struct/gm), 3);
 });
 
 test('a lambda takes its free locals, then its parameters', () => {
@@ -155,9 +155,9 @@ test('a lambda takes its free locals, then its parameters', () => {
     name === 'three free locals, two parameters');
   // Monomorphic functions first (add 0, mk 1); locals a 0, b 1, c 2, x 3,
   // y 4.
-  assert.match(checked(source), new RegExp('^func bumpusFn1Lambda0\\('
-    + 'bumpusLocal0 int32, bumpusLocal1 bool, bumpusLocal2 bumpusTy\\d+, '
-    + 'bumpusLocal3 int32, bumpusLocal4 int32\\) int32 \\{$', 'm'));
+  assert.match(checked(source), new RegExp('^func waxwingFn1Lambda0\\('
+    + 'waxwingLocal0 int32, waxwingLocal1 bool, waxwingLocal2 waxwingTy\\d+, '
+    + 'waxwingLocal3 int32, waxwingLocal4 int32\\) int32 \\{$', 'm'));
 });
 
 test('representative independence: unused lambda parameters as Int or Bool',

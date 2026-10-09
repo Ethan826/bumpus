@@ -1,6 +1,6 @@
-# Bumpus language specification (stage 0, closed ADTs, comparison, polymorphism, functions)
+# Waxwing language specification (stage 0, closed ADTs, comparison, polymorphism, functions)
 
-Provisional name. A file is one program: type declarations and functions in
+Waxwing source files use `.wxw`. A file is one program: type declarations and functions in
 any order, with required function signatures. Behavioral claims below name
 their verifying test file in test/.
 
@@ -159,12 +159,12 @@ Printing. The executable prints `main`'s value plus LF; printing is a backend
 wrapper, not a source effect. Int prints decimal with a leading `-` when
 negative, Bool `true` or `false`, a declared value `Name` or
 `Name(f1, f2)` with `, ` separators: the coverage-witness format without `_`,
-so every printed value is valid Bumpus source that reproduces the value
+so every printed value is valid Waxwing source that reproduces the value
 under the same declarations (adt-print round trip). Re-reading is bounded by
 the nesting limit below: a printed list `Cons(1, Cons(2, … Nil))` of more
 than 128 elements nests deeper than 128 levels, so it is rejected with
 E_NESTING rather than recompiled (heap-based phases, BACKLOG H001, would lift this). Malformed
-values, possible only from foreign code (I001), panic with `bumpus: malformed
+values, possible only from foreign code (I001), panic with `waxwing: malformed
 value` when a comparison or print visits a nil field pointer or unknown tag;
 comparison stops at the first difference, so later malformed fields can go
 unnoticed; total order is claimed only for well-formed values.
@@ -241,7 +241,7 @@ Polymorphism (P001; ADR 007; spec docs/plans/2026-10-08-polymorphism-design.md).
   generic declaration never used is checked but not emitted (poly-run).
 - Evaluation and printing are unchanged: a generic value prints with its
   source constructor names and re-reads (`Cons(Pair(1, true), Nil)`;
-  poly-run, examples/lists.bumpus and bootstrap/lists.go).
+  poly-run, examples/lists.wxw and bootstrap/lists.go).
 
 Functions (FN001; ADR 008; spec docs/plans/2026-10-08-functions-design.md).
 
@@ -293,7 +293,7 @@ Functions (FN001; ADR 008; spec docs/plans/2026-10-08-functions-design.md).
   E_SPECIALIZATION `Recursive call to grow changes its type arguments`;
   `->` in a type declaration's fields is a type constructor for the rule
   (fn-names, fn-specialize; rows `value-edge`, `arrow-key`).
-- Scale. Long parameter lists and arrow spines cost Bumpus's phases
+- Scale. Long parameter lists and arrow spines cost Waxwing's phases
   linear time and no stack in their length (fn-linear, at 20,000 and
   80,000 parameters); generated Go builds within 10 s at 5,000
   parameters (fn-scale.serial). Functions are neither printed nor

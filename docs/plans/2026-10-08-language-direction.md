@@ -1,4 +1,4 @@
-# Bumpus language direction and planning handoff
+# Waxwing language direction and planning handoff
 
 Recorded 2026-10-08 at the user's request to commit the current discussion.
 Status: durable direction and hypotheses, not an implementation spec.
@@ -23,11 +23,11 @@ Haskell influence does not settle laziness or every advanced type feature.
 
 Developer experience also includes the user's requested syntax highlighting
 and IDE support (IDE001), first-class doctests (DOC001), property-based
-testing for Bumpus programs (PBT001), and LLM skills/discoverability (AI001).
+testing for Waxwing programs (PBT001), and LLM skills/discoverability (AI001).
 Literate capabilities (LIT001) remain exploratory. See
 [tooling direction](2026-10-08-tooling-direction.md) for intended outcomes,
 dependencies and proposed acceptance; no tooling implementation is selected.
-PKG001 adds library/package integration: Bumpus source libraries compiled
+PKG001 adds library/package integration: Waxwing source libraries compiled
 to the selected host target, typed FFI bindings, and dependency-inverted
 services fulfilled by host-library adapters or fakes. Review package/host
 dependency resolution, locks and compiled exports with M001/I001/FX001;
@@ -62,7 +62,7 @@ Deliver supported helpers after FN001 and coordinate generic operations,
 modules and practical data APIs with K001/C001, M001 and D001 respectively;
 this adds no work to FN001's approved scope.
 
-Bumpus currently has no function values, lambdas or closures. Design FN001
+Waxwing currently has no function values, lambdas or closures. Design FN001
 as its own milestone. Go closures offer a lowering route, but the design
 must specify function typing, captured values, evaluation order and how
 specialization discovers referenced functions. A polymorphic named function
@@ -128,7 +128,7 @@ problem not supported by P001, not merely another concrete row key.
 Current roadmap coverage is insufficient: I001 mentions effect sequencing
 inside Go FFI work, and docs/bootstrap.md needs an explicit effect boundary
 for self-hosting. Neither specifies source-language monadic effects.
-The compiler's own monadic Host ports are not Bumpus language support.
+The compiler's own monadic Host ports are not Waxwing language support.
 
 Design FX001 after FN001, coordinated with R001, K001, C001 and I001.
 Compare two design families explicitly: ZIO-like environment/error/result
@@ -160,7 +160,7 @@ for FX001, not approved syntax or authorization to implement effects.
 Make `do` an expression elaborated into bind and lambdas. Illustrative
 syntax, including block punctuation and `<-`, remains subject to design:
 
-```bumpus
+```waxwing
 fn profile(id) =
   do {
     user <- fetchUser(id);
@@ -172,7 +172,7 @@ fn profile(id) =
 
 Its proposed meaning is:
 
-```bumpus
+```waxwing
 bind(fetchUser(id), fn(user) =>
   bind(fetchPreferences(user.id), fn(preferences) =>
     bind(logAccess(user.id), fn(_) =>
@@ -189,7 +189,7 @@ value. The selected abstraction determines sequencing: Result-like bind
 bypasses later continuations on failure; a deferred effect constructs a
 computation that performs the operations when run. `do` itself provides
 neither scheduling nor resource cleanup. The effect design must explain
-how Bumpus's strict evaluation distinguishes construction from execution.
+how Waxwing's strict evaluation distinguishes construction from execution.
 
 For service-oriented effects, aim to infer the combined service
 requirements and typed failures, with real or fake services supplied at
@@ -255,7 +255,7 @@ language or general traits over rows in the first effects release.
 Internal row inference and well-formedness remain necessary. This
 deferral does not remove R001's planned record-row lacks constraints.
 
-### MileAhead's open error rows and Bumpus surface syntax
+### MileAhead's open error rows and Waxwing surface syntax
 
 Inspected 2026-10-08 at the user's request. The MileAhead reference is
 `../trailmapper` (`../mileahead` is absent). Its AGENTS.md section
@@ -279,11 +279,11 @@ Preserve these properties as a design brief:
   need closed comparison/rendering. Partial handling should preserve and
   forward the unhandled remainder.
 
-Candidate Bumpus syntax avoids exposing PureScript's `Variant` carrier,
+Candidate Waxwing syntax avoids exposing PureScript's `Variant` carrier,
 `inj`, proxies and `on`/`case_` plumbing. An error-type expression could
 denote a tagged open sum directly:
 
-```bumpus
+```waxwing
 fn validateName(text: Text): Result(ValidationError + ...errors, Name);
 fn saveWidget(widget: Widget): Result(DbError + ...errors, Widget);
 fn createWidget(text: Text):
@@ -343,7 +343,7 @@ Routes considered:
   support; LLVM can also target WASM, but supplies no garbage collector.
 - Direct WASM: choose linear-memory or WasmGC representation, host imports,
   exports and runtime support.
-- Bumpus VM: useful for a concrete embedding need, but requires its own
+- Waxwing VM: useful for a concrete embedding need, but requires its own
   execution, memory, interface and resource-control design.
 
 Assistant recommendation, not a user-selected target: JavaScript alongside

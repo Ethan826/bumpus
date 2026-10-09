@@ -73,7 +73,7 @@ adding a bypass allowlist.
   hand-kept) in one parallel `node --test` run, except the
   `test/*.serial.test.mjs` files, which it runs afterwards in a second
   run with `--test-concurrency=1` (scale tests that time `go build` or
-  long Bumpus phases against fixed bounds, so the parallel runner's own
+  long Waxwing phases against fixed bounds, so the parallel runner's own
   load cannot fail them; user decision 2026-10-09, FN001 Task 8). A new
   test that builds large Go programs against a time bound takes the
   `.serial.test.mjs` suffix (review convention; the split by suffix is
@@ -86,7 +86,7 @@ adding a bypass allowlist.
   (Format.Go.Compare reverses the tag comparison), `first-field` (compares
   the last field first), `show-fields` (Format.Go.Show prints only the
   first field) and `state-thread` (Format.Parse.Grammar's `apply` runs the
-  second parser from the original state; examples/answer.bumpus must still
+  second parser from the original state; examples/answer.wxw must still
   compile to bootstrap/answer.go) and `capture` (Format.Go.Match drops a
   match's scrutinee from its free locals, so an enclosing lifted match
   misses a local read only there; probe builds and runs test/match-lift's
@@ -123,7 +123,7 @@ adding a bypass allowlist.
   `[name, source]` pairs (an array, so a computed name collision is refused
   at declaration rather than collapsing silently) and, on the first `run(name)`, compiles them all, writes a synthetic module
   under `.build/go-batches/<id>/` (its own go.mod with module path
-  `bumpusbatch` and the pinned toolchain's language version, one package
+  `waxwingbatch` and the pinned toolchain's language version, one package
   `c<N>` per case, a dispatcher `main` importing them), builds once with
   GOCACHE under .build and GOWORK off, and runs each case as its own process
   (the binary invoked with the case's package name). `<id>` is the test
@@ -132,14 +132,14 @@ adding a bypass allowlist.
   Before rewriting, each program must have exactly one `package main` clause
   and exactly one `func main() { fmt.Println(...) }` line (Format.Go's
   entryMain) and no `func Main`; only those two lines change. Failure
-  contract: a Bumpus rejection is recorded per case and rethrown, unchanged,
+  contract: a Waxwing rejection is recorded per case and rethrown, unchanged,
   by that case's `run` (runGo's error), while the other cases still build;
   an unexpected program shape or a Go compile failure is a batch
   infrastructure failure, thrown by every case's `run`, naming the offending
   case(s) when Go's output identifies their package. `run` keeps runGo's
   contract (stdout, exit status 0 asserted); `result` returns the raw
   process outcome. Panics keep their message and exit status; stack traces
-  differ (package path `bumpusbatch/c<N>`, `Main`). Batch directories
+  differ (package path `waxwingbatch/c<N>`, `Main`). Batch directories
   (binaries included) persist after a run and are replaced only by that
   batch's next run; `rm -rf .build/go-batches` reclaims them. Because the
   directories are fixed per test file, two concurrent test runs in one
@@ -210,7 +210,7 @@ are scope decisions, not hidden failures. No external issue/commit/push rule
 from a reference project is inherited.
 
 Generated output/output caches and lockfiles are excluded from line limits.
-Bumpus fixture files and generated Go are data; maintained source or test code
+Waxwing fixture files and generated Go are data; maintained source or test code
 cannot be moved into those trees to evade checks. The checker tests test the
 checker itself. Structural guarantees are bounded by direct imports and known
 library APIs, not a proof of arbitrary dependency purity.
@@ -219,7 +219,7 @@ library APIs, not a proof of arbitrary dependency purity.
 
 Superpowers is project-local, revision-pinned third-party guidance, preserved
 unmodified under .agents/skills with its MIT notice. It is distinct from
-maintained Bumpus source/tests/tooling; project gates still cover their existing
+maintained Waxwing source/tests/tooling; project gates still cover their existing
 roots without weakened checks. docs/planning-skills.md records instruction
 precedence and adoption. Migrated plans preserve historical evidence without
 asserting retroactive TDD/commit records. Execution uses the installed plan/task/review helpers and real commit ranges.

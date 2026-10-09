@@ -22,7 +22,7 @@ import Format.Go.Data (goType)
 type Placed = { kind ∷ Int, slot ∷ Int }
 
 nodeName ∷ Int → String
-nodeName number = "bumpusNode" <> show number
+nodeName number = "waxwingNode" <> show number
 
 -- `nodes` numbers each argument type's node (design §13 rule 2).
 entry

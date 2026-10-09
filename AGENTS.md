@@ -1,7 +1,7 @@
-# Working in Bumpus
+# Working in Waxwing
 
 Read README.md, docs/plans/bootstrap.md, docs/progress.md, and docs/findings.md
-before changing code. The language name is provisional. Finish the current
+before changing code. The language is Waxwing. Finish the current
 vertical slice before adding language features. Task tracking is local.
 
 - Own every observed failure. Fix it or add a specific local BACKLOG.md item

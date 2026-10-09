@@ -30,8 +30,8 @@ goType ∷ Ty → String
 goType = case _ of
   TInt → "int32"
   TBool → "bool"
-  TData (TypeId index) → "bumpusTy" <> show index
-  TFun (FunTypeId index) → "bumpusFun" <> show index
+  TData (TypeId index) → "waxwingTy" <> show index
+  TFun (FunTypeId index) → "waxwingFun" <> show index
   TUnit → "struct{}"
 
 -- One named Go type per interned arrow, in number order (design §13 rule
@@ -50,15 +50,15 @@ funTypeDeclarations table = joinWith "" (Array.mapWithIndex declared table)
     <> "\n\n"
 
 ctorName ∷ CtorId → String
-ctorName (CtorId index) = "bumpusCtor" <> show index
+ctorName (CtorId index) = "waxwingCtor" <> show index
 
 functionName ∷ FunctionId → String
-functionName (FunctionId index) = "bumpusFn" <> show index
+functionName (FunctionId index) = "waxwingFn" <> show index
 
 localName ∷ LocalId → String
 localName (LocalId index)
-  | index < 0 = "bumpusPipe"
-  | otherwise = "bumpusLocal" <> show index
+  | index < 0 = "waxwingPipe"
+  | otherwise = "waxwingLocal" <> show index
 
 -- A pipe's left operand, bound as the last parameter of the function the
 -- pipe is lifted to (Format.Go.Pipe). Resolve numbers locals from 0, so
@@ -75,10 +75,10 @@ boolean value = if value then "true" else "false"
 -- Raised by every helper that meets a value its declarations cannot
 -- produce: an unknown tag or a nil field (only foreign code, I001).
 malformed ∷ String
-malformed = "panic(\"bumpus: malformed value\")"
+malformed = "panic(\"waxwing: malformed value\")"
 
 typeName ∷ TypeId → String
-typeName (TypeId index) = "bumpusTy" <> show index
+typeName (TypeId index) = "waxwingTy" <> show index
 
 fieldName ∷ CtorId → Int → String
 fieldName (CtorId ctor) index = "c" <> show ctor <> "f" <> show index
@@ -87,7 +87,7 @@ fieldName (CtorId ctor) index = "c" <> show ctor <> "f" <> show index
 -- already a reference (design §7).
 fieldType ∷ Ty → String
 fieldType = case _ of
-  TData (TypeId index) → "*bumpusTy" <> show index
+  TData (TypeId index) → "*waxwingTy" <> show index
   other → goType other
 
 structDeclaration ∷ Declared → String
