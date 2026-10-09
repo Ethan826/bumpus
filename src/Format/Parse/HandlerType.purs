@@ -33,12 +33,15 @@ type Parsed =
   , close ∷ Token
   }
 
-operand ∷ Parser TypeRef → Parser TypeRef
-operand inner = build <$> token <*> optionalOn "(" (parseArguments inner)
+-- `single` reads one operand and leaves a following `with` unread, so the
+-- row after an effect label belongs to the handler, not to the label.
+operand ∷ Parser TypeRef → Parser TypeRef → Parser TypeRef
+operand inner single = build <$> token
+  <*> optionalOn "(" (parseArguments inner)
   where
   parseArguments parser = refine apply
     ( expect "(" *>
-        ( parsed <$> sepBy1 "," (argument parser)
+        ( parsed <$> sepBy1 "," (argument single)
             <*> optionalOn "with" (rowRef parser)
             <*> expect ")"
         )

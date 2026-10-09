@@ -5,7 +5,7 @@ import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe')
 import Data.Tuple (Tuple(..))
 import Data.Traversable (traverse)
 import Domain.Problem (Problem(..))
@@ -61,12 +61,13 @@ type Parameter =
 -- PureScript is strict, so the productions below receive `inner`, which
 -- reaches `typeRef` lazily.
 typeRef ∷ Parser TypeRef
-typeRef = typeOf <$> typeAndRow
+typeRef = refine withoutRow typeAndRow
   where
-  typeOf found = found.ty
+  withoutRow found = maybe' (kept found) unexpectedRow found.row
+  kept found _ = Right found.ty
 
 typeAndRow ∷ Parser { ty ∷ TypeRef, row ∷ Maybe RowRef }
-typeAndRow = combined <$> chainRight "->" (segment inner)
+typeAndRow = refine combined (chainRight "->" (segment inner))
   where
   inner = defer later
   later _ = typeRef
@@ -80,12 +81,13 @@ operand inner = dispatch
   [ on "Int" (IntRef <$> tokenSpan)
   , on "Bool" (BoolRef <$> tokenSpan)
   , on "Unit" (UnitRef <$> tokenSpan)
-  , on "Handler" (HandlerType.operand inner)
+  , on "Handler" (HandlerType.operand inner (defer single))
   , onWhen upperText (spanned appliedOf (parts <$> upperName <*> arguments))
   , onWhen lowerText (variable <$> token)
   ]
   (refine unknown token)
   where
+  single _ = operand inner
   parts identifier found = { identifier, arguments: found }
   arguments = optionalOn "(" (expect "(" *> sepBy1 "," argument <* expect ")")
   argument = dispatch
@@ -145,13 +147,31 @@ parameters found = map (startingAt found.span.start)
 startingAt ∷ Position → TypeRef → Parameter
 startingAt start ty = { start, ty, row: Nothing }
 
+-- A row follows the chain's last segment: it is the signature's row for a
+-- lone type, or the final arrow's row. Only the first segment of an arrow
+-- chain has no arrow before it, so a row there would be dropped; reject it.
 combined
   ∷ { init ∷ Array Segment, last ∷ Segment }
-  → { ty ∷ TypeRef, row ∷ Maybe RowRef }
-combined chain =
+  → Either Diagnostic { ty ∷ TypeRef, row ∷ Maybe RowRef }
+combined chain = maybe' (merged chain) unexpectedRow
+  (Array.findMap segmentRow (Array.take 1 chain.init))
+
+merged
+  ∷ { init ∷ Array Segment, last ∷ Segment }
+  → Unit
+  → Either Diagnostic { ty ∷ TypeRef, row ∷ Maybe RowRef }
+merged chain _ = Right
   { ty: folded chain
   , row: if Array.null chain.init then chain.last.row else Nothing
   }
+
+segmentRow ∷ Segment → Maybe RowRef
+segmentRow found = found.row
+
+-- A row with no meaning where it was written is an error, never dropped.
+unexpectedRow ∷ ∀ a. RowRef → Either Diagnostic a
+unexpectedRow (RowRef span _ _) = Left
+  (problemAt (Syntax "Unexpected effect row") span)
 
 appliedOf ∷ Span → Applied → TypeRef
 appliedOf span found =
