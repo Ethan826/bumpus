@@ -119,7 +119,7 @@ matchCtor
   → Either Diagnostic (Threaded Matched)
 matchCtor env scheme expected span id use = do
   reached ← expectType env scheme.state expected
-    (TData use.ctor.owner scheme.value.arguments)
+    (TData use.ctor.owner scheme.value.arguments [])
     span
   checked ← fieldsAgainst env reached
     (map (at scheme.value) use.ctor.fields)

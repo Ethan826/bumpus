@@ -9,7 +9,7 @@ import Data.Traversable (traverse)
 import Domain.Problem (DuplicateKind(..), Problem(..), UnboundKind(..))
 import Domain.Syntax as Syntax
 import Domain.Resolved as Resolved
-import Domain.Type (arrows)
+import Domain.Type.Parts (arrows)
 import Features.Resolve.Repeated (repeated)
 import Features.Resolve.Variables (uniqueTypeParameters)
 
@@ -68,8 +68,10 @@ resolveType types variables = resolved
   applied span name arguments index
     | arity index /= Array.length arguments = Left
         (Syntax.problemAt (TypeArguments name) span)
-    | otherwise = Resolved.TData (Resolved.TypeId index)
-        <$> traverse resolved arguments
+    | otherwise = rowless index <$> traverse resolved arguments
+  -- No syntax writes a row argument yet (FX001 Task 4).
+  rowless index arguments = Resolved.TData (Resolved.TypeId index) arguments
+    []
   arity index = maybe 0 parameterCount (Array.index types index)
   parameterCount info = Array.length info.parameters
   unbound kind span name _ = Left

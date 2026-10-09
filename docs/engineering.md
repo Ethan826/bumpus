@@ -92,7 +92,8 @@ adding a bypass allowlist.
   misses a local read only there; probe builds and runs test/match-lift's
   capture program), and since P001 four more, whose probes live in
   test/regression-poly.mjs (imported by test/regression.mjs): `occurs`
-  (Features.Check.Unify `bindBounded` skips the occurs check; probe
+  (`bindBounded` skips the occurs check, in Features.Check.Binding since
+  FX001 Task 3, Features.Check.Unify before; probe
   requires E_TYPE `Infinite type: _ occurs in List(_)`), `rigid` (a rigid
   variable unifies with any type; probe requires `fn f(x: a): Int = x;`
   to be E_TYPE `Expected Int, found a`), `instantiate`
@@ -180,7 +181,12 @@ and explicit edge cases with no discarded inputs. Parsing tests compare with
 independent generated trees; executable comparisons use a BigInt interpreter.
 The unifier (Features.Check.Unify, P001 Task 3) is compared with an
 independent union-find oracle (test/unify-oracle.mjs) and checked for
-soundness, acyclicity and most-generality over generated pairs.
+soundness, acyclicity and most-generality over generated pairs. Row
+unification (Features.Check.UnifyRow, FX001 Task 3) is compared with an
+independent recursive Leijen oracle (test/row-oracle.mjs) over generated
+rows with repeated keys, shared tails and rigid tails, and checked for
+soundness (scoped-label equality), symmetric acceptance and acyclicity; its
+side-condition test runs in a timeout-guarded child process.
 
 Measurement and checking tools are committed, not ad hoc (T003); neither
 runs in verify. scripts/differential.mjs compares two built compilers

@@ -4,14 +4,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { member } from '../output/Data.Set/index.js';
-import { TData, TFun, TInt, TVar, ordTypeId } from '../output/Domain.Type/index.js';
+import { ordTypeId } from '../output/Domain.Ids/index.js';
+import { closedRow } from '../output/Domain.Row/index.js';
+import { TData, TFun, TInt, TVar } from '../output/Domain.Type/index.js';
 import { containsFunction, functional } from '../output/Features.Check.Functional/index.js';
 
 const int = TInt.value;
-const fun = (parameter, result) => TFun.create(parameter)(result);
+const fun = (parameter, result) => TFun.create(parameter)(closedRow)(result);
 const variable = TVar.create(0);
 // TypeId and VarId are newtypes, so plain numbers at run time.
-const applied = (id, ...args) => TData.create(id)(args);
+const applied = (id, ...args) => TData.create(id)(args)([]);
 const ctor = (owner, fields) => ({ name: `C${owner}`, owner, fields, fieldSyntax: [], span: null });
 
 const [List, Box, A, B, Phantom, C, E, H, Plain] = [0, 1, 2, 3, 4, 5, 6, 7, 8];

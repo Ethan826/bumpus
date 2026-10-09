@@ -167,7 +167,7 @@ const spineLength = 200;
 
 test(`a written spine of ${spineLength} parameters is one level`, () => {
   let ty = parameterType(spineOf(spineLength));
-  for (let count = 0; count < spineLength; count++) ty = ty.value1;
+  for (let count = 0; count < spineLength; count++) ty = ty.value2;
   assert.equal(shape(ty), 'TInt');
   resolved(listed(nestingLimit - 1, spineOf(spineLength)));
 });

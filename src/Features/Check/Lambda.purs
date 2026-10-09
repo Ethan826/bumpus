@@ -8,7 +8,8 @@ import Domain.Checked.Internal (Open(..), rigid)
 import Domain.Checked.Internal as Checked
 import Domain.Resolved as Resolved
 import Domain.Syntax (Diagnostic, Span)
-import Domain.Type (Ty(..), arrows)
+import Domain.Type (Ty(..))
+import Domain.Type.Parts (arrows)
 import Features.Check.Context (CheckEnv, Infer, Locals, bindAll)
 import Features.Check.Match (Typed)
 import Features.Check.Scheme (State, Threaded, threadAll)

@@ -271,7 +271,7 @@ build rows directly.
   attribute provenance on both paths without changing unification.
 - Equality, ordering and `exceedsLimit` walk rows with loops.
 
-- [ ] **Step 1: Write failing tests** (unit and generated, oracle in
+- [x] **Step 1: Write failing tests** (unit and generated, oracle in
   test/row-oracle.mjs written independently): distinct keys commute,
   same keys do not; repeated keys with differing arguments match the
   first occurrence and mismatch is an error, never a skip; `Clock +
@@ -287,14 +287,14 @@ build rows directly.
   replaced by the same spliced row (shared relationship preserved);
   splicing keeps order and multiplicity; renaming via Functor and
   `substitute` agree on row-free types.
-- [ ] **Step 2: Run** `node --test test/unify-row.test.mjs`. Expected:
+- [x] **Step 2: Run** `node --test test/unify-row.test.mjs`. Expected:
   FAIL.
-- [ ] **Step 3: Implement.** Every existing `TFun` gets the closed empty
+- [x] **Step 3: Implement.** Every existing `TFun` gets the closed empty
   row and every `TData` empty row arguments, and `Specialize/Lower` erases
   rows, so all existing behavior is unchanged.
-- [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0,
+- [x] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0,
   snapshots byte-identical.
-- [ ] **Step 5: Commit** `feat: effect rows and scoped-label unification
+- [x] **Step 5: Commit** `feat: effect rows and scoped-label unification
   (FX001)`.
 
 ### Task 4: Signatures, effect declarations, operations and Console

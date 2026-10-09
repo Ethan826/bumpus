@@ -56,7 +56,7 @@ trailing (Checked.Expr expression) = case expression.node of
 
 functionOrMeta ∷ Ty Open → Boolean
 functionOrMeta = case _ of
-  TFun _ _ → true
+  TFun _ _ _ → true
   TVar (Hole _) → true
   _ → false
 

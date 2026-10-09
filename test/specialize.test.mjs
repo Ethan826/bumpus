@@ -16,10 +16,12 @@ const succeeded = (result, source) => {
   return result.value0;
 };
 
-// A checked type must be a ground TData with no arguments, and a checked call
+// A checked type must be a ground TData with no arguments (type or row),
+// and a checked call
 // or construction must record no instantiation; both are dropped, so what
 // remains must equal the monomorphic IR exactly.
-const emptyField = new Set(['TData:value1', 'Call:value1', 'Construct:value1']);
+const emptyField = new Set(['TData:value1', 'TData:value2', 'Call:value1',
+  'Construct:value1']);
 const plain = (node, checked) => {
   if (Array.isArray(node)) return node.map(item => plain(item, checked));
   if (node === null || typeof node !== 'object') return node;

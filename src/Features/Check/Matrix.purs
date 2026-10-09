@@ -55,7 +55,8 @@ complete signature ty heads =
     TInt → true
     TUnit → true
     TVar _ → true
-    TFun _ _ → true
+    TFun _ _ _ → true
+    THandler _ _ → true
     _ → false
 
 -- Resolution enforces constructor arity, so a head whose field count

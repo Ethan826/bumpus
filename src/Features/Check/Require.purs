@@ -18,7 +18,8 @@ import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..), TypeName(..))
 import Domain.Resolved (TypeInfo)
 import Domain.Syntax (Diagnostic, Span, problemAt)
-import Domain.Type (Ty(..), TypeId(..), VarId(..), spine)
+import Domain.Type (Ty(..), TypeId(..), VarId(..))
+import Domain.Type.Parts (spine)
 import Features.Check.Hint (Declared, hinted)
 import Features.Check.Scheme (State, flexible, opened, resolved, tooDeep)
 import Features.Check.Unify (Failure(..), inferredTypeLimit, unify)
@@ -48,7 +49,8 @@ require env state expected actual = either hint Right
 
 -- A failure names the whole expected and found types, resolved under the
 -- substitution before this comparison, as monomorphic checking always did;
--- the unifier's own pair is only the innermost one that differs.
+-- the unifier's own pair is only the innermost one that differs. A row
+-- failure is reported so too until rows are written (FX001 Task 4).
 expectType
   ∷ ∀ r
   . Names r
@@ -65,10 +67,16 @@ expectType env state expected actual span = do
   where
   bound subst = Right (state { subst = subst })
   failed = case _ of
-    Mismatch _ _ → reported TypeMismatch (resolved state.subst expected)
-      (resolved state.subst actual)
     Occurs meta whole → reported InfiniteType (TVar (Hole meta)) (opened whole)
     TooDeep → tooDeepAt span
+    Mismatch _ _ → mismatched unit
+    RowMissing _ _ → mismatched unit
+    RowExtra _ → mismatched unit
+    RowSharedTail _ _ → mismatched unit
+    RowMismatch _ _ → mismatched unit
+  -- A function: `where` bindings are strict, and this resolves both types.
+  mismatched _ = reported TypeMismatch (resolved state.subst expected)
+    (resolved state.subst actual)
   reported problem one other = do
     first ← typeName env span one
     second ← typeName env span other
@@ -90,12 +98,13 @@ typeName env span = case _ of
   TInt → Right IntName
   TBool → Right BoolName
   TUnit → Right UnitName
-  TData (TypeId index) arguments → maybe' missing (named arguments)
+  TData (TypeId index) arguments _ → maybe' missing (named arguments)
     (Array.index env.types index)
   TVar (Rigid (VarId index)) → maybe' unnamed (Right <<< VariableName)
     (Array.index env.variables index)
   TVar (Hole _) → Right HoleName
-  arrow@(TFun _ _) → arrowName (spine arrow)
+  arrow@(TFun _ _ _) → arrowName (spine arrow)
+  THandler _ _ → Left (problemAt (Internal "Unnamed handler type") span)
   where
   missing _ = Left (problemAt (Internal "Invalid resolved type") span)
   unnamed _ = Left (problemAt (Internal "Unnamed type variable") span)

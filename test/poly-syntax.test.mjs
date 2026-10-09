@@ -69,7 +69,7 @@ test('parameterized declarations resolve; VarId i is the i-th parameter',
     const [nil, cons, pair, proxy] = program.ctors;
     assert.deepEqual(nil.fields, []);
     assert.deepEqual(cons.fields,
-      [TVar.create(0), TData.create(0)([TVar.create(0)])]);
+      [TVar.create(0), TData.create(0)([TVar.create(0)])([])]);
     assert.deepEqual(pair.fields, [TVar.create(0), TVar.create(1)]);
     assert.deepEqual(proxy.fields, []);
     assert.equal(cons.fieldSyntax.length, 2);
@@ -88,7 +88,7 @@ test('function variables number in first occurrence, parameters then result',
       + ' fn f(x: b, y: List(a)): Pair(c, b) = f(x, y);' + main).functions;
     assert.deepEqual(f.variables, ['b', 'a', 'c']);
     assert.deepEqual(f.result,
-      TData.create(1)([TVar.create(2), TVar.create(0)]));
+      TData.create(1)([TVar.create(2), TVar.create(0)])([]));
   });
 
 test('a variable may appear only in the result', () => {

@@ -15,7 +15,7 @@ import { checkedPoly } from './phases.mjs';
 const arrowText = (program, type) => {
   const parts = [];
   let rest = type;
-  for (; rest instanceof TFun; rest = rest.value1) {
+  for (; rest instanceof TFun; rest = rest.value2) {
     const parameter = groundText(program, rest.value0);
     parts.push(rest.value0 instanceof TFun ? `(${parameter})` : parameter);
   }

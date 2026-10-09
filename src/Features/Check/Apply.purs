@@ -12,6 +12,7 @@ import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
 import Domain.Resolved as Resolved
 import Domain.Syntax (Diagnostic, Span, problemAt)
+import Domain.Row (closedRow)
 import Domain.Type (Ty(..))
 import Features.Check.Context (CheckEnv, Infer)
 import Features.Check.Require (expectType, require, typeName)
@@ -97,13 +98,14 @@ applyValue env state ty argument = do
 -- Whether `ty` may still be applied: an arrow, or a meta not yet bound.
 functionLike ∷ State → Ty Open → Boolean
 functionLike state ty = case headOf state ty of
-  TFun _ _ → true
+  TFun _ _ _ → true
   TVar (Hole _) → true
   _ → false
 
 -- An arrow opens as its parameter and result; an unbound meta is first
--- bound to an arrow of two fresh metas; anything else (Int, Bool, a
--- declared type, a rigid variable) is not a function, at `span`.
+-- bound to a pure arrow of two fresh metas (no syntax writes a row yet);
+-- anything else (Int, Bool, a declared type, a rigid variable) is not a
+-- function, at `span`.
 open
   ∷ ∀ r
   . CheckEnv r
@@ -112,7 +114,7 @@ open
   → Span
   → Either Diagnostic (Threaded Opened)
 open env state ty span = case headOf state ty of
-  TFun parameter result → Right { value: { parameter, result }, state }
+  TFun parameter _ result → Right { value: { parameter, result }, state }
   meta@(TVar (Hole _)) → bindArrow env state meta span
   other → notAFunction env state other span
 
@@ -124,7 +126,7 @@ bindArrow
   → Span
   → Either Diagnostic (Threaded Opened)
 bindArrow env state meta span = do
-  reached ← expectType env fresh meta (TFun parameter result) span
+  reached ← expectType env fresh meta (TFun parameter closedRow result) span
   pure { value: { parameter, result }, state: reached }
   where
   parameter = TVar (Hole state.next)

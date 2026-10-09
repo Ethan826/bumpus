@@ -18,7 +18,8 @@ import Domain.Syntax
   , typeRefSpan
   , typeRefSpine
   )
-import Domain.Type (Ty(..), TypeId(..), VarId, children)
+import Domain.Type (Ty(..), TypeId(..), VarId)
+import Domain.Type.Parts (children)
 import Features.Check.Components (components)
 
 -- The instantiation rule over the reference graph of type declarations
@@ -71,14 +72,14 @@ judgeField
   → TypeRef
   → Either Diagnostic Unit
 judgeField types inside ty syntax = case ty, syntax of
-  TData id arguments, NamedRef span _ references → reference span id
+  TData id arguments _, NamedRef span _ references → reference span id
     arguments
     references
-  TData _ _, _ → Left (mismatch (typeRefSpan syntax))
-  TFun _ _, FunRef span _ _ → paired span (children ty)
+  TData _ _ _, _ → Left (mismatch (typeRefSpan syntax))
+  TFun _ _ _, FunRef span _ _ → paired span (children ty)
     (spineParts (typeRefSpine syntax))
     (judgeField types inside)
-  TFun _ _, _ → Left (mismatch (typeRefSpan syntax))
+  TFun _ _ _, _ → Left (mismatch (typeRefSpan syntax))
   _, _ → Right unit
   where
   reference span id arguments references = offending span id arguments
@@ -115,7 +116,7 @@ mismatch = problemAt (Internal "Field syntax mismatch")
 -- types its parameters and result mention are referenced.
 referenced ∷ ∀ v. Ty v → Array Int
 referenced = case _ of
-  TData (TypeId index) arguments → Array.cons index
+  TData (TypeId index) arguments _ → Array.cons index
     (Array.concatMap referenced arguments)
   ty → Array.concatMap referenced (children ty)
 

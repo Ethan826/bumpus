@@ -82,7 +82,7 @@ const keysOf = source => {
   assert.ok(result instanceof Right, JSON.stringify(result));
   return result.value0;
 };
-const listOf = argument => TData.create(0)([argument]);
+const listOf = argument => TData.create(0)([argument])([]);
 const typeKey = (declaration, args) =>
   ({ declaration, function: false, arguments: args });
 const functionKey = (declaration, args) =>

@@ -8,7 +8,7 @@ import Data.Maybe (Maybe(..), isNothing, maybe, maybe')
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Domain.Problem (EntryKind(..), Problem(..))
-import Domain.Type (ground)
+import Domain.Type.Parts (ground)
 import Domain.Syntax as Syntax
 import Features.Resolve.Expression (expression)
 import Features.Resolve.Fresh (runFresh)

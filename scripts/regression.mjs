@@ -60,7 +60,7 @@ const rows = [
   },
   {
     // P001: a meta must not bind to a type that properly contains it.
-    name: 'occurs', file: 'src/Features/Check/Unify.purs',
+    name: 'occurs', file: 'src/Features/Check/Binding.purs',
     needle: 'if mentions meta resolved then',
     replacement: 'if false then',
     probe: 'occurs', message: /occurs check missing/

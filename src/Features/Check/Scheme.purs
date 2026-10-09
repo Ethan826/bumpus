@@ -16,6 +16,7 @@ module Features.Check.Scheme
   ) where
 
 import Prelude
+import Prim hiding (Row)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Foldable (foldl)
@@ -26,7 +27,9 @@ import Data.Traversable (traverse)
 import Domain.Checked.Internal (Open(..))
 import Domain.Checked.Internal as Checked
 import Domain.Syntax (Diagnostic, Span)
-import Domain.Type (Ty(..), VarId(..), children)
+import Domain.Type (Ty(..), VarId(..))
+import Domain.Row (Row(..), isPure)
+import Domain.Type.Parts (children, rowArguments, rowsOf)
 import Features.Check.Unify (Flex, Subst, exceedsLimit, resolve, walk)
 import Features.Check.Unify as Unify
 import Features.Check.Walk (foldTypes, retype)
@@ -161,7 +164,20 @@ numberHole found meta =
   if Map.member meta found.seen then found
   else { next: found.next + 1, seen: Map.insert meta found.next found.seen }
 
+-- A type's holes: its parts', then its rows' (each row's tail, then its
+-- label arguments). Type and row metas share one numbering, so a row
+-- meta stays apart from every type meta.
 foldHoles ∷ ∀ b. (b → Int → b) → b → Ty Open → b
 foldHoles step found = case _ of
   TVar (Hole meta) → step found meta
-  ty → foldl (foldHoles step) found (children ty)
+  ty → foldl foldRow (foldl (foldHoles step) found (children ty))
+    (rowsOf ty)
+  where
+  foldRow reached row@(Row _ tail)
+    | isPure row = reached
+    | otherwise = foldl (foldHoles step)
+        (maybe reached (tailHole reached) tail)
+        (rowArguments row)
+  tailHole reached = case _ of
+    Hole meta → step reached meta
+    Checked.Rigid _ → reached

@@ -55,9 +55,10 @@ candidates tables ty = case ty of
   TInt → Right []
   TBool → Right [ HBool true, HBool false ]
   TUnit → Right []
-  TData id _ → applied tables id ty
+  TData id _ _ → applied tables id ty
   TVar _ → Right []
-  TFun _ _ → Right []
+  TFun _ _ _ → Right []
+  THandler _ _ → Right []
 
 -- The declared constructors whose expanded counterparts are inhabited.
 applied ∷ Signature → TypeId → Ty Open → Lookup (Array Head)
@@ -77,7 +78,7 @@ fieldTypes tables ty = case _ of
   fieldsOf ctor = arguments >>= substituted ctor
   substituted ctor values = traverse (substitute values) ctor.fields
   arguments = case ty of
-    TData _ values → Right values
+    TData _ values _ → Right values
     _ → Left (Internal "Constructor head on a type that is not data")
 
 arity ∷ Signature → Head → Lookup Int

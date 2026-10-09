@@ -43,8 +43,9 @@ functional ctors =
 -- Whether `ty` mentions an arrow, directly or through a functional type.
 containsFunction ∷ ∀ v. Functional → Ty v → Boolean
 containsFunction found = case _ of
-  TFun _ _ → true
-  TData id arguments → Set.member id found
+  TFun _ _ _ → true
+  THandler _ _ → true
+  TData id arguments _ → Set.member id found
     || Array.any (containsFunction found) arguments
   _ → false
 

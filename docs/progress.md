@@ -2627,3 +2627,91 @@ snapshots are byte-identical (verify's snapshot tests).
   regression proofs, load 3.6-6.1; the serial 20,000-let test 535 ms of
   1,500 (log .build/fx001-task2-verify2.log; the first run, before the
   serial split, .build/fx001-task2-verify.log, also exit 0).
+
+### FX001 Task 3: effect rows and scoped-label unification (2026-10-09)
+
+Branch fx001. Behavior-preserving: no syntax writes a row yet; every
+existing `TFun` carries the closed empty row and every `TData` empty row
+arguments. No existing assertion changes; the five bootstrap snapshots are
+byte-identical (verify's snapshot tests).
+
+- What changed: new Domain.Ids (`TypeId`, moved and re-exported by
+  Domain.Type; `EffectId`) and Domain.Row (`Row t v`, `Label t`,
+  `EffectRef`, `LabelKey`, `TypeHead`, `labelKey`, `closedRow`, `openRow`,
+  `isPure`; parameterized over the argument type, so Domain.Type imports
+  it; `Row` hides Prim's). Domain.Type: `TFun (Ty v) (TyRow v) (Ty v)`,
+  `TData TypeId (Array (Ty v)) (Array (TyRow v))`, `THandler (Label (Ty
+  v)) (TyRow v)`; the Monad/Bind instance is gone, replaced by sort-aware
+  `substitute`/`substituteRow` over `Substitution v w = { types, rows }`
+  (a row tail splices its image: labels appended, its tail the new tail);
+  Functor is `substitute` with `TVar`/`openRow`. Spines are walked as
+  arrow nodes (`stagesThrough`, `foldStages`: no record per arrow);
+  `spine`, `arrows`, `ground`, `children`, `rowsOf`, `rowArguments` and
+  `typeHead` moved to the new Domain.Type.Parts (250-line limit). The
+  checker's substitution moved to Features.Check.Subst (`Subst { types,
+  rows, fresh }`: fresh row metas count down from -1, apart from the
+  checker's, which count up; `walkRow`, `resolveRow`), binding and the
+  depth bound to Features.Check.Binding (`bindType`, `extendRow`,
+  `bindTail`, `exceedsLimit` counting label arguments one level deeper),
+  both re-exported by Features.Check.Unify, whose `TFun`, `TData` and
+  `THandler` cases unify rows through the new Features.Check.UnifyRow
+  (Leijen 2005 §7, a `tailRec` loop over labels, first occurrence by key,
+  the side condition `tail(r1) ∉ dom(θ)` in both the rewrite and the
+  left-over-entry cases; `unifyRowsTraced` also returns `RowEvent`s by
+  `OccurrenceId`, Features.Check.Occurrence; Features.Check.RowSide holds
+  the operand walk). `Failure` gains `RowMissing`, `RowExtra`,
+  `RowSharedTail` and `RowMismatch` (tails alone differ: not in the brief,
+  needed for closed against rigid); Require reports each as the existing
+  whole-type E_TYPE mismatch. Specialize erases rows; `THandler` is an
+  Internal error in Lower and Require and abstract to coverage until Tasks
+  5 and 6. Scheme numbers row holes with type holes. Regression row
+  `occurs` now mutates Features.Check.Binding.
+- Tests seen failing first: test/unify-row.test.mjs and
+  test/row-substitute.test.mjs (both failed to import
+  output/Domain.Row; log .build/fx001-task3-red.log), then 14 tests pass:
+  scoped commutation and order, first occurrence (mismatch never skips),
+  Fail keys by payload identity (deferred keys match nothing until known),
+  the side condition for `Clock + ...r`/`Log + ...r` and for a left-over
+  entry, both in a child process with a 20 s timeout (the generated test
+  then refuses to run if it failed), `RowMissing`/`RowExtra`/
+  `RowMismatch`, 1,500 generated pairs (959 unify; 54 `RowSharedTail`)
+  against the independent recursive oracle test/row-oracle.mjs (same
+  acceptance, symmetric acceptance, scoped-label equality, acyclicity,
+  equal normal forms up to renaming), 1,000-label rows, arrow rows in
+  `unify` (occurs and depth through label arguments), traced events, and
+  five substitution laws. Test support only changed elsewhere: value
+  construction gains row arguments, two renderers (test/fn-shape.mjs,
+  test/fn-checked.mjs) leave out pure rows, and imports follow the moved
+  names.
+- Isolated mutants (scratchpad copy, not committed): the rewrite-case side
+  condition removed, and the left-over-entry one removed: each fails the
+  timeout test at 20 s and the generated test at once; first occurrence
+  replaced by last (`findLastIndex`): three tests fail.
+- Found and fixed on the way: a strict `where` binding resolving both
+  types on every `expectType` (the mismatch message) made the `occurs`
+  regression mutant overflow instead of reporting, and cost about 2x in
+  Require; it is a function now. A helper frame per applied level in
+  `unify` overflowed test/unify-arrow at 1,000 levels; the fold is back in
+  `unifyHeads`. `compare` on applications compares row arguments before
+  type arguments so the recursive comparison stays last.
+- Cost: fn-linear forms at 20,000 parameters through Specialize, alone,
+  5 runs each, this build (before the final `compare` change) against an
+  isolated build of e110526 (ms, medians): value 415/403, over 605/534, lambda 542/539, mismatch
+  181/161, partialFirst 423/396, partialAll 300/289, parenthesized
+  397/400, pipe 289/309. Minimum `--stack-size` for test/poly-depth's
+  1,000-deep check: 575 KB (was 559).
+- Differential: a scratch variant of scripts/differential.mjs comparing
+  resolve and check by acceptance only (their types now carry rows by
+  design) against the e110526 build: 0 differences over 2,486 harvested,
+  1,029 fuzz, 1,000 match and 1,000 mutation sources and 1,085 name
+  probes. Its harvest run (the suite under the hook) failed four timing
+  bounds (fn-linear partialFirst 1,022 ms, partialAll 702, pipe 970; the
+  serial 20,000-let test, run there in parallel, 2,130 ms).
+- Reach: unit and generated tests drive Domain.Type, Features.Check.Unify
+  and UnifyRow directly; through the pipeline only pure rows exist, which
+  every existing test exercises.
+- GREEN: `rm -rf output && npm run verify` exit 0: 640 parallel tests
+  and 13 serial (was 626 + 13; +14), zero failures/skips, twenty-two
+  regression proofs, load 2.0-5.9 (log .build/fx001-task3-verify2.log; an
+  earlier run, .build/fx001-task3-verify.log, failed only the `occurs`
+  proof above).

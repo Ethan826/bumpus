@@ -14,7 +14,7 @@ import Domain.Problem (Problem(..))
 import Domain.Resolved (CtorId(..), FunctionId(..), Ty(..), VarId)
 import Domain.Resolved as Resolved
 import Domain.Syntax (Diagnostic, Span, problemAt)
-import Domain.Type (arrows)
+import Domain.Type.Parts (arrows)
 import Features.Check.Apply (applyAll, functionLike)
 import Features.Check.Context (CheckEnv, Infer)
 import Features.Check.Require (require)
@@ -70,7 +70,7 @@ saturatedResult env = case _ of
     (Array.length declared.parameters)
     declared.result
   ctor arguments info = counted arguments (Array.length info.fields)
-    (TData info.owner [])
+    (TData info.owner [] [])
   counted arguments count result =
     if Array.length arguments == count then Just result else Nothing
 
@@ -78,7 +78,7 @@ saturatedResult env = case _ of
 -- type, whatever the instantiation.
 fixedResult ∷ Ty VarId → Boolean
 fixedResult = case _ of
-  TFun _ _ → false
+  TFun _ _ _ → false
   TVar _ → false
   _ → true
 

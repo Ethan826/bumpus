@@ -20,7 +20,8 @@ import Domain.IR.Internal as IR
 import Domain.Problem (Problem(..))
 import Domain.Resolved (FunctionId(..))
 import Domain.Syntax (Diagnostic, Span, origin, problemAt)
-import Domain.Type (Ty(..), TypeId(..), arrows)
+import Domain.Type (Ty(..), TypeId(..))
+import Domain.Type.Parts (arrows)
 import Features.Specialize.Body (fillFunction)
 import Features.Specialize.Copy (run)
 import Features.Specialize.Intern (funTypes)
@@ -102,7 +103,8 @@ values table = map snd (Map.toUnfoldable table ∷ Array (Tuple Int v))
 functionIndex ∷ FunctionId → Int
 functionIndex (FunctionId index) = index
 
--- The ground type of each output type so far, and the arrow table.
+-- The ground type of each output type so far, and the arrow table. Keys
+-- hold no rows: specialization erases them.
 type Grounds = { types ∷ Map Int (Ty Void), table ∷ Array IR.FunType }
 
 groundOf
@@ -114,8 +116,10 @@ groundOf table found work = do
   types ← found
   arguments ← traverse (groundType { types, table } work.span)
     work.arguments
-  pure
-    (Map.insert work.output (TData (TypeId work.declaration) arguments) types)
+  pure (Map.insert work.output (rowless arguments) types)
+  where
+  -- Rows are erased in specialization (FX001 design §4).
+  rowless arguments = TData (TypeId work.declaration) arguments []
 
 key ∷ Grounds → Work → Either Diagnostic Key
 key grounds work = made <$> traverse (groundType grounds work.span)

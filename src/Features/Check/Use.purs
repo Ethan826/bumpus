@@ -15,7 +15,7 @@ import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
 import Domain.Resolved (CtorId(..), FunctionId(..), Ty(..), TypeId(..))
 import Domain.Syntax (Diagnostic, Span, problemAt)
-import Domain.Type (arrows)
+import Domain.Type.Parts (arrows)
 import Features.Check.Context (CheckEnv)
 import Features.Check.Scheme (Scheme, State, Threaded, at, instantiate)
 
@@ -56,7 +56,7 @@ ctorUse env state span (CtorId index) =
   use ctor scheme =
     { value:
         { fields: map (at scheme.value) ctor.fields
-        , result: TData ctor.owner scheme.value.arguments
+        , result: TData ctor.owner scheme.value.arguments []
         , scheme: scheme.value
         }
     , state: scheme.state

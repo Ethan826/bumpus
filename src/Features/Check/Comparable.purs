@@ -8,7 +8,8 @@ import Domain.Checked.Internal (Open(..))
 import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..), TypeName)
 import Domain.Syntax (Diagnostic, Span, problemAt)
-import Domain.Type (Ty(..), children)
+import Domain.Type (Ty(..))
+import Domain.Type.Parts (children)
 import Features.Check.Functional (Functional, containsFunction)
 import Features.Check.Require (Names, typeName)
 

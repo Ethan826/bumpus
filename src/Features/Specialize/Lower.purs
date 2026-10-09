@@ -9,7 +9,8 @@ import Domain.Checked.Internal (Open(..))
 import Domain.IR.Internal as IR
 import Domain.Resolved (CtorId(..), CtorInfo)
 import Domain.Syntax (Span, TypeRef(..), typeRefSpan, typeRefSpine)
-import Domain.Type (Spine, Ty(..), TypeId(..), VarId(..), spine)
+import Domain.Type (Ty(..), TypeId(..), VarId(..))
+import Domain.Type.Parts (Spine, spine)
 import Features.Specialize.Copy (get, modify)
 import Features.Specialize.Keys
   ( Env
@@ -25,15 +26,18 @@ import Features.Specialize.Keys
 -- are numbered before it, so each key refers only to earlier output types.
 -- An arrow's parameters and final result are lowered in order, along its
 -- spine, then its suffixes interned (FN001 Task 5): no recursion per arrow.
+-- Rows are erased (FX001 design §4): no Go type depends on one. A handler
+-- type has no lowering yet (FX001 Task 6).
 lowerType ∷ Env → Array IR.Ty → Span → Ty Open → Specializing IR.Ty
 lowerType env arguments span = case _ of
   TInt → pure IR.TInt
   TBool → pure IR.TBool
   TUnit → pure IR.TUnit
-  TData id parts → traverse recur parts >>= applied env span id
+  TData id parts _ → traverse recur parts >>= applied env span id
   TVar (Rigid (VarId index)) → argument span arguments index
   TVar (Hole _) → lowerType env [] span (map absurd env.representative)
-  arrow@(TFun _ _) → lowerSpine recur (spine arrow)
+  arrow@(TFun _ _ _) → lowerSpine recur (spine arrow)
+  THandler _ _ → internal "Unlowered handler type" span unit
   where
   recur part = lowerType env arguments span part
 
@@ -83,17 +87,18 @@ fillCtor env work (CtorId output) ctor = do
 lowerField
   ∷ Env → Array IR.Ty → Ty VarId → TypeRef → Specializing IR.Ty
 lowerField env arguments ty syntax = case ty, syntax of
-  TData id parts, NamedRef span _ references →
+  TData id parts _, NamedRef span _ references →
     paired span parts references (lowerField env arguments)
       >>= applied env span id
-  TData _ _, _ → mismatch
+  TData _ _ _, _ → mismatch
   TVar (VarId index), _ → argument (typeRefSpan syntax) arguments index
   TInt, _ → pure IR.TInt
   TBool, _ → pure IR.TBool
   TUnit, _ → pure IR.TUnit
-  TFun _ _, FunRef span _ _ → lowerWritten span (spine ty)
+  TFun _ _ _, FunRef span _ _ → lowerWritten span (spine ty)
     (typeRefSpine syntax)
-  TFun _ _, _ → mismatch
+  TFun _ _ _, _ → mismatch
+  THandler _ _, _ → mismatch
   where
   mismatch = internal "Field syntax mismatch" (typeRefSpan syntax) unit
   recur = lowerField env arguments

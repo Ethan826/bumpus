@@ -119,7 +119,7 @@ test('coverage reports an invalid type id as E_INTERNAL', async () => {
   const ir = await load('Domain.Checked.Internal');
   const { TData, TInt } = await load('Domain.Resolved');
   const span = { start: position(0), end: position(1) };
-  const missingType = TData.create(5)([]);
+  const missingType = TData.create(5)([])([]);
   const expr = (ty, node) => ir.Expr.create({ ty, span, node });
   const pattern = ir.Pattern.create(
     { ty: missingType, span, shape: ir.Ctor.create(0)([]) });
@@ -143,7 +143,7 @@ test('a constructor field-count mismatch is E_INTERNAL', async () => {
   const resolved = await load('Domain.Resolved');
   const { TData, TInt } = resolved;
   const span = { start: position(0), end: position(1) };
-  const box = TData.create(0)([]);
+  const box = TData.create(0)([])([]);
   const types = [{ name: 'Box', ctors: [0], span }];
   const ctors = [{ name: 'Wrap', owner: 0, fields: [TInt.value], span }];
   const wild = ir.Pattern.create({ ty: TInt.value, span, shape: ir.Wildcard.value });

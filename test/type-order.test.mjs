@@ -6,9 +6,12 @@ import assert from 'node:assert/strict';
 import { eqInt } from '../output/Data.Eq/index.js';
 import { ordInt } from '../output/Data.Ord/index.js';
 import { Just } from '../output/Data.Maybe/index.js';
-import { TBool, TData, TFun, TInt, TVar, eqTy, ground, ordTy } from '../output/Domain.Type/index.js';
+import { closedRow } from '../output/Domain.Row/index.js';
+import { TBool, TData, TFun, TInt, TVar, eqTy, ordTy } from '../output/Domain.Type/index.js';
+import { ground } from '../output/Domain.Type.Parts/index.js';
 import * as problem from '../output/Domain.Problem/index.js';
 import { wire } from '../output/Format.Diagnostic/index.js';
+import { eqFlex } from '../output/Features.Check.Subst/index.js';
 import * as unifier from '../output/Features.Check.Unify/index.js';
 import { choose, generator } from './coverage-oracle.mjs';
 
@@ -19,8 +22,8 @@ const longSpine = 20000;
 
 // `parameters` copies of TInt, then `last`, then the result, by a loop.
 const longArrow = (parameters, last, result) => {
-  let built = TFun.create(last)(result);
-  for (let index = 0; index < parameters; index += 1) built = TFun.create(TInt.value)(built);
+  let built = TFun.create(last)(closedRow)(result);
+  for (let index = 0; index < parameters; index += 1) built = TFun.create(TInt.value)(closedRow)(built);
   return built;
 };
 
@@ -34,13 +37,13 @@ test('equality and order on 20,000-long spines need no deep recursion', () => {
   assert.equal(ordering(one, differs), 'LT');
   assert.equal(ordering(differs, one), 'GT');
   assert.equal(ordering(one, longArrow(longSpine, TInt.value, TInt.value)), 'GT');
-  assert.equal(ordering(TFun.create(TInt.value)(TInt.value), one), 'LT');
+  assert.equal(ordering(TFun.create(TInt.value)(closedRow)(TInt.value), one), 'LT');
 });
 
 test('substitution and grounding walk a 20,000-long spine by a loop', () => {
   const one = longArrow(longSpine, TInt.value, TBool.value);
   const substituted = unifier.substitute(unifier.empty)(one);
-  assert.ok(eqTy(unifier.eqFlex).eq(substituted)(one));
+  assert.ok(eqTy(eqFlex).eq(substituted)(one));
   const grounded = ground(one);
   assert.ok(grounded instanceof Just);
   assert.equal(eq(grounded.value0)(one), true);
@@ -72,7 +75,7 @@ const arrowFree = (next, depth) => {
   if (shape === 2) return TVar.create(choose(next, 2));
   const count = choose(next, 3);
   return TData.create(choose(next, 2))(Array.from({ length: count },
-    () => arrowFree(next, depth - 1)));
+    () => arrowFree(next, depth - 1)))([]);
 };
 const generatedPairs = 2000;
 const maximumDepth = 3;

@@ -103,7 +103,7 @@ roots functions = Array.fromFoldable (foldl body Set.empty functions)
   where
   body found function = foldTypes collect found function.body
   collect found _ ty = case ty of
-    TData _ _ → Set.insert ty found
+    TData _ _ _ → Set.insert ty found
     _ → found
 
 armRow ∷ Checked.Arm → Array Checked.Pattern

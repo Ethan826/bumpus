@@ -8,7 +8,8 @@ import Data.Tuple (Tuple(..))
 import Domain.Checked.Internal as Checked
 import Domain.IR.Internal as IR
 import Domain.Resolved (CtorId(..), CtorInfo, FunctionId(..), TypeInfo)
-import Domain.Type (Ty, TypeId(..), ground)
+import Domain.Type (Ty, TypeId(..))
+import Domain.Type.Parts (ground)
 import Features.Specialize.Intern (noArrows)
 import Features.Specialize.Keys (Env, State, Work)
 
