@@ -4,12 +4,10 @@ Status: Proposed design investigation (CF001); not authorized for
 implementation; pending user review. Revised 2026-10-09 after an
 adversarial review (findings and responses at the end).
 
-Requirements: the user's brief of 2026-10-09 (.superpowers/sdd/
-2026-10-09-effects-plan/cc-requirements.md, local ledger). Ground truth:
-effects spec docs/plans/2026-10-09-effects-design.md ("spec", "D"), plan
-docs/plans/2026-10-09-effects-plan.md, shipped Tasks 6-7 and Task 8
-(041cb31). The fix of Task 8's `defer` check (§5 R0) is under review and
-pending reconciliation. Everything below is proposed unless marked shipped.
+Requirements: .superpowers/sdd/2026-10-09-effects-plan/cc-requirements.md
+(user, 2026-10-09). Ground truth: spec docs/plans/2026-10-09-effects-
+design.md ("D"), its plan, Tasks 6-7 and Task 8 (041cb31) with the
+controller's `defer` ruling (§5 R0). All else is proposed.
 
 ## 1. Purpose, scope, non-goals
 
@@ -19,8 +17,8 @@ effect rows, lawful abstractions and runtime boundaries can give, so that
 programmers do not manage synchronization and the runtime stays small.
 
 Non-goals: no general scheduler, channels, async I/O, timeouts,
-supervision, mutable cells, user-declared laws, or new syntax is
-authorized. Syntax in examples is hypothetical and labeled so.
+supervision, mutable cells, user laws or new syntax; example syntax is
+hypothetical.
 
 ## 2. Shipped baseline and its contracts (Tasks 6-8)
 
@@ -48,12 +46,11 @@ one that meets a diverging cleanup is never delivered.
   one mutable Go location, at least one a write, unordered by
   happens-before. (b) *Atomicity*: an operation on a shared resource is
   observed as indivisible. (a) is a safety property; (b) is per-resource.
-- **Determinism.** The observable outcome (stdout trace, result, stderr
-  report, exit status) is independent of scheduling. *Quasi-determinism*
-  (Kuper et al. 2014): every run yields the same outcome or an error.
-- **Deadlock freedom.** No reachable state in which tasks wait cyclically
-  and none can proceed. Go detects only total deadlock, as a fatal error
-  that skips cleanup; partial deadlocks are silent.
+- **Determinism.** The observable outcome (stdout, result, report, exit
+  status) is schedule-independent; *quasi-determinism* (Kuper et al.
+  2014): the same outcome or an error.
+- **Deadlock freedom.** No reachable cyclic wait. Go detects only total
+  deadlock (a fatal error skipping cleanup); partial ones are silent.
 - **Cancellation safety.** On cancellation each cleanup runs exactly
   once, no pending cause is lost, shared resources keep their invariants,
   and cancellation completes unless a shielded cleanup diverges.
@@ -88,11 +85,9 @@ types; capability typestate is later subsumed by affine transfer plus
 states form a join-semilattice; writes take the least upper bound; reads
 are threshold reads against a threshold set of pairwise-incompatible
 elements (join is top), giving determinism, with top a deterministic
-error. The generalization to activation sets, freezing and handlers
-(Kuper et al. 2014) gives quasi-determinism (same answer or an error; the
-error arises when a write follows a freeze). CRDTs (Shapiro et al. 2011):
-sufficient conditions for convergence, semilattice state or commuting
-concurrent operations.
+error. Activation sets, freezing and handlers (Kuper et al. 2014) give
+quasi-determinism (error when a write follows a freeze). CRDTs (Shapiro
+et al. 2011): convergence from semilattice state or commuting operations.
 
 | Construct | Laws | Guarantee | Extra condition | Established by |
 |---|---|---|---|---|
@@ -103,16 +98,13 @@ concurrent operations.
 | Exact read before writers finish | semilattice + freeze | quasi-determinism | error if a write follows the freeze | trusted built-in only |
 | Retried / duplicated contributions | + idempotence | convergence | as CRDT state merge | trusted built-in only |
 
-`Int` addition wraps modulo 2^32 (docs/language.md), so `(+, 0)` is a
-commutative monoid (ESTABLISHED, modular arithmetic); floating point
-(D001) is not associative, so a parallel float sum depends on shape.
+`Int` addition wraps modulo 2^32 (docs/language.md): `(+, 0)` is a
+commutative monoid (ESTABLISHED); floats (D001) are not associative.
 
-**4.7 How laws are established.** In decreasing strength: (1) compiler
-restriction (only constructs lawful by construction); (2) proof for a
-built-in; (3) trusted built-in supported by tests; (4) user obligation
-supported by property tests (PBT001). A type-class instance declaration
-is never a proof (C001/STD001 must not treat `instance Monoid` as
-evidence). Policy: a user-asserted law may affect *which value* is
+**4.7 How laws are established.** Strongest first: compiler restriction;
+proof for a built-in; trusted built-in plus tests; user obligation plus
+property tests (PBT001). An instance declaration is never a proof
+(C001/STD001 must not treat `instance Monoid` as evidence). Policy: a user-asserted law may affect *which value* is
 computed and *which failure* is reported (a crashing combiner makes it
 shape-dependent); it must never affect type soundness, data-race freedom,
 cleanup, report integrity, or termination of the runtime's own waits.
@@ -122,21 +114,26 @@ read forever or release it nondeterministically.
 
 ## 5. Task-boundary rules (proposed)
 
-Syntax here is **hypothetical**. `par let x = e1, y = e2;` is a block
-item that evaluates `e1` and `e2` as child tasks and binds both after
-both join.
+Hypothetical syntax: block item `par let x = e1, y = e2;` runs `e1`, `e2`
+as child tasks and binds both after the join.
 
 **R0. Negative effect restrictions (general rule).** A check that an
 expression "performs no X" (`defer`: no `Fail`; `par` child: nothing but
-`Fail`) is judged on the expression's *own* row after the enclosing
-declaration's constraints are solved and deferred `Fail` keys settled,
-excluding the equation that consumes it into the current row. Its labels
-must avoid X, and its tail must be a meta that can be closed to empty;
-a tail bound to the rigid ambient row or a named `...e` is rejected,
-because an instantiation can supply X there. (Later alternative: carry a
-"lacks X" requirement to instantiation sites; needs row constraints,
-deferred in FX001.) Restricted rows are then consumed by the closed-row
-coercion of spec §2. Examples, both accepted by a labels-only check:
+`Fail`; this is the controller's ruling for `defer`, generalized) works
+as follows. The restricted expression is checked against its own row with
+a fresh meta tail. Its labels are consumed into the enclosing current row
+(with a fresh tail there); its tail is never unified with the current row.
+After the enclosing function's constraints settle (deferred `Fail` keys
+included; labels arriving then are consumed then), any remaining
+forbidden label is rejected, a tail resolved to a rigid row variable
+(ambient `...` or named `...e`) is rejected, because an instantiation can
+supply X there, and an unsolved meta tail closes to empty. Diagnostics
+(E_EFFECT): `defer must not fail, but it performs <L>`; `defer must not
+fail, but it may perform any effect of <r>`; for `par` (hypothetical
+wording) `a par child may only fail, but it performs <L>` and `… but it
+may perform any effect of <r>`. Pending user confirmation: this strictness
+versus an internal "lacks X" constraint checked at instantiation sites.
+Examples, both accepted by a labels-only check:
 
 ```
 // hypothetical: callers pass printing / failing callbacks
@@ -146,8 +143,8 @@ fn after(f: Unit -> Unit): Int = { defer f(()); 0 };
 
 Task 8 (041cb31) inspects the labels of the deferred expression's row at
 the item (Features/Check/Defer.purs), so `after` is accepted while a
-caller's `Fail` can escape cleanup. A fix is under review; this document
-is to be reconciled with it. Required rejection tests: both examples.
+caller's `Fail` can escape cleanup; the ruling above fixes it. Required
+rejection tests: both examples.
 
 **B1. Lookup inherited, unwinding local.** A child starts with the
 parent's context *for lookup* (immutable nodes published before the `go`
@@ -168,8 +165,8 @@ handle {
 } { fail(error: DbError) => empty() }
 ```
 
-Without B1, `load(2)`'s panic has no owner on its goroutine and the
-process dies without running the parent's cleanup.
+Without B1, `load(2)`'s panic has no owner on its goroutine; the
+process dies without the parent's cleanup.
 
 **B2. Clauses run on the child.** A parent-installed handler reached by a
 child runs its clause on the child's goroutine in the handler-site
@@ -179,8 +176,8 @@ in the child's row. A clause's `fail` toward a parent `handle` is B1.
 **B3. Sharing versus transfer.** Shareability is a property of *types*,
 derived transitively: immutable data and function values are Shareable;
 `Handler(L with R)` is Shareable only if L is not declared local and
-every label in R is Shareable, with R's tail closed (R0-style) or itself
-Shareable-bounded. Not Shareable: FX003 local-state handlers, captured
+every label in R is Shareable, with R's tail closed (R0-style); bounded
+tails are a later alternative needing row constraints. Not Shareable: FX003 local-state handlers, captured
 continuations, foreign handles until I001 classifies them. A label-only
 check is not enough (B2):
 
@@ -193,11 +190,10 @@ let c = counter(0);
 par let a = with c { tick() }, b = with c { tick() };  // rows Fail-only
 ```
 
-Both must be rejected: the first by the handler-type rule (its Log
-handler's clause row contains the local Counter), the second by checking
-that the children's captured free variables are Shareable. In FX001 every
-type is Shareable, so the capture check rejects nothing yet; FX003 cannot
-land without it. Transfer (affine move, returned at join) is deferred.
+Both are rejected: the first by the handler-type rule (the Log clause
+row holds local Counter), the second by a Shareable check on captured
+free variables. In FX001 every type is Shareable, so it rejects nothing
+yet; FX003 cannot land without it. Affine transfer is deferred.
 
 **B4. Child failures.** A child's outcome is a value, a typed abort (B1),
 or a defect with its cause list (its cleanup causes appended). The parent
@@ -208,48 +204,69 @@ boundary (supervision stays deferred, D9). Any program containing `par`
 emits the defect runtime (`waxwingReport`), so a forwarded Go runtime
 panic is reported in Waxwing's format, not Go's trace.
 
-**B5. Child-local constructs.** `with`, `handle`, markers and `defer`
-inside a child belong to it; its cleanup runs on its goroutine before its
-outcome is published (exactly once, spec §3).
+**B5. Child-local constructs.** `with`, `handle`, markers and `defer` in
+a child are its own; its cleanup runs on its goroutine before its
+outcome is recorded (exactly once, spec §3).
 
 ## 6. Equivalence, resources and failure selection
 
-**Equivalence (conditional).** For every run in which no goroutine,
-discarded children included, incurs a Go fatal error, `par let x1 = e1,
-…, xn = en;` has the observable outcome of `let x1 = e1; …; let xn = en;`
-evaluated left to right, over outcomes {value, typed abort, recoverable
-defect with its cause list, divergence}. The condition is not checkable
-statically; the resource clauses below bound how often it can fail where
-the sequential program would not.
+**Equivalence (conditional).** Condition: no goroutine started by the
+construct (inline and discarded children included, at any time) and no
+spawned stack it adds incurs a Go fatal error. Under it, `par let x1 =
+e1, …, xn = en;` has the observable outcome of `let x1 = e1; …; let xn =
+en;` evaluated left to right, over {value, typed abort, recoverable
+defect with its cause list, divergence}. Assumption: every divergent
+Waxwing computation makes unboundedly many calls (Waxwing has no loop
+construct), so function-entry polls reach it. The condition is not
+checkable statically; the resource clauses bound the extra exposure.
 
-**Resource clauses (part of CF001).**
+**Execution and discard (part of CF001).**
 - *Bounded live tasks.* At most B child goroutines are live program-wide
-  (B a runtime constant, e.g. a small multiple of GOMAXPROCS). When the
-  budget is exhausted a child runs inline on the forking goroutine, in
-  index order, which sequential semantics permits exactly. So `fib(n) =
-  par let a = fib(n-1), b = fib(n-2); a + b` holds at most B extra
-  goroutine stacks, not O(fib(n)).
-- *Stack depth* differs: a spawned child starts on a fresh stack, so a
-  program that overflows sequentially may complete in parallel; inline
-  children keep sequential depth. Never the reverse for running children.
-- *Discarded children stop.* Programs containing `par` run in ctx mode;
-  the child root's context node carries a task record with an atomic
-  `discarded` flag, copied into nodes installed below it, and every
-  function entry polls it (one load and branch). A discarded child unwinds
-  at its next call, running its cleanup; its outcome is ignored. Residual
-  exposure: work and allocation between discard and the next call.
+  (B a runtime constant, e.g. a small multiple of GOMAXPROCS). Over
+  budget, a child runs inline on the parent goroutine, after the spawned
+  ones are started, in index order. So `fib(n) = par let a = fib(n-1),
+  b = fib(n-2); a + b` holds at most B extra goroutine stacks.
+- *Every child has a root.* Spawned and inline children alike run under a
+  root wrapper with its own task record: it recovers the child's outcome
+  and records it, never raising it, so an inline child's abort cannot
+  pre-empt a crash of a spawned child to its left.
+- *Eager discard.* When child j's root records a non-value, it sets the
+  `discarded` flag of every sibling with index > j (safe: the selected
+  index is at most j). An inline child not yet started is skipped; a
+  running one, spawned or inline, unwinds at its next function-entry poll
+  to its root, which records "discarded". So `par let a = fail(E), b =
+  spin();` with `b` inline aborts, as sequentially.
+- *Polls.* Each poll is a nil-checked load of the task pointer plus an
+  atomic load of its flag. It does not fire while the task runs deferred
+  expressions (N3 contract below). The join does not wait for discarded
+  children; they release their budget slot when they exit.
+- *Stack and memory.* A spawned child starts on a fresh stack, so per
+  goroutine depth never exceeds the sequential depth, and a sequential
+  overflow may complete in parallel; but up to B live stacks add
+  aggregate memory, so out-of-memory can occur where the sequential run
+  does not (covered by the condition, not guaranteed against).
+- *Residual exposure.* Work and allocation of a discarded child between
+  the flag and its next call, and a discarded child's pure cleanup that
+  diverges (it keeps a goroutine until program exit).
+
+**Discard runtime contract (extension of Task 8).** Discard unwinds with
+a distinct sentinel panic (`waxwingDiscard`), which `handle` re-panics as
+any non-owned panic; `waxwingCleanup` treats it as a pending non-defect:
+it runs the remaining cleanup, records no cause for it and re-panics the
+sentinel (a defect raised by cleanup meanwhile is recorded as usual and
+ignored with the discarded outcome); a per-task cleanup depth, owned by
+the child's goroutine, masks polls while deferred expressions run, so each
+cleanup runs exactly once and to completion (O6, C4).
 
 **Failure selection (leftmost).** Let i be the least index whose child
-did not produce a value. The parent waits until children 1..i-1 produced
-values and child i finished, re-raises child i's outcome, and discards
-children right of i. If some child j < i diverges, the construct
-diverges, as sequentially.
+did not produce a value. The parent waits until children 1..i-1 recorded
+values and child i recorded its outcome, then re-raises child i's
+outcome. If some child j < i diverges, the construct diverges, as
+sequentially (eager discard never stops a child left of a failure).
 
-Why rows must be restricted: discarding equals never having run only if
-the discarded children did nothing observable. That holds when a child's
-row is Fail-only under R0 and its captures are Shareable (B3): it can
-abort, crash or diverge, nothing else. With any other label the right
-siblings' effects already happened.
+Why rows are restricted: discarding equals never having run only if the
+discarded child did nothing observable, which holds for Fail-only rows
+(R0) with Shareable captures (B3). Other labels' effects already happened.
 
 ```
 // hypothetical
@@ -259,10 +276,9 @@ handle { par let a = fail(E1), b = grow(nil); 0 } { fail(e: E1) => 1 }
                                       // b discarded and stopped at a call
 ```
 
-Effectful children (FX002) cannot be sequentially equivalent. To settle
-there: leftmost among finished children versus first-to-finish; whether
-sibling defects become secondary report lines (a report-format change);
-whether extra typed aborts are dropped or forbidden statically.
+Effectful children (FX002) cannot be sequentially equivalent; to settle
+there: leftmost-among-finished versus first-to-finish, secondary report
+lines (a format change), and dropping versus forbidding extra aborts.
 
 ## 7. Cancellation as a future block-exit reason
 
@@ -275,33 +291,27 @@ cancellation points. CF001's discard (§6) is its restricted precursor.
   function entry, operation performs, `with`/`handle` entry. Foreign
   calls (I001) are not interruptible unless adapters poll. Clauses run
   in the handler-site context (B2), so FX002 must find the task identity
-  outside the context list (e.g. a separate task parameter).
-- **C2 Not a failure.** Cancellation is not a typed failure, is not
-  caught by `handle`, unwinds to the task root and is not a report cause.
-  An already pending abort or defect is kept and the cancellation absorbed.
-  A defect raised by cleanup while a cancellation unwinds becomes the
-  task's outcome (first cause), and the parent's selection policy decides
-  whether it is reported; a cancelled child's defect is reported only if
-  that child is selected (leftmost), otherwise discarded (FX002 decision
-  whether to append it as a secondary line).
-- **C3 Exactly-once cleanup.** Each activation's deferred expressions run
-  once whatever the exit reason; a request during cleanup neither restarts
-  nor skips it.
-- **C4 Shielding.** Cleanup is shielded by default. An explicit
-  `shield { … }` for ordinary code is optional and later.
+  outside the context list (e.g. a separate task parameter). CF001 may
+  keep it in the context list only because Fail-only children never run a
+  parent-installed clause; FX002 supersedes that placement.
+- **C2 Not a failure.** Not a typed failure, not caught by `handle`, not
+  a report cause; a pending abort or defect is kept. A defect raised by
+  cleanup during cancellation becomes the task's outcome; it is reported
+  only if that task is selected (secondary lines: FX002 decision).
+- **C3 Exactly-once cleanup**, whatever the exit reason. **C4** Cleanup
+  is shielded by default; an explicit `shield { … }` is optional, later.
 - **C5 Suspending cleanup.** Cleanup that waits can deadlock on a task
   waiting for this task's scope. Proposed: cleanup may wait only on tasks
   it starts itself; static (from rows, at check time) or runtime check is
   an FX002 decision.
-- **C6 Continuation ownership (new, not OCaml precedent).** A captured
-  continuation is affine, owned by the clause activation that captured it:
-  resumed once or discarded once; discard is the "continuation discard"
-  exit and runs the captured frames' cleanup. Proposed beyond OCaml 5
-  (where resuming or discontinuing is the programmer's obligation): the
-  runtime discards an unresumed continuation when its owner exits or its
-  task is cancelled. Obligation: discard-on-exit runs each captured
-  activation's cleanup exactly once (PROPOSED PROOF). Continuations are
-  not Shareable and do not cross tasks.
+- **C6 Continuation ownership (new, not OCaml precedent).** Affine,
+  owned by the capturing clause activation: resumed once or discarded
+  once; discard is the "continuation discard" exit and runs the captured
+  frames' cleanup. Beyond OCaml 5 (where resume/discontinue is the
+  programmer's obligation), the runtime discards an unresumed
+  continuation when its owner exits or its task is cancelled; obligation:
+  each captured activation's cleanup runs exactly once (PROPOSED PROOF).
+  Not Shareable; never crosses tasks.
 - **C7 Unresolved.** Multi-shot resumption of continuations containing
   `defer` remains unresolved (spec §3), including whether cleanup runs per
   resumption.
@@ -315,7 +325,7 @@ Row erasure (Task 6) can remain. What future work needs, and where:
 | R0 restrictions (`par` Fail-only, `defer` Fail-free) | Check, after solving the declaration | none |
 | B3 Shareability | Check, from types, handler clause rows and a declaration attribute (hypothetical `local effect Counter`); `EffectInfo` may carry it for runtime assertions | none: derived from types and declarations |
 | C5 waiting in cleanup | Check, from rows | none |
-| CF001 discard polls | runtime: `par` forces ctx mode; task record on context nodes | additive field in `waxwingCtx` |
+| CF001 discard polls | runtime: `par` joins the ctx-mode triggers; task record on context nodes | additive field in `waxwingCtx`; spec §4 trigger change (§10) |
 | FX002 blocking on goroutines | none: goroutines are stackful, so blocking needs no CPS | none |
 | General resume (`ctl`): which code may capture | post-specialization analysis over the IR call graph and function-value flow, keyed by an `EffectInfo` control kind | conservative merging per `FunType`; if too imprecise, a suspension bit on IR arrow types (bounded row-aware re-specialization, already named in spec §4) |
 
@@ -327,23 +337,25 @@ incompatibility, and it is already recorded (decision 1 revision).
 **Subset.** One built-in structured fork-join item (hypothetical `par let
 x1 = e1, …, xn = en;`) whose children are Fail-only under R0 and capture
 only Shareable values (B3), with conditional sequential equivalence and
-leftmost selection (§6), bounded live tasks with inline fallback,
-discarded children stopped at function-entry polls, child roots with
-abort transfer at the join (B1, B4), and the defect runtime emitted with
-`par`. No shared mutable state, no effectful children, no user laws.
+leftmost selection (§6), bounded live tasks with inline fallback, a
+root for every child (inline included), eager discard stopped at
+function-entry polls with the discard runtime contract (§6), abort
+transfer at the join (B1, B4), and the defect runtime emitted with `par`. No shared mutable state, no effectful children, no user laws.
 
 **Core semantics sketch.** The parent blocks at `par` with outcomes
 `o1..on`, each ⊥ (running), `V v`, `A (m, p)` (abort to marker m) or
-`D cs` (defect). Child k runs `ek` (spawned, or inline if over budget)
-with the parent's context Γ for lookup and an empty unwind stack; its
-cleanup runs inside it. Join: if all `ok = V vk`, bind and continue. If
-the least i with `oi ∉ V` has `oi ≠ ⊥` and `oj = V` for all j < i, mark
-children > i discarded and re-raise `oi` (abort: panic to m on the parent
-goroutine; defect: causes `cs`, then parent cleanup causes). Otherwise
-wait.
+`D cs` (defect), or `X` (discarded). Child k runs `ek` under its own
+root (spawned, or inline after the spawns if over budget) with the
+parent's context Γ for lookup and an empty unwind stack; its cleanup runs
+inside it. When child j records `A` or `D`, every child k > j gets `X`
+(stopping at its next poll; an unstarted inline child never starts).
+Join: if all `ok = V vk`, bind and continue. If the least i with
+`oi ∉ V` has `oi ∈ {A, D}` and `oj = V` for all j < i, re-raise `oi`
+(abort: panic to m on the parent goroutine; defect: causes `cs`, then
+parent cleanup causes). Otherwise wait. `X` is never selected: only
+indices > some recorded failure receive it.
 
 **Per-guarantee contract.**
-
 | Property | Assumptions | Compiler checks | Runtime left | Excluded programs |
 |---|---|---|---|---|
 | Type/effect soundness | spec §2 rows; R0 | R0 on children; B3 captures | child root; re-raise at join | children with non-Fail labels or open rigid/named tails (row-polymorphic callbacks) |
@@ -353,7 +365,6 @@ wait.
 | Cancellation safety | n/a: only pure discard, whose cleanup is unobservable | none | discard poll | (all cancellation is FX002) |
 
 **Proof obligations.**
-
 | # | Obligation | Status |
 |---|---|---|
 | O1 | Under FX001 (no mutable cells), Fail-only children with Shareable captures share no mutable state; the generated Go for them writes only goroutine-local locals and fresh allocations | PROPOSED PROOF (over the lowering contract) + TEST-ONLY (`-race` runs of the CF001 corpus); must be re-proved when FX003 adds cells |
@@ -364,22 +375,21 @@ wait.
 | O6 | Exactly-once cleanup per child activation, including discard unwinding; child cause order as sequential | PROPOSED PROOF (spec §3 per goroutine) + TEST-ONLY |
 | O7 | Every recoverable panic on a child goroutine is recovered by its root | TEST-ONLY (injected crashes, guard panics, Go runtime panics) |
 | O8 | Publication of Γ and outcomes: `WaitGroup.Done` synchronizes before the `Wait` it unblocks | ESTABLISHED (Go `sync` documentation); the `go`-statement rule: trusted platform guarantee, not re-verified here |
-| O9 | Inline fallback over budget yields the sequential outcome for that child | PROPOSED PROOF (immediate) + TEST-ONLY (budget 0 and 1 runs equal sequential) |
-| O10 | A discarded child stops at its next function entry; live goroutines never exceed B | TEST-ONLY (probes: `fib`, `grow`, discard in a loop) |
+| O9 | Per construct, any mix of spawned and inline children yields the sequential outcome (eager discard reaches inline children; roots never raise) | PROPOSED PROOF + TEST-ONLY (budgets 0, 1, B; budget 1 with a spawned failing left child and an inline divergent right child must abort) |
+| O10 | A discarded child stops at its next function entry outside cleanup; live goroutines never exceed B | TEST-ONLY (probes: `fib`, `grow`, `par let a = slow(), b = fail(E), c = grow(nil)`, discard in a loop) |
 | O11 | Fatal-error exposure is limited to §6's residual cases | TEST-ONLY (documented limitation) |
 
 Oracle: plan Task 10's interpreter running `par` sequentially, diffed
 against runs with injected yields and budgets 0, 1 and B.
 
-Not guaranteed by CF001: anything about effectful children; cancellation
-safety beyond discard; lawful reductions (CF002 candidate: built-in `Int`
-sum, then user monoids as user obligations with PBT001, per §4.7).
+Not guaranteed: anything about effectful children; cancellation beyond
+discard; lawful reductions (CF002 candidate: built-in `Int` sum first).
 
 ## 10. Handoff
 
 **Settle before concurrency (FX002), mutable state (FX003), resumable
 handlers (spec "FX004"):**
-1. R0, for `defer` (now; Task 8 fix pending reconciliation) and `par`.
+1. R0, for `defer` (ruled; strictness pending user confirmation) and `par`.
 2. B1 (lookup inherited, unwinding local, abort transfer at join).
 3. B3 as a transitive property of handler types plus the capture check:
    before FX003, which cannot land without it.
@@ -392,9 +402,8 @@ handlers (spec "FX004"):**
 8. Whether effectful parallelism promises more than race freedom
    (recommend: no determinism promise; leftmost selection by default).
 
-**Can wait for runtime implementation:** the budget B; join primitive;
-Console line atomicity; chunking of large `par`; goroutine- versus
-CPS-backed one-shot resume.
+**Can wait:** the budget B; join primitive; Console line atomicity;
+chunking of large `par`; goroutine- versus CPS-backed one-shot resume.
 
 **Necessary changes to the existing design** (spec text, not code):
 1. §2 `defer` rule: adopt R0 (row tails). Example: `after` in §5.
@@ -405,16 +414,27 @@ CPS-backed one-shot resume.
 3. Direction decision 4 and resume-readiness: add B1. Example: §5's
    `handle { par let a = load(1), … }` without B1.
 4. §3 "Cleanup failures" and §1's `with pure` sentence: §11's wording.
+5. §4 "Uniform `ctx`" (D:485-491): `par` joins the trigger list, and in
+   that mode every function entry polls the task flag. Example: the pure
+   `fib` above, effect-free today and emitted without `ctx`, would take
+   `ctx *waxwingCtx` in every function and pay a nil-checked pointer load
+   plus an atomic load per call (to be measured, as plan Task 1 did for
+   lookup). Programs without `par` are unchanged, so plan test 13 and the
+   byte-identical snapshots still hold. Rejected alternative: polls only at
+   `par`, join and operation boundaries cannot stop a pure divergent child.
+6. Task 8 runtime contract: the discard sentinel, its non-defect
+   treatment in `waxwingCleanup`, and poll masking during cleanup (§6).
 No change is needed to row erasure, markers, the `defer`-must-not-fail
 decision, or (for CF001) the report format; FX002 may change the format
-if sibling defects become secondary lines. The context list gains one
-additive field only if CF001 is built.
+if sibling defects become secondary lines.
 
 **Compatibility of Tasks 6-8.** Task 6: compatible (§8). Task 7:
 compatible; immutable nodes make inherited lookup race-free; the child
-root and re-raise are additive. Task 8: compatible at runtime (per-
-activation cleanup state is goroutine-safe; `main`'s report needs the
-child root to forward defects); its `defer` check needs R0. None of
+root, re-raise and the task field on context nodes are additive, but the
+ctx-mode trigger and function-entry polls change §4 (change 5). Task 8:
+compatible at runtime after change 6 (per-activation cleanup state is
+goroutine-safe; `main`'s report needs the child root to forward defects);
+its `defer` check needs R0, as ruled. None of
 Tasks 6-8 needs to be undone.
 
 ## 11. Documentation audit (corrections for the controller to apply)
@@ -422,38 +442,32 @@ Tasks 6-8 needs to be undone.
 Seven over-promises (file:line, quoted, then proposed wording), plus one
 ID inconsistency. D = docs/plans/2026-10-09-effects-design.md.
 
-1. D:46-47 "cancellation are a follow-up milestone on the same evidence
-   model." → "… a follow-up milestone (FX002) building on the evidence
-   model, subject to task-boundary rules under review (CF001)."
+1. D:46-47 "… on the same evidence model." → "… building on the
+   evidence model, subject to task-boundary rules under review (CF001)."
 2. D:49-51 "specified to remain sound under future captured
    continuations." → "intended to remain sound under future one-shot
-   continuations (section 3, Block exits); multi-shot continuations
-   containing `defer` are unresolved."
-3. D:75-77 "Defects are uncatchable; cleanup still runs. … running
-   deferred cleanup on the way." → "Recoverable defects are uncatchable;
-   cleanup still runs. … on the way; Go fatal errors (stack exhaustion,
-   out of memory) skip cleanup (section 3)."
+   continuations; multi-shot continuations containing `defer` are
+   unresolved (section 3)."
+3. D:75-77 "Defects are uncatchable; cleanup still runs." → "Recoverable
+   defects are uncatchable; cleanup still runs …; Go fatal errors (stack
+   exhaustion, out of memory) skip cleanup (section 3)."
 4. D:125 "Omission is not a promise of purity; `with pure` is." →
-   "Omission is not a promise of an empty effect row; `with pure` is. It
-   promises neither termination nor freedom from `crash` (section 3)."
-5. D:341-343 "exits for exactly one of four reasons: … run exactly once
-   per exiting activation." → "exits for exactly one reason: normal
-   completion, typed abort or recoverable defect in FX001; continuation
-   discard and cancellation are future reasons. … exactly once per exiting
-   activation; a Go fatal error is not an exit and runs none."
-6. D:349-358 "a typed failure pending while the block unwinds always
-   reaches its own `handle`, and no typed error is ever lost or converted
-   … the program is already failing uncatchably, so nothing recoverable
-   is lost" → "a typed failure pending while blocks unwind reaches its own
+   "… not a promise of an empty effect row; `with pure` is. It promises
+   neither termination nor freedom from `crash` (section 3)."
+5. D:341-343 "exits for exactly one of four reasons" → "exits for exactly
+   one reason: normal completion, typed abort or recoverable defect in
+   FX001; continuation discard and cancellation are future reasons. …;
+   a Go fatal error is not an exit and runs no cleanup."
+6. D:349-358 "always reaches its own `handle`, and no typed error is ever
+   lost or converted … so nothing recoverable is lost" → "reaches its own
    `handle` if every deferred expression run on the way completes
    normally; no typed cleanup failure can replace, drop or convert it. …
    If cleanup raises a recoverable defect, the pending abort stops being
-   recoverable and becomes the first cause of the report; if cleanup
-   diverges, it is never delivered."
-7. docs/progress.md:3034-3035 "Only defects can fail cleanup, so a
-   pending typed abort always reaches its `handle`." → "… reaches its
-   `handle` unless a cleanup on the way raises a defect (the abort then
-   heads the defect report) or diverges."
+   recoverable and heads the report; if cleanup diverges, it is never
+   delivered."
+7. docs/progress.md:3034-3035 "a pending typed abort always reaches its
+   `handle`" → "… reaches its `handle` unless a cleanup on the way raises
+   a defect (the abort then heads the report) or diverges."
 
 Items 3-4 must also reach plan Task 12's language section. Checked and
 accurate: effects-plan.md:526-530 and :657-658; docs/findings.md:371-375;
@@ -487,16 +501,18 @@ fetched). Re-read theorem wording in full text before writing any proof.
 
 ## Review response (2026-10-09)
 
-Review: .superpowers/sdd/2026-10-09-effects-plan/review-cf001-result.md.
-C1: conditional equivalence; bounded tasks, inline fallback and discard
-polls are in the subset (§6, §9, O9-O11). I1: rule R0 for `par` and
-`defer`; Task 8 fix pending. I2: O1 FX001-relative; capture check in
-CF001, prerequisite of FX003. I3: transitive handler-type Shareability
-(B3). I4: O3 PROPOSED PROOF; O8 split. I5: OCaml claim corrected; C6 new
-with its own obligation. I6: "Established by" column; policy covers
-failure choice and termination; blocking lattices built-in only. I7: 4.5b
-(Atkey) and §9 per-guarantee table. I8: handoff 4. Minor M1-M10 applied
-(O5 wording; sufficient conditions and threshold sets; 041cb31; defect
-runtime with `par`; audit items 1 and 6 and Task 12 note; C5 check-time;
-report-format qualification; C2 cases; §4.6 atomicity and totality;
-`Record`). Declined: none.
+Round 1 (review-cf001-result.md). C1: conditional equivalence; bounded
+tasks, inline fallback and discard in the subset. I1: R0. I2: O1
+FX001-relative; capture check. I3: transitive handler Shareability. I4:
+O3 PROPOSED PROOF; O8 split. I5: OCaml corrected; C6 new. I6: "Established
+by" column; policy scope; blocking lattices built-in only. I7: 4.5b and
+§9 table. I8: handoff 4. M1-M10 applied. Declined: none.
+
+Round 2 (rereview-cf001-result.md). N1: a root for every child (inline
+included) that records, never raises; eager discard right of a recorded
+failure; exact condition and no-loop assumption (§6); `X` in the sketch;
+O9/O10 tests. N2: change 5 (`par` as ctx trigger, polls, example, cost)
+and the Task 7 note; C1 explains CF001's task-identity placement. N3:
+discard runtime contract (§6, change 6). R0 matches the `defer` ruling,
+with diagnostics; only strictness versus a lacks-constraint awaits the
+user. M-a to M-d applied. Declined: none.
