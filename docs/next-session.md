@@ -1,7 +1,9 @@
-# Waxwing / FX001 Task 8 next (cloud session 2026-10-09)
+# Waxwing / FX001 Task 9 next (cloud session 2026-10-09)
 
-Branch claude/vibrant-cerf-3km61i (contains fx001 through Task 6). Tasks 1-7
-complete; Task 8 (defer, crash, cleanup, defect report) is next.
+Branch claude/vibrant-cerf-3km61i (contains fx001 through Task 6). Tasks 1-8
+complete; Tasks 9-12 are being amended (re-scan after CF001), then
+executed. CF001 (concurrency design) and FX007 (relaxing strict defer)
+await the user's review.
 Execution is subagent-driven per .agents/skills/subagent-driven-development
 (linked into .claude/skills so new sessions load it): Sonnet implementers,
 Opus reviews and planning (user, 2026-10-09). Pre-flight rulings F1-F19 and

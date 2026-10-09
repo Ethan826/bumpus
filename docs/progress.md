@@ -3070,3 +3070,40 @@ BACKLOG T007 environment bounds (same set on pre-change baselines);
 regression proofs 33/33 (.build/fx001-task7-regression.log). The
 fx-block.serial 20,000-let test sits at its 1,500 ms bound on this
 container: 49717bc 1,533-1,574 ms vs Task 7 1,386-1,505 ms, alternating.
+
+### FX001 Task 8 — `defer`, `crash`, cleanup and the defect report (2026-10-09)
+
+Subagent-driven: Sonnet implementer (041cb31; fix round d5bfa8d, resumed
+after a container restart), Opus task review and scoped re-review.
+`defer e` (block item) and `crash(value: a): b` (built-in, printable
+argument, no effect, uncatchable) run through every phase. Cleanup runs
+LIFO, exactly once per exiting activation, in the registration context;
+the defect report follows spec §5 (exit status 1, first line the original
+cause, later lines `cleanup failed: `; `<not printable>` decided
+statically). Runtime pieces (Format.Go.Cleanup, Format.Go.Report) are
+emitted only when used; defer and crash do not force ctx; blocks without
+`defer` emit no Go `defer`. Conventions recorded: with no pending cause the
+first cleanup crash is the unprefixed first line; Go runtime panics print
+as `panic: <text>`.
+
+The user's rule that `defer` must not fail is enforced soundly after
+review: the first implementation checked only labels, so five programs
+(callback parameters with ambient or named rows, unsettled closures,
+lambdas decided later) let a typed failure escape cleanup and become a
+fatal report. Ruling (controller, pending user confirmation of strict over
+a lacks-Fail constraint): the deferred expression has its own row; after
+the function's constraints settle, a remaining Fail label or a tail
+resolved to a rigid row variable is E_EFFECT (`defer must not fail, but it
+performs <L>` / `... but it may perform any effect of <r>`). Accepted
+limitations (spec §2, BACKLOG FX007): the bracket idiom needs `with pure`
+callbacks; a local lambda also called outside the `defer` in a non-main
+function is rejected in it. Report.payloadName now walks arrow spines by a
+loop (a 5,000-arrow payload crashed the compiler).
+
+Evidence: fx-cleanup 32/32 (RED 24/26 before, then 7 new failing tests
+for the fix round; seven isolated mutants caught). `npm run verify`
+(.build/fx001-task8-verify.log): build, gates, 818/818 parallel tests;
+serial 12/22, the 10 failures are BACKLOG T007 timing bounds; regression
+proofs 33/33 (.build/fx001-task8-regression.log). Re-review probes:
+legitimate defers (`defer log(1)`, `defer print(x)`, monomorphic helpers)
+accepted; the check is linear (1k-8k defers).

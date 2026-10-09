@@ -280,7 +280,19 @@ lambda-bound parameters, Leijen 2014 §3.2).
   (deferred keys included). Cleanup that can fail handles its failure
   inside the deferred expression, e.g. `defer handle release(r)
   { fail(e: ReleaseError) => () }`. Other effects (Log, State, …) are
-  allowed and come from the current row.
+  allowed and come from the current row. Precisely (Task 8 review
+  ruling, 2026-10-09): the deferred expression has its own row; its labels
+  are consumed into the current row but its tail is never unified with
+  it; after the function's constraints settle, a remaining `Fail` label
+  is rejected, and so is a tail resolved to a rigid row variable, which a
+  caller could fill with `Fail`: E_EFFECT `defer must not fail, but it may
+  perform any effect of <r>` (`...` ambient, `...e` named). Consequences,
+  accepted for now and lifted only by a future internal lacks-`Fail`
+  constraint (BACKLOG FX007): cleanup through an effect-polymorphic
+  callback (the bracket idiom) is rejected, so a deferred callback
+  parameter must be `with pure`; a local lambda also called outside the
+  `defer` in a non-`main` function shares that function's ambient row and
+  is rejected in the `defer`.
 - `let x = e` is monomorphic in FX001; let-generalization would need its
   own effects-aware soundness treatment.
 
