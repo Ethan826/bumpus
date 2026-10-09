@@ -17,7 +17,13 @@ tests (`test/*.serial.test.mjs`), twenty-two regression proofs
 tier, not in verify), scripts/ladder-profile.mjs, scripts/stage-probe.mjs,
 `node scripts/regression.mjs name…`.
 
-Next steps: none authorized. Candidates, for the user to choose: C001
+Update 2026-10-09: the user chose FX001. Its written spec,
+docs/plans/2026-10-09-effects-design.md, was settled section by section
+with the user and awaits their review of the whole document (including
+its "Awaiting confirmation" list). Next: apply review changes, then
+writing-plans. No implementation is authorized.
+
+Earlier next steps (before FX001 was chosen): none authorized. Candidates, for the user to choose: C001
 and R001 (review jointly; decide whether instances are ordinary records),
 FX001, FN001 follow-ups FN002-FN006, and the open timing/scale items
 T002-T005, G002, G003.
