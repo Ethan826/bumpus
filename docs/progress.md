@@ -3036,3 +3036,35 @@ so a pending typed abort always reaches its `handle`. Spec §2 (`defer`
 rule), §3 ("Cleanup failures", with rejected alternatives), §5 (report
 example, probes 6 and 11), plan Global Constraints and Tasks 8, 10 and 12,
 findings and the handoff were updated. Docs only; no code changed.
+
+### FX001 Task 7 — Go lowering of handlers, operations and failures (2026-10-09)
+
+Subagent-driven: Sonnet implementer (e9a613f, fix round 4b80bd1), Opus task
+review and scoped re-review. Effect programs now build and run. ctx mode is
+chosen over the emitted IR (any effect layout or effect node); in it every
+function, stage, lambda, constructor, lifted helper and function type takes
+`ctx *waxwingCtx` first; otherwise Go output is unchanged (bootstrap
+snapshots byte-identical, Console-only programs without ctx). Runtime (Task
+1's adopted shapes, emitted only when used): immutable context list,
+non-zero-sized markers, targeted aborts recovered only by their own lifted
+`handle` helper. Keys: user effect EffectId+1, Fail families by declared
+head (negative keys); missing handler is `panic("no handler for L")`.
+Handler structs per layout (empty for Console/Fail layouts), perform
+functions call clauses with the frame's outer context (intercept-and-
+forward), clauses lifted like lambdas. Features.Specialize.Unlowered is
+deleted; every 'unlowered effect' assertion was replaced by an executable
+assertion (test/fx-run.test.mjs, 24 programs with exact stdout).
+Two checker defects found and fixed: constructor patterns dropped row
+arguments (Check.Match/Tables), and consumption did not resolve a bound row
+tail (Check.Consume); Check-level tests in test/fx-check-fixes.test.mjs,
+each failing with its fix reverted. Review found one Critical: the clauses
+of one `handle` were installed in reverse (runtime panic for Error(Int) vs
+Error(Bool) clauses); fixed with probes. Regression rows: block-order needle
+updated; handler-metadata replaced by effect-free-ctx.
+
+Evidence: `rm -rf output && npm run verify` (.build/fx001-task7-verify.log):
+build, gates, 786/786 parallel tests; serial 12/22, the 10 failures are the
+BACKLOG T007 environment bounds (same set on pre-change baselines);
+regression proofs 33/33 (.build/fx001-task7-regression.log). The
+fx-block.serial 20,000-let test sits at its 1,500 ms bound on this
+container: 49717bc 1,533-1,574 ms vs Task 7 1,386-1,505 ms, alternating.

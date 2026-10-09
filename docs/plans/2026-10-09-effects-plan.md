@@ -7,9 +7,9 @@ corrections). Execution: subagent-driven (fresh implementer and reviewer
 per task, then a whole-branch review), on branch fx001 in
 .worktrees/fx001, chosen by the user 2026-10-09. Stop and report if
 Task 1's measurements reject a runtime shape. Tasks 1-5 are complete
-(Waxwing rename 40cf312). Task 6 is complete and reviewed on branch
+(Waxwing rename 40cf312). Tasks 6-7 are complete and reviewed on branch
 claude/vibrant-cerf-3km61i (cloud session, 2026-10-09; no worktree);
-Task 7 is next. Current evidence is in docs/progress.md and the local SDD
+Task 8 is next. Current evidence is in docs/progress.md and the local SDD
 ledger (.superpowers/sdd/, git-ignored).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

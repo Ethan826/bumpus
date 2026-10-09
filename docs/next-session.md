@@ -1,7 +1,7 @@
-# Waxwing / FX001 Task 7 next (cloud session 2026-10-09)
+# Waxwing / FX001 Task 8 next (cloud session 2026-10-09)
 
-Branch claude/vibrant-cerf-3km61i (contains fx001 through Task 6). Tasks 1-6
-complete; Task 7 (Go lowering of handlers, operations, failures) is next.
+Branch claude/vibrant-cerf-3km61i (contains fx001 through Task 6). Tasks 1-7
+complete; Task 8 (defer, crash, cleanup, defect report) is next.
 Execution is subagent-driven per .agents/skills/subagent-driven-development
 (linked into .claude/skills so new sessions load it): Sonnet implementers,
 Opus reviews and planning (user, 2026-10-09). Pre-flight rulings F1-F19 and
