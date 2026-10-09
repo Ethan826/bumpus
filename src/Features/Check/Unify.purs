@@ -2,10 +2,11 @@ module Features.Check.Unify
   ( module Features.Check.Subst
   , module Features.Check.Binding
   , unify
+  , settleRows
   ) where
 
 import Prelude hiding (compose)
-import Control.Monad.Rec.Class (Step(..), tailRec)
+import Control.Monad.Rec.Class (Step(..), tailRec, tailRecM)
 import Data.Array as Array
 import Data.Either (Either(..), either)
 import Data.Foldable (foldM)
@@ -27,7 +28,7 @@ import Features.Check.Subst
   , walk
   , walkRow
   )
-import Features.Check.UnifyRow (unifyRows)
+import Features.Check.UnifyRow (unifyRows, unifyRowsTraced, untraced)
 
 -- Rigid matches only the same rigid; a meta binds to any type that does not
 -- properly contain it; applied types unify argument-wise, left to right,
@@ -41,6 +42,25 @@ import Features.Check.UnifyRow (unifyRows)
 -- Rows unify by scoped labels (Features.Check.UnifyRow, FX001).
 unify ∷ Subst → Ty Flex → Ty Flex → Either Failure Subst
 unify = unifyAt 1
+
+-- Retries the postponed row pairs, in order, until a pass decides none
+-- (a pair is decided when it unifies or fails; the first failure is the
+-- result). Pairs still undecidable stay in `postponed`: FX001 Task 5
+-- reports them (`Fail needs a concrete error family`).
+settleRows ∷ Subst → Either Failure Subst
+settleRows = tailRecM pass
+  where
+  pass subst@(Subst bindings) = next subst <$> foldM retry
+    { subst: Subst bindings { postponed = [] }, decided: false }
+    bindings.postponed
+  next original found =
+    if found.decided then Loop found.subst else Done original
+  retry reached pair = settled reached <$> unifyRowsTraced unify untraced
+    reached.subst
+    pair.left
+    pair.right
+  settled reached traced =
+    { subst: traced.subst, decided: reached.decided || not traced.postponed }
 
 unifyAt ∷ Int → Subst → Ty Flex → Ty Flex → Either Failure Subst
 unifyAt level subst left right =

@@ -112,7 +112,8 @@ extendBounded
   → Int
   → Either Failure { subst ∷ Subst, fresh ∷ Int }
 extendBounded (Subst bindings) meta label resolved fresh =
-  maybe' extended (Left <<< Occurs meta) (Array.find (holdsRow meta) resolved)
+  maybe' extended (Left <<< RowOccurs meta)
+    (Array.find (holdsRow meta) resolved)
   where
   extended _ = Right
     { subst: Subst
@@ -120,6 +121,7 @@ extendBounded (Subst bindings) meta label resolved fresh =
         , rows: Map.insert meta (Row [ label ] (Just (Meta fresh)))
             bindings.rows
         , fresh: fresh - 1
+        , postponed: bindings.postponed
         }
     , fresh
     }

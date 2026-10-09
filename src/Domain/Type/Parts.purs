@@ -4,6 +4,7 @@ module Domain.Type.Parts
   , spineThrough
   , arrows
   , ground
+  , groundErased
   , children
   , rowsOf
   , rowArguments
@@ -46,15 +47,16 @@ arrows parameters result = Array.foldr pureArrow result parameters
 -- The same type with no variable in it, if it has none: no type variable
 -- and no row tail.
 ground ∷ ∀ v. Ty v → Maybe (Ty Void)
-ground = case _ of
-  TInt → Just TInt
-  TBool → Just TBool
-  TUnit → Just TUnit
-  TData id arguments rows → TData id <$> traverse ground arguments
-    <*> traverse groundRow rows
-  TVar _ → Nothing
-  THandler label row → THandler <$> groundLabel label <*> groundRow row
-  arrow@(TFun _ _ _) → groundStages (stagesThrough identity arrow)
+ground ty = groundWith groundRow ty
+
+-- The same with every row erased to the closed row: ground when no type
+-- variable remains, whatever the rows. Specialization erases rows (design
+-- §4), so a function polymorphic only in its effects is monomorphic
+-- there, and `main` may have an open row.
+groundErased ∷ ∀ v. Ty v → Maybe (Ty Void)
+groundErased = groundWith erased
+  where
+  erased _ = Just closedRow
 
 -- The types a structural pass enters: an application's type arguments, a
 -- handler's label arguments, or an arrow's parameters followed by its
@@ -100,11 +102,36 @@ typeHead = case _ of
   TData id _ _ → Just (HeadData id)
   _ → Nothing
 
--- Right to left: each arrow rebuilt once its result is ground.
-groundStages ∷ ∀ v. Stages v → Maybe (Ty Void)
-groundStages found = foldStages stage (ground found.result) found.arrows
+groundWith
+  ∷ ∀ v. (TyRow v → Maybe (TyRow Void)) → Ty v → Maybe (Ty Void)
+groundWith rowGround = case _ of
+  TInt → Just TInt
+  TBool → Just TBool
+  TUnit → Just TUnit
+  TData id arguments rows → TData id <$> traverse recur arguments
+    <*> traverse rowGround rows
+  TVar _ → Nothing
+  THandler (Label effect arguments) row → THandler
+    <$> (Label effect <$> traverse recur arguments)
+    <*> rowGround row
+  arrow@(TFun _ _ _) → groundStages recur rowGround
+    (stagesThrough identity arrow)
   where
-  stage parameter row rest = TFun <$> ground parameter <*> groundRow row
+  recur ty = groundWith rowGround ty
+
+-- Right to left: each arrow rebuilt once its result is ground.
+groundStages
+  ∷ ∀ v
+  . (Ty v → Maybe (Ty Void))
+  → (TyRow v → Maybe (TyRow Void))
+  → Stages v
+  → Maybe (Ty Void)
+groundStages typeGround rowGround found = foldStages stage
+  (typeGround found.result)
+  found.arrows
+  where
+  stage parameter row rest = TFun <$> typeGround parameter
+    <*> rowGround row
     <*> rest
 
 -- A row is ground when closed and its labels' arguments are ground.

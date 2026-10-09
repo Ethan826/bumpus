@@ -77,7 +77,17 @@ adding a bypass allowlist.
   load cannot fail them; user decision 2026-10-09, FN001 Task 8). A new
   test that builds large Go programs against a time bound takes the
   `.serial.test.mjs` suffix (review convention; the split by suffix is
-  automated in scripts/verify.mjs). Then verify runs
+  automated in scripts/verify.mjs). FN006's 20,000-parameter timing suite
+  is now test/fn-linear-timing.serial.test.mjs, separate from the existing
+  fn-linear.serial.test.mjs; every workload, assertion and bound is
+  unchanged. Repeated parallel-contention failures motivated this runner
+  prerequisite (FX001 Task 3 continuation, user-authorized 2026-10-09).
+  T003's deep/wide match ladder timing block is similarly extracted to
+  test/match-lift-timing.serial.test.mjs; semantic match-lift tests stay
+  parallel. Its source, constants, assertion and 1500 ms bound are identical
+  (controller ruling after a 1670.670250 ms parallel failure). These moves
+  apply the existing fixed-bound scheduling policy, not looser checks.
+  Then verify runs
   scripts/regression.mjs, a table of isolated-copy mutations, each of which
   must pass on the healthy build and fail on its mutant: `branch`
   (Features.Check.Infer branch type), `nil-guard` (Format.Go.Match drops the `!= nil`
@@ -186,7 +196,15 @@ unification (Features.Check.UnifyRow, FX001 Task 3) is compared with an
 independent recursive Leijen oracle (test/row-oracle.mjs) over generated
 rows with repeated keys, shared tails and rigid tails, and checked for
 soundness (scoped-label equality), symmetric acceptance and acyclicity; its
-side-condition test runs in a timeout-guarded child process.
+side-condition test runs in a timeout-guarded child process. These solved
+properties remain in test/unify-row.test.mjs. The separate deferred-row
+properties (test/row-properties.test.mjs) distinguish pending acceptance
+from solved equality: an independent transactional oracle models rollback,
+postponement and settling, with deferred keys, same-family payloads, arrow
+label arguments and nonempty starting substitutions. Pending constraints
+are retried after the body's ordinary constraints; they are not equality
+witnesses. groundErased is used only at Resolve/Seeds monomorphism
+boundaries; strict ground still checks both type variables and row tails.
 
 Measurement and checking tools are committed, not ad hoc (T003); neither
 runs in verify. scripts/differential.mjs compares two built compilers

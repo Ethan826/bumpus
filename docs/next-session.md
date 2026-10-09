@@ -1,25 +1,29 @@
-# Waxwing rename at FX001 Task 3 checkpoint
+# Waxwing / FX001 Task 3 continuation
 
-Update 2026-10-09: the language name is settled as Waxwing, extension
-`.wxw` (ADR 009). Rename work is in `.worktrees/fx001`, based on 3481468;
-FX001 Tasks 1-3 are committed there. Eight additional worker source edits
-remain uncommitted and intact; finish their deferred-Fail-row tests and
-review fixes before Task 4 (R003 records the failing row assertion). The main checkout has not been merged or renamed.
+Update 2026-10-09: Waxwing / `.wxw` rename is committed separately as
+40cf312 on fx001 in `.worktrees/fx001`; main has not been merged or renamed.
+The user resumed FX001. Tasks 1-2 are complete; Task 3's deferred-Fail-row
+and rows-erasing monomorphism fixes resumed from the eight preserved source
+edits, now completed. Their tests/oracle distinguish postponed constraints from solved
+row equality. Clean-output verification passes (643 parallel + 22 serial
+tests, 22 regression proofs); obtain independent review before Task 4.
+Effects uses ADR 010; naming already occupies ADR 009.
+
+FN006's fixed-bound timing suite is moved to
+`test/fn-linear-timing.serial.test.mjs`, retaining every byte of its contents
+and all workloads/assertions/bounds. The existing fn-linear.serial.test.mjs
+remains. T003's unchanged deep/wide match-ladder timing block is likewise
+extracted into match-lift-timing.serial.test.mjs; its semantic tests remain
+parallel. Current continuation evidence: docs/progress.md and the local SDD
+ledger/report under .superpowers/sdd/2026-10-09-effects-plan/.
+
 Current CLI: `npm run waxwing -- run examples/answer.wxw` after building.
-Current logo: assets/branding/waxwing-logo.png; editable SVG masters and
-supplied notes are alongside it. User confirmed the visible assets are final.
-Verification evidence is in docs/progress.md: combined tree has the
-unfinished row assertion and timing failures; isolated rename-only tree has
-only the known pipe timing failure, with 13 serial tests and 22 proofs passed.
-Bounded seven-phase differential against 3481468: zero differences
-(5,462 sources + 1,085 identifier probes; generated names normalized).
-Full corpus comparison interrupted and tracked as T006.
-Main has not been merged; rename and worker edits remain uncommitted.
-Commit the rename separately from the eight worker files before completing
-the Task 3 review fix; the supplied Claude handoff and SDD ledger detail
-its missing tests/oracle work. Keep model delegation small, using Luna for
-mechanical tasks and retaining independent compiler-semantics review.
-The Bumpus logo and historical documents remain archival evidence.
+Final supplied logo: assets/branding/waxwing-logo.png, with editable SVG
+masters/notes alongside it. Rename-only comparison against 3481468 had zero
+differences over 5,462 sources and 1,085 name probes; full corpus comparison
+was interrupted (T006). Historical rename verification failures remain in
+R003/FN006/T004. No merge or push authorized. Keep model delegation small
+and retain independent compiler-semantics review.
 
 # FN001 merged into main
 

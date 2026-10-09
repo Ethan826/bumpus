@@ -405,3 +405,53 @@ was then preserved at its correct path. These are execution mistakes, not
 additional compiler defects. Isolated rename validation uses the original
 3481468 versions of the eight worker files in a copy only, leaving live
 files intact (.build/waxwing-validation-scope.json).
+
+
+## FX001 Task 3 fix continuation (2026-10-09)
+
+The inherited matching-path postponement still immediately rejected a
+left-over deferred right label in finish. New row-deferred regression ran
+first: 9/10 passed; the left-over case failed with RowExtra
+(.build/fx001-task3-fix-red.log). Guarding that path by the resolved key
+now postpones the entire pair with rollback, just like the matching path.
+Focused post-fix run passed 44/44 (.build/fx001-task3-fix-focused.log).
+The eight inherited source edits were preserved and completed; no fresh
+RED history is claimed for their already-implemented behavior. Isolated
+source mutants supply regression proof for those inherited fixes.
+
+Operational failures: an exploratory read requested nonexistent
+scripts/test.mjs (verify is scripts/verify.mjs); no check was omitted.
+After the user interruption, the former focused-run session identifier no
+longer existed; its complete 44-test TAP summary confirmed completion.
+No duplicate build/verification was started. FN006's timing suite is
+renamed to fn-linear-timing.serial.test.mjs with identical file contents,
+under the user's authorized existing serial-runner policy.
+
+The continuation's single clean-output full verify exited 1
+(.build/fx001-task3-fix-verify.log): zero build warnings/errors, tidy,
+strict-rebuild and structural gates passed; 643/644 parallel tests passed.
+The sole failure was the existing match-lift ladder timing bound:
+1670.670250 ms >1500. T003 records the exact evidence and next profiling
+step; no bound/runner change or unchanged rerun hides it. Host load observed
+afterward was 5.89/5.64/4.54, which does not establish causation. Serial
+verification and regression proofs are run explicitly as the unreached
+remainder, with separate logs and statuses.
+
+Controller ruling after this reproduced T003 failure: apply the existing
+fixed-bound scheduling policy by extracting only the deep/wide ladder
+block into match-lift-timing.serial.test.mjs with its required imports.
+All semantic match-lift tests remain parallel; the extracted block/source,
+constants, assertion and 1500 ms bound are byte-identical
+(.build/fx001-task3-fix-ladder-identity.txt). First serial continuation
+passed 21/21 (.build/fx001-task3-fix-serial.log). A second clean-output full
+verify follows the actual scheduling change, preserving the first failed
+log; it is not an unchanged retry. No further scheduling iteration is
+authorized blindly if another timing failure appears.
+
+After the authorized scheduling extraction, the changed-tree clean-output
+npm run verify exited 0: 643 parallel + 22 serial tests, no failures/skips,
+zero build warnings/errors and all 22 existing regression proofs
+(.build/fx001-task3-fix-verify-serial-scheduling.log). The ladder test took
+410.995667 ms total against its unchanged 1500 ms timed-compilation bound.
+The original failed log remains. No later-task effect syntax/runtime
+behavior is claimed; deferred origin/provenance retention remains Task 9.

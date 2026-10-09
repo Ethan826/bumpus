@@ -2848,3 +2848,62 @@ regression proofs pass; earlier failures remain recorded. The rename and
 eight preserved FX001 worker files remain uncommitted; main is unchanged.
 For the continuation, commit the rename separately from Task 3 review fixes;
 finish those fixes/tests and re-review before Task 4. No merge or push.
+
+
+## FX001 Task 3 review-fix continuation (2026-10-09)
+
+The user resumed FX001 after the rename's separate commit 40cf312.
+Preserved and completed the eight paused source files: deferred Fail keys
+postpone the whole original row equation with type/row/fresh/event rollback;
+settleRows retries after other constraints and preserves undecidable pairs;
+groundErased is used only for Seeds/Resolve monomorphism while strict
+ground remains strict. RowOccurs distinguishes a row's occurs failure.
+The left-over-right path also needed a deferred-key guard: new tests first
+failed 9/10 with RowExtra, then passed after that guard. Exact closed/open
+reflexivity, one-Fail settling, closed deferred right, never-skip-first,
+rollback, retry, arrow continuation and erased grounding cases are covered.
+
+The independent transactional oracle now models rollback, postponement and
+settling. Generators include deferred Fail arguments, same-family
+Error(Int)/Error(Bool), arrow label arguments and nonempty starting type/row
+substitutions. Original 1,500-pair solved laws (including symmetric
+acceptance and scoped equality) remain; 2,000 further pairs in both
+directions distinguish pending acceptance from solved equality and compare
+settling after ordinary constraints. Focused run: 44/44 pass, no skips
+(.build/fx001-task3-fix-focused.log). Seven isolated source mutants all
+compiled successfully then failed intended assertions; full logs/results
+in .build/fx001-task3-fix-mutants, summarized in the local Task 3 report.
+
+Verification history retained:
+
+- First clean-output npm run verify exited 1; build had zero warnings/
+  errors and gates/strict-rebuild passed, but parallel match-lift timing
+  was 1670.670250 ms >1500 (643/644 pass). Exact raw log:
+  .build/fx001-task3-fix-verify.log. T003 records evidence/next action.
+  Explicit serial continuation then passed 21/21, no skips
+  (.build/fx001-task3-fix-serial.log); no unchanged full rerun hid the failure.
+- User-authorized FN006 prerequisite moved the byte-identical
+  fn-linear.test.mjs to fn-linear-timing.serial.test.mjs; the existing
+  fn-linear.serial.test.mjs stays. Controller then authorized extracting
+  only match-lift's timing block to match-lift-timing.serial.test.mjs,
+  keeping semantic tests parallel. Both timing workloads, all constants,
+  assertions and bounds are identical (hash/block identity records in
+  .build/fx001-task3-fix-{timing,ladder}-identity.txt). This applies the
+  existing suffix-driven serial policy; no checks are skipped or weakened.
+- After that actual scheduling change, a second clean-output npm run
+  verify exited 0: 356 modules, zero source/library warnings/errors,
+  pinned formatting, strict-rebuild/structural gates, 643 parallel tests
+  plus 22 serial tests, zero failures/skips, and all 22 existing regression
+  proofs. Ladder: 410.995667 ms test duration against unchanged 1500 ms
+  timed-compilation bound. Complete raw log:
+  .build/fx001-task3-fix-verify-serial-scheduling.log.
+
+The row fix is verified through direct semantic tests/oracles; no syntax
+can create nonempty effect rows yet. Task 5 must settle after body
+constraints and diagnose remaining unknown families. Deferred equations
+currently carry no spans/provenance; Task 9 must preserve/recover origins
+when integrating traced retries. UnifyRow is 249 lines. Both are explicit
+handoff concerns, not claims of completed later tasks. Active effects ADR
+references now use 010 (009 is naming). Ready for independent review before
+Task 4; no merge or push. Local report/ledger:
+.superpowers/sdd/2026-10-09-effects-plan/{task-3-report,progress}.md.

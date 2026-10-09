@@ -8,7 +8,7 @@ import Data.Maybe (Maybe(..), isNothing, maybe, maybe')
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Domain.Problem (EntryKind(..), Problem(..))
-import Domain.Type.Parts (ground)
+import Domain.Type.Parts (groundErased)
 import Domain.Syntax as Syntax
 import Features.Resolve.Expression (expression)
 import Features.Resolve.Fresh (runFresh)
@@ -93,11 +93,13 @@ checkEntry definition = maybe (pure (Resolved.FunctionId definition.index))
     (Syntax.problemAt (EntryProblem kind) definition.function.span)
 
 -- `main` takes no parameters and returns a ground type: there is no caller
--- to choose its type arguments.
+-- to choose its type arguments. Rows are erased first: a row variable is
+-- not a type argument (FX001).
 entryProblem ∷ Definition → Maybe EntryKind
 entryProblem definition
   | not (Array.null definition.function.parameters) = Just EntryParameters
-  | isNothing (ground definition.signature.result) = Just EntryPolymorphic
+  | isNothing (groundErased definition.signature.result) =
+      Just EntryPolymorphic
   | otherwise = Nothing
 
 resolveFunction

@@ -2,11 +2,13 @@ module Features.Check.Subst
   ( Flex(..)
   , Subst(..)
   , Failure(..)
+  , RowPair
   , empty
   , isEmpty
   , substitute
   , substituteRow
   , compose
+  , postpone
   , walk
   , walkRow
   , resolve
@@ -49,9 +51,17 @@ derive instance ordFlex ∷ Ord Flex
 -- never rewrites earlier bindings; `resolve` follows the links on demand.
 -- Row unification extends a row meta with a fresh tail meta; `fresh` is
 -- the next, counting down from -1, so it never meets a checker meta,
--- which counts up from 0 (Features.Check.Scheme).
+-- which counts up from 0 (Features.Check.Scheme). `postponed`: row pairs
+-- whose unification met a Fail label with a deferred key (design §2), in
+-- order, to be retried by Features.Check.Unify `settleRows`.
 newtype Subst = Subst
-  { types ∷ Map Int (Ty Flex), rows ∷ Map Int (TyRow Flex), fresh ∷ Int }
+  { types ∷ Map Int (Ty Flex)
+  , rows ∷ Map Int (TyRow Flex)
+  , fresh ∷ Int
+  , postponed ∷ Array RowPair
+  }
+
+type RowPair = { left ∷ TyRow Flex, right ∷ TyRow Flex }
 
 -- Types and rows are resolved under the substitution reached at the
 -- failure: a mismatch names the first pair of subterms that differ, left
@@ -60,7 +70,9 @@ newtype Subst = Subst
 -- limit. Rows (FX001): `RowMissing`, a label the other row, closed or
 -- rigid, lacks; `RowExtra`, an entry left over against a closed or rigid
 -- tail; `RowSharedTail`, the two rows (Leijen's side condition);
--- `RowMismatch`, two rows that differ in their tails alone.
+-- `RowMismatch`, two rows that differ in their tails alone; `RowOccurs`,
+-- a row meta and the label argument holding it in a row (an infinite
+-- row), apart from `Occurs`, whose meta is a type's.
 data Failure
   = Mismatch (Ty Flex) (Ty Flex)
   | Occurs Int (Ty Flex)
@@ -69,9 +81,11 @@ data Failure
   | RowExtra (Label (Ty Flex))
   | RowSharedTail (TyRow Flex) (TyRow Flex)
   | RowMismatch (TyRow Flex) (TyRow Flex)
+  | RowOccurs Int (Ty Flex)
 
 empty ∷ Subst
-empty = Subst { types: Map.empty, rows: Map.empty, fresh: -1 }
+empty = Subst
+  { types: Map.empty, rows: Map.empty, fresh: -1, postponed: [] }
 
 -- No meta is bound, so resolving under it changes no type.
 isEmpty ∷ Subst → Boolean
@@ -89,6 +103,9 @@ substituteRow subst = Type.substituteRow (substitution subst)
 
 -- `substitute (compose later earlier)` is `substitute later` after
 -- `substitute earlier`; Map.union keeps the earlier side's bindings.
+-- Precondition: `later` was made from `earlier` (or neither made fresh row
+-- metas), so their fresh metas do not collide; the smaller counter is
+-- kept. Postponed pairs are the earlier's, then the later's.
 compose ∷ Subst → Subst → Subst
 compose later@(Subst laterBindings) (Subst earlierBindings) = Subst
   { types: Map.union (map (substitute later) earlierBindings.types)
@@ -96,7 +113,13 @@ compose later@(Subst laterBindings) (Subst earlierBindings) = Subst
   , rows: Map.union (map (substituteRow later) earlierBindings.rows)
       laterBindings.rows
   , fresh: min laterBindings.fresh earlierBindings.fresh
+  , postponed: earlierBindings.postponed <> laterBindings.postponed
   }
+
+-- The substitution with this row pair set aside, undecided.
+postpone ∷ Subst → RowPair → Subst
+postpone (Subst bindings) pair =
+  Subst bindings { postponed = Array.snoc bindings.postponed pair }
 
 -- The type itself if it is not a bound meta, else the end of its chain.
 -- Only a meta enters the loop: most types walked are not one, and the

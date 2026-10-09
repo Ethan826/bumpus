@@ -53,9 +53,9 @@ test('Fail labels are keyed by their payload\'s type identity', () => {
   assert.ok(key(label('fail', rigid(0))) instanceof Nothing);
   const payload = unifyRows(row([label('fail', list(int))]), row([label('fail', list(bool))]));
   assert.equal(kind(payload), 'Mismatch');
-  // A deferred key matches nothing until its payload's head is known.
-  assert.equal(kind(unifyRows(row([label('fail', meta(0))]), row([label('fail', int)]))),
-    'RowMissing');
+  // Deferred keys retain their row equality for later constraints.
+  const deferred = unifyRows(row([label('fail', meta(0))]), row([label('fail', int)]));
+  assert.equal(deferred.subst.postponed.length, 1);
   const known = unifyRows(row([label('fail', meta(0))]), row([label('fail', int)]),
     solved(unifyRows(row([state(1, meta(0))]), row([state(1, int)]))));
   assert.equal(kind(known), 'Subst');
@@ -112,7 +112,7 @@ test('generated pairs: sound, symmetric, acyclic, and as the oracle decides', ()
   assert.ok(sideConditionHolds, 'the side condition test failed');
   const seen = { succeeded: 0, failed: 0, shared: 0 };
   for (let index = 0; index < cases; index += 1) {
-    const [left, right] = index % 2 === 0 ? unifiablePair(next) : anyPair(next);
+    const [left, right] = index % 2 === 0 ? unifiablePair(next, false) : anyPair(next, false);
     const context = JSON.stringify([left, right]);
     const outcome = unifyRows(left, right);
     const expected = oracleUnifyRows(left, right);

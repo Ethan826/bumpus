@@ -650,7 +650,7 @@ native stack limits do not dominate); unwinding cost (a `fail` across N
 frames, separately from 100,000 caught failures); `go build` of the
 acceptance scenario.
 
-**Documents.** ADR 009 (effects); docs/language.md section; BACKLOG: FN002
+**Documents.** ADR 010 (effects); docs/language.md section; BACKLOG: FN002
 absorbed; new FX002 (concurrency), FX003 (local state), FX004 (general
 resume and CPS confinement), FX005 (`ctx` elimination, cached lookup);
 user Console handlers with D001; value-level error sums with R001; the

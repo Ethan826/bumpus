@@ -7,7 +7,7 @@ import * as rows from '../output/Features.Check.UnifyRow/index.js';
 import { choose } from './coverage-oracle.mjs';
 import { keyOf, normalRow } from './row-oracle.mjs';
 import {
-  bool, fromRow, int, list, meta, rigid, rowBindingsOf, bindingsOf, toRow
+  bool, fromRow, fun, int, list, meta, rigid, rowBindingsOf, bindingsOf, substOf, toRow
 } from './unify-support.mjs';
 
 export { fromRow };
@@ -28,18 +28,28 @@ export const scopedEqual = (left, right) =>
   JSON.stringify(normalRow(left)) === JSON.stringify(normalRow(right));
 
 // Every meta a binding mentions, types and rows apart.
-const typeMetas = t => t.k === 'meta' ? [t.n] : (t.args ?? []).flatMap(typeMetas);
-const rowParts = r => ({
-  types: r.labels.flatMap(l => l.args.flatMap(typeMetas)),
-  rows: r.tail !== null && r.tail.k === 'meta' ? [r.tail.n] : []
-});
+const typeParts = t => {
+  const nested = [...(t.args ?? []).map(typeParts),
+    ...(t.rows ?? []).map(rowParts), ...(t.row ? [rowParts(t.row)] : [])];
+  return { types: [...(t.k === 'meta' ? [t.n] : []), ...nested.flatMap(p => p.types)],
+    rows: nested.flatMap(p => p.rows) };
+};
+const rowParts = r => {
+  const nested = r.labels.flatMap(l => l.args.map(typeParts));
+  return { types: nested.flatMap(p => p.types),
+    rows: [...(r.tail?.k === 'meta' ? [r.tail.n] : []), ...nested.flatMap(p => p.rows)] };
+};
 
 // No meta reaches itself through bindings of either sort.
 export const acyclic = subst => {
   const [types, rowMap] = [bindingsOf(subst), rowBindingsOf(subst)];
   const edges = node => {
     const [sort, n] = node;
-    if (sort === 't') return types.has(n) ? typeMetas(types.get(n)).map(m => ['t', m]) : [];
+    if (sort === 't') {
+      if (!types.has(n)) return [];
+      const parts = typeParts(types.get(n));
+      return [...parts.types.map(m => ['t', m]), ...parts.rows.map(m => ['r', m])];
+    }
     if (!rowMap.has(n)) return [];
     const parts = rowParts(rowMap.get(n));
     return [...parts.types.map(m => ['t', m]), ...parts.rows.map(m => ['r', m])];
@@ -60,29 +70,33 @@ export const acyclic = subst => {
 };
 
 // Label arguments: small alphabets, so repeated keys and shared metas are
-// common. Effect 0 takes no argument, 1 and 2 take one; Fail's payload has
-// a concrete head (deferred keys are tested by example, not generated).
-const groundArgument = next => [int, bool, rigid(0), list(int), list(bool)][choose(next, 5)];
+// common. Error(Int)/Error(Bool) share the Error family key; arrows
+// appear as ordinary label arguments (and as indefinitely deferred Fail).
+const error = arg => ({ k: 'data', id: 2, args: [arg] });
+const groundArgument = next => [int, bool, rigid(0), list(int), list(bool),
+  error(int), error(bool), fun(int, bool)][choose(next, 8)];
 // Rigid row variables are 5 and 6, apart from the rigid type variable 0.
-const groundLabel = next => {
+const groundLabel = (next, deferred) => {
   const which = choose(next, 5);
   if (which === 0) return label(0);
   if (which === 3) return label('console');
-  if (which === 4) return label('fail', [int, bool, list(int)][choose(next, 3)]);
+  if (which === 4) return label('fail', [int, bool, list(int), list(bool),
+    error(int), error(bool), ...(deferred ? [fun(int, bool)] : [])][choose(next, deferred ? 7 : 6)]);
   return label(which, groundArgument(next));
 };
 const anyArgument = next => choose(next, 3) === 0 ? meta(choose(next, 3)) : groundArgument(next);
-const anyLabel = next => {
-  const ground = groundLabel(next);
-  return ground.e === 1 || ground.e === 2 ? label(ground.e, anyArgument(next)) : ground;
+const anyLabel = (next, deferred) => {
+  const ground = groundLabel(next, deferred);
+  return ground.e === 1 || ground.e === 2 || deferred && ground.e === 'fail'
+    ? label(ground.e, anyArgument(next)) : ground;
 };
 const anyTail = next => [null, rigid(5), rigid(6), rowMeta(10), rowMeta(11), rowMeta(12)][choose(next, 6)];
 const count = (next, most) => choose(next, most + 1);
 
 // An arbitrary pair: often failing, often sharing a tail.
-export const anyPair = next => [
-  row(Array.from({ length: count(next, 4) }, () => anyLabel(next)), anyTail(next)),
-  row(Array.from({ length: count(next, 4) }, () => anyLabel(next)), anyTail(next))
+export const anyPair = (next, deferred = true) => [
+  row(Array.from({ length: count(next, 4) }, () => anyLabel(next, deferred)), anyTail(next)),
+  row(Array.from({ length: count(next, 4) }, () => anyLabel(next, deferred)), anyTail(next))
 ];
 
 // A scoped permutation of `labels`: repeatedly take the first remaining
@@ -118,10 +132,10 @@ const keyPrefix = (next, labels) => {
 // A view of `ground` that unifies with any other view: a scoped permutation,
 // some arguments replaced by type metas (the same meta for the same ground
 // argument), and, if it drops entries, an open tail standing for them.
-const view = (next, ground, tailMeta, sigma) => {
+const view = (next, ground, tailMeta, sigma, deferred) => {
   const dropping = choose(next, 2) === 0;
   const kept = dropping ? keyPrefix(next, ground.labels) : ground.labels;
-  const abstracted = scopedShuffle(next, kept).map(l => l.e === 'fail' ? l : {
+  const abstracted = scopedShuffle(next, kept).map(l => !deferred && l.e === 'fail' ? l : {
     ...l, args: l.args.map(arg => abstractArgument(next, arg, sigma))
   });
   return row(abstracted, dropping ? rowMeta(tailMeta) : ground.tail);
@@ -137,9 +151,17 @@ const abstractArgument = (next, arg, sigma) => {
 };
 
 // A pair that must unify: two views of one ground row.
-export const unifiablePair = next => {
-  const ground = row(Array.from({ length: count(next, 5) }, () => groundLabel(next)),
+export const unifiablePair = (next, deferred = true) => {
+  const ground = row(Array.from({ length: count(next, 5) }, () => groundLabel(next, deferred)),
     [null, rigid(5)][choose(next, 2)]);
   const sigma = new Map();
-  return [view(next, ground, 10, sigma), view(next, ground, 11, sigma)];
+  return [view(next, ground, 10, sigma, deferred), view(next, ground, 11, sigma, deferred)];
+};
+
+// Acyclic, nonempty starting substitutions, including an already extended
+// row. These seeds deliberately constrain arbitrary generated pairs.
+export const startingSubst = next => {
+  const types = new Map([[0, choose(next, 2) === 0 ? int : bool]]);
+  const rows = new Map([[12, row([label('console')], rowMeta(13))]]);
+  return { subst: substOf(types, rows), seed: { types, rows } };
 };

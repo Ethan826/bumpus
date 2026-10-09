@@ -74,6 +74,7 @@ expectType env state expected actual span = do
     RowExtra _ → mismatched unit
     RowSharedTail _ _ → mismatched unit
     RowMismatch _ _ → mismatched unit
+    RowOccurs _ _ → mismatched unit
   -- A function: `where` bindings are strict, and this resolves both types.
   mismatched _ = reported TypeMismatch (resolved state.subst expected)
     (resolved state.subst actual)

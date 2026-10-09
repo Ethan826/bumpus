@@ -7,9 +7,10 @@ corrections). Execution: subagent-driven (fresh implementer and reviewer
 per task, then a whole-branch review), on branch fx001 in
 .worktrees/fx001, chosen by the user 2026-10-09. Stop and report if
 Task 1's measurements reject a runtime shape. Tasks 1-3 are committed
-at 3481468. Additional row/entry/specialization review fixes are paused
-and uncommitted; finish their tests before Task 4. The Waxwing rename
-checkpoint and verification results are recorded in docs/progress.md (R003).
+at 3481468. The Waxwing rename is committed separately at 40cf312. Task 3
+row/entry/specialization review fixes are implemented and verified on
+2026-10-09; obtain independent review before Task 4. Current evidence is in
+docs/progress.md and the local SDD ledger.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -621,7 +622,7 @@ programs at `Features.Check.Unlowered` (Global Constraints).
 ### Task 12: Regression proofs and documentation
 
 **Files:**
-- Create: `scripts/regression-fx.mjs`, `docs/adr/009-effects.md`
+- Create: `scripts/regression-fx.mjs`, `docs/adr/010-effects.md`
 - Modify: `scripts/regression.mjs`, `docs/language.md` (Effects),
   `docs/architecture.md`, `docs/engineering.md` if a rule changed,
   `BACKLOG.md`, `docs/findings.md`, `docs/progress.md`,
@@ -634,7 +635,7 @@ programs at `Features.Check.Unlowered` (Global Constraints).
   closed parameter rows opened; `ctx` emitted for effect-free programs;
   `ctx` mode by reachability; layout edges omitted; provenance dropped;
   abbreviation disabled.
-- [ ] **Step 2: Write** ADR 009 and the language section, including the
+- [ ] **Step 2: Write** ADR 010 and the language section, including the
   documented limits: `with pure` promises neither termination nor
   freedom from defects; Go fatal errors skip cleanup; eta-expansion for
   pure locals; no generic Result-to-failure helper.
@@ -645,5 +646,5 @@ programs at `Features.Check.Unlowered` (Global Constraints).
   I001 callback boundary; PKG001 export calling convention.
 - [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0
   with the new regression proofs.
-- [ ] **Step 5: Commit** `docs: FX001 ADR 009, language and regression
+- [ ] **Step 5: Commit** `docs: FX001 ADR 010, language and regression
   proofs`.

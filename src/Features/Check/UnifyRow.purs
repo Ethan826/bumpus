@@ -5,6 +5,7 @@ module Features.Check.UnifyRow
   , RowEvent(..)
   , unifyRows
   , unifyRowsTraced
+  , untraced
   ) where
 
 import Prelude
@@ -13,7 +14,7 @@ import Control.Monad.Rec.Class (Step(..), tailRec)
 import Data.Array as Array
 import Data.Either (Either(..), either)
 import Data.Foldable (foldM)
-import Data.Maybe (Maybe(..), maybe')
+import Data.Maybe (Maybe(..), maybe, maybe')
 import Data.Tuple (Tuple(..))
 import Domain.Row (Label(..), Row(..), isPure, labelKey, openRow)
 import Domain.Syntax (Span)
@@ -34,6 +35,7 @@ import Features.Check.Subst
   ( Failure(..)
   , Flex(..)
   , Subst
+  , postpone
   , resolveLabel
   , resolveRow
   , walk
@@ -45,7 +47,10 @@ type Unifier = Subst → Ty Flex → Ty Flex → Either Failure Subst
 -- Where each operand's own labels were written.
 type Sides = { left ∷ Span, right ∷ Span }
 
-type Traced = { subst ∷ Subst, events ∷ Array RowEvent }
+-- `postponed`: the pair met a deferred Fail key and was set aside in
+-- `subst` (which is otherwise the substitution it started from), with no
+-- events.
+type Traced = { subst ∷ Subst, events ∷ Array RowEvent, postponed ∷ Boolean }
 
 -- What unification did with each label (for provenance, design §6): a
 -- left label matched an existing right entry (the right occurrence says
@@ -56,8 +61,9 @@ data RowEvent = Matched OccurrenceId OccurrenceId | Extended Int OccurrenceId
 type Pending =
   { subst ∷ Subst, left ∷ Side, right ∷ Side, events ∷ Stack RowEvent }
 
--- The operands as given, which failures name, resolved.
-type Operands = { left ∷ TyRow Flex, right ∷ TyRow Flex }
+-- The operands as given, which failures name, resolved, and the
+-- substitution before them, to which a postponed pair reverts.
+type Operands = { left ∷ TyRow Flex, right ∷ TyRow Flex, start ∷ Subst }
 
 -- Leijen's scoped-label unification (2005, §7; design §2). Each left
 -- label, in order, matches the first right entry with its key, whose
@@ -65,7 +71,12 @@ type Operands = { left ∷ TyRow Flex, right ∷ TyRow Flex }
 -- it, unless that would bind the left's own tail (`tail(r1) ∉ dom(θ)`),
 -- which would rewrite forever (`Clock + ...r` against `Log + ...r`).
 -- Left over right entries extend the left's meta tail, one at a time.
--- A loop over labels: no recursion per label.
+-- A loop over labels: no recursion per label. A Fail label whose key is
+-- still deferred (its payload's head unknown), on the left or among the
+-- right entries up to the match, postpones the whole pair: the
+-- substitution reverts to `subst` with the pair added to its `postponed`
+-- (Features.Check.Unify `settleRows` retries it), and the enclosing
+-- unification goes on.
 -- Two pure rows (every row before row syntax) skip the loop.
 unifyRows ∷ Unifier → Subst → TyRow Flex → TyRow Flex → Either Failure Subst
 unifyRows unify subst left right =
@@ -83,14 +94,14 @@ unifyRowsTraced
   → TyRow Flex
   → Either Failure Traced
 unifyRowsTraced unify sides subst left right = tailRec
-  (step unify { left, right })
+  (step unify { left, right, start: subst })
   { subst
   , left: written sides.left left
   , right: written sides.right right
   , events: Bottom
   }
 
--- Spans for the untraced form, whose events are dropped unread.
+-- Spans for an untraced use, whose events are dropped unread.
 untraced ∷ Sides
 untraced = { left: nowhere, right: nowhere }
   where
@@ -118,15 +129,30 @@ consume
   → Entry
   → Step Pending (Either Failure Traced)
 consume unify operands pending entry =
-  maybe' (absent operands pending entry) (present unify pending entry)
-    (keyed =<< labelKey (typeHead <<< walk pending.subst) entry.label)
+  maybe' (postponed operands) keyed (keyOf entry)
   where
+  keyOf found = labelKey (typeHead <<< walk pending.subst) found.label
   entries = pending.right.entries
-  keyed key = located =<< Array.findIndex (sameKey key) entries
-  sameKey key other = labelKey (typeHead <<< walk pending.subst) other.label
-    == Just key
-  located index = withIndex index <$> Array.index entries index
+  keyed key = maybe' (absent operands pending entry) (decided key)
+    (Array.findIndex (stops key) entries)
+  -- The first entry with the key, or with a key not yet known.
+  stops key other = maybe true (eq key) (keyOf other)
+  decided key index = maybe' (postponed operands)
+    (present unify pending entry <<< withIndex index)
+    (matching key =<< Array.index entries index)
+  matching key other =
+    if keyOf other == Just key then Just other else Nothing
   withIndex index other = { index, other }
+
+postponed ∷ Operands → Unit → Step Pending (Either Failure Traced)
+postponed operands _ = Done
+  ( Right
+      { subst: postpone operands.start
+          { left: operands.left, right: operands.right }
+      , events: []
+      , postponed: true
+      }
+  )
 
 present
   ∷ Unifier
@@ -176,16 +202,18 @@ absent operands pending entry _ = case tailOf pending.right.tail of
     , events = Push (Extended meta entry.occurrence) pending.events
     }
 
--- Every left label is matched: what is left on the right extends the
--- left's meta tail, one entry per step; then the tails unify.
+-- Left-over entries must have known keys before extension or rejection.
 finish
   ∷ Operands → Pending → Unit → Step Pending (Either Failure Traced)
 finish operands pending _ =
   maybe' closing extra (Array.head pending.right.entries)
   where
   closing _ = Done (traced <$> unifyTails operands pending)
-  traced subst = { subst, events: stackItems pending.events }
-  extra first = case tailOf pending.left.tail of
+  traced subst =
+    { subst, events: stackItems pending.events, postponed: false }
+  extra first = maybe' (postponed operands) (knownExtra first)
+    (labelKey (typeHead <<< walk pending.subst) first.label)
+  knownExtra first _ = case tailOf pending.left.tail of
     MetaTail meta
       | tailOf pending.right.tail == MetaTail meta → Done
           (Left (shared operands pending.subst))

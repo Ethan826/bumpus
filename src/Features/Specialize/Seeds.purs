@@ -9,7 +9,7 @@ import Domain.Checked.Internal as Checked
 import Domain.IR.Internal as IR
 import Domain.Resolved (CtorId(..), CtorInfo, FunctionId(..), TypeInfo)
 import Domain.Type (Ty, TypeId(..))
-import Domain.Type.Parts (ground)
+import Domain.Type.Parts (groundErased)
 import Features.Specialize.Intern (noArrows)
 import Features.Specialize.Keys (Env, State, Work)
 
@@ -65,11 +65,12 @@ ranks flags = Array.zipWith ranked flags (Array.scanl counted 0 flags)
   counted total flag = if flag then total + 1 else total
   ranked flag total = if flag then Just (total - 1) else Nothing
 
+-- Rows do not count: specialization erases them (FX001 design §4).
 monomorphic ∷ Checked.FunctionDecl → Boolean
 monomorphic function = Array.all isGround
   (Array.snoc function.parameters function.result)
   where
-  isGround ty = isJust (ground ty)
+  isGround ty = isJust (groundErased ty)
 
 ownedBy ∷ Env → CtorInfo → Boolean
 ownedBy env ctor = isJust (join (Array.index env.monoTypes (owner ctor.owner)))
