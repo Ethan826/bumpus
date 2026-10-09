@@ -12,7 +12,7 @@ controller's `defer` ruling (§5 R0). All else is proposed.
 ## 1. Purpose, scope, non-goals
 
 Purpose: decide, before concurrency (FX002), local mutable state (FX003)
-and general resume (the spec's "FX004"; §11), which guarantees types,
+and general resume (FX006; renumbered from the spec's former "FX004", §11), which guarantees types,
 effect rows, lawful abstractions and runtime boundaries can give, so that
 programmers do not manage synchronization and the runtime stays small.
 
@@ -404,7 +404,7 @@ discard; lawful reductions (CF002 candidate: built-in `Int` sum first).
 ## 10. Handoff
 
 **Settle before concurrency (FX002), mutable state (FX003), resumable
-handlers (spec "FX004"):**
+handlers (FX006):**
 1. R0, for `defer` (ruled; strictness pending user confirmation) and `par`.
 2. B1 (lookup inherited, unwinding local, abort transfer at join).
 3. B3 as a transitive property of handler types plus the capture check:
@@ -459,6 +459,10 @@ its `defer` check needs R0, as ruled. None of
 Tasks 6-8 needs to be undone.
 
 ## 11. Documentation audit (corrections for the controller to apply)
+
+Status: items 1-7 applied by the controller 2026-10-09 (spec D, progress);
+the ID inconsistency was resolved by pre-flight ruling F14: general resume
+is FX006 in the spec and plan; BACKLOG FX004 keeps the Task 5 row.
 
 Seven over-promises (file:line, quoted, then proposed wording), plus one
 ID inconsistency. D = docs/plans/2026-10-09-effects-design.md.

@@ -44,11 +44,14 @@ rule was revised by the user on 2026-10-09 (section 3). Background: docs/plans/2
    direction document's `Failure(A + B + ...errors)` spelling may become
    sugar over the row form.
 4. **Synchronous only.** Goroutine-backed fork/await/race/timeout and
-   cancellation are a follow-up milestone on the same evidence model.
+   cancellation are a follow-up milestone building on the evidence model,
+   subject to task-boundary rules under review (CF001,
+   docs/plans/2026-10-09-concurrency-foundations-design.md).
 5. **Cleanup now.** A cleanup form (spelled `defer`, section 1) runs on
    normal exit, every abort passing through and recoverable defects
-   (decision 9), specified to remain sound under future captured
-   continuations.
+   (decision 9), intended to remain sound under future one-shot
+   continuations; multi-shot continuations containing `defer` are
+   unresolved (section 3).
 6. **Ambient open rows.** Every signature carries an implicit, rigid,
    universally quantified ambient row; unannotated arrows in it share that
    row. Written labels exactly bound a function's own effects
@@ -72,9 +75,10 @@ rule was revised by the user on 2026-10-09 (section 3). Background: docs/plans/2
 8. **Scoped labels.** A row may contain a label more than once; the
    innermost handler takes the operation. This permits intercept-and-
    forward handlers and needs no lacks constraints on row variables.
-9. **Defects are uncatchable; cleanup still runs.** Runtime defects are
-   never caught by `handle`; they unwind to program exit with a report,
-   running deferred cleanup on the way. Catching defects at
+9. **Recoverable defects are uncatchable; cleanup still runs.**
+   Recoverable runtime defects are never caught by `handle`; they unwind
+   to program exit with a report, running deferred cleanup on the way. Go
+   fatal errors (stack exhaustion, out of memory) skip cleanup (section 3). Catching defects at
    supervision boundaries is left to the concurrency follow-up.
 
 ## 1. Syntax (section approved by the user 2026-10-09 with adjustments)
@@ -122,7 +126,8 @@ fn h(f: a -> b with pure, x: a): b;              // callback must be pure
 fn safeDiv(n: Int, d: Int): Int with Fail(DivByZero);
 ```
 
-**Omission is not a promise of purity; `with pure` is.** Every signature
+**Omission is not a promise of an empty effect row; `with pure` is. It
+promises neither termination nor freedom from `crash` (section 3).** Every signature
 carries an ambient row (decision 6). Every arrow without `with`, and the
 signature itself when it has no `with` or a `with` without a spread, shares
 that ambient row. The ambient row lets a function pass through what its
@@ -338,22 +343,27 @@ DbError that fails with DbError while the body runs is not caught by that
 inner `handle`: the clause runs in the outer context. Unwinding runs the
 deferred expressions of every exited block, innermost first.
 
-**Block exits.** A block activation exits for exactly one of four reasons:
-normal completion, typed abort, recoverable defect, or (future) continuation
-discard. Its deferred expressions run exactly once per exiting activation.
-FX001 produces no discard; the event is named for general resume. Multi-
+**Block exits.** A block activation exits for exactly one reason: normal
+completion, typed abort or recoverable defect in FX001; continuation
+discard (general resume) and cancellation (concurrency, CF001) are future
+reasons. Its deferred expressions run exactly once per exiting activation.
+A Go fatal error is not an exit and runs no cleanup. Multi-
 shot resumption of continuations containing `defer` is explicitly
 unresolved and left to that milestone.
 
 **Cleanup failures (revised by the user 2026-10-09).** A deferred
 expression cannot end in a typed abort: section 2 rejects a `defer` whose
-expression performs an unhandled `Fail`, so a typed failure pending while
-the block unwinds always reaches its own `handle`, and no typed error is
-ever lost or converted. Cleanup may still handle failures internally and
+expression performs an unhandled `Fail` (or may, through an open row
+tail: Task 8 review ruling, pending user confirmation), so no typed cleanup
+failure can replace, drop or convert a pending typed failure. A pending
+typed failure reaches its own `handle` if every deferred expression run on
+the way completes normally; if cleanup raises a recoverable defect, the
+pending abort stops being recoverable and heads the report; if cleanup
+diverges, it is never delivered. Cleanup may still handle failures internally and
 complete normally, including during unwinding. What remains is defects:
 if cleanup raises a recoverable defect (`crash`, the missing-handler
 guard, a Go runtime panic), the program is already failing
-uncatchably, so nothing recoverable is lost: the pending cause (an abort
+uncatchably: the pending cause (an abort
 or an earlier defect, if any) is retained as the first cause, later causes
 are recorded in execution order, the remaining deferred expressions still
 run, and the program reports once. A typed abort pending when such a
@@ -669,7 +679,7 @@ frames, separately from 100,000 caught failures); `go build` of the
 acceptance scenario.
 
 **Documents.** ADR 010 (effects); docs/language.md section; BACKLOG: FN002
-absorbed; new FX002 (concurrency), FX003 (local state), FX004 (general
+absorbed; new FX002 (concurrency), FX003 (local state), FX006 (general
 resume and CPS confinement), FX005 (`ctx` elimination, cached lookup);
 user Console handlers with D001; value-level error sums with R001; the
 Result-to-failure limitation with STD001; I001 callback boundary; PKG001
@@ -776,7 +786,7 @@ failures"), replacing the earlier abort-to-defect conversion.
 ## Deferred (not FX001)
 
 Operation-level polymorphism (except Console's `print`); row parameters on
-effects; general resume (`ctl`, FX004); concurrency (FX002); mutable state
+effects; general resume (`ctl`, FX006); concurrency (FX002); mutable state
 (FX003); user Console handlers (with D001); value-level open error sums
 (with R001); refutable `let`; let-generalization; explicit effect-row
 constraint syntax; catching defects.

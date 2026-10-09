@@ -3032,7 +3032,9 @@ suppressed causes). The user chose the static rule, after Swift's `defer`:
 a deferred expression that performs an unhandled `Fail` is E_EFFECT
 `defer must not fail, but it performs <L>`; cleanup that can fail handles
 its failure inside the deferred expression. Only defects can fail cleanup,
-so a pending typed abort always reaches its `handle`. Spec §2 (`defer`
+so a pending typed abort reaches its `handle` unless a cleanup on the way
+raises a defect (the abort then heads the report) or diverges (corrected
+per CF001 §11). Spec §2 (`defer`
 rule), §3 ("Cleanup failures", with rejected alternatives), §5 (report
 example, probes 6 and 11), plan Global Constraints and Tasks 8, 10 and 12,
 findings and the handoff were updated. Docs only; no code changed.

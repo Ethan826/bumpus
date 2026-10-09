@@ -658,7 +658,7 @@ programs at `Features.Check.Unlowered` (Global Constraints).
   freedom from defects; Go fatal errors skip cleanup; eta-expansion for
   pure locals; no generic Result-to-failure helper.
 - [ ] **Step 3: Update BACKLOG:** FX001 done pending review; FN002 done;
-  new FX002 (concurrency), FX003 (local state), FX004 (general resume,
+  new FX002 (concurrency), FX003 (local state), FX006 (general resume,
   CPS confinement), FX005 (`ctx` elimination, cached lookup); D001 user
   Console handlers; R001 value-level error sums; STD001 limitation;
   I001 callback boundary; PKG001 export calling convention.
