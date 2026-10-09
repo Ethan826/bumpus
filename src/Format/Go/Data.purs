@@ -4,6 +4,8 @@ module Format.Go.Data
   , goType
   , ctorName
   , functionName
+  , effectName
+  , performName
   , fieldName
   , localName
   , pipeLocal
@@ -17,14 +19,16 @@ import Data.Array as Array
 import Data.String.Common (joinWith)
 import Domain.IR.Internal (EffectKey(..), FunType, FunTypeId(..), Ty(..))
 import Domain.Resolved (CtorId(..), FunctionId(..), LocalId(..), TypeId(..))
+import Format.Go.Context (typeList)
+import Format.Go.Context as Context
 import Format.Go.Layout (Declared, Layout, Member)
 
 -- Each type becomes one tagged struct and its constructor functions.
-declarations ∷ Layout → String
-declarations program = joinWith "" (map typeBlock program.types)
+declarations ∷ Boolean → Layout → String
+declarations context program = joinWith "" (map typeBlock program.types)
   where
   typeBlock declared = structDeclaration declared
-    <> joinWith "" (map constructor declared.members)
+    <> joinWith "" (map (constructor context) declared.members)
 
 goType ∷ Ty → String
 goType = case _ of
@@ -33,21 +37,21 @@ goType = case _ of
   TData (TypeId index) → "waxwingTy" <> show index
   TFun (FunTypeId index) → "waxwingFun" <> show index
   TUnit → "struct{}"
-  -- FX001 Task 7 declares one handler struct per effect layout; until then
-  -- Features.Specialize.Unlowered stops every program holding one.
-  THandler (EffectKey index) → "*waxwingEff" <> show index
+  -- One handler struct per effect layout (Format.Go.Effect).
+  THandler key → "*" <> effectName key
 
 -- One named Go type per interned arrow, in number order (design §13 rule
 -- 8): each names its result's type by number, so the text is linear in
 -- the number of distinct suffixes. A program without arrows emits none,
 -- so existing output is unchanged; a phantom arrow (a type argument no
 -- field holds) still gets its unused declaration.
-funTypeDeclarations ∷ Array FunType → String
-funTypeDeclarations table = joinWith "" (Array.mapWithIndex declared table)
+funTypeDeclarations ∷ Boolean → Array FunType → String
+funTypeDeclarations context table =
+  joinWith "" (Array.mapWithIndex declared table)
   where
   declared index arrow = "type " <> goType (TFun (FunTypeId index))
     <> " func("
-    <> goType arrow.parameter
+    <> typeList context [ goType arrow.parameter ]
     <> ") "
     <> goType arrow.result
     <> "\n\n"
@@ -57,6 +61,13 @@ ctorName (CtorId index) = "waxwingCtor" <> show index
 
 functionName ∷ FunctionId → String
 functionName (FunctionId index) = "waxwingFn" <> show index
+
+-- A layout's handler struct and, per operation, its perform function.
+effectName ∷ EffectKey → String
+effectName (EffectKey index) = "waxwingEff" <> show index
+
+performName ∷ EffectKey → Int → String
+performName key position = effectName key <> "Op" <> show position
 
 localName ∷ LocalId → String
 localName (LocalId index)
@@ -105,9 +116,10 @@ structDeclaration declared =
 
 -- Tags are 1-based within the owner so the zero value never names a
 -- constructor (Format.Go.Layout). Constructor ids are unique across types.
-constructor ∷ Member → String
-constructor member =
-  "func " <> ctorName member.id <> "(" <> joinWith ", " parameters
+constructor ∷ Boolean → Member → String
+constructor context member =
+  "func " <> ctorName member.id <> "("
+    <> joinWith ", " (Context.declared context parameters)
     <> ") "
     <> typeName member.ctor.owner
     <> " { return "

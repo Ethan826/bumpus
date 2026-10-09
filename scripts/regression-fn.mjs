@@ -86,7 +86,7 @@ export const fnRows = [
     // A helper evaluates its whole block of arguments, then applies.
     name: 'block-order', file: 'src/Format/Go/Apply.purs',
     needle: '    <> " {\\nreturn waxwingValue"\n'
-      + '    <> joinWith "" (map parenthesized parts.codes)',
+      + '    <> joinWith "" (map (parenthesized context) parts.codes)',
     replacement: '    <> " {\\n"\n'
       + '    <> joinWith "" (Array.mapWithIndex (\\i c → "var waxwingArg"\n'
       + '      <> show i <> " " <> joinWith "" (map (goType <<< IR.typeOf)\n'

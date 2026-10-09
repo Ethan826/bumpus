@@ -12,7 +12,7 @@ import Features.Check.Context (CheckEnv)
 import Features.Check.RowName (labelName, rowConflict)
 import Features.Check.Scheme (State, flexible, opened)
 import Features.Check.TypeName (typeName)
-import Features.Check.Unify (Failure(..), Flex(..), Subst(..), unify)
+import Features.Check.Unify (Failure(..), Flex(..), Subst(..), resolve, unify)
 import Features.Check.UnifyRow (unifyRows)
 
 -- Closed rows open only for consumption; the function value stays closed.
@@ -31,9 +31,13 @@ consumeAt
 consumeAt env state span row = either failed finished
   (consume state.subst (converted row) (converted env.current))
   where
-  converted found = case flexible (TFun TUnit found TUnit) of
-    TFun _ result _ → result
-    _ → openRow (Meta 0)
+  converted found =
+    case
+      resolve state.subst
+        (flexible (TFun TUnit found TUnit))
+      of
+      TFun _ result _ → result
+      _ → openRow (Meta 0)
   finished subst = Right (state { subst = subst })
   failed failure = failureAt env span failure
 

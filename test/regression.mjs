@@ -130,10 +130,18 @@ const deferredFailEffect = () => expectsDiagnostic(
   'deferred Fail capability'
 );
 
-const handlerMetadata = () => expectsDiagnostic(
-  'type H = H(Int, Handler(Console with pure)); fn main(): Int = 0;',
-  'E_INTERNAL', 'unlowered effect', 'handler type in later constructor field'
-);
+// FX001 Task 7: the evidence context is threaded only when the emitted IR
+// has an effect node or layout (design §4), so a Console-only program's Go
+// stays free of `ctx` and byte-identical to its snapshot.
+const effectFreeContext = () => {
+  const result = compile('fn main(): Unit with Console = print(1);');
+  assert.ok(result instanceof Right, 'effect-free probe program was rejected');
+  if (result.value0.includes('ctx')) {
+    console.error('ctx emitted for an effect-free program');
+    process.exit(1);
+  }
+  console.log('effect-free-ctx regression detects the defect');
+};
 
 // Runs the probe program's `main` and returns what it printed. The work
 // directory sits under .build/regression, which scripts/regression.mjs
@@ -219,7 +227,7 @@ const probes = {
   'duplicate-effect-parameter': duplicateEffectParameter,
   'duplicate-operation-parameter': duplicateOperationParameter,
   'deferred-fail-effect': deferredFailEffect,
-  'handler-metadata': handlerMetadata,
+  'effect-free-ctx': effectFreeContext,
   'ctor-order': ordered('Nil < Cons(0, Nil)', 'constructor order wrong'),
   'first-field': ordered('Cons(1, Nil) > Cons(0, Cons(5, Nil))',
     'first differing field ignored'),

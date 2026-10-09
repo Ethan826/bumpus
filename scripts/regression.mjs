@@ -172,13 +172,13 @@ const rows = [
     message: /deferred Fail capability: wrong diagnostic code/
   },
   {
-    // FX001 Task 6: the guard after Specialize stops a handler type held
-    // only by a constructor field through its effect layout.
-    name: 'handler-metadata', file: 'src/Features/Specialize/Unlowered.purs',
-    needle: 'map layoutSpan program.effects',
-    replacement: 'map layoutSpan (Array.take 0 program.effects)',
-    probe: 'handler-metadata',
-    message: /handler type in later constructor field:/
+    // FX001 Task 7: the mode is chosen over the emitted IR; threading the
+    // context through every program breaks Console-only output.
+    name: 'effect-free-ctx', file: 'src/Format/Go/Context.purs',
+    needle: '  || Array.any inFunction program.functions',
+    replacement: '  || not (Array.null program.functions)',
+    probe: 'effect-free-ctx',
+    message: /ctx emitted for an effect-free program/
   },
   {
     // P001 (R15): a key's arguments are numbered output types (FN001 Task

@@ -18,30 +18,37 @@ import Domain.IR.Internal as IR
 import Domain.IR.Internal (Ty)
 import Domain.Resolved (LocalId)
 import Format.Go.Capture (Captured, union, withoutAll)
+import Format.Go.Context (declared, passed)
 import Format.Go.Data (functionName, goType, localName)
 import Format.Go.Lowered (Lowered, Lowering, Scope, several)
 
 lowerBlock
   ∷ Scope → Lowering → Int → Ty → Array IR.Item → IR.Expr → Lowered
 lowerBlock scope lower next result items value =
-  { code: name <> "(" <> joinWith ", " (map capturedName captured) <> ")"
+  { code: name <> "("
+      <> joinWith ", " (passed context (map capturedName captured))
+      <> ")"
   , next: parts.next
   , lifted: [ lifted ] <> parts.lifted
   , free: captured
   , wrappers: parts.wrappers
   }
   where
+  context = scope.shape.context
   name = functionName scope.owner <> "Block" <> show next
   parts = several lower (next + 1) (IR.blockParts items value)
   captured = withoutAll (Array.mapMaybe letLocal items) (union parts.frees)
   capturedName local = localName local.id
-  lifted = blockFunction name captured result
+  lifted = blockFunction context name captured result
     (Array.zipWith statement items parts.codes)
     (fromMaybe "" (Array.last parts.codes))
 
-blockFunction ∷ String → Array Captured → Ty → Array String → String → String
-blockFunction name captured result statements value =
-  "func " <> name <> "(" <> joinWith ", " (map parameter captured) <> ") "
+blockFunction
+  ∷ Boolean → String → Array Captured → Ty → Array String → String → String
+blockFunction context name captured result statements value =
+  "func " <> name <> "("
+    <> joinWith ", " (declared context (map parameter captured))
+    <> ") "
     <> goType result
     <> " {\n"
     <> joinWith "" statements

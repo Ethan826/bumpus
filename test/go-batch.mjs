@@ -37,7 +37,7 @@ export const asCasePackage = (name, ident, go) => {
     && count(/^package main$/gm) === 1
     && count(/^func main\b/gm) === 1
     && (count(/^func main\(\) \{ fmt\.Println\(.*\) \}$/gm)
-      + count(/^func main\(\) \{ waxwingFn\d+\(\) \}$/gm)) === 1
+      + count(/^func main\(\) \{ waxwingFn\d+\((nil)?\) \}$/gm)) === 1
     && count(/^func Main\b/gm) === 0;
   if (!expected) {
     throw new assert.AssertionError({ message: `go batch: case `

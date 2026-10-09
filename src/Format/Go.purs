@@ -5,6 +5,7 @@ import Data.Array as Array
 import Data.String.Common (joinWith)
 import Domain.IR.Internal as IR
 import Format.Go.Compare (boolHelper, compareHelpers)
+import Format.Go.Context (declared, runtime)
 import Format.Go.Data
   ( declarations
   , funTypeDeclarations
@@ -12,6 +13,7 @@ import Format.Go.Data
   , goType
   , localName
   )
+import Format.Go.Effect (effectDeclarations)
 import Format.Go.Expression (expression)
 import Format.Go.Layout (Layout, layout)
 import Format.Go.Lowered (Shape, Wrapper, shapeOf)
@@ -36,14 +38,19 @@ emit program'@(IR.Program program) =
     <> (if usesFmt then "import \"fmt\"\n\n" else "")
     <> "func waxwingAdd(a int32, b int32) int32 { return a + b }\n\n"
     <> (if needsBoolHelper program' then boolHelper else "")
-    <> declarations tables
-    <> funTypeDeclarations program.funTypes
+    <>
+      ( if shape.context then runtime <> effectDeclarations program.effects
+        else ""
+      )
+    <> declarations shape.context tables
+    <> funTypeDeclarations shape.context program.funTypes
     <> stages.nodes
     <> compareHelpers tables
     <> showHelpers tables
     <> joinWith "\n" (map codeOf functions)
     <> stages.code
-    <> joinWith "" (map (entryMain program.entry) program.functions)
+    <> joinWith ""
+      (map (entryMain shape.context program.entry) program.functions)
   where
   -- Computed once; every emitter reads it instead of searching (I3).
   tables = layout { types: program.types, ctors: program.ctors }
@@ -59,15 +66,20 @@ emit program'@(IR.Program program) =
 -- Exactly one function is the entry (Features.Resolve); scanning the
 -- definitions finds its result type without a lookup that could fail.
 -- A Unit result prints nothing at all (FX001 design §1, Entry).
-entryMain ∷ FunctionId → IR.FunctionDecl → String
-entryMain entry definition
+entryMain ∷ Boolean → FunctionId → IR.FunctionDecl → String
+entryMain context entry definition
   | definition.id /= entry = ""
   | definition.result == TUnit = "\nfunc main() { "
-      <> functionName entry
-      <> "() }\n"
+      <> entered context entry
+      <> " }\n"
   | otherwise = "\nfunc main() { fmt.Println("
-      <> printed definition.result (functionName entry <> "()")
+      <> printed definition.result (entered context entry)
       <> ") }\n"
+
+-- The entry runs under no handler: an empty context.
+entered ∷ Boolean → FunctionId → String
+entered context entry = functionName entry
+  <> (if context then "(nil)" else "()")
 
 printing ∷ FunctionId → IR.FunctionDecl → Boolean
 printing entry definition = definition.id == entry
@@ -78,7 +90,7 @@ printing entry definition = definition.id == entry
 function ∷ Layout → Shape → IR.FunctionDecl → Emitted
 function tables shape definition =
   { code: "func " <> functionName definition.id <> "("
-      <> joinWith ", " parameters
+      <> joinWith ", " (declared shape.context parameters)
       <> ") "
       <> goType definition.result
       <> " {\nreturn "

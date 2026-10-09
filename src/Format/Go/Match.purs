@@ -4,6 +4,7 @@ import Prelude
 import Data.Array as Array
 import Data.String.Common (joinWith)
 import Format.Go.Capture (Captured, armFree, union)
+import Format.Go.Context (declared, passed)
 import Format.Go.Data
   ( boolean
   , fieldName
@@ -39,7 +40,10 @@ lowerMatch
   ∷ Scope → Lowering → Int → Ty → IR.Expr → Array IR.Arm → Lowered
 lowerMatch scope lower next result scrutinee arms =
   { code: signature.name <> "("
-      <> joinWith ", " (map capturedName signature.captured <> [ subject.code ])
+      <> joinWith ", "
+        ( passed context
+            (map capturedName signature.captured <> [ subject.code ])
+        )
       <> ")"
   , next: bodies.next
   , lifted: [ lifted ] <> subject.lifted <> bodies.lifted
@@ -59,7 +63,8 @@ lowerMatch scope lower next result scrutinee arms =
   patterns = map armPattern arms
   armPattern arm = arm.pattern
   capturedName captured = localName captured.id
-  lifted = matchFunction signature
+  context = scope.shape.context
+  lifted = matchFunction context signature
     (Array.zipWith (armCode scope.tables) arms bodies.codes)
 
 matchName ∷ FunctionId → Int → String
@@ -68,9 +73,11 @@ matchName owner number = functionName owner <> "Match" <> show number
 scrutineeName ∷ String
 scrutineeName = "waxwingScrutinee"
 
-matchFunction ∷ Signature → Array String → String
-matchFunction signature arms =
-  "func " <> signature.name <> "(" <> joinWith ", " parameters <> ") "
+matchFunction ∷ Boolean → Signature → Array String → String
+matchFunction context signature arms =
+  "func " <> signature.name <> "("
+    <> joinWith ", " (declared context parameters)
+    <> ") "
     <> goType signature.result
     <> " {\n"
     <> joinWith "" arms

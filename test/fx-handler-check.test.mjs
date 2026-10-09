@@ -6,6 +6,7 @@ import { resolve } from '../output/Features.Resolve/index.js';
 import { check } from '../output/Features.Check/index.js';
 import { wire } from '../output/Format.Diagnostic/index.js';
 import { compile } from '../output/Program.Compile/index.js';
+import { runGo } from './support.mjs';
 
 const checked = source => {
   const parsed = parse(source);
@@ -173,39 +174,34 @@ test('duplicate handler binders use the parameter diagnostic span', () => {
     source.indexOf('add(x, x)') + 5);
 });
 
-test('checked handlers stop before specialization', () => {
-  const result = compile(clock + 'fn main(): Int = '
-    + 'with handler Clock { now() => 1 } { now() };');
-  assert.ok(result instanceof Left);
-  assert.equal(wire(result.value0).message, 'unlowered effect');
+test('a checked handler runs end to end', () => {
+  assert.equal(runGo(clock + 'fn main(): Int = '
+    + 'with handler Clock { now() => 1 } { now() };'), '1\n');
 });
 
-test('checked failures stop before specialization', () => {
-  const result = compile('fn main(): Int = '
-    + 'handle fail(1) { fail(problem: Int) => 0 };');
-  assert.ok(result instanceof Left);
-  assert.equal(wire(result.value0).message, 'unlowered effect');
+test('a checked failure runs end to end', () => {
+  assert.equal(runGo('fn main(): Int = '
+    + 'handle fail(1) { fail(problem: Int) => 0 };'), '0\n');
 });
 
-test('handler types stop before specialization', () => {
-  const result = compile('fn f(h: Handler(Console with pure)): Int = 0;' + main);
-  assert.ok(result instanceof Left);
-  assert.equal(wire(result.value0).message, 'unlowered effect');
+// A handler type holds an effect layout; Console and Fail layouts have no
+// operations and still emit an empty handler struct (Task 7, ruling F3).
+test('a handler type in a signature builds and runs', () => {
+  assert.equal(runGo('fn f(h: Handler(Console with pure)): Int = 0;' + main),
+    '0\n');
 });
 
-test('handler types in later constructor fields stop before specialization', () => {
-  const result = compile('type H = H(Int, Handler(Console with pure));'
-    + main);
-  assert.ok(result instanceof Left);
-  assert.equal(wire(result.value0).message, 'unlowered effect');
+test('a handler type in a later constructor field builds and runs', () => {
+  assert.equal(runGo('type H = H(Int, Handler(Console with pure));' + main),
+    '0\n');
 });
 
-test('long function-type spines are guarded without recursive traversal', () => {
+test('long function-type spines are lowered without recursive traversal', () => {
   const arrows = Array.from({ length: 20000 }, () => 'Int').join(' -> ');
   const result = compile(`fn f(x: Handler(Console with pure) -> ${arrows})`
     + `: Int = 0;${main}`);
-  assert.ok(result instanceof Left);
-  assert.equal(wire(result.value0).message, 'unlowered effect');
+  assert.ok(result instanceof Right, JSON.stringify(result));
+  assert.ok(result.value0.includes('type waxwingEff0 struct {\n}'));
 });
 
 test('nested State handlers keep distinct first-seen type arguments', () => {

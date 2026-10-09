@@ -11,7 +11,7 @@ import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe')
-import Domain.Row (Row(..), closedRow)
+import Domain.Row (closedRow)
 import Domain.Type (TyRow)
 import Domain.Syntax as Syntax
 import Features.Check.Stages (arrowType, openedRow, stages)
@@ -23,6 +23,7 @@ import Domain.Resolved as Resolved
 import Domain.Syntax (Diagnostic, Span, problemAt)
 import Features.Check.Context (CheckEnv)
 import Features.Check.Scheme (Scheme, State, Threaded, at, instantiate)
+import Features.Check.Tables (ownerType)
 
 -- One use of a function's or constructor's scheme, its variables
 -- instantiated afresh: the parameters (fields) and the result, kept apart
@@ -94,18 +95,9 @@ ctorUse env state span (CtorId index) =
   owned ctor info = Right
     ( declarationUse state info.variables info.sorts
         ctor.fields
-        (TData ctor.owner (typeArguments info) (rowArguments info))
+        (ownerType ctor.owner info)
         closedRow
     )
-  typeArguments info = map (TVar <<< Resolved.VarId)
-    (positions Syntax.TypeSort info)
-  rowArguments info = map row (positions Syntax.RowSort info)
-  row position = Row [] (Just (Resolved.VarId position))
-  positions sort info = Array.mapMaybe identity
-    (Array.mapWithIndex select info.sorts)
-    where
-    select position sortValue =
-      if sortValue == sort then Just position else Nothing
 
 -- A bare reference is a value of the scheme's curried type (design §3).
 checkFunctionRef

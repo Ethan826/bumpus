@@ -38,9 +38,15 @@ usesBoolOrdering (IR.Expr expression) = case expression.node of
   IR.UnitValue → false
   IR.Print value → usesBoolOrdering value
   IR.Block items value → anyOf (IR.blockParts items value)
-  effect → anyOf (IR.effectParts effect)
+  IR.OperationRef _ _ → false
+  IR.Perform _ _ _ → effects
+  IR.HandlerValue _ _ → effects
+  IR.Install _ _ → effects
+  IR.Handle _ _ → effects
+  IR.Abort _ _ → effects
   where
   anyOf = Array.any usesBoolOrdering
+  effects = anyOf (IR.effectParts expression.node)
   armUses arm = usesBoolOrdering arm.body
 
 needsPrint ∷ IR.Program → Boolean
@@ -51,6 +57,12 @@ needsPrint (IR.Program program) = Array.any inFunction program.functions
 prints ∷ IR.Expr → Boolean
 prints (IR.Expr expression) = case expression.node of
   IR.Print _ → true
+  IR.Integer _ → false
+  IR.Boolean _ → false
+  IR.Local _ → false
+  IR.FunctionRef _ → false
+  IR.CtorRef _ → false
+  IR.UnitValue → false
   IR.Call _ arguments → anyOf arguments
   IR.Construct _ arguments → anyOf arguments
   IR.Add left right → anyOf [ left, right ]
@@ -61,7 +73,13 @@ prints (IR.Expr expression) = case expression.node of
   IR.Lambda _ body → prints body
   IR.Pipe left right → anyOf [ left, right ]
   IR.Block items value → anyOf (IR.blockParts items value)
-  other → anyOf (IR.effectParts other)
+  IR.OperationRef _ _ → false
+  IR.Perform _ _ _ → effects
+  IR.HandlerValue _ _ → effects
+  IR.Install _ _ → effects
+  IR.Handle _ _ → effects
+  IR.Abort _ _ → effects
   where
   anyOf = Array.any prints
+  effects = anyOf (IR.effectParts expression.node)
   armPrints arm = prints arm.body

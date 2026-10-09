@@ -6,11 +6,8 @@ import Domain.Syntax (Diagnostic)
 import Features.Check (check)
 import Features.Resolve (resolve)
 import Features.Specialize (specialize)
-import Features.Specialize.Unlowered (reject)
 import Format.Go (emit)
 import Format.Parse (parse)
 
 compile ∷ String → Either Diagnostic String
-compile = map emit <<< (parse >=> resolve >=> check >=> specialize >=> guarded)
-  where
-  guarded specialized = specialized <$ reject specialized
+compile = map emit <<< (parse >=> resolve >=> check >=> specialize)
