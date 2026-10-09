@@ -2528,3 +2528,15 @@ Verification: `npm run verify` exited 0 with 318 tests passing, no failures
 or skips, and twelve isolated regression proofs passing; evidence:
 `.build/pkg001-direction-verify.log`. This validates existing behavior,
 not the proposed package/interop features. T003/T004 remain open.
+
+## FN001 merged (2026-10-09)
+
+User approved merge and push. main had gained eight docs-only planning
+commits (2190c8f..340953a: FX001 do notation, error rows, STD001, LA001,
+tooling, PKG001); they were merged into fn001 (9527233). Conflicts: the
+T003 row (fn001's extends main's; kept fn001's) and two different T004
+items (main's large-source timing item kept as T004; fn001's unidentified
+harvest failure renumbered T005); progress kept both sides. Clean `rm -rf
+output && npm run verify` on the merged tree: exit 0, 541 + 12 tests,
+twenty-two proofs (.build/fn001-merge-verify.log). main fast-forwarded to
+fn001 and pushed to origin; worktree and branch removed.
