@@ -1,34 +1,23 @@
-module Features.Resolve.Expression (Scope, expression) where
+module Features.Resolve.Expression (expression) where
 
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Foldable (foldl)
-import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe, maybe')
 import Data.String as String
 import Data.Traversable (traverse)
 import Domain.Problem (Problem(..), UnboundKind(..))
 import Domain.Syntax as Syntax
+import Domain.Resolved (Global)
 import Features.Resolve.Block (block)
 import Features.Resolve.Fresh (Fresh, failure, liftEither)
+import Features.Resolve.HandlerExpression as HandlerExpression
 import Features.Resolve.Lambda (lambda)
 import Features.Resolve.Pattern (resolvePattern)
-import Domain.Resolved (Global)
+import Features.Resolve.Scope (Scope)
 import Domain.Resolved as Resolved
-
--- `types` and `variables` (the enclosing signature's) are what a lambda
--- annotation may name. `locals` maps each name in scope to its innermost
--- local, so a lookup in a block of 20,000 lets is no scan (FX001).
-type Scope =
-  { globals ∷ Array Global
-  , ctors ∷ Array Resolved.CtorInfo
-  , locals ∷ Map String Resolved.LocalId
-  , types ∷ Array Resolved.TypeInfo
-  , effects ∷ Array { name ∷ String, arity ∷ Int }
-  , variables ∷ Array String
-  }
 
 -- Binders are numbered in source pre-order: scrutinee before arms, each
 -- arm's pattern before its body, a lambda's parameters before its body,
@@ -57,6 +46,16 @@ expression scope = case _ of
     <*> traverse nested arguments
   Syntax.Pipe span left right → Resolved.Pipe span <$> nested left
     <*> nested right
+  Syntax.HandlerExpr span reference clauses →
+    HandlerExpression.handlerExpression expression scope span reference clauses
+  Syntax.With span handler body → Resolved.With span <$> nested handler
+    <*> nested body
+  Syntax.Handle span body clauses → HandlerExpression.failureHandler expression
+    scope
+    span
+    body
+    clauses
+  Syntax.Fail span value → Resolved.Fail span <$> nested value
   Syntax.UnitValue span → pure (Resolved.UnitValue span)
   Syntax.Block span items value → block expression scope span items value
   where

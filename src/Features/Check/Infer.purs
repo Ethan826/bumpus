@@ -20,6 +20,8 @@ import Features.Check.Operation
 import Features.Check.Apply (checkApply)
 import Features.Check.Arms (checkMatch)
 import Features.Check.Block (checkBlock)
+import Features.Check.Handler as Handler
+import Features.Check.Failure as Failure
 import Features.Check.Call (checkCall, checkConstruct)
 import Features.Check.Context (Locals)
 import Features.Check.Lambda (checkLambda)
@@ -94,6 +96,17 @@ inferNode env state expression = case expression of
   Resolved.Print span arguments → printCall infer env state span arguments
   Resolved.Block span items value → checkBlock infer env state span items
     value
+  Resolved.Handler span label clauses → Handler.handler infer env state span
+    label
+    clauses
+  Resolved.With span handler body → Handler.withHandler infer env state span
+    handler
+    body
+  Resolved.Handle span body clauses → Handler.handleFailure infer env state
+    span
+    body
+    clauses
+  Resolved.Fail span value → Failure.failExpression infer env state span value
 
 typed ∷ State → Span → Ty Open → Checked.Node → Inferred
 typed state span ty node = pure

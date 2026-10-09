@@ -11,7 +11,7 @@ import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe')
-import Domain.Row (closedRow)
+import Domain.Row (Row(..), closedRow)
 import Domain.Type (TyRow)
 import Domain.Syntax as Syntax
 import Features.Check.Stages (arrowType, openedRow, stages)
@@ -92,14 +92,20 @@ ctorUse env state span (CtorId index) =
   missingType _ = Left (problemAt (Internal "Invalid resolved type") span)
   ownerOf (TypeId owner) = Array.index env.types owner
   owned ctor info = Right
-    ( declarationUse state info.parameters
-        (map typeSort info.parameters)
+    ( declarationUse state info.variables info.sorts
         ctor.fields
-        (TData ctor.owner (Array.mapWithIndex variable info.parameters) [])
+        (TData ctor.owner (typeArguments info) (rowArguments info))
         closedRow
     )
-  typeSort _ = Syntax.TypeSort
-  variable position _ = TVar (Resolved.VarId position)
+  typeArguments info = map (TVar <<< Resolved.VarId)
+    (positions Syntax.TypeSort info)
+  rowArguments info = map row (positions Syntax.RowSort info)
+  row position = Row [] (Just (Resolved.VarId position))
+  positions sort info = Array.mapMaybe identity
+    (Array.mapWithIndex select info.sorts)
+    where
+    select position sortValue =
+      if sortValue == sort then Just position else Nothing
 
 -- A bare reference is a value of the scheme's curried type (design §3).
 checkFunctionRef

@@ -25,6 +25,7 @@ import Features.Check.Require (require, tooDeepAt)
 import Features.Check.Scheme (firstTooDeep, holes, resolved, start)
 import Features.Check.Unify (Subst, isEmpty)
 import Features.Check.Walk (retype)
+import Features.Check.Failure (settleKeys)
 
 check ∷ Resolved.Program → Either Diagnostic Checked.Program
 check program = do
@@ -94,16 +95,17 @@ checkFunction holders env function = do
     function.body
   finished ← require env body.state (rigid function.result) body.value
   maybe (Right unit) tooDeepAt (firstTooDeep finished.subst body.value)
-  let settled = settle finished.subst body.value
+  settledSubst ← settleKeys env finished.subst body.value
+  let settled = settle settledSubst body.value
   comparable holders env settled
   printable holders env settled
-  Entry.check env finished.subst function settled
+  Entry.check env settledSubst function settled
   pure
     { id: function.id
     , name: function.name
     , parameters: map parameterType function.parameters
     , result: rigid function.result
-    , row: Entry.resolvedRow finished.subst env.current
+    , row: Entry.resolvedRow settledSubst env.current
     , body: holes settled
     , span: function.span
     }

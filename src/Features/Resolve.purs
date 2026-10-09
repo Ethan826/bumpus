@@ -50,6 +50,7 @@ resolve program = do
         )
         tables
         (Effect.summaries program.effects)
+        effects
     )
     definitions
   pure
@@ -139,15 +140,18 @@ resolveFunction
   ∷ Array Global
   → Resolved.Tables
   → Array { name ∷ String, arity ∷ Int }
+  → Array Resolved.EffectInfo
   → Definition
   → Either Syntax.Diagnostic Resolved.FunctionDecl
-resolveFunction globals tables effects definition = withBody <$> runFresh
-  (Array.length parameters)
-  (expression scope definition.function.body)
+resolveFunction globals tables effects effectInfos definition =
+  withBody <$> runFresh
+    (Array.length parameters)
+    (expression scope definition.function.body)
   where
   scope =
     { globals
     , effects
+    , effectInfos
     , ctors: tables.ctors
     , locals
     , types: tables.types

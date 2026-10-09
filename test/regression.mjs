@@ -8,6 +8,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { polyProbes } from './regression-poly.mjs';
 import { fnProbes } from './regression-fn.mjs';
+import { task5Probes } from './regression-task5.mjs';
 const [compilerPath, outputDir, probe] = process.argv.slice(2);
 const { compile } = await import(pathToFileURL(resolve(compilerPath)));
 const load = name => import(pathToFileURL(resolve(outputDir, name, 'index.js')));
@@ -67,6 +68,72 @@ const exhaustive = () => {
   assert.ok(code === 'NonExhaustive', 'non-exhaustive match was accepted');
   console.log('exhaustive regression detects the defect');
 };
+
+const expectsDiagnostic = (source, code, message, label) => {
+  const result = compile(source);
+  assert.ok(result instanceof Left, `${label}: program was accepted`);
+  const found = wire(result.value0);
+  assert.equal(found.code, code, `${label}: wrong diagnostic code`);
+  assert.equal(found.message, message, `${label}: wrong diagnostic message`);
+};
+
+const nestedFail = () => expectsDiagnostic(
+  'fn id(x: Int): Int = x; '
+    + 'fn f(e: a): Int with Fail(a) + Fail(Int) = fail(id(fail(e))); '
+    + 'fn main(): Int = 0;',
+  'E_TYPE', 'Fail needs a concrete error family', 'nested Fail payload'
+);
+
+const duplicateBinder = () => expectsDiagnostic(
+  'effect Add { fn add(x: Int, y: Int): Int; }; '
+    + 'fn main(): Int = with handler Add { add(x, x) => x } { add(1, 2) };',
+  'E_DUPLICATE', 'Duplicate parameter x', 'duplicate handler binder'
+);
+
+const duplicateRowTail = () => expectsDiagnostic(
+  'fn f(): Int with ...e + ...r = 0; fn main(): Int = 0;',
+  'E_SYNTAX', 'Only one row tail is allowed', 'duplicate row tail'
+);
+
+const constructorFunction = () => expectsDiagnostic(
+  'fn F(): Int = 0; type T = F; fn main(): Int = 0;',
+  'E_DUPLICATE', 'Duplicate function F', 'constructor and function collision'
+);
+
+const duplicateEffect = () => expectsDiagnostic(
+  'effect Clock { fn now(): Int; }; effect Clock { fn later(): Int; }; '
+    + 'fn main(): Int = 0;',
+  'E_DUPLICATE', 'Duplicate effect Clock', 'duplicate effect'
+);
+
+const duplicateOperation = () => expectsDiagnostic(
+  'effect Clock { fn now(): Int; fn now(): Int; }; fn main(): Int = 0;',
+  'E_DUPLICATE', 'Duplicate operation now', 'duplicate operation'
+);
+
+const duplicateEffectParameter = () => expectsDiagnostic(
+  'effect State(a, a) { fn get(): a; }; fn main(): Int = 0;',
+  'E_DUPLICATE', 'Duplicate type parameter a', 'duplicate effect parameter'
+);
+
+const duplicateOperationParameter = () => expectsDiagnostic(
+  'effect State { fn put(a: Int, a: Bool): Unit; }; '
+    + 'fn main(): Int = 0;',
+  'E_DUPLICATE', 'Duplicate parameter a', 'duplicate operation parameter'
+);
+
+const deferredFailEffect = () => expectsDiagnostic(
+  'type DbError = DbError; fn f(): Int with pure = { '
+    + 'let raise = fn(error) => fail(error); raise(DbError) }; '
+    + 'fn main(): Int = 0;',
+  'E_EFFECT', 'f performs Fail(DbError), which its signature does not allow',
+  'deferred Fail capability'
+);
+
+const handlerMetadata = () => expectsDiagnostic(
+  'type H = H(Int, Handler(Console with pure)); fn main(): Int = 0;',
+  'E_INTERNAL', 'unlowered effect', 'handler type in later constructor field'
+);
 
 // Runs the probe program's `main` and returns what it printed. The work
 // directory sits under .build/regression, which scripts/regression.mjs
@@ -145,6 +212,14 @@ const stateThread = () => {
 
 const probes = {
   branch, 'nil-guard': nilGuard, exhaustive,
+  'nested-fail': nestedFail, 'duplicate-binder': duplicateBinder,
+  'duplicate-row-tail': duplicateRowTail, 'duplicate-effect': duplicateEffect,
+  'constructor-function': constructorFunction,
+  'duplicate-operation': duplicateOperation,
+  'duplicate-effect-parameter': duplicateEffectParameter,
+  'duplicate-operation-parameter': duplicateOperationParameter,
+  'deferred-fail-effect': deferredFailEffect,
+  'handler-metadata': handlerMetadata,
   'ctor-order': ordered('Nil < Cons(0, Nil)', 'constructor order wrong'),
   'first-field': ordered('Cons(1, Nil) > Cons(0, Cons(5, Nil))',
     'first differing field ignored'),
@@ -153,7 +228,7 @@ const probes = {
   'state-thread': stateThread, capture
 };
 const context = { compile, Left, Right, wire, printed, ran, probe };
-const external = { ...polyProbes, ...fnProbes };
+const external = { ...polyProbes, ...fnProbes, ...task5Probes };
 const delegated = name => () => external[name](context);
 for (const name of Object.keys(external)) probes[name] = delegated(name);
 assert.ok(probe in probes, `unknown probe: ${probe}`);

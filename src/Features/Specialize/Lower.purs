@@ -3,12 +3,18 @@ module Features.Specialize.Lower (lowerType, fillType) where
 import Prelude
 import Data.Array as Array
 import Data.Map as Map
-import Data.Maybe (maybe')
+import Data.Maybe (Maybe(..), maybe')
 import Data.Traversable (sequence, traverse)
 import Domain.Checked.Internal (Open(..))
 import Domain.IR.Internal as IR
 import Domain.Resolved (CtorId(..), CtorInfo)
-import Domain.Syntax (Span, TypeRef(..), typeRefSpan, typeRefSpine)
+import Domain.Syntax
+  ( Span
+  , TypeArgument(..)
+  , TypeRef(..)
+  , typeRefSpan
+  , typeRefSpine
+  )
 import Domain.Type (Ty(..), TypeId(..), VarId(..))
 import Domain.Type.Parts (Spine, spine)
 import Features.Specialize.Copy (get, modify)
@@ -88,7 +94,8 @@ lowerField
   ∷ Env → Array IR.Ty → Ty VarId → TypeRef → Specializing IR.Ty
 lowerField env arguments ty syntax = case ty, syntax of
   TData id parts _, NamedRef span _ references →
-    paired span parts references (lowerField env arguments)
+    paired span parts (Array.mapMaybe typeArgument references)
+      (lowerField env arguments)
       >>= applied env span id
   TData _ _ _, _ → mismatch
   TVar (VarId index), _ → argument (typeRefSpan syntax) arguments index
@@ -100,6 +107,9 @@ lowerField env arguments ty syntax = case ty, syntax of
   TFun _ _ _, _ → mismatch
   THandler _ _, _ → mismatch
   where
+  typeArgument = case _ of
+    TypeArgument foundType → Just foundType
+    RowArgument _ → Nothing
   mismatch = internal "Field syntax mismatch" (typeRefSpan syntax) unit
   recur = lowerField env arguments
   -- Each parameter and the final result beside its written source, as

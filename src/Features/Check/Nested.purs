@@ -4,7 +4,7 @@ import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Foldable (sequence_, traverse_)
-import Data.Maybe (maybe')
+import Data.Maybe (Maybe(..), maybe')
 import Data.Traversable (traverse)
 import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
@@ -13,6 +13,7 @@ import Domain.Syntax
   ( Diagnostic
   , RefSpine
   , Span
+  , TypeArgument(..)
   , TypeRef(..)
   , problemAt
   , typeRefSpan
@@ -74,7 +75,7 @@ judgeField
 judgeField types inside ty syntax = case ty, syntax of
   TData id arguments _, NamedRef span _ references → reference span id
     arguments
-    references
+    (Array.mapMaybe typeArgument references)
   TData _ _ _, _ → Left (mismatch (typeRefSpan syntax))
   TFun _ _ _, FunRef span _ _ _ → paired span (children ty)
     (spineParts (typeRefSpine syntax))
@@ -91,6 +92,9 @@ judgeField types inside ty syntax = case ty, syntax of
   nested span info = Left (problemAt (NestedDatatype info.name) span)
   missing span _ = Left (problemAt (Internal "Invalid type id") span)
   always _ = true
+  typeArgument = case _ of
+    TypeArgument foundType → Just foundType
+    RowArgument _ → Nothing
 
 -- Resolution keeps each field's source beside it, argument for argument;
 -- a disagreement is a compiler bug.

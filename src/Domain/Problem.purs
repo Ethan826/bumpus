@@ -32,6 +32,8 @@ data DuplicateKind
   | DuplicateParameter
   | DuplicateBinder
   | DuplicateTypeParameter
+  | DuplicateEffect
+  | DuplicateOperation
 
 data EntryKind
   = MissingEntry
@@ -79,3 +81,8 @@ data Problem
   | RowSort Boolean
   | NotPrintable TypeName
   | RowEquality String String String
+  | HandlerMissing String
+  | HandlerDuplicate String
+  | HandlerOperation String String
+  | FailNeedsConcrete
+  | ExpectedHandler TypeName

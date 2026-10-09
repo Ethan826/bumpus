@@ -2,7 +2,13 @@ module Format.Parse.Effect (effectDeclaration) where
 
 import Prelude
 import Data.Maybe (fromMaybe)
-import Domain.Syntax (EffectDecl, OperationDecl, Parameter, TypeParameter)
+import Domain.Syntax
+  ( EffectDecl
+  , OperationDecl
+  , Parameter
+  , Sort(..)
+  , TypeParameter
+  )
 import Format.Parse.Grammar
   ( Parser
   , commaList
@@ -56,4 +62,5 @@ parameter = parameterOf <$> name <* expect ":" <*> typeRef
 typeParameter ∷ Parser TypeParameter
 typeParameter = parameterOf <$> name
   where
-  parameterOf identifier = { name: identifier.text, span: identifier.span }
+  parameterOf identifier =
+    { name: identifier.text, sort: TypeSort, span: identifier.span }

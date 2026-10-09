@@ -2932,3 +2932,48 @@ unchanged rerun hid a failure. Concrete malformed-input validation gaps
 are BACKLOG FX004, with reproductions and the Task 5 next action.
 No merge or push. Implementation/evidence:
 .superpowers/sdd/2026-10-09-effects-plan/task-4-report.md.
+
+### FX001 Task 5 — handlers and typed failures in Check (2026-10-09)
+
+Implemented handler values, `with`, `handle`, and `fail` through Parse,
+Resolve, and Check. Handler clauses are checked against declared operations;
+`with` consumes the handler capability while preserving the outside row;
+`handle` settles concrete `Fail(E)` keys and forwards unhandled error
+families. Deferred retries preserve the original semantic failure category
+and `fail` span. Nested failures are traversed through their payloads.
+
+Row-parameterized ADTs support interleaved, multiple type/row parameters,
+bare effect labels, and `pure`; source sorts are retained while VarIds stay
+canonical (type slots first). The parser remains Applicative-only; Handler
+type syntax is isolated in Format.Parse.HandlerType. A declared ADT named
+Handler wins for `Handler(Foo)`, while `Handler(Clock)` resolves as a handler
+type when no such ADT exists. Duplicate effects, operations, effect/type
+parameters and function/handler binders use the existing duplicate
+diagnostics. Both written row forms reject repeated or nonfinal tails.
+
+Program.Compile rejects checked Handler/HandlerValue, With, Handle and Fail
+nodes, plus Handler types in signatures, expressions and every constructor
+field, before Specialize. The iterative type walk stays stack-safe at a
+20,000-arrow signature. This is Check-only support: specialization/lowering,
+runtime behavior, and Go emission remain later FX001 tasks.
+
+Root audit findings 1–13 are fixed and recorded with reproductions in
+.superpowers/sdd/2026-10-09-effects-plan/task-5-root-audit.md. The previous
+FX004 validation gaps are closed. Focused handler tests pass 81/81; the
+large-source suite passes 15/15, with 20,000-type duplicate rejection at
+475 ms against its unchanged five-second bound. Eleven new isolated source
+mutations prove the nested Fail, duplicate validation, deferred diagnostic,
+metadata guard and duplicate-scan timing regressions.
+
+Clean-output `npm run verify` exited 0 in
+.build/fx-handler-task5-verify5.log: zero build warnings/errors, pinned
+formatting, strict rebuild and structural gates, 722 parallel tests and 22
+serial tests with no failures or skips, and all 33 actual-source regression
+proofs. Earlier real failures remain preserved: verify2 exposed duplicate
+and resolver-metadata compatibility issues; verify4 exposed eager
+`when`-argument evaluation in duplicate scanning (6.92 s against the
+unchanged five-second limit). Those defects were fixed and their regression
+proofs added before verify5. Full interfaces, evidence and the remaining
+Task 9 origin-provenance handoff are in
+.superpowers/sdd/2026-10-09-effects-plan/task-5-report.md. No runtime or
+specialization behavior is claimed for this task.

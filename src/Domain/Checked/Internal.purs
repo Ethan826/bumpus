@@ -78,6 +78,10 @@ data Node
   | Print Expr
   | OperationRef EffectId Int Instantiation
   | Perform EffectId Int Instantiation (Array Expr)
+  | Handler EffectId Instantiation (Array HandlerClause)
+  | With Expr Expr
+  | Handle Expr (Array FailClause)
+  | Fail Expr
 
 -- A block item (FX001): a monomorphic `let` of a local or `_`, or a
 -- discarded value.
@@ -87,6 +91,11 @@ data Item = Let (Maybe LocalId) Expr | Discard Expr
 type Param = { local ∷ Maybe LocalId, ty ∷ Ty Open }
 
 type Arm = { pattern ∷ Pattern, body ∷ Expr, span ∷ Span }
+type HandlerClause =
+  { operation ∷ Int, parameters ∷ Array Param, body ∷ Expr, span ∷ Span }
+
+type FailClause =
+  { payload ∷ Ty Open, local ∷ LocalId, body ∷ Expr, span ∷ Span }
 
 -- A pattern carries the type it was checked against.
 data Pattern = Pattern { ty ∷ Ty Open, span ∷ Span, shape ∷ Shape }

@@ -1,16 +1,17 @@
-module Features.Check.Consume (consume, consumeAt) where
+module Features.Check.Consume (consume, consumeAt, failureAt) where
 
 import Prelude
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe')
 import Domain.Checked.Internal (Open)
-import Domain.Problem (Problem(..))
 import Domain.Row (Row(..), openRow)
+import Domain.Problem (Problem(..))
 import Domain.Syntax (Diagnostic, Span, problemAt)
 import Domain.Type (Ty(..), TyRow)
 import Features.Check.Context (CheckEnv)
 import Features.Check.RowName (labelName, rowConflict)
-import Features.Check.Scheme (State, flexible)
+import Features.Check.Scheme (State, flexible, opened)
+import Features.Check.TypeName (typeName)
 import Features.Check.Unify (Failure(..), Flex(..), Subst(..), unify)
 import Features.Check.UnifyRow (unifyRows)
 
@@ -34,11 +35,22 @@ consumeAt env state span row = either failed finished
     TFun _ result _ → result
     _ → openRow (Meta 0)
   finished subst = Right (state { subst = subst })
-  failed = case _ of
-    RowMissing label _ → rejected label
-    RowExtra label → rejected label
-    RowSharedTail left right → rowConflict env span left right
-    _ → Left (problemAt (Internal "Effect row consumption failed") span)
+  failed failure = failureAt env span failure
+
+failureAt
+  ∷ ∀ r a. CheckEnv r → Span → Failure → Either Diagnostic a
+failureAt env span = case _ of
+  Mismatch found expected → mismatch expected found
+  RowMissing label _ → rejected label
+  RowExtra label → rejected label
+  RowSharedTail left right → rowConflict env span left right
+  RowMismatch left right → rowConflict env span left right
+  _ → Left (problemAt (Internal "Effect row consumption failed") span)
+  where
+  mismatch expected found = do
+    expectedName ← typeName env span (opened expected)
+    foundName ← typeName env span (opened found)
+    Left (problemAt (TypeMismatch expectedName foundName) span)
   rejected label = do
     name ← labelName env span label
     Left (problemAt (EffectNotAllowed env.functionName name) span)

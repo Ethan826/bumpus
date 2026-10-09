@@ -8,6 +8,7 @@ import Data.Maybe (Maybe)
 import Domain.Syntax (Operator, Sort, Span, TypeRef)
 import Domain.Ids (EffectId)
 import Domain.Type (Ty(..), TyRow, TypeId(..), VarId(..))
+import Domain.Row (Label)
 
 newtype FunctionId = FunctionId Int
 newtype LocalId = LocalId Int
@@ -22,6 +23,10 @@ derive instance eqCtorId ∷ Eq CtorId
 type TypeInfo =
   { name ∷ String
   , parameters ∷ Array String
+  , rowParameters ∷ Array String
+  , variables ∷ Array String
+  , sorts ∷ Array Sort
+  , sourceSorts ∷ Array Sort
   , ctors ∷ Array CtorId
   , span ∷ Span
   }
@@ -82,6 +87,26 @@ data Expr
   | Perform Span EffectId Int (Array Expr)
   | PrintRef Span
   | Print Span (Array Expr)
+  | Handler Span (Label (Ty VarId)) (Array HandlerClause)
+  | With Span Expr Expr
+  | Handle Span Expr (Array FailClause)
+  | Fail Span Expr
+
+type HandlerClause =
+  { operation ∷ Int
+  , result ∷ Ty VarId
+  , parameters ∷ Array HandlerParameter
+  , body ∷ Expr
+  , span ∷ Span
+  }
+
+type HandlerParameter = { local ∷ Maybe LocalId, ty ∷ Ty VarId }
+type FailClause =
+  { label ∷ Label (Ty VarId)
+  , local ∷ Maybe LocalId
+  , body ∷ Expr
+  , span ∷ Span
+  }
 
 -- A block item: `let` binds a local, or `_` (Nothing); a discarded item's
 -- value is evaluated and dropped (FX001 design §1).
@@ -151,3 +176,7 @@ exprSpan expression = case expression of
   Perform span _ _ _ → span
   PrintRef span → span
   Print span _ → span
+  Handler span _ _ → span
+  With span _ _ → span
+  Handle span _ _ → span
+  Fail span _ → span

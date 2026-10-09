@@ -1,10 +1,19 @@
-module Format.Parse.Row (rowRef) where
+module Format.Parse.Row (rowRef, rowArgument, label) where
 
 import Prelude
 import Data.Array as Array
-import Data.Either (Either(..), either)
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
-import Domain.Syntax (LabelRef, RowRef(..), RowTail(..), TypeRef)
+import Domain.Problem (Problem(..))
+import Domain.Syntax
+  ( LabelRef
+  , RowRef(..)
+  , RowTail(..)
+  , Span
+  , TypeRef
+  , origin
+  , problemAt
+  )
 import Format.Parse.Grammar
   ( Parser
   , dispatch
@@ -12,6 +21,7 @@ import Format.Parse.Grammar
   , name
   , on
   , optionalOn
+  , refine
   , sepBy1
   , spanned
   , upperName
@@ -25,14 +35,7 @@ rowRef inner = spanned rowOf
   )
   where
   pureRow = { labels: [], tail: Just Pure }
-  ordinary = gathered <$> sepBy1 "+" component
-  component = dispatch [ on "..." (Right <$> spread) ] (Left <$> label inner)
-  gathered parts =
-    { labels: Array.mapMaybe (either Just noLabel) parts
-    , tail: Array.last (Array.mapMaybe (either noTail Just) parts)
-    }
-  noLabel _ = Nothing
-  noTail _ = Nothing
+  ordinary = gathered <$> validatedParts inner
   rowOf span found = RowRef span found.labels found.tail
 
 label ∷ Parser TypeRef → Parser LabelRef
@@ -46,8 +49,57 @@ label inner = spanned labelOf
     { name: identifier.text, arguments: fromMaybe [] found }
   labelOf span found = { name: found.name, arguments: found.arguments, span }
 
-spread ∷ Parser RowTail
-spread = Spread <$> (expect "..." *> identifier)
+rowArgument ∷ Parser TypeRef → Parser RowRef
+rowArgument inner = spanned rowOf (gathered <$> validatedParts inner)
   where
-  identifier = text <$> name
-  text found = found.text
+  rowOf span found = RowRef span found.labels found.tail
+
+gathered ∷ Array Part → { labels ∷ Array LabelRef, tail ∷ Maybe RowTail }
+gathered parts =
+  { labels: Array.mapMaybe labelPart parts, tail: lastTail parts }
+
+data Part = LabelPart LabelRef | TailPart RowTail Span
+
+rowPart ∷ Parser TypeRef → Parser Part
+rowPart inner = dispatch [ on "..." spreadPart ]
+  (LabelPart <$> label inner)
+  where
+  spreadPart = tailPart <$> expect "..." <*> name
+  tailPart marker found = TailPart (Spread found.text)
+    { start: marker.span.start, end: found.span.end }
+
+validatedParts ∷ Parser TypeRef → Parser (Array Part)
+validatedParts inner = refine validate (sepBy1 "+" (rowPart inner))
+  where
+  validate parts = case tails of
+    [] → Right parts
+    [ tail ] →
+      if tail.index == Array.length parts - 1 then Right parts
+      else invalid "Row tail must be last" tail.span
+    _ → invalid "Only one row tail is allowed" (secondTail tails).span
+    where
+    tails = Array.mapMaybe identity
+      ( Array.zipWith tailAt
+          (Array.range 0 (Array.length parts - 1))
+          parts
+      )
+    tailAt index = case _ of
+      TailPart _ span → Just { index, span }
+      _ → Nothing
+  secondTail tails = fromMaybe { index: 0, span: nowhere }
+    (Array.index tails 1)
+  invalid message span = Left (problemAt (Syntax message) span)
+  nowhere = { start: origin, end: origin }
+
+labelPart ∷ Part → Maybe LabelRef
+labelPart = case _ of
+  LabelPart labelValue → Just labelValue
+  _ → Nothing
+
+tailPartValue ∷ Part → Maybe RowTail
+tailPartValue = case _ of
+  TailPart tail _ → Just tail
+  _ → Nothing
+
+lastTail ∷ Array Part → Maybe RowTail
+lastTail = Array.last <<< Array.mapMaybe tailPartValue

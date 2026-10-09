@@ -59,6 +59,11 @@ code = case _ of
   RowEquality _ _ _ → Code.EffectError
   RowSort _ → Code.TypeMismatch
   NotPrintable _ → Code.TypeMismatch
+  HandlerMissing _ → Code.HandlerError
+  HandlerDuplicate _ → Code.HandlerError
+  HandlerOperation _ _ → Code.HandlerError
+  FailNeedsConcrete → Code.TypeMismatch
+  ExpectedHandler _ → Code.TypeMismatch
 
 codeName ∷ ErrorCode → String
 codeName = case _ of
@@ -124,6 +129,13 @@ message = case _ of
   RowEquality left right tail → left <> " and " <> right
     <> " cannot be made equal: both end in ..."
     <> tail
+  HandlerMissing operation → "Missing clause for " <> operation
+  HandlerDuplicate operation → "Duplicate clause for " <> operation
+  HandlerOperation operation effect → operation
+    <> " is not an operation of "
+    <> effect
+  FailNeedsConcrete → "Fail needs a concrete error family"
+  ExpectedHandler _ → "Expected a handler"
 
 wire ∷ Diagnostic → WireDiagnostic
 wire diagnostic =
@@ -160,6 +172,8 @@ duplicateWord = case _ of
   DuplicateParameter → "parameter"
   DuplicateBinder → "binder"
   DuplicateTypeParameter → "type parameter"
+  DuplicateEffect → "effect"
+  DuplicateOperation → "operation"
 
 unboundWord ∷ UnboundKind → String
 unboundWord = case _ of

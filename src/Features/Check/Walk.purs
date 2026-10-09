@@ -31,6 +31,12 @@ foldTypes step found (Checked.Expr expression) = case expression.node of
   Checked.Print value → recur own value
   Checked.OperationRef _ _ instantiation → applied instantiation []
   Checked.Perform _ _ instantiation arguments → applied instantiation arguments
+  Checked.Handler _ instantiation clauses → foldl handlerClause
+    (foldl (flip step expression.span) own instantiation)
+    clauses
+  Checked.With handler body → foldl recur own [ handler, body ]
+  Checked.Handle body clauses → foldl failureClause (recur own body) clauses
+  Checked.Fail value → recur own value
   Checked.Block items value → foldl recur own (Checked.blockParts items value)
   _ → own
   where
@@ -42,6 +48,12 @@ foldTypes step found (Checked.Expr expression) = case expression.node of
   parameter reached declared = step reached expression.span declared.ty
   arm reached checked = recur (foldPattern step reached checked.pattern)
     checked.body
+  handlerClause reached clause = foldl parameter
+    (recur reached clause.body)
+    clause.parameters
+  failureClause reached clause = recur
+    (step reached clause.span clause.payload)
+    clause.body
 
 -- The same body with `change` applied to every type `foldTypes` visits.
 retype ∷ (Ty Open → Ty Open) → Checked.Expr → Checked.Expr
@@ -79,6 +91,13 @@ retype change (Checked.Expr expression) = Checked.Expr
     Checked.Perform effect index instantiation arguments →
       Checked.Perform effect index (map change instantiation)
         (map recur arguments)
+    Checked.Handler effect instantiation clauses → Checked.Handler effect
+      (map change instantiation)
+      (map handlerClause clauses)
+    Checked.With handler body → Checked.With (recur handler) (recur body)
+    Checked.Handle body clauses → Checked.Handle (recur body)
+      (map failureClause clauses)
+    Checked.Fail value → Checked.Fail (recur value)
     Checked.Block items value → Checked.Block (map item items) (recur value)
     leaf → leaf
   parameter declared = declared { ty = change declared.ty }
@@ -89,6 +108,10 @@ retype change (Checked.Expr expression) = Checked.Expr
     { pattern = retypePattern change checked.pattern
     , body = recur checked.body
     }
+  handlerClause clause = clause
+    { parameters = map parameter clause.parameters, body = recur clause.body }
+  failureClause clause = clause
+    { payload = change clause.payload, body = recur clause.body }
 
 foldPattern ∷ ∀ b. (b → Span → Ty Open → b) → b → Checked.Pattern → b
 foldPattern step found (Checked.Pattern pattern) = case pattern.shape of

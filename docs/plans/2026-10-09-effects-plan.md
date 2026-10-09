@@ -379,8 +379,12 @@ programs at `Features.Check.Unlowered` (Global Constraints).
   `Fail`), `src/Features/Check/Comparable.purs` (handlers not
   comparable), `src/Features/Check/Walk.purs`
 - Create: `src/Format/Parse/Handler.purs`,
+  `src/Format/Parse/HandlerType.purs`,
   `src/Features/Resolve/Handler.purs`, `src/Features/Check/Handler.purs`,
   `src/Features/Check/Failure.purs` (deferred Fail keys),
+  `src/Features/Resolve/HandlerExpression.purs`,
+  `src/Features/Resolve/HandlerType.purs`,
+  `src/Features/Resolve/TypeValidation.purs`,
   `test/fx-handler-check.test.mjs`
 
 **Interfaces:**
@@ -399,7 +403,7 @@ programs at `Features.Check.Unlowered` (Global Constraints).
 - Row-parameterized types: `type Job(a, ...effects) = …`; arguments
   checked by sort and arity.
 
-- [ ] **Step 1: Write failing tests:** each E_HANDLER row; partial
+- [x] **Step 1: Write failing tests:** each E_HANDLER row; partial
   handling forwards the unmentioned family; `Fail(Error(Int))` and
   `Fail(Error(Bool))` share a key and mismatch as a payload error;
   `Fail(DbError)` and `Fail(ValidationError)` are separate; deferred key
@@ -407,11 +411,15 @@ programs at `Features.Check.Unlowered` (Global Constraints).
   type-check with the first-occurrence rule; comparing, printing or
   returning a handler (also nested in an ADT) rejected; `ctl` rejected;
   `Job(Int, Log + Clock)` accepted, `Job(Log, Int)` sort errors.
-- [ ] **Step 2: Run** `node --test test/fx-handler-check.test.mjs`.
-  Expected: FAIL.
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0.
-- [ ] **Step 5: Commit** `feat: handler and failure checking (FX001)`.
+- [x] **Step 2: Run** `node --test test/fx-handler-check.test.mjs`.
+  Focused Task 5 assertions pass (81/81); earlier RED evidence and all
+  compatibility failures/fixes are preserved in the Task 5 report.
+- [x] **Step 3: Implement.**
+- [x] **Step 4: Run** `rm -rf output && npm run verify`. Passed with 722
+  parallel tests, 22 serial tests, and 33 actual-source regression proofs;
+  `.build/fx-handler-task5-verify5.log`.
+- [x] **Step 5: Commit** `feat: handler and failure checking (FX001)`.
+  Local-only; no remote publication or merge.
 
 ### Task 6: Specialization: row erasure, effect keys and layout cycles
 

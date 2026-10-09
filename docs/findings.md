@@ -466,3 +466,16 @@ row variables must loop over long arrow spines, just as type collection
 already did; a 20,000-arrow regression and restored-source mutant pin it.
 Full verification: 672 parallel +22 serial tests, 22 existing proofs and
 four new isolated source sensitivity checks (docs/progress.md).
+
+FX001 Task 5: handler checking is complete through Check only. Rowless
+`Handler(Name)` is ambiguous with an ADT application, so resolution prefers
+a declared type named Handler and uses the effect interpretation only when
+no such type exists. Explicit `with` makes the special type unambiguous.
+Repeated duplicate scanning exposed a strictness trap: `when predicate
+ (expensive Either)` evaluates the diagnostic computation even when the
+predicate is false. Guarded branches keep it limited to actual collisions;
+one combined repeated-name pass preserves constructor/function namespace
+checking. The 20,000-type duplicate test is 475 ms after the fix (same 5 s
+bound); an isolated restored-strictness mutation fails that workload's
+timing assertion. Full Task 5 evidence and Task 9 deferred-row provenance
+handoff: .superpowers/sdd/2026-10-09-effects-plan/task-5-report.md.

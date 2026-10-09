@@ -99,12 +99,18 @@ foldCalls step found (Checked.Expr expression) = case expression.node of
   Checked.Lambda _ body → recur found body
   Checked.Print value → recur found value
   Checked.Perform _ _ _ arguments → foldl recur found arguments
+  Checked.Handler _ _ clauses → foldl handlerClause found clauses
+  Checked.With handler body → foldl recur found [ handler, body ]
+  Checked.Handle body clauses → foldl failureClause (recur found body) clauses
+  Checked.Fail value → recur found value
   Checked.Block items value → foldl recur found
     (Checked.blockParts items value)
   _ → found
   where
   recur = foldCalls step
   armBody arm = arm.body
+  handlerClause reached clause = recur reached clause.body
+  failureClause reached clause = recur reached clause.body
 
 rigid ∷ Open → Boolean
 rigid = case _ of

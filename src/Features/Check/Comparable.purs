@@ -7,6 +7,7 @@ import Data.Foldable (traverse_)
 import Domain.Checked.Internal (Open(..))
 import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..), TypeName)
+import Domain.Resolved (EffectInfo)
 import Domain.Syntax (Diagnostic, Span, problemAt)
 import Domain.Type (Ty(..))
 import Domain.Type.Parts (children)
@@ -21,7 +22,11 @@ import Features.Check.Require (Names, typeName)
 -- Comparisons are judged in source order (pre-order), each at its left
 -- operand.
 comparable
-  ∷ ∀ r. Functional → Names r → Checked.Expr → Either Diagnostic Unit
+  ∷ ∀ r
+  . Functional
+  → Names (effects ∷ Array EffectInfo | r)
+  → Checked.Expr
+  → Either Diagnostic Unit
 comparable functions env (Checked.Expr expression) = case expression.node of
   Checked.Call _ _ arguments → traverse_ recur arguments
   Checked.Construct _ _ arguments → traverse_ recur arguments
@@ -37,13 +42,25 @@ comparable functions env (Checked.Expr expression) = case expression.node of
   Checked.Pipe left right → traverse_ recur [ left, right ]
   Checked.Print value → recur value
   Checked.Perform _ _ _ arguments → traverse_ recur arguments
+  Checked.Handler _ _ clauses → traverse_ (recur <<< handlerBody) clauses
+  Checked.With handler body → traverse_ recur [ handler, body ]
+  Checked.Handle body clauses → traverse_ recur
+    (Array.cons body (map failureBody clauses))
+  Checked.Fail value → recur value
   Checked.Block items value → traverse_ recur (Checked.blockParts items value)
   _ → pure unit
   where
   recur = comparable functions env
   armBody arm = arm.body
+  handlerBody clause = clause.body
+  failureBody clause = clause.body
 
-judge ∷ ∀ r. Functional → Names r → Checked.Expr → Either Diagnostic Unit
+judge
+  ∷ ∀ r
+  . Functional
+  → Names (effects ∷ Array EffectInfo | r)
+  → Checked.Expr
+  → Either Diagnostic Unit
 judge functions env operand =
   if Array.any rigid variables then reject NotComparable
   else if not (Array.null variables) then reject AmbiguousType
@@ -57,7 +74,7 @@ judge functions env operand =
 
 rejected
   ∷ ∀ r
-  . Names r
+  . Names (effects ∷ Array EffectInfo | r)
   → Span
   → Ty Open
   → (TypeName → Problem)

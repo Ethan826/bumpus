@@ -51,10 +51,17 @@ check env subst definition body
 origin ∷ EffectRef → Checked.Expr → Maybe Checked.Expr
 origin effect whole@(Checked.Expr expression) = case expression.node of
   Checked.Perform owner _ _ _ | effect == UserEffect owner → Just whole
+  Checked.Handler _ _ clauses → first (map handlerBody clauses)
+  Checked.With handler body → first [ handler, body ]
+  Checked.Handle body clauses → first
+    (Array.cons body (map failureBody clauses))
+  Checked.Fail value → origin effect value
   Checked.Block items value → first (Checked.blockParts items value)
   Checked.Call _ _ arguments → first arguments
   Checked.Apply callee arguments → first (Array.cons callee arguments)
   Checked.Lambda _ body → origin effect body
   _ → Nothing
   where
+  handlerBody clause = clause.body
+  failureBody clause = clause.body
   first parts = Array.head (Array.mapMaybe (origin effect) parts)

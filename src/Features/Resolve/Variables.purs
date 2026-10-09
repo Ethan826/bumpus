@@ -42,7 +42,9 @@ occurrences = case _ of
   Syntax.BoolRef _ → []
   Syntax.UnitRef _ → []
   Syntax.VarRef _ name → [ name ]
-  Syntax.NamedRef _ _ arguments → Array.concatMap occurrences arguments
+  Syntax.NamedRef _ _ arguments → Array.concatMap argumentNames arguments
+  Syntax.THandlerRef _ label row → labelOccurrences label
+    <> maybe [] rowVariableNames row
   arrow@(Syntax.FunRef _ _ _ _) → spineOccurrences (Syntax.typeRefSpine arrow)
   where
   spineOccurrences found = Array.concatMap occurrences
@@ -79,9 +81,28 @@ type Occurrence = { name ∷ String, sort ∷ Syntax.Sort, span ∷ Syntax.Span 
 typeOccurrences ∷ Syntax.TypeRef → Array Occurrence
 typeOccurrences = case _ of
   Syntax.VarRef span name → [ { name, span, sort: Syntax.TypeSort } ]
-  Syntax.NamedRef _ _ arguments → Array.concatMap typeOccurrences arguments
+  Syntax.NamedRef _ _ arguments → Array.concatMap argumentOccurrences arguments
+  Syntax.THandlerRef _ label row → labelTypeOccurrences label
+    <> maybe [] rowOccurrences row
   arrow@(Syntax.FunRef _ _ _ _) → arrowOccurrences arrow
   _ → []
+
+argumentNames ∷ Syntax.TypeArgument → Array String
+argumentNames = case _ of
+  Syntax.TypeArgument reference → occurrences reference
+  Syntax.RowArgument row → rowVariableNames row
+    <> Array.concatMap labelNames (rowLabels row)
+
+labelNames ∷ Syntax.LabelRef → Array String
+labelNames label = Array.concatMap occurrences label.arguments
+
+rowLabels ∷ Syntax.RowRef → Array Syntax.LabelRef
+rowLabels (Syntax.RowRef _ labels _) = labels
+
+argumentOccurrences ∷ Syntax.TypeArgument → Array Occurrence
+argumentOccurrences = case _ of
+  Syntax.TypeArgument reference → typeOccurrences reference
+  Syntax.RowArgument row → rowOccurrences row
 
 -- Collect the right spine by loops; annotations on each stage still
 -- contribute variables, ordered by source offset in sortedVariables.
@@ -104,3 +125,14 @@ rowOccurrences (Syntax.RowRef span labels tail) =
   arguments label = Array.concatMap typeOccurrences label.arguments
   ending Syntax.Pure = []
   ending (Syntax.Spread name) = [ { name, span, sort: Syntax.RowSort } ]
+
+labelOccurrences ∷ Syntax.LabelRef → Array String
+labelOccurrences label = Array.concatMap occurrences label.arguments
+
+labelTypeOccurrences ∷ Syntax.LabelRef → Array Occurrence
+labelTypeOccurrences label = Array.concatMap typeOccurrences label.arguments
+
+rowVariableNames ∷ Syntax.RowRef → Array String
+rowVariableNames reference = map name (rowOccurrences reference)
+  where
+  name occurrence = occurrence.name

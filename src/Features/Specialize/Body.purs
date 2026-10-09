@@ -87,6 +87,10 @@ copyNode scope span = case _ of
   Checked.Print value → IR.Print <$> recur value
   Checked.OperationRef _ _ _ → internal "unlowered effect" span unit
   Checked.Perform _ _ _ _ → internal "unlowered effect" span unit
+  Checked.Handler _ _ _ → internal "unlowered effect" span unit
+  Checked.With _ _ → internal "unlowered effect" span unit
+  Checked.Handle _ _ → internal "unlowered effect" span unit
+  Checked.Fail _ → internal "unlowered effect" span unit
   Checked.Block items value → IR.Block <$> traverse (item scope) items
     <*> recur value
   where

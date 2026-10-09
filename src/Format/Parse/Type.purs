@@ -6,16 +6,21 @@ import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Tuple (Tuple(..))
+import Data.Traversable (traverse)
 import Domain.Problem (Problem(..))
 import Domain.Syntax
   ( Diagnostic
   , Position
-  , RowRef
+  , RowRef(..)
+  , RowTail(..)
   , Span
+  , TypeArgument(..)
   , TypeRef(..)
   , problemAt
   )
-import Format.Parse.Row (rowRef)
+import Format.Parse.Row (rowArgument, rowRef)
+import Format.Parse.HandlerType as HandlerType
 import Format.Lex (Token, isName, isUpper)
 import Format.Parse.Grammar
   ( Parser
@@ -36,7 +41,7 @@ import Format.Parse.Grammar
   , upperName
   )
 
-type Applied = { identifier ∷ Token, arguments ∷ Maybe (Array TypeRef) }
+type Applied = { identifier ∷ Token, arguments ∷ Maybe (Array TypeArgument) }
 
 -- What one `->` separates: an operand, or a parenthesized list of types.
 type Segment =
@@ -75,6 +80,7 @@ operand inner = dispatch
   [ on "Int" (IntRef <$> tokenSpan)
   , on "Bool" (BoolRef <$> tokenSpan)
   , on "Unit" (UnitRef <$> tokenSpan)
+  , on "Handler" (HandlerType.operand inner)
   , onWhen upperText (spanned appliedOf (parts <$> upperName <*> arguments))
   , onWhen lowerText (variable <$> token)
   ]
@@ -82,7 +88,15 @@ operand inner = dispatch
   where
   parts identifier found = { identifier, arguments: found }
   arguments = optionalOn "(" (expect "(" *> sepBy1 "," argument <* expect ")")
-  argument = nested inner
+  argument = dispatch
+    [ on "..." (spreadArgument inner)
+    , on "pure" pureArgument
+    ]
+    (typeOrRow inner)
+  pureRowArgument = spanned pureRow (expect "pure")
+  pureRow span _ = RowRef span [] (Just Pure)
+  spreadArgument parser = RowArgument <$> rowArgument parser
+  pureArgument = RowArgument <$> pureRowArgument
   variable found = VarRef found.span found.text
 
 -- A list of two or more types must be followed by `->`, which the chain
@@ -142,6 +156,44 @@ combined chain =
 appliedOf ∷ Span → Applied → TypeRef
 appliedOf span found =
   NamedRef span found.identifier.text (fromMaybe [] found.arguments)
+
+typeOrRow ∷ Parser TypeRef → Parser TypeArgument
+typeOrRow inner = refine makeArgument
+  ( Tuple <$> nested inner
+      <*> optionalOn "+" (expect "+" *> rowArgument inner)
+  )
+  where
+  makeArgument (Tuple first Nothing) = Right (TypeArgument first)
+  makeArgument (Tuple first (Just rest)) = rowArgumentFor first rest
+  rowArgumentFor first rest = case first of
+    NamedRef span name arguments →
+      RowArgument <$>
+        ( addFirst span name <$> traverse typeArgument arguments
+            <*> pure rest
+        )
+    _ → expectedLabel first
+  expectedLabel first = Left
+    (problemAt (Syntax "Expected an effect label") (typeRefSpan first))
+  typeArgument = case _ of
+    TypeArgument found → Right found
+    RowArgument row → Left (problemAt (RowSort false) (rowSpan row))
+  rowSpan (RowRef span _ _) = span
+
+addFirst ∷ Span → String → Array TypeRef → RowRef → RowRef
+addFirst span name arguments (RowRef rest labels tail) = RowRef
+  { start: span.start, end: rest.end }
+  (Array.cons { name, arguments, span } labels)
+  tail
+
+typeRefSpan ∷ TypeRef → Span
+typeRefSpan = case _ of
+  IntRef span → span
+  BoolRef span → span
+  UnitRef span → span
+  VarRef span _ → span
+  NamedRef span _ _ → span
+  FunRef span _ _ _ → span
+  THandlerRef span _ _ → span
 
 unknown ∷ Token → Either Diagnostic TypeRef
 unknown found = Left (problemAt (Syntax "Expected a type") found.span)

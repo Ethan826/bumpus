@@ -33,6 +33,10 @@ data Expr
   | Pipe Span Expr Expr
   | UnitValue Span
   | Block Span (Array Item) Expr
+  | HandlerExpr Span LabelRef (Array Clause)
+  | With Span Expr Expr
+  | Handle Span Expr (Array FailClause)
+  | Fail Span Expr
 
 -- A block item (FX001 design §1): `let name = e`, `let _ = e` (Nothing)
 -- spanning `let` through `e`, or `e`, whose value is discarded. A block
@@ -51,6 +55,15 @@ data Pattern
   | PCtor Span String (Array Pattern)
 
 type Arm = { pattern ∷ Pattern, body ∷ Expr, span ∷ Span }
+type Clause =
+  { name ∷ String
+  , parameters ∷ Array HandlerParameterRef
+  , body ∷ Expr
+  , span ∷ Span
+  }
+
+type HandlerParameterRef = { name ∷ Maybe String, span ∷ Span }
+type FailClause = { name ∷ String, ty ∷ TypeRef, body ∷ Expr, span ∷ Span }
 
 -- A lowercase name is a type variable; an applied type spans its head
 -- through its closing parenthesis. `FunRef` is one arrow, parameter then
@@ -60,8 +73,11 @@ data TypeRef
   | BoolRef Span
   | UnitRef Span
   | VarRef Span String
-  | NamedRef Span String (Array TypeRef)
+  | NamedRef Span String (Array TypeArgument)
+  | THandlerRef Span LabelRef (Maybe RowRef)
   | FunRef Span TypeRef (Maybe RowRef) TypeRef
+
+data TypeArgument = TypeArgument TypeRef | RowArgument RowRef
 
 data Sort = TypeSort | RowSort
 
@@ -76,7 +92,7 @@ type LabelRef = { name ∷ String, arguments ∷ Array TypeRef, span ∷ Span }
 type RefSpine = { parameters ∷ Array TypeRef, result ∷ TypeRef }
 
 type CtorDecl = { name ∷ String, fields ∷ Array TypeRef, span ∷ Span }
-type TypeParameter = { name ∷ String, span ∷ Span }
+type TypeParameter = { name ∷ String, sort ∷ Sort, span ∷ Span }
 type TypeDecl =
   { name ∷ String
   , parameters ∷ Array TypeParameter
@@ -154,6 +170,10 @@ exprSpan = case _ of
   Pipe span _ _ → span
   UnitValue span → span
   Block span _ _ → span
+  HandlerExpr span _ _ → span
+  With span _ _ → span
+  Handle span _ _ → span
+  Fail span _ → span
 
 typeRefSpan ∷ TypeRef → Span
 typeRefSpan = case _ of
@@ -162,6 +182,7 @@ typeRefSpan = case _ of
   UnitRef span → span
   VarRef span _ → span
   NamedRef span _ _ → span
+  THandlerRef span _ _ → span
   FunRef span _ _ _ → span
 
 -- A written spine can be thousands of arrows long, so it is walked by

@@ -38,6 +38,13 @@ import Format.Parse.Grammar
   )
 import Format.Parse.Block (block, parenthesized)
 import Format.Parse.Lambda (lambda)
+import Format.Parse.Handler
+  ( failExpr
+  , handleExpr
+  , handlerExpr
+  , unsupportedControl
+  , withExpr
+  )
 import Format.Parse.Literal (integerLiteral, integerStart)
 import Format.Parse.Pattern (arms)
 
@@ -71,6 +78,9 @@ expression = dispatch
   , on "match" (matchExpression inner)
   , on "fn" (lambda inner)
   , on "{" (block inner)
+  , on "handler" (handlerExpr inner)
+  , on "with" (withExpr inner)
+  , on "handle" (handleExpr inner)
   ]
   (pipeline inner)
   where
@@ -165,6 +175,9 @@ chain inner = joined <$> group <*> manyOn "(" group
 primary ∷ Parser Expr → Parser Primary
 primary inner = dispatch
   [ on "(" (parenthesized inner)
+  , on "fail" (bare <$> failExpr inner)
+  , on "ctl" (bare <$> unsupportedControl)
+  , on "resume" (bare <$> unsupportedControl)
   , on "true" (bare <<< boolean true <$> token)
   , on "false" (bare <<< boolean false <$> token)
   , onWhen integerStart (bare <<< integer <$> integerLiteral)
