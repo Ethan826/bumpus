@@ -168,10 +168,8 @@ handle {
 Without B1, `load(2)`'s panic has no owner on its goroutine; the
 process dies without the parent's cleanup.
 
-**B2. Clauses run on the child.** A parent-installed handler reached by a
-child runs its clause on the child's goroutine in the handler-site
-context; the clause's own effects are discharged there and never appear
-in the child's row. A clause's `fail` toward a parent `handle` is B1.
+**B2. Clauses run on the child**, in the handler-site context; their own
+effects never appear in the child's row; a clause's `fail` is B1.
 
 **B3. Sharing versus transfer.** Shareability is a property of *types*,
 derived transitively: immutable data and function values are Shareable;
@@ -195,14 +193,11 @@ row holds local Counter), the second by a Shareable check on captured
 free variables. In FX001 every type is Shareable, so it rejects nothing
 yet; FX003 cannot land without it. Affine transfer is deferred.
 
-**B4. Child failures.** A child's outcome is a value, a typed abort (B1),
-or a defect with its cause list (its cleanup causes appended). The parent
-waits for the outcomes §6 needs, then binds the values or re-raises the
-selected outcome: an abort keeps its target; a defect stays uncatchable
-and its causes start the parent's report. Defects are not caught at the
-boundary (supervision stays deferred, D9). Any program containing `par`
-emits the defect runtime (`waxwingReport`), so a forwarded Go runtime
-panic is reported in Waxwing's format, not Go's trace.
+**B4. Child failures.** Outcomes: value, typed abort (B1), or defect with
+its causes. The parent binds values or re-raises the selected outcome (§6):
+an abort keeps its target; a defect stays uncatchable and its causes start
+the parent's report (no supervision, D9). A program with `par` emits the
+defect runtime, so forwarded Go runtime panics use Waxwing's format.
 
 **B5. Child-local constructs.** `with`, `handle`, markers and `defer` in
 a child are its own; its cleanup runs on its goroutine before its
@@ -210,15 +205,16 @@ outcome is recorded (exactly once, spec §3).
 
 ## 6. Equivalence, resources and failure selection
 
-**Equivalence (conditional).** Condition: no goroutine started by the
-construct (inline and discarded children included, at any time) and no
-spawned stack it adds incurs a Go fatal error. Under it, `par let x1 =
-e1, …, xn = en;` has the observable outcome of `let x1 = e1; …; let xn =
-en;` evaluated left to right, over {value, typed abort, recoverable
+**Equivalence (conditional).** Condition, over both runs: the
+sequential run `let x1 = e1; …; let xn = en;` incurs no Go fatal error,
+and in the parallel run no Go fatal error occurs in the process while any
+goroutine started by the construct (inline, nested and discarded
+included) is live. Under it, `par let x1 = e1, …, xn = en;` has the
+sequential observable outcome over {value, typed abort, recoverable
 defect with its cause list, divergence}. Assumption: every divergent
-Waxwing computation makes unboundedly many calls (Waxwing has no loop
-construct), so function-entry polls reach it. The condition is not
-checkable statically; the resource clauses bound the extra exposure.
+computation makes unboundedly many calls (Waxwing has no loop construct,
+and current lowering emits only bounded runtime loops), so function-entry
+polls reach it. The condition is not checkable statically.
 
 **Execution and discard (part of CF001).**
 - *Bounded live tasks.* At most B child goroutines are live program-wide
@@ -230,33 +226,43 @@ checkable statically; the resource clauses bound the extra exposure.
   root wrapper with its own task record: it recovers the child's outcome
   and records it, never raising it, so an inline child's abort cannot
   pre-empt a crash of a spawned child to its left.
-- *Eager discard.* When child j's root records a non-value, it sets the
-  `discarded` flag of every sibling with index > j (safe: the selected
-  index is at most j). An inline child not yet started is skipped; a
-  running one, spawned or inline, unwinds at its next function-entry poll
-  to its root, which records "discarded". So `par let a = fail(E), b =
-  spin();` with `b` inline aborts, as sequentially.
-- *Polls.* Each poll is a nil-checked load of the task pointer plus an
-  atomic load of its flag. It does not fire while the task runs deferred
-  expressions (N3 contract below). The join does not wait for discarded
-  children; they release their budget slot when they exit.
+- *Eager discard.* When child j's root records a non-value, it discards
+  every sibling with index > j (safe: the selected index is at most j).
+  An inline child not yet started is skipped; a running one unwinds at its
+  next poll to its root, which records "discarded" (`X`). So `par let a =
+  fail(E), b = spin();` with `b` inline aborts, as sequentially.
+- *Propagation to nested `par`.* Each task record links its live
+  children (registered at fork). Discarding a task sets its flag and,
+  transitively, its live descendants' flags; a task forked by an already
+  discarded task starts discarded. Exception: a task forked while its
+  parent is in cleanup (a `par` inside `defer`) is shielded: propagation
+  skips it and its own join is not a discard point until that cleanup
+  ends (P4). Example: `par let a = fail(E), b = { par let c = grow(nil),
+  d = 1; c };` discards `b`, hence `c`, which stops at its next call.
+- *Polls.* Function entry and every join are poll points. A poll is a
+  nil-checked load of the task pointer plus an atomic load of its flag;
+  it does not fire while the task runs deferred expressions. A discarded
+  task waiting at its own join abandons it and unwinds. The join does not
+  wait for discarded children; they release their budget slot on exit.
 - *Stack and memory.* A spawned child starts on a fresh stack, so per
   goroutine depth never exceeds the sequential depth, and a sequential
-  overflow may complete in parallel; but up to B live stacks add
-  aggregate memory, so out-of-memory can occur where the sequential run
-  does not (covered by the condition, not guaranteed against).
-- *Residual exposure.* Work and allocation of a discarded child between
-  the flag and its next call, and a discarded child's pure cleanup that
-  diverges (it keeps a goroutine until program exit).
+  overflow may complete in parallel (excluded by the condition on the
+  sequential run). Out-of-memory is process-wide: up to B live stacks and
+  concurrent allocation can exhaust memory the sequential run would not.
+- *Residual exposure.* A discarded task's work until its next poll; a
+  discarded task's diverging pure cleanup keeps its goroutine.
 
 **Discard runtime contract (extension of Task 8).** Discard unwinds with
 a distinct sentinel panic (`waxwingDiscard`), which `handle` re-panics as
 any non-owned panic; `waxwingCleanup` treats it as a pending non-defect:
 it runs the remaining cleanup, records no cause for it and re-panics the
-sentinel (a defect raised by cleanup meanwhile is recorded as usual and
-ignored with the discarded outcome); a per-task cleanup depth, owned by
-the child's goroutine, masks polls while deferred expressions run, so each
-cleanup runs exactly once and to completion (O6, C4).
+sentinel, even if a cleanup raised a defect meanwhile (those causes are
+dropped with the discarded outcome). A root records `X` for any panic it
+recovers while its task is flagged, sentinel or defect; no task identity
+is needed in the sentinel. A per-task cleanup depth, owned by the task's
+goroutine, masks its polls while deferred expressions run, and children
+forked inside that cleanup are shielded (above), so each cleanup runs
+exactly once and to completion (O6, C4).
 
 **Failure selection (leftmost).** Let i be the least index whose child
 did not produce a value. The parent waits until children 1..i-1 recorded
@@ -352,8 +358,12 @@ inside it. When child j records `A` or `D`, every child k > j gets `X`
 Join: if all `ok = V vk`, bind and continue. If the least i with
 `oi ∉ V` has `oi ∈ {A, D}` and `oj = V` for all j < i, re-raise `oi`
 (abort: panic to m on the parent goroutine; defect: causes `cs`, then
-parent cleanup causes). Otherwise wait. `X` is never selected: only
-indices > some recorded failure receive it.
+parent cleanup causes). If the parent is itself discarded (and not in
+cleanup), it abandons the join and unwinds. Otherwise wait. Within one
+level `X` is never selected: a sibling discard reaches only indices >
+some recorded failure, and overwriting their recorded outcomes is
+harmless because they are unselectable; an ancestor discard reaches every
+child but also abandons the parent's join, so no selection happens.
 
 **Per-guarantee contract.**
 | Property | Assumptions | Compiler checks | Runtime left | Excluded programs |
@@ -376,7 +386,7 @@ indices > some recorded failure receive it.
 | O7 | Every recoverable panic on a child goroutine is recovered by its root | TEST-ONLY (injected crashes, guard panics, Go runtime panics) |
 | O8 | Publication of Γ and outcomes: `WaitGroup.Done` synchronizes before the `Wait` it unblocks | ESTABLISHED (Go `sync` documentation); the `go`-statement rule: trusted platform guarantee, not re-verified here |
 | O9 | Per construct, any mix of spawned and inline children yields the sequential outcome (eager discard reaches inline children; roots never raise) | PROPOSED PROOF + TEST-ONLY (budgets 0, 1, B; budget 1 with a spawned failing left child and an inline divergent right child must abort) |
-| O10 | A discarded child stops at its next function entry outside cleanup; live goroutines never exceed B | TEST-ONLY (probes: `fib`, `grow`, `par let a = slow(), b = fail(E), c = grow(nil)`, discard in a loop) |
+| O10 | A discarded child stops at its next function entry outside cleanup; live goroutines never exceed B | TEST-ONLY (probes: `fib`, `grow`, `par let a = slow(), b = fail(E), c = grow(nil)`, nested `par let a = fail(E), b = { par let c = grow(nil), d = 1; c }`, `par` inside `defer` under discard, discard in a loop) |
 | O11 | Fatal-error exposure is limited to §6's residual cases | TEST-ONLY (documented limitation) |
 
 Oracle: plan Task 10's interpreter running `par` sequentially, diffed
@@ -422,8 +432,13 @@ chunking of large `par`; goroutine- versus CPS-backed one-shot resume.
    lookup). Programs without `par` are unchanged, so plan test 13 and the
    byte-identical snapshots still hold. Rejected alternative: polls only at
    `par`, join and operation boundaries cannot stop a pure divergent child.
+   Lowering invariant (with a test): any future lowering that turns (tail)
+   recursion or another construct into a Go loop keeps a poll in each
+   iteration.
 6. Task 8 runtime contract: the discard sentinel, its non-defect
-   treatment in `waxwingCleanup`, and poll masking during cleanup (§6).
+   treatment in `waxwingCleanup`, poll masking during cleanup, and
+   discard propagation to nested tasks with shielding of tasks forked in
+   cleanup (§6).
 No change is needed to row erasure, markers, the `defer`-must-not-fail
 decision, or (for CF001) the report format; FX002 may change the format
 if sibling defects become secondary lines.
@@ -501,18 +516,15 @@ fetched). Re-read theorem wording in full text before writing any proof.
 
 ## Review response (2026-10-09)
 
-Round 1 (review-cf001-result.md). C1: conditional equivalence; bounded
-tasks, inline fallback and discard in the subset. I1: R0. I2: O1
-FX001-relative; capture check. I3: transitive handler Shareability. I4:
-O3 PROPOSED PROOF; O8 split. I5: OCaml corrected; C6 new. I6: "Established
-by" column; policy scope; blocking lattices built-in only. I7: 4.5b and
-§9 table. I8: handoff 4. M1-M10 applied. Declined: none.
-
-Round 2 (rereview-cf001-result.md). N1: a root for every child (inline
-included) that records, never raises; eager discard right of a recorded
-failure; exact condition and no-loop assumption (§6); `X` in the sketch;
-O9/O10 tests. N2: change 5 (`par` as ctx trigger, polls, example, cost)
-and the Task 7 note; C1 explains CF001's task-identity placement. N3:
-discard runtime contract (§6, change 6). R0 matches the `defer` ruling,
-with diagnostics; only strictness versus a lacks-constraint awaits the
-user. M-a to M-d applied. Declined: none.
+Round 1 (review-cf001-result.md): C1, I1-I8 and M1-M10 applied (see
+§6, R0, B3, §4, §9, §10). Round 2 (rereview-cf001-result.md): N1 roots
+for every child and eager discard; N2 change 5; N3 discard contract and
+change 6; R0 aligned with the `defer` ruling; M-a to M-d applied.
+Round 3 (rereview2-cf001-result.md): P1 discard propagates to live
+descendants, tasks forked by discarded tasks start discarded, joins are
+poll points, a discarded parent abandons its join, `X` invariant restated
+across levels, nested probe in O10, change 6 extended; P2 condition over
+both runs, out-of-memory process-wide; P3 loop-lowering poll invariant
+(change 5); P4 tasks forked in cleanup shielded; P5 roots see the
+sentinel and record `X` for anything recovered while flagged. Declined in
+all rounds: none.
