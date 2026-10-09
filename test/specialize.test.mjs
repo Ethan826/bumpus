@@ -68,9 +68,12 @@ const withoutResolution = ({ effects, ...program }) => {
 const identical = source => {
   const resolved = succeeded(resolve(succeeded(parse(source), source)), source);
   const program = succeeded(check(resolved), source);
-  const { funTypes, ...specialized } = succeeded(specialize(program), source);
-  // A monomorphic program without arrows interns none (FN001 Task 5).
+  const { funTypes, effects, ...specialized } =
+    succeeded(specialize(program), source);
+  // A monomorphic program without arrows interns none (FN001 Task 5), and
+  // one without effects has no effect layout (FX001 Task 6).
   assert.deepEqual(funTypes, [], 'arrow table');
+  assert.deepEqual(effects, [], 'effect layouts');
   for (const table of ['types', 'ctors', 'functions']) {
     assert.equal(specialized[table].length, program[table].length, table);
   }

@@ -84,9 +84,9 @@ const keysOf = source => {
 };
 const listOf = argument => TData.create(0)([argument])([]);
 const typeKey = (declaration, args) =>
-  ({ declaration, function: false, arguments: args });
+  ({ declaration, function: false, effect: false, arguments: args });
 const functionKey = (declaration, args) =>
-  ({ declaration, function: true, arguments: args });
+  ({ declaration, function: true, effect: false, arguments: args });
 
 // List is type 0, length function 0 and main function 1 in `library`.
 test('length(Nil) shares the length key at Int', () => {

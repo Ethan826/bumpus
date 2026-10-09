@@ -75,9 +75,12 @@ for (const [name, program] of bareCycles) {
   });
 }
 
+// The result's handler row is `pure`: a bare `Handler(Grow(Int))` result
+// would share grow's ambient row, which the clause's `next` result (an
+// operation type, so `pure`) cannot match (design §1, §2).
 test('a Grow handler at bare parameters makes one effect key', () => {
   const source = list + 'effect Grow(a) { fn next(): Handler(Grow(a)); }; '
-    + 'fn grow(): Handler(Grow(Int)) = handler Grow(Int) '
+    + 'fn grow(): Handler(Grow(Int) with pure) = handler Grow(Int) '
     + '{ next() => grow() };' + main;
   assert.deepEqual(keysOf(source, /^effect/), ['effect Grow[Int]']);
 });
