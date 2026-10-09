@@ -4,9 +4,12 @@ import Prelude
 import Data.Array as Array
 import Data.Maybe (Maybe)
 import Domain.Syntax (Operator, Span)
+import Domain.Type (TyRow)
+import Domain.Ids (EffectId)
 import Domain.Resolved
   ( CtorId
   , CtorInfo
+  , EffectInfo
   , FunctionId
   , LocalId
   , Ty
@@ -29,7 +32,8 @@ derive instance ordOpen ∷ Ord Open
 type Instantiation = Array (Ty Open)
 
 newtype Program = Program
-  { types ∷ Array TypeInfo
+  { effects ∷ Array EffectInfo
+  , types ∷ Array TypeInfo
   , ctors ∷ Array CtorInfo
   , functions ∷ Array FunctionDecl
   , entry ∷ FunctionId
@@ -41,6 +45,7 @@ type FunctionDecl =
   , name ∷ String
   , parameters ∷ Array (Ty Open)
   , result ∷ Ty Open
+  , row ∷ TyRow Open
   , body ∷ Expr
   , span ∷ Span
   }
@@ -70,6 +75,9 @@ data Node
   | Pipe Expr Expr
   | UnitValue
   | Block (Array Item) Expr
+  | Print Expr
+  | OperationRef EffectId Int Instantiation
+  | Perform EffectId Int Instantiation (Array Expr)
 
 -- A block item (FX001): a monomorphic `let` of a local or `_`, or a
 -- discarded value.

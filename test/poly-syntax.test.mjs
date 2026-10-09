@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TData, TVar } from '../output/Domain.Type/index.js';
+import { TypeSort, RowSort } from '../output/Domain.Syntax/index.js';
 import * as problem from '../output/Domain.Problem/index.js';
 import { message } from '../output/Format.Diagnostic/index.js';
 import { nestingLimit } from '../output/Format.Parse.Grammar/index.js';
@@ -77,29 +78,33 @@ test('parameterized declarations resolve; VarId i is the i-th parameter',
 
 test('type variables do not collide with value names', () => {
   const [a] = resolved('fn a(a: a): a = a;' + main).functions;
-  assert.deepEqual(a.variables, ['a']);
+  assert.deepEqual(a.variables, ['a', '']);
   assert.deepEqual(a.parameters[0].ty, TVar.create(0));
   assert.deepEqual(a.result, TVar.create(0));
+  assert.deepEqual(a.sorts, [TypeSort.value, RowSort.value]);
 });
 
 test('function variables number in first occurrence, parameters then result',
   () => {
     const [f] = resolved(list + ' type Pair(a, b) = Pair(a, b);'
       + ' fn f(x: b, y: List(a)): Pair(c, b) = f(x, y);' + main).functions;
-    assert.deepEqual(f.variables, ['b', 'a', 'c']);
+    assert.deepEqual(f.variables, ['b', 'a', 'c', '']);
+    assert.deepEqual(f.sorts, [TypeSort.value, TypeSort.value,
+      TypeSort.value, RowSort.value]);
     assert.deepEqual(f.result,
       TData.create(1)([TVar.create(2), TVar.create(0)])([]));
   });
 
 test('a variable may appear only in the result', () => {
   const [loop] = resolved('fn loop(): a = loop();' + main).functions;
-  assert.deepEqual(loop.variables, ['a']);
+  assert.deepEqual(loop.variables, ['a', '']);
 });
 
-test('monomorphic declarations have no parameters or variables', () => {
+test('monomorphic declarations have one ambient row variable', () => {
   const program = resolved('type T = A(Int);' + main);
   assert.deepEqual(program.types[0].parameters, []);
-  assert.deepEqual(program.functions[0].variables, []);
+  assert.deepEqual(program.functions[0].variables, ['']);
+  assert.deepEqual(program.functions[0].sorts, [RowSort.value]);
 });
 
 test('type names render applied types, variables and holes', () => {

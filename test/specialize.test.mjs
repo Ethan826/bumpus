@@ -47,8 +47,18 @@ const ctorInfo = ({ fieldSyntax, ...info }) => {
   assert.equal(fieldSyntax.length, info.fields.length, info.name);
   return info;
 };
-const withoutResolution = program => ({ ...program,
-  types: program.types.map(typeInfo), ctors: program.ctors.map(ctorInfo) });
+const functionInfo = ({ row, ...info }) => {
+  assert.deepEqual(row.value0, [], `${info.name} has effect labels`);
+  assert.equal(row.value1.constructor.name, 'Just');
+  assert.equal(row.value1.value0.constructor.name,
+    info.name === 'main' ? 'Hole' : 'Rigid');
+  return info;
+};
+const withoutResolution = ({ effects, ...program }) => {
+  assert.deepEqual(effects, [], 'effect declarations');
+  return { ...program, functions: program.functions.map(functionInfo),
+    types: program.types.map(typeInfo), ctors: program.ctors.map(ctorInfo) };
+};
 
 const identical = source => {
   const resolved = succeeded(resolve(succeeded(parse(source), source)), source);

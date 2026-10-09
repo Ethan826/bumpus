@@ -1,4 +1,4 @@
-module Format.Go.Usage (needsBoolHelper) where
+module Format.Go.Usage (needsBoolHelper, needsPrint) where
 
 import Prelude
 import Data.Array as Array
@@ -36,7 +36,31 @@ usesBoolOrdering (IR.Expr expression) = case expression.node of
   IR.Lambda _ body → usesBoolOrdering body
   IR.Pipe left right → anyOf [ left, right ]
   IR.UnitValue → false
+  IR.Print value → usesBoolOrdering value
   IR.Block items value → anyOf (IR.blockParts items value)
   where
   anyOf = Array.any usesBoolOrdering
   armUses arm = usesBoolOrdering arm.body
+
+needsPrint ∷ IR.Program → Boolean
+needsPrint (IR.Program program) = Array.any inFunction program.functions
+  where
+  inFunction function = prints function.body
+
+prints ∷ IR.Expr → Boolean
+prints (IR.Expr expression) = case expression.node of
+  IR.Print _ → true
+  IR.Call _ arguments → anyOf arguments
+  IR.Construct _ arguments → anyOf arguments
+  IR.Add left right → anyOf [ left, right ]
+  IR.Compare _ left right → anyOf [ left, right ]
+  IR.If condition yes no → anyOf [ condition, yes, no ]
+  IR.Match scrutinee arms → prints scrutinee || Array.any armPrints arms
+  IR.Apply callee arguments → anyOf (Array.cons callee arguments)
+  IR.Lambda _ body → prints body
+  IR.Pipe left right → anyOf [ left, right ]
+  IR.Block items value → anyOf (IR.blockParts items value)
+  _ → false
+  where
+  anyOf = Array.any prints
+  armPrints arm = prints arm.body

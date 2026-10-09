@@ -28,6 +28,9 @@ foldTypes step found (Checked.Expr expression) = case expression.node of
   Checked.Compare _ left right → foldl recur own [ left, right ]
   Checked.If condition yes no → foldl recur own [ condition, yes, no ]
   Checked.Match scrutinee arms → foldl arm (recur own scrutinee) arms
+  Checked.Print value → recur own value
+  Checked.OperationRef _ _ instantiation → applied instantiation []
+  Checked.Perform _ _ instantiation arguments → applied instantiation arguments
   Checked.Block items value → foldl recur own (Checked.blockParts items value)
   _ → own
   where
@@ -70,6 +73,12 @@ retype change (Checked.Expr expression) = Checked.Expr
     Checked.Lambda parameters body → Checked.Lambda (map parameter parameters)
       (recur body)
     Checked.Pipe left right → Checked.Pipe (recur left) (recur right)
+    Checked.Print value → Checked.Print (recur value)
+    Checked.OperationRef effect index instantiation →
+      Checked.OperationRef effect index (map change instantiation)
+    Checked.Perform effect index instantiation arguments →
+      Checked.Perform effect index (map change instantiation)
+        (map recur arguments)
     Checked.Block items value → Checked.Block (map item items) (recur value)
     leaf → leaf
   parameter declared = declared { ty = change declared.ty }

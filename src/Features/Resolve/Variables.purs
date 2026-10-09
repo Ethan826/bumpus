@@ -1,12 +1,15 @@
 module Features.Resolve.Variables
   ( signatureVariables
+  , sortedVariables
   , uniqueTypeParameters
   ) where
 
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Foldable (traverse_)
+import Data.Foldable (foldM, traverse_)
+import Data.Maybe (Maybe(..), maybe)
+import Data.Traversable (mapAccumL)
 import Domain.Problem (DuplicateKind(..), Problem(..))
 import Domain.Syntax as Syntax
 import Features.Resolve.Repeated (laterRepeat)
@@ -40,7 +43,64 @@ occurrences = case _ of
   Syntax.UnitRef _ → []
   Syntax.VarRef _ name → [ name ]
   Syntax.NamedRef _ _ arguments → Array.concatMap occurrences arguments
-  arrow@(Syntax.FunRef _ _ _) → spineOccurrences (Syntax.typeRefSpine arrow)
+  arrow@(Syntax.FunRef _ _ _ _) → spineOccurrences (Syntax.typeRefSpine arrow)
   where
   spineOccurrences found = Array.concatMap occurrences
     (Array.snoc found.parameters found.result)
+
+-- Sort disagreements are diagnosed at the second written occurrence.
+sortedVariables
+  ∷ Array Syntax.TypeRef
+  → Maybe Syntax.RowRef
+  → Either Syntax.Diagnostic (Array { name ∷ String, sort ∷ Syntax.Sort })
+sortedVariables references row = foldM insert []
+  ( Array.sortWith offset
+      ( Array.concatMap typeOccurrences references <> maybe [] rowOccurrences
+          row
+      )
+  )
+  where
+  offset occurrence = occurrence.span.start.offset
+  insert found occurrence = maybe (Right (Array.snoc found (named occurrence)))
+    (same found occurrence)
+    (Array.find (matching occurrence.name) found)
+  named occurrence = { name: occurrence.name, sort: occurrence.sort }
+  matching name entry = entry.name == name
+  same found occurrence previous
+    | occurrence.sort == previous.sort = Right found
+    | otherwise = Left
+        ( Syntax.problemAt
+            (RowSort (occurrence.sort == Syntax.RowSort))
+            occurrence.span
+        )
+
+type Occurrence = { name ∷ String, sort ∷ Syntax.Sort, span ∷ Syntax.Span }
+
+typeOccurrences ∷ Syntax.TypeRef → Array Occurrence
+typeOccurrences = case _ of
+  Syntax.VarRef span name → [ { name, span, sort: Syntax.TypeSort } ]
+  Syntax.NamedRef _ _ arguments → Array.concatMap typeOccurrences arguments
+  arrow@(Syntax.FunRef _ _ _ _) → arrowOccurrences arrow
+  _ → []
+
+-- Collect the right spine by loops; annotations on each stage still
+-- contribute variables, ordered by source offset in sortedVariables.
+arrowOccurrences ∷ Syntax.TypeRef → Array Occurrence
+arrowOccurrences reference =
+  Array.concatMap typeOccurrences
+    (Array.snoc spine.parameters spine.result)
+    <> Array.concatMap (maybe [] rowOccurrences) taken.value
+  where
+  spine = Syntax.typeRefSpine reference
+  taken = mapAccumL next reference
+    (Array.replicate (Array.length spine.parameters) unit)
+  next (Syntax.FunRef _ _ row result) _ = { accum: result, value: row }
+  next result _ = { accum: result, value: Nothing }
+
+rowOccurrences ∷ Syntax.RowRef → Array Occurrence
+rowOccurrences (Syntax.RowRef span labels tail) =
+  Array.concatMap arguments labels <> maybe [] ending tail
+  where
+  arguments label = Array.concatMap typeOccurrences label.arguments
+  ending Syntax.Pure = []
+  ending (Syntax.Spread name) = [ { name, span, sort: Syntax.RowSort } ]

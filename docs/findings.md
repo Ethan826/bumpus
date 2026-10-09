@@ -455,3 +455,14 @@ zero build warnings/errors and all 22 existing regression proofs
 410.995667 ms total against its unchanged 1500 ms timed-compilation bound.
 The original failed log remains. No later-task effect syntax/runtime
 behavior is claimed; deferred origin/provenance retention remains Task 9.
+
+
+FX001 Task 4: omitted rows in lambda annotations cannot resolve as pure.
+Resolve marks them with the signature's unwriteable ambient variable;
+Check substitutes only that row slot with the lambda's fresh row. Named
+row variables and type variables remain rigid. New Console callback and
+legacy comparison diagnostics verify the distinction. Collecting signature
+row variables must loop over long arrow spines, just as type collection
+already did; a 20,000-arrow regression and restored-source mutant pin it.
+Full verification: 672 parallel +22 serial tests, 22 existing proofs and
+four new isolated source sensitivity checks (docs/progress.md).

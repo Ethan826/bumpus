@@ -17,6 +17,7 @@ import Domain.Syntax (Diagnostic, Span, problemAt)
 import Domain.Resolved
   ( CtorId(..)
   , CtorInfo
+  , EffectInfo
   , LocalId
   , Tables
   , Ty(..)
@@ -40,7 +41,8 @@ type Typed = { id ∷ LocalId, ty ∷ Ty Open }
 type Matched = { pattern ∷ Checked.Pattern, locals ∷ Array Typed }
 
 type PatternEnv r =
-  { types ∷ Array TypeInfo
+  { effects ∷ Array EffectInfo
+  , types ∷ Array TypeInfo
   , ctors ∷ Array CtorInfo
   , variables ∷ Array String
   | r
@@ -55,7 +57,8 @@ checkPattern tables expected pattern = valueOf <$> patternAgainst env start
   expected
   pattern
   where
-  env = { types: tables.types, ctors: tables.ctors, variables: [] }
+  env =
+    { effects: [], types: tables.types, ctors: tables.ctors, variables: [] }
   valueOf threaded = threaded.value
 
 -- Patterns are checked top-down against the scrutinee's type. On a rigid

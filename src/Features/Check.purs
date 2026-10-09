@@ -4,10 +4,14 @@ import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map
-import Data.Maybe (maybe, maybe')
+import Data.Maybe (Maybe(..), maybe, maybe')
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Domain.Checked.Internal (rigid)
+import Domain.Checked.Internal (rigid, Open(..))
+import Domain.Row (Row(..))
+import Domain.Type (Ty(..), TyRow, VarId(..))
+import Features.Check.Entry as Entry
+import Features.Check.Printable (printable)
 import Domain.Checked.Internal as Checked
 import Domain.Resolved as Resolved
 import Domain.Problem (EntryKind(..), Problem(..))
@@ -28,7 +32,8 @@ check program = do
   functions ← traverse checkDefinition program.functions
   let
     checked = Checked.Program
-      { types: program.types
+      { effects: program.effects
+      , types: program.types
       , ctors: program.ctors
       , functions
       , entry: program.entry
@@ -61,7 +66,10 @@ printableEntry holders program =
 
 environment ∷ Resolved.Program → Resolved.FunctionDecl → Env
 environment program function =
-  { functions: program.functions
+  { current: current function
+  , functionName: function.name
+  , effects: program.effects
+  , functions: program.functions
   , types: program.types
   , ctors: program.ctors
   , variables: function.variables
@@ -82,16 +90,20 @@ checkFunction
   → Resolved.FunctionDecl
   → Either Diagnostic Checked.FunctionDecl
 checkFunction holders env function = do
-  body ← infer env start function.body
+  body ← infer env (start { next = Array.length function.variables })
+    function.body
   finished ← require env body.state (rigid function.result) body.value
   maybe (Right unit) tooDeepAt (firstTooDeep finished.subst body.value)
   let settled = settle finished.subst body.value
   comparable holders env settled
+  printable holders env settled
+  Entry.check env finished.subst function settled
   pure
     { id: function.id
     , name: function.name
     , parameters: map parameterType function.parameters
     , result: rigid function.result
+    , row: Entry.resolvedRow finished.subst env.current
     , body: holes settled
     , span: function.span
     }
@@ -104,3 +116,12 @@ checkFunction holders env function = do
 settle ∷ Subst → Checked.Expr → Checked.Expr
 settle subst body =
   if isEmpty subst then body else retype (resolved subst) body
+
+current ∷ Resolved.FunctionDecl → TyRow Open
+current function = case rigid (TFun TUnit function.row TUnit) of
+  TFun _ row _ → if function.name == "main" then mainRow row else row
+  _ → Row [] Nothing
+  where
+  mainRow (Row labels tail) = Row labels (map flexible tail)
+  flexible (Rigid (VarId index)) = Hole index
+  flexible hole = hole

@@ -140,8 +140,9 @@ adding a bypass allowlist.
   file's basename plus an optional label, sanitized; a batch clears only its
   own directory, never the root, and an id may be claimed once per process.
   Before rewriting, each program must have exactly one `package main` clause
-  and exactly one `func main() { fmt.Println(...) }` line (Format.Go's
-  entryMain) and no `func Main`; only those two lines change. Failure
+  and exactly one canonical printed entry (`func main() { fmt.Println(...) }`)
+  or Unit entry (`func main() { waxwingFnN() }`), and no `func Main`; only
+  those two lines change. Failure
   contract: a Waxwing rejection is recorded per case and rethrown, unchanged,
   by that case's `run` (runGo's error), while the other cases still build;
   an unexpected program shape or a Go compile failure is a batch

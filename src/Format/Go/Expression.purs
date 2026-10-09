@@ -23,6 +23,7 @@ import Format.Go.Lowered
   )
 import Format.Go.Match (lowerMatch)
 import Format.Go.Pipe (lowerPipe)
+import Format.Go.Show (printed)
 import Format.Go.Value (applyValue, named, reference)
 
 -- `next` is the number the first lifted function met in pre-order will
@@ -52,6 +53,7 @@ expression scope next whole@(IR.Expr term) = case term.node of
     lowerLambda scope lower next whole parameters body
   IR.Pipe left right → lowerPipe scope lower next whole left right
   IR.UnitValue → leaf next "struct{}{}"
+  IR.Print value → printedValue (IR.typeOf value) (lower next value)
   IR.Block items value → lowerBlock scope lower next term.ty items value
   where
   lower = expression scope
@@ -77,3 +79,10 @@ conditional ty codes = joinWith "" (Array.zipWith append pieces codes)
   <> " }()"
   where
   pieces = [ "func() " <> goType ty <> " { if ", " { return ", " }; return " ]
+
+printedValue ∷ Ty → Lowered → Lowered
+printedValue ty value = value
+  { code = "func() struct{} { fmt.Println("
+      <> printed ty value.code
+      <> "); return struct{}{} }()"
+  }

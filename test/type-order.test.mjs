@@ -103,21 +103,21 @@ const listOf = argument => problem.AppliedName.create('List')([argument]);
 test('arrow type names are right-associative, function parameters parenthesized', () => {
   const map = arrow(arrow(name.int, name.int),
     arrow(listOf(name.int), listOf(name.int)));
-  assert.deepEqual(wire({ problem: problem.TypeMismatch.create(map)(name.int), span }), {
-    code: 'E_TYPE', span,
+  assert.deepEqual(wire({ problem: problem.TypeMismatch.create(map)(name.int), span, related: [] }), {
+    code: 'E_TYPE', span, related: [],
     message: 'Expected (Int -> Int) -> List(Int) -> List(Int), found Int'
   });
   const returned = arrow(name.int, arrow(name.int, name.int));
   const nestedResult = listOf(arrow(name.int, name.int));
-  assert.equal(wire({ problem: problem.NotComparable.create(returned), span }).message,
+  assert.equal(wire({ problem: problem.NotComparable.create(returned), span, related: [] }).message,
     'Type Int -> Int -> Int is not comparable');
-  assert.equal(wire({ problem: problem.AmbiguousType.create(nestedResult), span }).message,
+  assert.equal(wire({ problem: problem.AmbiguousType.create(nestedResult), span, related: [] }).message,
     'Ambiguous type List(Int -> Int) in comparison');
 });
 
 test('a 20,000-long arrow type name renders without deep recursion', () => {
   let built = name.int;
   for (let index = 0; index < longSpine; index += 1) built = arrow(name.int, built);
-  const text = wire({ problem: problem.NotComparable.create(built), span }).message;
+  const text = wire({ problem: problem.NotComparable.create(built), span, related: [] }).message;
   assert.equal(text, `Type ${'Int -> '.repeat(longSpine)}Int is not comparable`);
 });

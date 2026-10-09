@@ -36,12 +36,13 @@ export const asCasePackage = (name, ident, go) => {
   const expected = count(/^package \w+$/gm) === 1
     && count(/^package main$/gm) === 1
     && count(/^func main\b/gm) === 1
-    && count(/^func main\(\) \{ fmt\.Println\(.*\) \}$/gm) === 1
+    && (count(/^func main\(\) \{ fmt\.Println\(.*\) \}$/gm)
+      + count(/^func main\(\) \{ waxwingFn\d+\(\) \}$/gm)) === 1
     && count(/^func Main\b/gm) === 0;
   if (!expected) {
     throw new assert.AssertionError({ message: `go batch: case `
       + `${JSON.stringify(name)} has an unexpected shape (need one `
-      + '"package main" and one "func main() { fmt.Println(...) }")' });
+      + '"package main" and one canonical printed or Unit main)' });
   }
   return go.replace(/^package main$/m, `package ${ident}`)
     .replace(/^func main\(\) \{ /m, 'func Main() { ');

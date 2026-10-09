@@ -10,12 +10,17 @@ module Format.Wire
   ) where
 
 import Domain.Host (HostFailure(..))
-import Domain.Syntax (Diagnostic, Span)
+import Domain.Syntax (Diagnostic, Note, Span)
 import Format.Diagnostic (wire)
 
 type PlainRecord = { code ∷ String, message ∷ String }
 type SourceRecord =
-  { code ∷ String, message ∷ String, span ∷ Span, file ∷ String }
+  { code ∷ String
+  , message ∷ String
+  , span ∷ Span
+  , file ∷ String
+  , related ∷ Array Note
+  }
 
 type ToolRecord =
   { ok ∷ Boolean, code ∷ String, message ∷ String, command ∷ String }
@@ -42,6 +47,7 @@ sourceRecord file diagnostic = SourceWire
   , message: rendered.message
   , span: rendered.span
   , file
+  , related: rendered.related
   }
   where
   rendered = wire diagnostic

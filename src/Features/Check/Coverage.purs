@@ -49,6 +49,9 @@ covered signature (Checked.Expr expression) = case expression.node of
   Checked.Lambda _ body → recur body
   Checked.Pipe left right → traverse_ recur [ left, right ]
   Checked.UnitValue → pure unit
+  Checked.Print value → recur value
+  Checked.OperationRef _ _ _ → pure unit
+  Checked.Perform _ _ _ arguments → traverse_ recur arguments
   Checked.Block items value → traverse_ recur (Checked.blockParts items value)
   where
   recur = covered signature

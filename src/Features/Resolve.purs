@@ -12,13 +12,18 @@ import Domain.Type.Parts (groundErased)
 import Domain.Syntax as Syntax
 import Features.Resolve.Expression (expression)
 import Features.Resolve.Fresh (runFresh)
-import Features.Resolve.Types (resolveType, typeTable)
-import Features.Resolve.Variables (signatureVariables)
+import Features.Resolve.Types (resolveTypeWith, typeTable)
+import Features.Resolve.Row (resolveRow)
+import Features.Resolve.Effect as Effect
+import Features.Resolve.Variables (sortedVariables)
 import Domain.Resolved (Global)
+import Domain.Type (TyRow)
 import Domain.Resolved as Resolved
 
 type Signature =
   { variables ∷ Array String
+  , sorts ∷ Array Syntax.Sort
+  , row ∷ TyRow Resolved.VarId
   , parameters ∷ Array Resolved.Parameter
   , result ∷ Resolved.Ty Resolved.VarId
   }
@@ -29,15 +34,31 @@ type Definition =
 resolve ∷ Syntax.Program → Either Syntax.Diagnostic Resolved.Program
 resolve program = do
   tables ← typeTable program
-  signatures ← traverse (resolveSignature tables.types) functions
+  effects ← Effect.effects tables.types program.effects
+  signatures ← traverse
+    (resolveSignature tables.types (Effect.summaries program.effects))
+    functions
   let
     definitions = Array.mapWithIndex indexed
       (Array.zipWith pair functions signatures)
   entry ← entryPoint definitions
   -- Applied once, so the globals are built once rather than per function.
-  bodies ← traverse (resolveFunction (globals tables.ctors) tables)
+  bodies ← traverse
+    ( resolveFunction
+        ( globals tables.ctors <> Effect.globals effects
+            <> [ { name: "print", ref: Resolved.BuiltinPrint } ]
+        )
+        tables
+        (Effect.summaries program.effects)
+    )
     definitions
-  pure { types: tables.types, ctors: tables.ctors, functions: bodies, entry }
+  pure
+    { types: tables.types
+    , ctors: tables.ctors
+    , effects
+    , functions: bodies
+    , entry
+    }
   where
   functions = program.functions
   pair function signature = { function, signature }
@@ -59,19 +80,31 @@ ctorGlobal index info =
 
 resolveSignature
   ∷ Array Resolved.TypeInfo
+  → Array { name ∷ String, arity ∷ Int }
   → Syntax.FunctionDecl
   → Either Syntax.Diagnostic Signature
-resolveSignature types function = do
-  parameters ← traverse resolveParameter function.parameters
-  result ← resolveType types variables function.result
-  pure { variables, parameters, result }
+resolveSignature types effects function = do
+  occurrences ← sortedVariables references function.row
+  let written = Array.sortWith sort occurrences
+  let
+    variables = map name written <> [ "" ]
+    sorts = map sort written <> [ Syntax.RowSort ]
+    ambient = Just (Resolved.VarId (Array.length written))
+    resolved = resolveTypeWith types effects variables ambient
+  parameters ← traverse (parameter resolved) function.parameters
+  result ← resolved function.result
+  row ← resolveRow effects variables ambient resolved function.row
+  pure { variables, sorts, parameters, result, row }
   where
-  variables = signatureVariables
-    (Array.snoc (map parameterType function.parameters) function.result)
-  parameterType parameter = parameter.ty
-  resolveParameter parameter = withType parameter
-    <$> resolveType types variables parameter.ty
-  withType parameter ty = { name: parameter.name, ty, span: parameter.span }
+  references = Array.snoc (map parameterType function.parameters)
+    function.result
+  parameterType entry = entry.ty
+  name variable = variable.name
+  sort variable = variable.sort
+  parameter resolved declaration = withType declaration <$> resolved
+    declaration.ty
+  withType declaration ty =
+    { name: declaration.name, ty, span: declaration.span }
 
 entryPoint
   ∷ Array Definition → Either Syntax.Diagnostic Resolved.FunctionId
@@ -105,14 +138,16 @@ entryProblem definition
 resolveFunction
   ∷ Array Global
   → Resolved.Tables
+  → Array { name ∷ String, arity ∷ Int }
   → Definition
   → Either Syntax.Diagnostic Resolved.FunctionDecl
-resolveFunction globals tables definition = withBody <$> runFresh
+resolveFunction globals tables effects definition = withBody <$> runFresh
   (Array.length parameters)
   (expression scope definition.function.body)
   where
   scope =
     { globals
+    , effects
     , ctors: tables.ctors
     , locals
     , types: tables.types
@@ -126,6 +161,8 @@ resolveFunction globals tables definition = withBody <$> runFresh
     { id: Resolved.FunctionId definition.index
     , name: definition.function.name
     , variables: definition.signature.variables
+    , sorts: definition.signature.sorts
+    , row: definition.signature.row
     , parameters: definition.signature.parameters
     , result: definition.signature.result
     , body

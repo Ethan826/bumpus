@@ -73,3 +73,9 @@ data Problem
   | Internal String
   -- Rendered as its problem, with the hint after; code and span unchanged.
   | Hinted Problem Hint
+  | EffectNotAllowed String String
+  | UnhandledEffect String
+  | MustBePure String
+  | RowSort Boolean
+  | NotPrintable TypeName
+  | RowEquality String String String

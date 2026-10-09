@@ -128,7 +128,7 @@ test(`${nestingLimit} nested blocks build and run; one more is E_NESTING`,
     const over = nestedBlocks(nestingLimit + 1);
     assert.deepEqual(wire(compile(over).value0), {
       code: 'E_NESTING', message: `Nesting exceeds ${nestingLimit} levels`,
-      span: spanAt(over, '0', nestingLimit)
+      span: spanAt(over, '0', nestingLimit), related: []
     });
   });
 

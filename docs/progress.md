@@ -2907,3 +2907,28 @@ handoff concerns, not claims of completed later tasks. Active effects ADR
 references now use 010 (009 is naming). Ready for independent review before
 Task 4; no merge or push. Local report/ledger:
 .superpowers/sdd/2026-10-09-effects-plan/{task-3-report,progress}.md.
+
+
+### FX001 Task 4 — effect signatures, operations and Console (2026-10-09)
+
+Implemented sorted signature variables with one rigid ambient row,
+explicit rows, declared operations, stage consumption, Console print and
+Unit entry output. Rows erase from specialization arguments. Field and
+operation arrows default to pure, with declared effect names available;
+lambda annotation omissions share the lambda's own fresh ambient row.
+Program.Compile explicitly rejects user effects before specialization;
+handlers and user effect execution remain later tasks. Wire diagnostics
+carry related: [] with existing messages and spans preserved.
+
+Clean-output npm run verify exited 0 (.build/fx001-task4-verify.log):
+zero build warnings/errors, formatting/structure/strict-rebuild gates,
+672 parallel tests, 22 serial tests, no failures or skips, and all 22
+existing actual-source regression proofs. Four additional isolated actual
+source mutants built and failed their named regressions: lambda annotation
+omission, 20,000-arrow row collection, row argument erasure and effect
+names in field types (.build/fx001-task4-sensitivity/{results.json,*-test.log}).
+Earlier failed runs remain documented in the local Task 4 report; no
+unchanged rerun hid a failure. Concrete malformed-input validation gaps
+are BACKLOG FX004, with reproductions and the Task 5 next action.
+No merge or push. Implementation/evidence:
+.superpowers/sdd/2026-10-09-effects-plan/task-4-report.md.

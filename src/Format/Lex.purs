@@ -106,6 +106,8 @@ scanAt source state head
   | isSpace head = continue (spaces source state)
   | isLetter head = continue (word source state isNameChar)
   | isDigit head = continue (word source state isDigit)
+  | head == '.', String.slice state.index (state.index + 3) source == "..." =
+      continue (emit "..." state)
   | pairStart head, Just text ← twoCharacter source state.index =
       continue (emit text state)
   | punctuation head = continue (emit (String.singleton head) state)

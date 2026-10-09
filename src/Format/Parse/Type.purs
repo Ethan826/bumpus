@@ -1,13 +1,21 @@
-module Format.Parse.Type (typeRef) where
+module Format.Parse.Type (typeRef, typeAndRow) where
 
 import Prelude
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.Either (Either(..))
-import Data.Maybe (Maybe, fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Domain.Problem (Problem(..))
-import Domain.Syntax (Diagnostic, Position, Span, TypeRef(..), problemAt)
+import Domain.Syntax
+  ( Diagnostic
+  , Position
+  , RowRef
+  , Span
+  , TypeRef(..)
+  , problemAt
+  )
+import Format.Parse.Row (rowRef)
 import Format.Lex (Token, isName, isUpper)
 import Format.Parse.Grammar
   ( Parser
@@ -31,10 +39,15 @@ import Format.Parse.Grammar
 type Applied = { identifier ∷ Token, arguments ∷ Maybe (Array TypeRef) }
 
 -- What one `->` separates: an operand, or a parenthesized list of types.
-type Segment = { span ∷ Span, types ∷ NonEmptyArray TypeRef }
+type Segment =
+  { span ∷ Span
+  , types ∷ NonEmptyArray TypeRef
+  , row ∷ Maybe RowRef
+  }
 
 -- A parameter type and where its segment starts.
-type Parameter = { start ∷ Position, ty ∷ TypeRef }
+type Parameter =
+  { start ∷ Position, ty ∷ TypeRef, row ∷ Maybe RowRef }
 
 -- `->` is right-associative and loosest (FN001 design §1). The chain is
 -- read as a list and folded right, never one recursion per arrow, and a
@@ -43,7 +56,12 @@ type Parameter = { start ∷ Position, ty ∷ TypeRef }
 -- PureScript is strict, so the productions below receive `inner`, which
 -- reaches `typeRef` lazily.
 typeRef ∷ Parser TypeRef
-typeRef = folded <$> chainRight "->" (segment inner)
+typeRef = typeOf <$> typeAndRow
+  where
+  typeOf found = found.ty
+
+typeAndRow ∷ Parser { ty ∷ TypeRef, row ∷ Maybe RowRef }
+typeAndRow = combined <$> chainRight "->" (segment inner)
   where
   inner = defer later
   later _ = typeRef
@@ -72,11 +90,14 @@ operand inner = dispatch
 -- `()` is rejected at `)`, where a type is expected.
 segment ∷ Parser TypeRef → Parser Segment
 segment inner = spanned segmentOf
-  ( dispatch [ on "(" parenthesized ]
-      (NonEmptyArray.singleton <$> operand inner)
+  ( parts
+      <$> dispatch [ on "(" parenthesized ]
+        (NonEmptyArray.singleton <$> operand inner)
+      <*> optionalOn "with" (rowRef inner)
   )
   where
-  segmentOf span types = { span, types }
+  parts types row = { types, row }
+  segmentOf span found = { span, types: found.types, row: found.row }
   parenthesized = expect "(" *> grouped
     (NonEmptyArray.cons' <$> inner <*> dispatch [ on "," more ] closing)
   more = expect "," *> sepBy1 "," inner <* expect ")" <* arrowNext
@@ -87,20 +108,36 @@ segment inner = spanned segmentOf
 -- lone type keeps its own span, parenthesized or not.
 folded ∷ { init ∷ Array Segment, last ∷ Segment } → TypeRef
 folded chain = Array.foldr arrow (NonEmptyArray.last chain.last.types)
-  (Array.concatMap parameters chain.init <> lastParameters)
+  ( Array.concat
+      ( Array.zipWith annotated chain.init
+          (Array.drop 1 chain.init <> [ chain.last ])
+      ) <> lastParameters
+  )
   where
   end = chain.last.span.end
   lastParameters = map (startingAt chain.last.span.start)
     (NonEmptyArray.init chain.last.types)
   arrow parameter result =
-    FunRef { start: parameter.start, end } parameter.ty result
+    FunRef { start: parameter.start, end } parameter.ty parameter.row result
+  annotated before after = setLast after.row (parameters before)
+  setLast row found = fromMaybe found
+    (Array.modifyAt (Array.length found - 1) (withRow row) found)
+  withRow row parameter = parameter { row = row }
 
 parameters ∷ Segment → Array Parameter
 parameters found = map (startingAt found.span.start)
   (NonEmptyArray.toArray found.types)
 
 startingAt ∷ Position → TypeRef → Parameter
-startingAt start ty = { start, ty }
+startingAt start ty = { start, ty, row: Nothing }
+
+combined
+  ∷ { init ∷ Array Segment, last ∷ Segment }
+  → { ty ∷ TypeRef, row ∷ Maybe RowRef }
+combined chain =
+  { ty: folded chain
+  , row: if Array.null chain.init then chain.last.row else Nothing
+  }
 
 appliedOf ∷ Span → Applied → TypeRef
 appliedOf span found =

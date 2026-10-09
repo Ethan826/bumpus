@@ -9,7 +9,7 @@ import Domain.Checked.Internal as Checked
 import Domain.Resolved (LocalId)
 import Domain.Resolved as Resolved
 import Domain.Syntax (Diagnostic)
-import Domain.Type (Ty)
+import Domain.Type (Ty, TyRow)
 import Features.Check.Scheme (State, Threaded)
 
 -- The type of each local in scope. LocalIds are unique per function, so
@@ -21,7 +21,10 @@ type Locals = Map LocalId (Ty Open)
 -- declarations, and the enclosing function's variables' names. The row is
 -- open so Features.Check.Infer can pass its own environment through.
 type CheckEnv r =
-  { functions ∷ Array Resolved.FunctionDecl
+  { current ∷ TyRow Open
+  , functionName ∷ String
+  , effects ∷ Array Resolved.EffectInfo
+  , functions ∷ Array Resolved.FunctionDecl
   , types ∷ Array Resolved.TypeInfo
   , ctors ∷ Array Resolved.CtorInfo
   , variables ∷ Array String

@@ -5,8 +5,9 @@ module Domain.Resolved
 
 import Prelude
 import Data.Maybe (Maybe)
-import Domain.Syntax (Operator, Span, TypeRef)
-import Domain.Type (Ty(..), TypeId(..), VarId(..))
+import Domain.Syntax (Operator, Sort, Span, TypeRef)
+import Domain.Ids (EffectId)
+import Domain.Type (Ty(..), TyRow, TypeId(..), VarId(..))
 
 newtype FunctionId = FunctionId Int
 newtype LocalId = LocalId Int
@@ -42,7 +43,11 @@ type Local = { name ∷ String, id ∷ LocalId }
 
 -- A function carries its declared parameter count, which decides what its
 -- bare name means (FN001 design §2).
-data GlobalRef = GlobalFunction FunctionId Int | GlobalCtor CtorId
+data GlobalRef
+  = GlobalFunction FunctionId Int
+  | GlobalCtor CtorId
+  | Operation EffectId Int Int
+  | BuiltinPrint
 
 -- Functions and constructors share one global namespace.
 type Global = { name ∷ String, ref ∷ GlobalRef }
@@ -73,6 +78,10 @@ data Expr
   | Pipe Span Expr Expr
   | UnitValue Span
   | Block Span (Array Item) Expr
+  | OperationRef Span EffectId Int
+  | Perform Span EffectId Int (Array Expr)
+  | PrintRef Span
+  | Print Span (Array Expr)
 
 -- A block item: `let` binds a local, or `_` (Nothing); a discarded item's
 -- value is evaluated and dropped (FX001 design §1).
@@ -90,15 +99,32 @@ type FunctionDecl =
   { id ∷ FunctionId
   , name ∷ String
   , variables ∷ Array String
+  , sorts ∷ Array Sort
+  , row ∷ TyRow VarId
   , parameters ∷ Array Parameter
   , result ∷ Ty VarId
   , body ∷ Expr
   , span ∷ Span
   }
 
+type OperationInfo =
+  { name ∷ String
+  , parameters ∷ Array Parameter
+  , result ∷ Ty VarId
+  , span ∷ Span
+  }
+
+type EffectInfo =
+  { name ∷ String
+  , parameters ∷ Array String
+  , operations ∷ Array OperationInfo
+  , span ∷ Span
+  }
+
 type Program =
   { types ∷ Array TypeInfo
   , ctors ∷ Array CtorInfo
+  , effects ∷ Array EffectInfo
   , functions ∷ Array FunctionDecl
   , entry ∷ FunctionId
   }
@@ -121,3 +147,7 @@ exprSpan expression = case expression of
   Pipe span _ _ → span
   UnitValue span → span
   Block span _ _ → span
+  OperationRef span _ _ → span
+  Perform span _ _ _ → span
+  PrintRef span → span
+  Print span _ → span

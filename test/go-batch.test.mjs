@@ -132,3 +132,12 @@ test('duplicate case names are refused when the batch is declared', () => {
   assert.equal(runGoBatch(import.meta.url, unique(1, 'same'), 'no dup')
     .run('same'), '42\n');
 });
+
+test('Unit entries batch without printing their result', () => {
+  const batch = runGoBatch(import.meta.url, [
+    ['quiet', 'fn main(): Unit = ();'],
+    ['console', 'fn main(): Unit with Console = print(42);']
+  ], 'unit');
+  assert.equal(batch.run('quiet'), '');
+  assert.equal(batch.run('console'), '42\n');
+});

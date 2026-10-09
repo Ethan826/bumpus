@@ -17,7 +17,7 @@ import Format.Go.Layout (Layout, layout)
 import Format.Go.Lowered (Shape, Wrapper, shapeOf)
 import Format.Go.Show (appendsWithFmt, printed, showHelpers)
 import Format.Go.Stage (staged)
-import Format.Go.Usage (needsBoolHelper)
+import Format.Go.Usage (needsBoolHelper, needsPrint)
 import Domain.IR.Internal (Ty(..))
 import Domain.Resolved (FunctionId, LocalId(..))
 
@@ -50,7 +50,8 @@ emit program'@(IR.Program program) =
   shape = shapeOf program'
   functions = map (function tables shape) program.functions
   stages = staged shape (Array.concatMap wrappersOf functions)
-  usesFmt = Array.any (printing program.entry) program.functions
+  usesFmt = needsPrint program'
+    || Array.any (printing program.entry) program.functions
     || appendsWithFmt tables
   codeOf emitted = emitted.code
   wrappersOf emitted = emitted.wrappers

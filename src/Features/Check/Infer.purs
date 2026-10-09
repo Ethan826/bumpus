@@ -10,6 +10,13 @@ import Domain.Problem (Problem(..))
 import Domain.Resolved (Ty(..))
 import Domain.Resolved as Resolved
 import Domain.Syntax (Diagnostic, Operator, Span, problemAt)
+import Domain.Type (TyRow)
+import Features.Check.Operation
+  ( operationCall
+  , operationRef
+  , printCall
+  , printRef
+  )
 import Features.Check.Apply (checkApply)
 import Features.Check.Arms (checkMatch)
 import Features.Check.Block (checkBlock)
@@ -22,7 +29,10 @@ import Features.Check.Require (bounded, require)
 import Features.Check.Scheme (State, Threaded)
 
 type Env =
-  { functions ∷ Array Resolved.FunctionDecl
+  { current ∷ TyRow Open
+  , functionName ∷ String
+  , effects ∷ Array Resolved.EffectInfo
+  , functions ∷ Array Resolved.FunctionDecl
   , types ∷ Array Resolved.TypeInfo
   , ctors ∷ Array Resolved.CtorInfo
   , variables ∷ Array String
@@ -76,6 +86,12 @@ inferNode env state expression = case expression of
     arguments
   Resolved.Pipe span left right → checkPipe infer env state span left right
   Resolved.UnitValue span → typed state span TUnit Checked.UnitValue
+  Resolved.OperationRef span effect index → operationRef env state span effect
+    index
+  Resolved.Perform span effect index arguments →
+    operationCall infer env state span effect index arguments
+  Resolved.PrintRef span → printRef env state span
+  Resolved.Print span arguments → printCall infer env state span arguments
   Resolved.Block span items value → checkBlock infer env state span items
     value
 

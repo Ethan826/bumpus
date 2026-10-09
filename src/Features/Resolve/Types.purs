@@ -1,15 +1,17 @@
-module Features.Resolve.Types (typeTable, resolveType) where
+module Features.Resolve.Types (typeTable, resolveType, resolveTypeWith) where
 
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
-import Data.Maybe (maybe, maybe')
+import Data.Maybe (Maybe(..), maybe, maybe')
 import Data.Traversable (traverse)
+import Data.Tuple (Tuple(..))
+import Control.Monad.Rec.Class (Step(..), tailRec)
 import Domain.Problem (DuplicateKind(..), Problem(..), UnboundKind(..))
 import Domain.Syntax as Syntax
 import Domain.Resolved as Resolved
-import Domain.Type.Parts (arrows)
+import Features.Resolve.Row (resolveRow)
 import Features.Resolve.Repeated (repeated)
 import Features.Resolve.Variables (uniqueTypeParameters)
 
@@ -32,9 +34,12 @@ typeTable program = do
   uniqueCtors program.functions owned
   uniqueFunctions program.functions
   uniqueTypeParameters program.types
-  ctors ← traverse (resolveCtor types) owned
+  ctors ← traverse (resolveCtor types effects) owned
   pure { types, ctors }
   where
+  effects = map summary program.effects
+  summary effect =
+    { name: effect.name, arity: Array.length effect.parameters }
   owned = ownedCtors program.types
   types = Array.zipWith typeInfo (firstCtors program.types) program.types
 
@@ -46,7 +51,16 @@ resolveType
   → Array String
   → Syntax.TypeRef
   → Either Syntax.Diagnostic (Resolved.Ty Resolved.VarId)
-resolveType types variables = resolved
+resolveType types variables = resolveTypeWith types [] variables Nothing
+
+resolveTypeWith
+  ∷ Array Resolved.TypeInfo
+  → Array { name ∷ String, arity ∷ Int }
+  → Array String
+  → Maybe Resolved.VarId
+  → Syntax.TypeRef
+  → Either Syntax.Diagnostic (Resolved.Ty Resolved.VarId)
+resolveTypeWith types effects variables ambient = resolved
   where
   resolved = case _ of
     Syntax.IntRef _ → pure Resolved.TInt
@@ -59,10 +73,16 @@ resolveType types variables = resolved
       (unbound UnboundType span name)
       (applied span name arguments)
       (Array.findIndex (named name) types)
-    arrow@(Syntax.FunRef _ _ _) → spine (Syntax.typeRefSpine arrow)
-  -- A long written spine is resolved by a loop, not one call per arrow.
-  spine found = arrows <$> traverse resolved found.parameters
-    <*> resolved found.result
+    arrow@(Syntax.FunRef _ _ _ _) → spine arrow
+  spine arrow = do
+    parameters ← traverse resolved (Syntax.typeRefSpine arrow).parameters
+    rows ← traverse (resolveRow effects variables ambient resolved)
+      (arrowRows arrow)
+    result ← resolved (Syntax.typeRefSpine arrow).result
+    pure (Array.foldr stage result (Array.zip parameters rows))
+  stage pair result = Resolved.TFun (first pair) (second pair) result
+  first (Tuple value _) = value
+  second (Tuple _ value) = value
   variable index = pure (Resolved.TVar (Resolved.VarId index))
   named name info = info.name == name
   applied span name arguments index
@@ -115,11 +135,14 @@ typeInfo first declaration =
 
 resolveCtor
   ∷ Array Resolved.TypeInfo
+  → Array { name ∷ String, arity ∷ Int }
   → Owned
   → Either Syntax.Diagnostic Resolved.CtorInfo
-resolveCtor types entry = withFields <$> traverse field entry.decl.fields
+resolveCtor types effects entry = withFields <$> traverse field
+  entry.decl.fields
   where
-  field reference = resolveType types entry.parameters reference
+  field reference = resolveTypeWith types effects entry.parameters Nothing
+    reference
   withFields fields =
     { name: entry.decl.name
     , owner: entry.owner
@@ -199,3 +222,11 @@ duplicate
   ∷ DuplicateKind → String → Syntax.Span → Either Syntax.Diagnostic Unit
 duplicate kind name span = Left
   (Syntax.problemAt (Duplicate kind name) span)
+
+arrowRows ∷ Syntax.TypeRef → Array (Maybe Syntax.RowRef)
+arrowRows reference = Array.reverse (tailRec step { rest: reference, rows: [] })
+  where
+  step found = case found.rest of
+    Syntax.FunRef _ _ row rest → Loop
+      { rest, rows: Array.cons row found.rows }
+    _ → Done found.rows

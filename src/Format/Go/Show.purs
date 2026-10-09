@@ -19,6 +19,7 @@ showHelpers program = joinWith "" (map showHelper program.types)
 -- output is unchanged; a declared value is rendered by its printer.
 printed ∷ Ty → String → String
 printed ty call = case ty of
+  TUnit → "func(_ struct{}) string { return \"()\" }(" <> call <> ")"
   TData owner → "string(" <> showName owner <> "(nil, " <> call <> "))"
   _ → call
 

@@ -95,7 +95,7 @@ lowerField env arguments ty syntax = case ty, syntax of
   TInt, _ → pure IR.TInt
   TBool, _ → pure IR.TBool
   TUnit, _ → pure IR.TUnit
-  TFun _ _ _, FunRef span _ _ → lowerWritten span (spine ty)
+  TFun _ _ _, FunRef span _ _ _ → lowerWritten span (spine ty)
     (typeRefSpine syntax)
   TFun _ _ _, _ → mismatch
   THandler _ _, _ → mismatch

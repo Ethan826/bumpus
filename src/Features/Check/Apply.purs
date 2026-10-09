@@ -12,8 +12,9 @@ import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
 import Domain.Resolved as Resolved
 import Domain.Syntax (Diagnostic, Span, problemAt)
-import Domain.Row (closedRow)
-import Domain.Type (Ty(..))
+import Domain.Row (openRow)
+import Features.Check.Consume (consumeAt)
+import Domain.Type (Ty(..), TyRow)
 import Features.Check.Context (CheckEnv, Infer)
 import Features.Check.Require (expectType, require, typeName)
 import Features.Check.Scheme (State, Threaded, headOf, resolved, threadAll)
@@ -23,7 +24,8 @@ import Features.Check.Scheme (State, Threaded, headOf, resolved, threadAll)
 type Applying = { ty ∷ Ty Open, state ∷ State }
 
 -- A function type opened for one argument.
-type Opened = { parameter ∷ Ty Open, result ∷ Ty Open }
+type Opened =
+  { parameter ∷ Ty Open, result ∷ Ty Open, row ∷ TyRow Open }
 
 -- FN001 design §3: `e(a1, …, aj)` is `e(a1)…(aj)`. The callee first.
 checkApply
@@ -76,9 +78,10 @@ applyNext infer env applying argument = do
   opened ← open env applying.state applying.ty (Resolved.exprSpan argument)
   checked ← infer env opened.state argument
   reached ← require env checked.state opened.value.parameter checked.value
+  consumed ← consumeAt env reached (Resolved.exprSpan argument) opened.value.row
   pure
     { value: checked.value
-    , state: { ty: opened.value.result, state: reached }
+    , state: { ty: opened.value.result, state: consumed }
     }
 
 -- A value of type `ty` applied to an argument already checked: a pipe's
@@ -93,7 +96,8 @@ applyValue
 applyValue env state ty argument = do
   opened ← open env state ty (Checked.spanOf argument)
   reached ← require env opened.state opened.value.parameter argument
-  pure { value: opened.value.result, state: reached }
+  consumed ← consumeAt env reached (Checked.spanOf argument) opened.value.row
+  pure { value: opened.value.result, state: consumed }
 
 -- Whether `ty` may still be applied: an arrow, or a meta not yet bound.
 functionLike ∷ State → Ty Open → Boolean
@@ -114,7 +118,7 @@ open
   → Span
   → Either Diagnostic (Threaded Opened)
 open env state ty span = case headOf state ty of
-  TFun parameter _ result → Right { value: { parameter, result }, state }
+  TFun parameter row result → Right { value: { parameter, result, row }, state }
   meta@(TVar (Hole _)) → bindArrow env state meta span
   other → notAFunction env state other span
 
@@ -126,12 +130,13 @@ bindArrow
   → Span
   → Either Diagnostic (Threaded Opened)
 bindArrow env state meta span = do
-  reached ← expectType env fresh meta (TFun parameter closedRow result) span
-  pure { value: { parameter, result }, state: reached }
+  reached ← expectType env fresh meta (TFun parameter row result) span
+  pure { value: { parameter, result, row }, state: reached }
   where
   parameter = TVar (Hole state.next)
   result = TVar (Hole (state.next + 1))
-  fresh = state { next = state.next + 2 }
+  row = openRow (Hole (state.next + 2))
+  fresh = state { next = state.next + 2 + 1 }
 
 notAFunction
   ∷ ∀ r a. CheckEnv r → State → Ty Open → Span → Either Diagnostic a

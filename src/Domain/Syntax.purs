@@ -10,7 +10,10 @@ import Domain.Problem (Problem)
 
 type Position = { offset ∷ Int, line ∷ Int, column ∷ Int }
 type Span = { start ∷ Position, end ∷ Position }
-type Diagnostic = { problem ∷ Problem, span ∷ Span }
+type Note = { span ∷ Span, reason ∷ NoteReason }
+data NoteReason = RequiredBy String
+type Diagnostic =
+  { problem ∷ Problem, span ∷ Span, related ∷ Array Note }
 
 data Operator = Equal | NotEqual | Less | LessEqual | Greater | GreaterEqual
 
@@ -58,7 +61,16 @@ data TypeRef
   | UnitRef Span
   | VarRef Span String
   | NamedRef Span String (Array TypeRef)
-  | FunRef Span TypeRef TypeRef
+  | FunRef Span TypeRef (Maybe RowRef) TypeRef
+
+data Sort = TypeSort | RowSort
+
+derive instance eqSort ∷ Eq Sort
+derive instance ordSort ∷ Ord Sort
+
+data RowTail = Spread String | Pure
+data RowRef = RowRef Span (Array LabelRef) (Maybe RowTail)
+type LabelRef = { name ∷ String, arguments ∷ Array TypeRef, span ∷ Span }
 
 -- An arrow's parameters along its result side, and the final result.
 type RefSpine = { parameters ∷ Array TypeRef, result ∷ TypeRef }
@@ -77,11 +89,31 @@ type FunctionDecl =
   { name ∷ String
   , parameters ∷ Array Parameter
   , result ∷ TypeRef
+  , row ∷ Maybe RowRef
   , body ∷ Expr
   , span ∷ Span
   }
 
-type Program = { types ∷ Array TypeDecl, functions ∷ Array FunctionDecl }
+type OperationDecl =
+  { name ∷ String
+  , parameters ∷ Array Parameter
+  , result ∷ TypeRef
+  , row ∷ Maybe RowRef
+  , span ∷ Span
+  }
+
+type EffectDecl =
+  { name ∷ String
+  , parameters ∷ Array TypeParameter
+  , operations ∷ Array OperationDecl
+  , span ∷ Span
+  }
+
+type Program =
+  { types ∷ Array TypeDecl
+  , functions ∷ Array FunctionDecl
+  , effects ∷ Array EffectDecl
+  }
 
 -- Wire codes; Format.Diagnostic maps each Problem to one.
 data ErrorCode
@@ -99,6 +131,8 @@ data ErrorCode
   | Redundant
   | NonExhaustive
   | SpecializationError
+  | EffectError
+  | HandlerError
 
 derive instance eqErrorCode ∷ Eq ErrorCode
 
@@ -128,7 +162,7 @@ typeRefSpan = case _ of
   UnitRef span → span
   VarRef span _ → span
   NamedRef span _ _ → span
-  FunRef span _ _ → span
+  FunRef span _ _ _ → span
 
 -- A written spine can be thousands of arrows long, so it is walked by
 -- loops, never by one recursion per arrow: one counts the arrows, one takes
@@ -139,11 +173,11 @@ typeRefSpine reference =
   where
   count = tailRec counted (Tuple 0 reference)
   counted (Tuple found rest) = case rest of
-    FunRef _ _ more → Loop (Tuple (found + 1) more)
+    FunRef _ _ _ more → Loop (Tuple (found + 1) more)
     _ → Done found
   taken = mapAccumL take reference (Array.replicate count unit)
   take rest _ = case rest of
-    FunRef _ parameter more → { accum: more, value: Just parameter }
+    FunRef _ parameter _ more → { accum: more, value: Just parameter }
     settled → { accum: settled, value: Nothing }
 
 patternSpan ∷ Pattern → Span
@@ -155,4 +189,4 @@ patternSpan = case _ of
   PCtor span _ _ → span
 
 problemAt ∷ Problem → Span → Diagnostic
-problemAt problem span = { problem, span }
+problemAt problem span = { problem, span, related: [] }

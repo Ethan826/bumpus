@@ -84,6 +84,9 @@ copyNode scope span = case _ of
   Checked.Lambda parameters body → lambda scope recur span parameters body
   Checked.Pipe left right → IR.Pipe <$> recur left <*> recur right
   Checked.UnitValue → pure IR.UnitValue
+  Checked.Print value → IR.Print <$> recur value
+  Checked.OperationRef _ _ _ → internal "unlowered effect" span unit
+  Checked.Perform _ _ _ _ → internal "unlowered effect" span unit
   Checked.Block items value → IR.Block <$> traverse (item scope) items
     <*> recur value
   where

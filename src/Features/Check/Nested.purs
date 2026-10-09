@@ -76,7 +76,7 @@ judgeField types inside ty syntax = case ty, syntax of
     arguments
     references
   TData _ _ _, _ → Left (mismatch (typeRefSpan syntax))
-  TFun _ _ _, FunRef span _ _ → paired span (children ty)
+  TFun _ _ _, FunRef span _ _ _ → paired span (children ty)
     (spineParts (typeRefSpine syntax))
     (judgeField types inside)
   TFun _ _ _, _ → Left (mismatch (typeRefSpan syntax))

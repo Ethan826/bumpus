@@ -99,6 +99,7 @@ data Node
   | Pipe Expr Expr
   | UnitValue
   | Block (Array Item) Expr
+  | Print Expr
 
 -- Mirrors the checked IR's block items (FX001).
 data Item = Let (Maybe LocalId) Expr | Discard Expr

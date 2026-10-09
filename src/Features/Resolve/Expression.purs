@@ -26,6 +26,7 @@ type Scope =
   , ctors ∷ Array Resolved.CtorInfo
   , locals ∷ Map String Resolved.LocalId
   , types ∷ Array Resolved.TypeInfo
+  , effects ∷ Array { name ∷ String, arity ∷ Int }
   , variables ∷ Array String
   }
 
@@ -93,6 +94,11 @@ bareName scope span name = maybe' otherwise found (findLocal scope name)
   global entry = case entry.ref of
     Resolved.GlobalCtor id → bareConstructor scope span id
     Resolved.GlobalFunction id arity → bareFunction span name id arity
+    Resolved.Operation effect index arity →
+      if arity == 0 then Left
+        (Syntax.problemAt (FunctionNeedsCall name) span)
+      else pure (Resolved.OperationRef span effect index)
+    Resolved.BuiltinPrint → pure (Resolved.PrintRef span)
 
 bareFunction
   ∷ Syntax.Span
@@ -136,6 +142,9 @@ callName scope span name arguments = maybe' globalCall localCall
   dispatch global = case global.ref of
     Resolved.GlobalFunction id _ → Resolved.Call span id <$> resolved
     Resolved.GlobalCtor id → constructorCall scope span name id resolved
+    Resolved.Operation effect index _ → Resolved.Perform span effect index
+      <$> resolved
+    Resolved.BuiltinPrint → Resolved.Print span <$> resolved
   resolved = traverse (expression scope) arguments
 
 constructorCall

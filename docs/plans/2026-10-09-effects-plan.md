@@ -348,7 +348,7 @@ Console-only programs run end to end.
   call through which it arrives (notes added in Task 9).
 - Every existing diagnostic has `related: []` and unchanged text.
 
-- [ ] **Step 1: Write failing tests:** parsing and printing of rows;
+- [x] **Step 1: Write failing tests:** parsing and printing of rows;
   ambient sharing (`map` with an effectful callback inherits it); a body
   performing an unlisted label at a rigid row is E_EFFECT `<f> performs
   <L>, which its signature does not allow`; `with pure` callback given a
@@ -359,10 +359,10 @@ Console-only programs run end to end.
   interleaved application, over-application of an arity-one function
   returning a function, and `|>` (exact stdout); `Unhandled <L> in main`
   for an operation of a declared effect; sort errors both ways.
-- [ ] **Step 2: Run** the two new test files. Expected: FAIL.
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0.
-- [ ] **Step 5: Commit** `feat: effect signatures, operations and
+- [x] **Step 2: Run** the two new test files. Expected: FAIL.
+- [x] **Step 3: Implement.**
+- [x] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0.
+- [x] **Step 5: Commit** `feat: effect signatures, operations and
   Console (FX001)`.
 
 ### Task 5: Handlers, `with`, `handle` and `fail` in the checker

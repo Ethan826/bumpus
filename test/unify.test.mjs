@@ -173,8 +173,8 @@ test('an infinite type is E_TYPE with both types named', () => {
   const span = { start: { line: 1, column: 1, offset: 0 }, end: { line: 1, column: 2, offset: 1 } };
   const infinite = problem.InfiniteType.create(problem.HoleName.value)(
     problem.AppliedName.create('List')([problem.HoleName.value]));
-  assert.deepEqual(wire({ problem: infinite, span }),
-    { code: 'E_TYPE', message: 'Infinite type: _ occurs in List(_)', span });
+  assert.deepEqual(wire({ problem: infinite, span, related: [] }),
+    { code: 'E_TYPE', message: 'Infinite type: _ occurs in List(_)', span, related: [] });
 });
 
 // Ruling R7: unification recurses by type level, so past the limit it fails

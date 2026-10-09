@@ -108,8 +108,8 @@ test('Format renders type names and witnesses from problem data', async () => {
   assert.equal(message(problem.NonExhaustive.create(literals)),
     'Missing pattern: Pair(-1, true)');
   const span = { start: position(0), end: position(1) };
-  assert.deepEqual(wire({ problem: problem.Internal.create('Broken'), span }),
-    { code: 'E_INTERNAL', message: 'Broken', span });
+  assert.deepEqual(wire({ problem: problem.Internal.create('Broken'), span, related: [] }),
+    { code: 'E_INTERNAL', message: 'Broken', span, related: [] });
 });
 
 // Ruling R5: a table miss is a compiler bug, never a vacuously complete match.
@@ -131,7 +131,7 @@ test('coverage reports an invalid type id as E_INTERNAL', async () => {
     functions: [{ id: 0, parameters: [], result: TInt.value, body, span }] });
   assert.equal(result.constructor.name, 'Left', 'invalid type id passed');
   assert.deepEqual(wire(result.value0),
-    { code: 'E_INTERNAL', message: 'Invalid type id', span });
+    { code: 'E_INTERNAL', message: 'Invalid type id', span, related: [] });
 });
 
 // Review Minor 7: resolution enforces arity, so a field count that disagrees

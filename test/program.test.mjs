@@ -67,7 +67,7 @@ test('a source diagnostic is status 1 with the wire fields and file', () => {
   const outcome = execute(host, ['build', 'bad.wxw', 'program']);
   const expected = { ...rejected(mistyped, 'E_TYPE'), file: 'bad.wxw' };
   assert.deepEqual(outcome, { status: 1, stdout: '', stderr: expected });
-  assert.deepEqual(keysOf(outcome.stderr), ['code', 'message', 'span', 'file']);
+  assert.deepEqual(keysOf(outcome.stderr), ['code', 'message', 'span', 'file', 'related']);
   assert.deepEqual(calls, [['readSource', 'bad.wxw']]);
 });
 

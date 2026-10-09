@@ -14,14 +14,11 @@ const fieldsOf = value => withoutRows(value, Object.keys(value)
   .filter(key => /^value\d+$/.test(key)).map(key => value[key])
   .filter(field => !isSpan(field)));
 
-// FX001: a closed empty row (every row until row syntax) and an
-// application's empty row arguments are left out, so a shape states the
-// same structure it did before arrows carried rows.
-const isPureRow = value => value !== null && typeof value === 'object'
-  && value.constructor.name === 'Row' && Array.isArray(value.value0)
-  && value.value0.length === 0 && value.value1?.constructor.name === 'Nothing';
+// Legacy FN001 shapes erase arrow rows; FX tests assert row semantics.
+const isRow = value => value !== null && typeof value === 'object'
+  && value.constructor.name === 'Row';
 const withoutRows = (value, fields) => fields.filter((field, index) =>
-  !isPureRow(field) && !(value.constructor.name === 'TData' && index === 2
+  !isRow(field) && !(value.constructor.name === 'TData' && index === 2
     && Array.isArray(field) && field.length === 0));
 
 export const tree = value => {

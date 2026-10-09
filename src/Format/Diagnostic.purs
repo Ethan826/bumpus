@@ -19,10 +19,11 @@ import Domain.Problem
   , UnboundKind(..)
   , Witness(..)
   )
-import Domain.Syntax (Diagnostic, ErrorCode, Span)
+import Domain.Syntax (Diagnostic, ErrorCode, Note, Span)
 import Domain.Syntax as Code
 
-type WireDiagnostic = { code ∷ String, message ∷ String, span ∷ Span }
+type WireDiagnostic =
+  { code ∷ String, message ∷ String, span ∷ Span, related ∷ Array Note }
 
 code ∷ Problem → ErrorCode
 code = case _ of
@@ -52,6 +53,12 @@ code = case _ of
   NonExhaustive _ → Code.NonExhaustive
   Internal _ → Code.InternalError
   Hinted problem _ → code problem
+  EffectNotAllowed _ _ → Code.EffectError
+  UnhandledEffect _ → Code.EffectError
+  MustBePure _ → Code.EffectError
+  RowEquality _ _ _ → Code.EffectError
+  RowSort _ → Code.TypeMismatch
+  NotPrintable _ → Code.TypeMismatch
 
 codeName ∷ ErrorCode → String
 codeName = case _ of
@@ -69,6 +76,8 @@ codeName = case _ of
   Code.Redundant → "E_REDUNDANT"
   Code.NonExhaustive → "E_NON_EXHAUSTIVE"
   Code.SpecializationError → "E_SPECIALIZATION"
+  Code.EffectError → "E_EFFECT"
+  Code.HandlerError → "E_HANDLER"
 
 message ∷ Problem → String
 message = case _ of
@@ -105,12 +114,23 @@ message = case _ of
   NonExhaustive witness → "Missing pattern: " <> pattern witness
   Internal text → text
   Hinted problem hint → message problem <> hintMessage hint
+  EffectNotAllowed name label → name <> " performs " <> label
+    <> ", which its signature does not allow"
+  UnhandledEffect label → "Unhandled " <> label <> " in main"
+  MustBePure label → "This function must be pure, but it performs " <> label
+  RowSort true → "Expected an effect row, found a type"
+  RowSort false → "Expected a type, found an effect row"
+  NotPrintable ty → "Expected a printable value, found " <> typeName ty
+  RowEquality left right tail → left <> " and " <> right
+    <> " cannot be made equal: both end in ..."
+    <> tail
 
 wire ∷ Diagnostic → WireDiagnostic
 wire diagnostic =
   { code: codeName (code diagnostic.problem)
   , message: message diagnostic.problem
   , span: diagnostic.span
+  , related: diagnostic.related
   }
 
 entryMessage ∷ EntryKind → String
