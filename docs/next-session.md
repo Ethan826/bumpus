@@ -24,9 +24,11 @@ diagnostic quality was added at the user's request (provenance, row
 difference first, origin/boundary/path notes, distinguished missing-
 handler, same-key mismatch and callback-purity errors, bounded
 abbreviation, regression cases; PureScript research cases in LA001).
-The spec is approved for planning; the implementation plan
-docs/plans/2026-10-09-effects-plan.md (12 tasks) awaits the user's review
-and choice of execution method. No implementation is authorized.
+The spec is approved; the implementation plan
+docs/plans/2026-10-09-effects-plan.md (12 tasks) was revised after the
+user's review and execution is authorized: subagent-driven (fresh
+implementer and reviewer per task, whole-branch review), branch fx001 in
+.worktrees/fx001; stop and report if Task 1 rejects a runtime shape.
 
 Earlier next steps (before FX001 was chosen): none authorized. Candidates, for the user to choose: C001
 and R001 (review jointly; decide whether instances are ordinary records),

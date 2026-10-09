@@ -1,7 +1,12 @@
 # Effects, Handlers and Typed Failures Implementation Plan (FX001)
 
-Status: draft for the user's review (2026-10-09). No task is authorized
-and nothing is implemented. Execution method not yet chosen.
+Status: revised after the user's plan review (2026-10-09: acyclic row
+modules, sort-aware substitution, Task 1 measurement gate, consistent
+phase boundaries, differential coverage and reproduction, two smaller
+corrections). Execution: subagent-driven (fresh implementer and reviewer
+per task, then a whole-branch review), on branch fx001 in
+.worktrees/fx001, chosen by the user 2026-10-09. Stop and report if
+Task 1's measurements reject a runtime shape. Nothing is implemented.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -75,11 +80,22 @@ direction decisions.
   original cause, later lines prefixed `cleanup failed: `; causes
   `crash: V`, `fail(T): V`, `no handler for L`; non-printable payload
   `fail(T): <not printable>`.
-- Phase boundaries for tests, as in FN001: until Task 7, Program.Compile
-  calls `Features.Specialize.Unlowered.reject` (reinstated), returning
-  `Internal "unlowered effect"` for any program whose monomorphic IR
-  contains an effect node other than `print`; Task 7 narrows it and Task 8
-  deletes it. Each progress entry states how far its tests reach.
+- Phase boundaries (every intermediate commit builds and verifies; no
+  incomplete node reaches a phase that does not support it):
+  - Task 3: rows reach Specialize only as closed empty rows, which
+    `Specialize/Lower` already erases.
+  - Tasks 4-5: Program.Compile calls `Features.Check.Unlowered.reject ∷
+    Checked.Program → Either Diagnostic Unit` after Check and before
+    Specialize, returning `Internal "unlowered effect"` for any program
+    with an effect declaration, operation invocation, handler value or
+    type, `with`, `handle` or `fail` (not `print`, which runs end to end
+    from Task 4). Tests of these tasks call Check directly.
+  - Task 6: that guard is replaced by `Features.Specialize.Unlowered.reject
+    ∷ IR.Program → Either Diagnostic Unit` after Specialize, rejecting the
+    same nodes in the monomorphic IR; tests call `specialize` directly.
+  - Task 7 deletes the guard; Task 8 adds `defer` and `crash` through
+    every phase in one task.
+  Each progress entry states how far its tests reach.
 - Every task: each new behavioral test seen failing before its code;
   `npm run verify` exits 0; an evidence entry in docs/progress.md; commit
   on branch fx001 in .worktrees/fx001. Never push. Timing failures under
@@ -125,15 +141,24 @@ No compiler change. Confirms §4's Go runtime before lowering code exists.
   handler; an abort crossing an unrelated inner `handle` to its target;
   two cleanup failures produce the confirmed report lines in order;
   1,000 markers allocated in a loop are pairwise distinct.
-- [ ] **Step 3: Measure, attributed separately:** installation (10^6
-  shallow installs); lookup (a context 10,000 deep built once, then 10^6
-  performs at depth 1, 100 and 10,000); unwinding (one abort across 1,000
-  frames, and 100,000 caught aborts at depth 1); `go build` of 2,000
-  lifted helpers. Record under .build/fx001-task1/ and in findings.
+- [ ] **Step 3: Measure, attributed separately**, each configuration
+  five times (report median, minimum and maximum), each run with an
+  explicit timeout (build 300 s, run 120 s): installation (10^6 shallow
+  installs); lookup (a context 10,000 deep built once, then 10^6 performs
+  at depth 1, 100 and 10,000); unwinding (one abort across 1,000 frames;
+  100,000 caught aborts at depth 1); `go build` of programs with 1,000,
+  2,000 and 4,000 lifted helpers. Every measured loop folds its results
+  into a checksum the program prints and the script verifies, so the Go
+  compiler cannot remove the measured work. Raw output under
+  .build/fx001-task1/; summary in findings.
 - [ ] **Step 4: Decide.** Adopt the shapes if every semantic check passes
-  and build time is linear in helpers (2,000 within 5× of 2 × the 1,000
-  time). Lookup cost is recorded, not bounded (FX005). Otherwise stop and
-  report to the user.
+  and the median `go build` of the 4,000-helper program is at most 10 s
+  (the scale rule's per-program build bound). Growth ratios between sizes
+  are reported as observations, not as a linearity proof: the scale rule
+  claims linearity for Bumpus phases only, and Go builds have measured
+  absolute bounds. Lookup, installation and unwinding costs are recorded,
+  not bounded (FX005). If a semantic check fails or the bound is
+  exceeded, stop and report to the user.
 - [ ] **Step 5: Commit** `docs: FX001 runtime shape measurement`.
 
 ### Task 2: Unit, blocks and `let` (absorbs FN002)
@@ -177,8 +202,8 @@ Pure; runs end to end. No rows yet.
   `;` is Unit and the hinted E_TYPE row exactly; `{ let x = 1 }` exact
   E_SYNTAX row; `main` returning Unit prints nothing; Unit compares and
   prints `()` inside an ADT; evaluation order of items (divergence probe
-  as FN001's); 128-deep nested blocks hit E_NESTING exactly at the
-  limit; 20,000 `let` items compile in linear time (bounded test).
+  as FN001's); 128 nested blocks compile, build and run, and 129 are
+  E_NESTING; 20,000 `let` items compile in linear time (bounded test).
 - [ ] **Step 2: Run** `node --test test/fx-block.test.mjs`. Expected:
   FAIL.
 - [ ] **Step 3: Implement** the files above.
@@ -198,30 +223,52 @@ build rows directly.
   Expand, Comparable, Inhabited, Nested, Instantiation, Specialize/Lower,
   Specialize/Keys, Format.Diagnostic type names), `test/unify.test.mjs`,
   `test/unify-oracle.mjs`
-- Create: `src/Domain/Row.purs`, `src/Features/Check/UnifyRow.purs`,
+- Create: `src/Domain/Ids.purs` (`TypeId` moved from Domain.Type and
+  re-exported there; `EffectId`), `src/Domain/Row.purs`,
+  `src/Features/Check/UnifyRow.purs`,
   `test/unify-row.test.mjs`, `test/row-oracle.mjs`
 
 **Interfaces:**
-- `Domain.Row`: `data Row v = Row (Array (Label v)) (Maybe v)` (`Nothing`
-  closed); `data Label v = Label EffectRef (Array (Ty v))`; `data
+- Acyclic modules: `Domain.Row` does not import `Domain.Type`; it is
+  parameterized over the argument type and `Domain.Type` imports it.
+  `Domain.Row`: `data Row t v = Row (Array (Label t)) (Maybe v)`
+  (`Nothing` closed); `data Label t = Label EffectRef (Array t)`; `data
   EffectRef = UserEffect EffectId | FailEffect | ConsoleEffect`;
   `newtype EffectId = EffectId Int`; `data LabelKey = EffectKey
   EffectRef | FailKey TypeHead` with `data TypeHead = HeadInt | HeadBool
-  | HeadUnit | HeadData TypeId`; `labelKey ∷ Label v → Maybe LabelKey`
-  (`Nothing` while a Fail payload's head is a variable: deferred key).
-- `Domain.Type`: `TFun (Ty v) (Row v) (Ty v)`; `TData TypeId (Array (Ty
-  v)) (Array (Row v))` (type arguments, then row arguments, each in
-  declaration order); `THandler (Label v) (Row v)`; `TUnit`. A meta is
-  used at one sort only; `Subst` gains `rows ∷ Map Int (Row Flex)`.
+  | HeadUnit | HeadData TypeId` (TypeId and EffectId live in
+  `Domain.Ids`, imported by both); `labelKey ∷ (t → Maybe TypeHead) →
+  Label t → Maybe LabelKey` (`Nothing` while a Fail payload's head is a
+  variable: deferred key).
+- `Domain.Type`: `type TyRow v = Row (Ty v) v`; `TFun (Ty v) (TyRow v)
+  (Ty v)`; `TData TypeId (Array (Ty v)) (Array (TyRow v))` (type
+  arguments, then row arguments, each in declaration order); `THandler
+  (Label (Ty v)) (TyRow v)`; `TUnit`.
+- Sort-aware substitution (interface decision): `Ty`'s Monad/Bind
+  instance is removed (Functor stays for renaming). `substitute ∷
+  Substitution v w → Ty v → Ty w` with `type Substitution v w = { types
+  ∷ v → Ty w, rows ∷ v → TyRow w }`; a row tail `v` is replaced by
+  splicing `rows v` (its labels appended in order, its tail becoming the
+  new tail). Every current `>>=` on `Ty` moves to `substitute`. A
+  variable or meta has one sort by construction; the checker's `Subst`
+  holds `types ∷ Map Int (Ty Flex)` and `rows ∷ Map Int (TyRow Flex)`
+  and `Scheme.instantiate` creates metas per sort.
 - `UnifyRow.unifyRows ∷ (Subst → Ty Flex → Ty Flex → Either Failure
   Subst) → Subst → Row Flex → Row Flex → Either Failure Subst`: Leijen
   §7 with the side condition `tail(r1) ∉ dom(θ)`, first occurrence by
   key, label arguments unified with the passed type unifier; a loop over
   labels. `Unify`'s `TFun` case calls it with `unify`.
-- `Failure` gains `RowMissing (Label Flex) (Row Flex)`, `RowExtra (Label
-  Flex)`, `RowSharedTail (Row Flex) (Row Flex)`; extensions of a meta
-  tail are recorded in `Subst` order so Task 9 attaches provenance to
-  each extending meta (one meta per scoped occurrence).
+- `Failure` gains `RowMissing (Label (Ty Flex)) (TyRow Flex)`,
+  `RowExtra (Label (Ty Flex))`, `RowSharedTail (TyRow Flex) (TyRow
+  Flex)`.
+- Occurrences: every label occurrence has an `OccurrenceId = Written
+  Span Int | Extended Int` (a written annotation's span and position, or
+  the meta whose binding added it). `unifyRows` reports, besides the
+  substitution, `Array RowEvent` with `Matched OccurrenceId
+  OccurrenceId` (a label matched an existing entry; the rewrite knows
+  through which meta binding or written row it reached that entry) and
+  `Extended Int OccurrenceId` (a meta tail was extended), so Task 9 can
+  attribute provenance on both paths without changing unification.
 - Equality, ordering and `exceedsLimit` walk rows with loops.
 
 - [ ] **Step 1: Write failing tests** (unit and generated, oracle in
@@ -234,12 +281,17 @@ build rows directly.
   keys, shared tails and rigid variables: a success makes both rows
   equal under scoped-label equality after substitution, acceptance is
   symmetric, substitutions are acyclic; 1,000-label rows unify; the
-  oracle agrees on every generated pair.
+  oracle agrees on every generated pair. Substitution: identity
+  (`{ types: TVar, rows: open-empty-row }`) is the identity; composition
+  equals sequential application; two occurrences of one row variable are
+  replaced by the same spliced row (shared relationship preserved);
+  splicing keeps order and multiplicity; renaming via Functor and
+  `substitute` agree on row-free types.
 - [ ] **Step 2: Run** `node --test test/unify-row.test.mjs`. Expected:
   FAIL.
 - [ ] **Step 3: Implement.** Every existing `TFun` gets the closed empty
-  row and every `TData` empty row arguments, so all existing behavior is
-  unchanged.
+  row and every `TData` empty row arguments, and `Specialize/Lower` erases
+  rows, so all existing behavior is unchanged.
 - [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0,
   snapshots byte-identical.
 - [ ] **Step 5: Commit** `feat: effect rows and scoped-label unification
@@ -267,6 +319,7 @@ Console-only programs run end to end.
   (`print`)
 - Create: `src/Format/Parse/Effect.purs`, `src/Features/Resolve/Row.purs`,
   `src/Features/Check/Consume.purs`, `src/Features/Check/Entry.purs`,
+  `src/Features/Check/Unlowered.purs` (the pre-specialization guard),
   `test/fx-signature.test.mjs`, `test/fx-console.test.mjs`
 
 **Interfaces:**
@@ -276,7 +329,8 @@ Console-only programs run end to end.
   `with` are `pure`. A name used as both type and row variable is E_TYPE
   sort error at its second use. A declaration's non-final stages carry
   fresh quantified rows.
-- `Consume.consume ∷ Subst → Row Flex → Row Flex → Either Failure Subst`
+- `Consume.consume ∷ Subst → TyRow Flex → TyRow Flex → Either Failure
+  Subst`
   (stage row, current row): tail present → unify; closed → unify
   `s + fresh` with current. Instantiating a declaration reference opens a
   closed final-stage row of its own stages only.
@@ -309,8 +363,8 @@ Console-only programs run end to end.
 
 ### Task 5: Handlers, `with`, `handle` and `fail` in the checker
 
-Checked through Specialize; programs with these nodes stop at the
-`unlowered effect` guard.
+Check only: tests call Check directly; Program.Compile stops these
+programs at `Features.Check.Unlowered` (Global Constraints).
 
 **Files:**
 - Modify: `src/Format/Lex.purs`, `src/Domain/Syntax.purs` (`HandlerExpr
@@ -378,9 +432,10 @@ Checked through Specialize; programs with these nodes stop at the
 - Nested rule over types and effects (§4 "Layout dependencies"); a
   violation is the existing `NestedDatatype` problem, E_SPECIALIZATION,
   at the nested reference.
-- `Unlowered.reject ∷ IR.Program → Either Diagnostic Unit`: `Internal
+- `Features.Specialize.Unlowered.reject ∷ IR.Program → Either Diagnostic
+  Unit` replaces `Features.Check.Unlowered` (deleted): `Internal
   "unlowered effect"` for any program with an effect node other than
-  print.
+  `print`.
 
 - [ ] **Step 1: Write failing tests:** recursive handler installation
   yields one function key; growing-label recursion (`a := List(a)`
@@ -401,8 +456,8 @@ Checked through Specialize; programs with these nodes stop at the
 - Modify: `src/Format/Go.purs`, `src/Format/Go/Expression.purs`,
   `src/Format/Go/Lambda.purs`, `src/Format/Go/Stage.purs`,
   `src/Format/Go/Apply.purs`, `src/Format/Go/Data.purs`,
-  `src/Format/Go/Usage.purs` (`usesContext`), `Unlowered.purs` (narrowed
-  to `defer`/`crash`)
+  `src/Format/Go/Usage.purs` (`usesContext`), delete
+  `src/Features/Specialize/Unlowered.purs` and its Program.Compile call
 - Create: `src/Format/Go/Context.purs` (runtime text and mode),
   `src/Format/Go/Effect.purs` (handler structs, perform functions),
   `src/Format/Go/Handle.purs`, `test/fx-run.test.mjs`
@@ -437,8 +492,8 @@ Checked through Specialize; programs with these nodes stop at the
 **Files:**
 - Modify: Block parser/checker/lowering (`Defer` item), `src/Domain/IR/
   Internal.purs` (`Defer`, `Crash`), `src/Format/Go/Context.purs`
-  (`bumpusCleanup`, `bumpusDefect`, main's recovery wrapper), delete
-  `src/Features/Specialize/Unlowered.purs`
+  (`bumpusCleanup`, `bumpusDefect`, main's recovery wrapper); `defer` and
+  `crash` go through every phase in this task
 - Create: `src/Features/Check/Defer.purs`, `test/fx-cleanup.test.mjs`
 
 **Interfaces:**
@@ -473,11 +528,17 @@ Checked through Specialize; programs with these nodes stop at the
   `test/fx-diagnostics.test.mjs`
 
 **Interfaces:**
-- §6 exactly. `Provenance`: `Map Int Origin` keyed by the meta whose
-  binding introduced a label occurrence (Task 3's extension record), plus
-  written labels keyed by annotation span; `Origin = { span, consumed ∷
-  Consumed, via ∷ Maybe Boundary }`. Reports reconstruct paths from
-  these links; nothing grows per call during checking.
+- §6 exactly. `Provenance`: `Map OccurrenceId Origin` (Task 3's
+  occurrence identity) with `Origin = { span, consumed ∷ Consumed, via ∷
+  Maybe Boundary }`. Both `RowEvent`s attribute origins: `Extended m o`
+  records the consuming origin for the new occurrence `Extended m`;
+  `Matched o existing` (a consumed label matched an existing entry,
+  written or extended, without extending any meta) records the origin for
+  `existing` if it has none yet, and links `o` to `existing` so later
+  attribution follows the matched occurrence. First origin per
+  occurrence wins; occurrences are never merged by effect key. Reports
+  reconstruct paths from these links; nothing grows per call during
+  checking.
 - Abbreviation constants (named, in Format.Diagnostic.Row):
   `visibleLabels = 4`, `pathHops = 2` at each end, `maxNotes = 4`,
   `maxCharacters = 2000`; type arguments elided off the path to the
@@ -490,7 +551,9 @@ Checked through Specialize; programs with these nodes stop at the
   row missing one label (Review Focus 5); a same-key payload mismatch
   under nested `State` handlers with a note at the innermost occurrence;
   the side condition; repeated `Fail` families attribute each origin to
-  its own occurrence.
+  its own occurrence; a label consumed into a signature-written row
+  (match without extension) and one consumed into an already-extended
+  meta row both get origin notes.
 - [ ] **Step 2: Run** `node --test test/fx-diagnostics.test.mjs`.
   Expected: FAIL.
 - [ ] **Step 3: Implement.**
@@ -506,14 +569,31 @@ Checked through Specialize; programs with these nodes stop at the
   `test/fx-programs.mjs` (generator), `test/fx-oracle.test.mjs`
 - Modify: `scripts/differential-corpus.mjs` (effect corpus)
 
-- [ ] **Step 1: Write** the interpreter and a generator of well-typed
-  programs over two user effects, nested handlers, `handle`, `fail`,
-  `defer`, `crash` and Console traces, with seeds recorded.
-- [ ] **Step 2: Run** generated comparisons of Go stdout, stderr and exit
-  status against the interpreter (at least 500 programs); every
-  executable probe of Tasks 4-8 also runs through the interpreter.
-  Expected: 0 differences.
-- [ ] **Step 3: Commit** `test: FX001 reference interpreter and
+- [ ] **Step 1: Write** the interpreter. Validate it first against
+  hand-derived traces: every executable probe of Tasks 2 and 4-8 has a
+  hand-written expected stdout, stderr and exit status (already in those
+  tasks' tests); the interpreter must reproduce each exactly before any
+  differential result is trusted. A disagreement there is an interpreter
+  or probe defect, investigated before Step 3.
+- [ ] **Step 2: Write** a generator of well-typed programs over two user
+  effects with Console traces, and a per-program feature census. Required
+  coverage per run, failing the run when unmet: at least 50 programs each
+  with nested same-key handlers (including intercept-and-forward),
+  targeted aborts crossing an unrelated `handle`, interleaved stage
+  ordering with over-application, and escaped callbacks invoked under a
+  different handler; at least 25 each for every cleanup outcome (normal
+  exit, abort, defect, failing cleanup during unwinding, cleanup handling
+  its own failure, unreached `defer`). The census is printed with the
+  run.
+- [ ] **Step 3: Run** generated comparisons of Go stdout, stderr and exit
+  status against the interpreter: at least 500 programs and the coverage
+  above. Expected: 0 differences. Every program's seed is recorded; a
+  differing program's seed and source are written to
+  .build/fx001-differential/, and a shrinker (drop block items, handlers,
+  clauses and defers; replace subexpressions by literals of their type;
+  keep only while still well-typed and still differing) writes the
+  minimized source beside it.
+- [ ] **Step 4: Commit** `test: FX001 reference interpreter and
   differential corpus`.
 
 ### Task 11: Scale and the acceptance scenario
