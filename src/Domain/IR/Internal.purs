@@ -17,7 +17,7 @@ import Domain.Resolved (CtorId, FunctionId, LocalId, TypeId)
 -- so comparing two types is constant time whatever they stand for, and a
 -- 5,000-parameter arrow is one table entry per suffix, not a tree copied
 -- into every expression typed by it (design §7, §13 rule 8).
-data Ty = TInt | TBool | TData TypeId | TFun FunTypeId
+data Ty = TInt | TBool | TData TypeId | TFun FunTypeId | TUnit
 
 -- An arrow's number: its index in `funTypes`.
 newtype FunTypeId = FunTypeId Int
@@ -97,6 +97,11 @@ data Node
   | Apply Expr (Array Expr)
   | Lambda (Array Param) Expr
   | Pipe Expr Expr
+  | UnitValue
+  | Block (Array Item) Expr
+
+-- Mirrors the checked IR's block items (FX001).
+data Item = Let (Maybe LocalId) Expr | Discard Expr
 
 -- Mirrors the checked IR (FN001): `Call` and `Construct` may be partial;
 -- a lambda parameter is a typed local or a typed discard.
@@ -119,3 +124,12 @@ typeOf (Expr expression) = expression.ty
 
 spanOf ∷ Expr → Span
 spanOf (Expr expression) = expression.span
+
+itemValue ∷ Item → Expr
+itemValue = case _ of
+  Let _ value → value
+  Discard value → value
+
+-- A block's expressions in evaluation order: its items', then its value.
+blockParts ∷ Array Item → Expr → Array Expr
+blockParts items value = Array.snoc (map itemValue items) value

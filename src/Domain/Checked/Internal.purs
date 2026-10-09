@@ -1,6 +1,7 @@
 module Domain.Checked.Internal where
 
 import Prelude
+import Data.Array as Array
 import Data.Maybe (Maybe)
 import Domain.Syntax (Operator, Span)
 import Domain.Resolved
@@ -67,6 +68,12 @@ data Node
   | Apply Expr (Array Expr)
   | Lambda (Array Param) Expr
   | Pipe Expr Expr
+  | UnitValue
+  | Block (Array Item) Expr
+
+-- A block item (FX001): a monomorphic `let` of a local or `_`, or a
+-- discarded value.
+data Item = Let (Maybe LocalId) Expr | Discard Expr
 
 -- A lambda parameter: a typed local, or a typed discard (`_`).
 type Param = { local ∷ Maybe LocalId, ty ∷ Ty Open }
@@ -93,3 +100,12 @@ typeOf (Expr expression) = expression.ty
 
 spanOf ∷ Expr → Span
 spanOf (Expr expression) = expression.span
+
+itemValue ∷ Item → Expr
+itemValue = case _ of
+  Let _ value → value
+  Discard value → value
+
+-- A block's expressions in evaluation order: its items', then its value.
+blockParts ∷ Array Item → Expr → Array Expr
+blockParts items value = Array.snoc (map itemValue items) value

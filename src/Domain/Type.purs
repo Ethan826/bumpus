@@ -33,20 +33,22 @@ derive instance ordVarId ∷ Ord VarId
 -- `TFun A (TFun B C)`, whose chain of results is its spine. A declaration
 -- of thousands of parameters has a spine as long, so every pass here walks
 -- a spine by a loop and recurses only into parameters and type arguments,
--- whose depth the nesting limits bound (design §1, §3).
+-- whose depth the nesting limits bound (design §1, §3). `TUnit` is the
+-- type of `()` (FX001), last so the order of the earlier ones is kept.
 data Ty v
   = TInt
   | TBool
   | TData TypeId (Array (Ty v))
   | TVar v
   | TFun (Ty v) (Ty v)
+  | TUnit
 
 -- An arrow's parameters, in order, and its final result, which is not an
 -- arrow. A type that is not an arrow is its own result.
 type Spine v = { parameters ∷ Array (Ty v), result ∷ Ty v }
 
 -- Constructors in declaration order, as the derived instance ranked them.
-data Head = IntHead | BoolHead | DataHead | VarHead | FunHead
+data Head = IntHead | BoolHead | DataHead | VarHead | FunHead | UnitHead
 
 derive instance eqHead ∷ Eq Head
 derive instance ordHead ∷ Ord Head
@@ -91,6 +93,7 @@ ground ∷ ∀ v. Ty v → Maybe (Ty Void)
 ground = case _ of
   TInt → Just TInt
   TBool → Just TBool
+  TUnit → Just TUnit
   TData id arguments → TData id <$> traverse ground arguments
   TVar _ → Nothing
   arrow@(TFun _ _) → groundSpine (spine arrow)
@@ -140,6 +143,7 @@ substituteWith ∷ ∀ v w. (v → Ty w) → Ty v → Ty w
 substituteWith substitution = case _ of
   TInt → TInt
   TBool → TBool
+  TUnit → TUnit
   TData id arguments → TData id (map substituted arguments)
   TVar variable → substitution variable
   arrow@(TFun _ _) → substitutedSpine (spine arrow)
@@ -175,6 +179,7 @@ sameLeaf ∷ ∀ v. Eq v ⇒ Ty v → Ty v → Boolean
 sameLeaf one other = case one, other of
   TInt, TInt → true
   TBool, TBool → true
+  TUnit, TUnit → true
   TVar first, TVar second → first == second
   _, _ → false
 
@@ -190,3 +195,4 @@ headOf = case _ of
   TData _ _ → DataHead
   TVar _ → VarHead
   TFun _ _ → FunHead
+  TUnit → UnitHead

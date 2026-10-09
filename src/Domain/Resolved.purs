@@ -14,6 +14,7 @@ newtype CtorId = CtorId Int
 
 derive instance eqFunctionId ∷ Eq FunctionId
 derive instance eqLocalId ∷ Eq LocalId
+derive instance ordLocalId ∷ Ord LocalId
 derive instance eqCtorId ∷ Eq CtorId
 
 -- `VarId i` in a constructor field is the owner's i-th parameter.
@@ -70,6 +71,12 @@ data Expr
   | Lambda Span (Array Param) Expr
   | Apply Span Expr (Array Expr)
   | Pipe Span Expr Expr
+  | UnitValue Span
+  | Block Span (Array Item) Expr
+
+-- A block item: `let` binds a local, or `_` (Nothing); a discarded item's
+-- value is evaluated and dropped (FX001 design §1).
+data Item = Let Span (Maybe LocalId) Expr | Discard Expr
 
 -- A lambda parameter: a local, or `_` (Nothing), which binds nothing. Its
 -- annotation names only the enclosing signature's variables.
@@ -112,3 +119,5 @@ exprSpan expression = case expression of
   Lambda span _ _ → span
   Apply span _ _ → span
   Pipe span _ _ → span
+  UnitValue span → span
+  Block span _ _ → span

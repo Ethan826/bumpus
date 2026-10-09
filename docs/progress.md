@@ -2567,3 +2567,63 @@ per repetition; 0.2-0.4 s builds) and was discarded; the seed now varies
 per run. Measurements (.build/fx001-task1/run3.log): median `go build` 0.83 s
 / 1.53 s / 2.91 s at 1,000 / 2,000 / 4,000 helpers (bound 10 s). Decision:
 ADOPT the shapes. Details in findings "FX001 Task 1".
+
+### FX001 Task 2: Unit, blocks and let (2026-10-09)
+
+Branch fx001. No existing test assertion changes; the five bootstrap
+snapshots are byte-identical (verify's snapshot tests).
+
+- What changed: Format.Lex reserves `effect handler handle with let defer
+  Unit ctl resume` at once (controller ruling; `pure` stays a name).
+  Domain.Syntax gains `UnitRef`, `UnitValue`, `Block` and `Item` (`Let`,
+  `Discard`); the new Format.Parse.Block parses `{}` (Unit), items
+  separated by `;` (a trailing `;` makes the value `UnitValue` at the
+  closing `}`, which marks the block trailing; `{ let x = 1 }` is E_SYNTAX
+  `Expected ;` at `}`) and `()`; `{` joins the loosest expression dispatch,
+  every item nested (128 nested blocks parse, 129 are E_NESTING). Domain.Type
+  and the IR gain `TUnit` (Go `struct{}`, value `struct{}{}`); Resolved,
+  Checked and IR gain `UnitValue`, `Block` and `Item`. Features.Resolve.Block
+  threads the scope through the items (new Fresh `thread`, a balanced
+  traverse); a `let` is in scope for later items only, shadowing as a match
+  binder, its LocalId taken before its expression's binders. The resolver's
+  scope and the checker's locals became maps (by name, by LocalId) so a
+  20,000-let block costs no scan per lookup. Features.Check.Block: `let` is
+  monomorphic, discards may have any type, the block's type is its value's.
+  Check.Hint adds `TrailingSemicolon` (rendered `; remove the trailing ;?`)
+  on a mismatch whose found expression is a trailing block. Unit is
+  comparable (always equal; ordering lowered through an inline
+  `func(struct{}, struct{}) int` so both operands still run) and prints
+  `()`. Format.Go.Block lifts each block to `bumpusFn{f}Block{k}` (pre-order,
+  counter shared with Match/Lambda/Pipe/Apply), captures in LocalId order
+  (Capture `withoutAll`), each `let` a typed `var` plus `_ = x` (typed
+  because an arity-one function value is a lifted Go func of unnamed type;
+  the brief's `x :=` would leave it unnamed), `_ = e` for `let _` and
+  discards, `return` the value. A Unit `main` emits `func main() {
+  bumpusFn<n>() }` and prints nothing; `import "fmt"` is emitted only when
+  main prints or a printer appends an Int/Bool field. The style gate's
+  applicative-module list adds Format.Parse.Block. The interpreter
+  (test/poly-parse.mjs, test/poly-oracle.mjs) reads and runs blocks, `let`,
+  `()`, `{}` and `f()` calls.
+- Tests seen failing first: test/fx-block.test.mjs, 86 tests, 85 failing
+  and one passing before any code (`1 + { 2 }` was already `Expected an
+  expression` at `{`, kept as a characterization row); log
+  .build/fx001-task2-red.log. One test-construction slip fixed after GREEN
+  (the `()` and `f()` rows pointed at the first occurrence, inside `main()`
+  and `fn f()`). The 20,000-let timing test moved to
+  test/fx-block.serial.test.mjs after the first verify: under the parallel
+  run it took 999 ms against its 1,500 ms bound (load about 5).
+- Isolated mutants (scratchpad copies, not committed), each failing its
+  rows: block items emitted in reverse (3 order probes); hint ignoring the
+  span (the `{ 1; () }` row); a let never entering scope (2 run rows); Unit
+  ordering returning 1 (the two boxed `<=`/`>` rows); Unit main printing
+  (both silent-entry rows).
+- Scale: 20,000 lets compile to Go in 490-510 ms, 40,000 in 915 ms, 80,000
+  in 1,739 ms (linear, no stack failure); bound 1,500 ms.
+- Reach: Parse → Resolve → Check → Specialize → Go, built and run in one
+  batch (two Unit-main programs via runGo, which the batch's Println shape
+  check does not admit); the interpreter agrees on every run row and probe.
+- GREEN: `rm -rf output && npm run verify` exit 0: 626 parallel tests and
+  13 serial (was 541 + 12; +85 and +1), zero failures/skips, twenty-two
+  regression proofs, load 3.6-6.1; the serial 20,000-let test 535 ms of
+  1,500 (log .build/fx001-task2-verify2.log; the first run, before the
+  serial split, .build/fx001-task2-verify.log, also exit 0).

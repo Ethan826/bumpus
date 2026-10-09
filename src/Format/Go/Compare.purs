@@ -59,6 +59,7 @@ comparison ∷ Operator → Ty → String → String → String
 comparison operator ty left right = case ty of
   TData owner → viaHelper (compareName owner)
   TBool | isOrdering operator → viaHelper "bumpusCmpBool"
+  TUnit | isOrdering operator → viaHelper unitOrder
   _ → "(" <> left <> " " <> symbol <> " " <> right <> ")"
   where
   symbol = goOperator operator
@@ -66,6 +67,12 @@ comparison operator ty left right = case ty of
     <> ") "
     <> symbol
     <> " 0)"
+
+-- Unit has one value, so any two are equal (ADR 005); Go has no ordering
+-- on struct{}, and this literal still evaluates both operands in order,
+-- with no helper to emit.
+unitOrder ∷ String
+unitOrder = "func(struct{}, struct{}) int { return 0 }"
 
 -- Tags are 1-based declaration positions, so comparing tags orders
 -- constructors. An out-of-range tag is malformed (I001 foreign values).
@@ -106,6 +113,8 @@ fieldComparison field = case _ of
     <> right
     <> " { return 1 }\n"
   TBool → decide ("bumpusCmpBool(" <> left <> ", " <> right <> ")")
+  -- Two Unit fields are always equal.
+  TUnit → ""
   TData owner → "if " <> left <> " == nil || " <> right <> " == nil { "
     <> malformed
     <> " }\n"

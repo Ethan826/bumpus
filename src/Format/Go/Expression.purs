@@ -5,6 +5,7 @@ import Data.Array as Array
 import Data.String.Common (joinWith)
 import Domain.IR.Internal as IR
 import Domain.IR.Internal (Ty)
+import Format.Go.Block (lowerBlock)
 import Format.Go.Compare (comparison)
 import Format.Go.Data (boolean, goType, integer, localName)
 import Format.Go.Capture (union)
@@ -25,8 +26,9 @@ import Format.Go.Pipe (lowerPipe)
 import Format.Go.Value (applyValue, named, reference)
 
 -- `next` is the number the first lifted function met in pre-order will
--- take; each match, lambda, temporary pipe and application helper becomes
--- its own top-level function (Format.Go.Match, .Lambda, .Pipe, .Apply).
+-- take; each match, lambda, temporary pipe, application helper and block
+-- becomes its own top-level function (Format.Go.Match, .Lambda, .Pipe,
+-- .Apply, .Block). Unit is Go's `struct{}`, its value `struct{}{}`.
 -- One arm per node, each delegating; a flat exhaustive dispatch.
 expression ∷ Scope → Int → IR.Expr → Lowered
 expression scope next whole@(IR.Expr term) = case term.node of
@@ -49,6 +51,8 @@ expression scope next whole@(IR.Expr term) = case term.node of
   IR.Lambda parameters body →
     lowerLambda scope lower next whole parameters body
   IR.Pipe left right → lowerPipe scope lower next whole left right
+  IR.UnitValue → leaf next "struct{}{}"
+  IR.Block items value → lowerBlock scope lower next term.ty items value
   where
   lower = expression scope
   each = several lower next

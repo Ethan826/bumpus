@@ -8,6 +8,7 @@ module Domain.Problem where
 data TypeName
   = IntName
   | BoolName
+  | UnitName
   | DataName String
   | AppliedName String (Array TypeName)
   | VariableName String
@@ -39,8 +40,9 @@ data EntryKind
   | EntryFunction
 
 -- What a diagnostic suggests beside its problem: a partial application
--- of the named function or constructor, short of this many arguments.
-data Hint = MissingArguments String Int
+-- of the named function or constructor, short of this many arguments; or
+-- a block whose trailing `;` made it Unit (FX001 design §1).
+data Hint = MissingArguments String Int | TrailingSemicolon
 
 -- The lexer and parser are Format, so their payloads may be text.
 data Problem

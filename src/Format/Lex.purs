@@ -36,6 +36,8 @@ punctuation = case _ of
   '>' → true
   _ → false
 
+-- FX001 reserves its words at once (design §1), though later tasks parse
+-- most of them; `pure` stays an ordinary name.
 reserved ∷ String → Boolean
 reserved = case _ of
   "fn" → true
@@ -49,6 +51,15 @@ reserved = case _ of
   "type" → true
   "match" → true
   "_" → true
+  "effect" → true
+  "handler" → true
+  "handle" → true
+  "with" → true
+  "let" → true
+  "defer" → true
+  "Unit" → true
+  "ctl" → true
+  "resume" → true
   _ → false
 
 -- The first characters of `twoCharacterTokens`.

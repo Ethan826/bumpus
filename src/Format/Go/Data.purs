@@ -32,6 +32,7 @@ goType = case _ of
   TBool → "bool"
   TData (TypeId index) → "bumpusTy" <> show index
   TFun (FunTypeId index) → "bumpusFun" <> show index
+  TUnit → "struct{}"
 
 -- One named Go type per interned arrow, in number order (design §13 rule
 -- 8): each names its result's type by number, so the text is linear in

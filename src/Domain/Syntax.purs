@@ -28,6 +28,14 @@ data Expr
   | Lambda Span (Array LambdaParam) Expr
   | Apply Span Expr (Array Expr)
   | Pipe Span Expr Expr
+  | UnitValue Span
+  | Block Span (Array Item) Expr
+
+-- A block item (FX001 design §1): `let name = e`, `let _ = e` (Nothing)
+-- spanning `let` through `e`, or `e`, whose value is discarded. A block
+-- whose items end in `;` has the value `UnitValue` at its closing `}`;
+-- no written value ends where the block does, so that span marks it.
+data Item = Let Span (Maybe String) Expr | Discard Expr
 
 -- A lambda parameter spans its name; `_` (no name) binds nothing.
 type LambdaParam = { name ∷ Maybe String, ty ∷ Maybe TypeRef, span ∷ Span }
@@ -47,6 +55,7 @@ type Arm = { pattern ∷ Pattern, body ∷ Expr, span ∷ Span }
 data TypeRef
   = IntRef Span
   | BoolRef Span
+  | UnitRef Span
   | VarRef Span String
   | NamedRef Span String (Array TypeRef)
   | FunRef Span TypeRef TypeRef
@@ -109,11 +118,14 @@ exprSpan = case _ of
   Lambda span _ _ → span
   Apply span _ _ → span
   Pipe span _ _ → span
+  UnitValue span → span
+  Block span _ _ → span
 
 typeRefSpan ∷ TypeRef → Span
 typeRefSpan = case _ of
   IntRef span → span
   BoolRef span → span
+  UnitRef span → span
   VarRef span _ → span
   NamedRef span _ _ → span
   FunRef span _ _ → span

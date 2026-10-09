@@ -41,7 +41,8 @@ adding a bypass allowlist.
   and do-blocks directly in case/if branches; parse recovery fails the gate;
 - the same CST gate keeps parser productions applicative (G001;
   tools/style/src/Style/Parser.purs): in Format.Parse and
-  Format.Parse.{Literal, Pattern, Expression, Declaration, Type, Lambda}
+  Format.Parse.{Literal, Pattern, Expression, Declaration, Type, Lambda,
+  Block}
   it rejects every `do` block, the operators `>>=`, `=<<`, `>=>` and
   `<=<` (including sections such as `(>>=)`), and the names `bind`,
   `join`, `discard`, Prelude's `ap`, `ifM`, `whenM`, `unlessM` and

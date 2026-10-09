@@ -158,6 +158,7 @@ unifyHeads level subst left right = case left, right of
   TVar (Rigid one), TVar (Rigid other) | one == other → Right subst
   TInt, TInt → Right subst
   TBool, TBool → Right subst
+  TUnit, TUnit → Right subst
   TData one lefts, TData other rights
     | one == other && Array.length lefts == Array.length rights →
         foldM unifyPair subst (Array.zip lefts rights)

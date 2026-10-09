@@ -48,7 +48,7 @@ typeRef = folded <$> chainRight "->" (segment inner)
   inner = defer later
   later _ = typeRef
 
--- Int, Bool, a type variable, or a capitalized name with optional type
+-- Int, Bool, Unit, a type variable, or a capitalized name with optional type
 -- arguments, each one nesting level deeper (ADR 006); otherwise E_SYNTAX at
 -- that token. `List()` is rejected at `)`; `Int(a)` and `a(Int)` at `(`,
 -- by whatever follows the type.
@@ -56,6 +56,7 @@ operand ∷ Parser TypeRef → Parser TypeRef
 operand inner = dispatch
   [ on "Int" (IntRef <$> tokenSpan)
   , on "Bool" (BoolRef <$> tokenSpan)
+  , on "Unit" (UnitRef <$> tokenSpan)
   , onWhen upperText (spanned appliedOf (parts <$> upperName <*> arguments))
   , onWhen lowerText (variable <$> token)
   ]

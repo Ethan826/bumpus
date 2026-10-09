@@ -4,10 +4,12 @@ module Features.Resolve.Fresh
   , fresh
   , liftEither
   , runFresh
+  , thread
   ) where
 
 import Prelude
 import Data.Either (Either(..))
+import Data.Traversable (traverse)
 import Domain.Resolved (LocalId(..))
 import Domain.Syntax (Diagnostic)
 
@@ -35,6 +37,56 @@ instance Bind Fresh where
     resume numbered = step (continue numbered.value) numbered.next
 
 instance Monad Fresh
+
+-- A resolution that also threads a state `s` left to right: a block's
+-- scope, which each `let` extends for the items after it (FX001).
+newtype Threading s a =
+  Threading (s → Int → Either Diagnostic (Carried s a))
+
+type Carried s a = { value ∷ a, state ∷ s, next ∷ Int }
+
+instance Functor (Threading s) where
+  map transform (Threading run) = Threading (mapped <<< run)
+    where
+    mapped running next = map changed (running next)
+    changed carried = carried { value = transform carried.value }
+
+instance Apply (Threading s) where
+  apply (Threading runChange) (Threading run) = Threading applied
+    where
+    applied state next = runChange state next >>= continue
+    continue changing = map (changed changing.value)
+      (run changing.state changing.next)
+    changed change carried = carried { value = change carried.value }
+
+instance Applicative (Threading s) where
+  pure value = Threading carry
+    where
+    carry state next = Right { value, state, next }
+
+-- `each` over the items in order, each seeing the state the one before it
+-- left. Array's traverse nests its applies in a balanced tree (as
+-- Features.Check.Scheme `threadAll` does), so a block of 20,000 items
+-- neither copies per item nor nests one frame per item.
+thread
+  ∷ ∀ s a b
+  . (s → a → Fresh { value ∷ b, state ∷ s })
+  → s
+  → Array a
+  → Fresh { value ∷ Array b, state ∷ s }
+thread each state items = Fresh (finish <<< running (traverse threaded items))
+  where
+  threaded item = Threading (stepped item)
+  stepped item before next = map carry (step (each before item) next)
+  carry stepResult =
+    { value: stepResult.value.value
+    , state: stepResult.value.state
+    , next: stepResult.next
+    }
+  running (Threading run) = run state
+  finish result = map numberedOf result
+  numberedOf whole =
+    { value: { value: whole.value, state: whole.state }, next: whole.next }
 
 -- The next LocalId; ids are handed out in the order `fresh` runs.
 fresh ∷ Fresh LocalId

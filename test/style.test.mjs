@@ -30,7 +30,7 @@ const doBlock = 'f x = do\n  y <- x\n  pure y';
 test('parser productions reject do blocks and bind operators', () => {
   for (const name of ['Format.Parse', 'Format.Parse.Literal', 'Format.Parse.Pattern',
     'Format.Parse.Expression', 'Format.Parse.Declaration', 'Format.Parse.Type',
-    'Format.Parse.Lambda']) {
+    'Format.Parse.Lambda', 'Format.Parse.Block']) {
     for (const body of [doBlock, 'f x = x >>= g', 'f x = g =<< x', 'f = (>>=)']) {
       assert.ok(check(inModule(name, body)).some(finding => finding.includes('applicative')), `${name}: ${body}`);
     }
@@ -46,7 +46,7 @@ test('the grammar core, cursor and other modules may sequence monadically', () =
 
 const parserModules = ['Format.Parse', 'Format.Parse.Literal', 'Format.Parse.Pattern',
   'Format.Parse.Expression', 'Format.Parse.Declaration', 'Format.Parse.Type',
-  'Format.Parse.Lambda'];
+  'Format.Parse.Lambda', 'Format.Parse.Block'];
 
 // Prelude's Monad helpers and Control.Bind's names sequence through Bind too
 // (G001 final review M1).

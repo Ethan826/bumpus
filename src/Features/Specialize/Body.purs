@@ -24,7 +24,7 @@ import Features.Specialize.Values
 -- The signature first, then the body in pre-order (design §6): an
 -- expression's type, then a reference's instantiation and callee, then
 -- its parts left to right; an arm's pattern before its body; a lambda's
--- parameters before its body.
+-- parameters before its body; a block's items in order, then its value.
 fillFunction ∷ Env → Work → Specializing Unit
 fillFunction env work = maybe'
   (internal "Invalid function id" work.span)
@@ -83,9 +83,17 @@ copyNode scope span = case _ of
     <*> each arguments
   Checked.Lambda parameters body → lambda scope recur span parameters body
   Checked.Pipe left right → IR.Pipe <$> recur left <*> recur right
+  Checked.UnitValue → pure IR.UnitValue
+  Checked.Block items value → IR.Block <$> traverse (item scope) items
+    <*> recur value
   where
   recur = expression scope
   each = traverse recur
+
+item ∷ Scope → Checked.Item → Specializing IR.Item
+item scope = case _ of
+  Checked.Let local value → IR.Let local <$> expression scope value
+  Checked.Discard value → IR.Discard <$> expression scope value
 
 arm ∷ Scope → Checked.Arm → Specializing IR.Arm
 arm scope checked = do

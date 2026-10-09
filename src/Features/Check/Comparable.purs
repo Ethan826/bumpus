@@ -34,6 +34,7 @@ comparable functions env (Checked.Expr expression) = case expression.node of
     (Array.cons callee arguments)
   Checked.Lambda _ body → recur body
   Checked.Pipe left right → traverse_ recur [ left, right ]
+  Checked.Block items value → traverse_ recur (Checked.blockParts items value)
   _ → pure unit
   where
   recur = comparable functions env

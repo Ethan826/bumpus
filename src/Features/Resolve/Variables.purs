@@ -37,6 +37,7 @@ occurrences ∷ Syntax.TypeRef → Array String
 occurrences = case _ of
   Syntax.IntRef _ → []
   Syntax.BoolRef _ → []
+  Syntax.UnitRef _ → []
   Syntax.VarRef _ name → [ name ]
   Syntax.NamedRef _ _ arguments → Array.concatMap occurrences arguments
   arrow@(Syntax.FunRef _ _ _) → spineOccurrences (Syntax.typeRefSpine arrow)

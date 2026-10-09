@@ -1,8 +1,8 @@
 module Features.Check.Infer (Env, infer) where
 
 import Prelude
-import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Map as Map
 import Data.Maybe (maybe')
 import Domain.Checked.Internal (Open)
 import Domain.Checked.Internal as Checked
@@ -12,11 +12,12 @@ import Domain.Resolved as Resolved
 import Domain.Syntax (Diagnostic, Operator, Span, problemAt)
 import Features.Check.Apply (checkApply)
 import Features.Check.Arms (checkMatch)
+import Features.Check.Block (checkBlock)
 import Features.Check.Call (checkCall, checkConstruct)
+import Features.Check.Context (Locals)
 import Features.Check.Lambda (checkLambda)
 import Features.Check.Pipe (checkPipe)
 import Features.Check.Use (checkCtorRef, checkFunctionRef)
-import Features.Check.Match (Typed)
 import Features.Check.Require (bounded, require)
 import Features.Check.Scheme (State, Threaded)
 
@@ -25,7 +26,7 @@ type Env =
   , types ∷ Array Resolved.TypeInfo
   , ctors ∷ Array Resolved.CtorInfo
   , variables ∷ Array String
-  , locals ∷ Array Typed
+  , locals ∷ Locals
   }
 
 type Inferred = Either Diagnostic (Threaded Checked.Expr)
@@ -74,6 +75,9 @@ inferNode env state expression = case expression of
     callee
     arguments
   Resolved.Pipe span left right → checkPipe infer env state span left right
+  Resolved.UnitValue span → typed state span TUnit Checked.UnitValue
+  Resolved.Block span items value → checkBlock infer env state span items
+    value
 
 typed ∷ State → Span → Ty Open → Checked.Node → Inferred
 typed state span ty node = pure
@@ -123,8 +127,7 @@ checkConditional env state span condition branches = do
 
 checkLocal ∷ Env → State → Span → Resolved.LocalId → Inferred
 checkLocal env state span id = maybe' missing found
-  (Array.find named env.locals)
+  (Map.lookup id env.locals)
   where
   missing _ = Left (problemAt (Internal "Invalid resolved local") span)
-  found local = typed state span local.ty (Checked.Local id)
-  named local = local.id == id
+  found ty = typed state span ty (Checked.Local id)

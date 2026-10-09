@@ -89,6 +89,7 @@ typeName ∷ ∀ r. Names r → Span → Ty Open → Either Diagnostic TypeName
 typeName env span = case _ of
   TInt → Right IntName
   TBool → Right BoolName
+  TUnit → Right UnitName
   TData (TypeId index) arguments → maybe' missing (named arguments)
     (Array.index env.types index)
   TVar (Rigid (VarId index)) → maybe' unnamed (Right <<< VariableName)

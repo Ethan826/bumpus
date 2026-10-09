@@ -3,11 +3,15 @@ module Features.Resolve.Expression (Scope, expression) where
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Foldable (foldl)
+import Data.Map (Map)
+import Data.Map as Map
 import Data.Maybe (Maybe, maybe')
 import Data.String as String
 import Data.Traversable (traverse)
 import Domain.Problem (Problem(..), UnboundKind(..))
 import Domain.Syntax as Syntax
+import Features.Resolve.Block (block)
 import Features.Resolve.Fresh (Fresh, failure, liftEither)
 import Features.Resolve.Lambda (lambda)
 import Features.Resolve.Pattern (resolvePattern)
@@ -15,17 +19,19 @@ import Domain.Resolved (Global)
 import Domain.Resolved as Resolved
 
 -- `types` and `variables` (the enclosing signature's) are what a lambda
--- annotation may name.
+-- annotation may name. `locals` maps each name in scope to its innermost
+-- local, so a lookup in a block of 20,000 lets is no scan (FX001).
 type Scope =
   { globals ∷ Array Global
   , ctors ∷ Array Resolved.CtorInfo
-  , locals ∷ Array Resolved.Local
+  , locals ∷ Map String Resolved.LocalId
   , types ∷ Array Resolved.TypeInfo
   , variables ∷ Array String
   }
 
 -- Binders are numbered in source pre-order: scrutinee before arms, each
--- arm's pattern before its body, a lambda's parameters before its body.
+-- arm's pattern before its body, a lambda's parameters before its body,
+-- a block's items in order, each `let` before its expression.
 -- A flat exhaustive dispatch (BACKLOG E003).
 expression ∷ Scope → Syntax.Expr → Fresh Resolved.Expr
 expression scope = case _ of
@@ -50,6 +56,8 @@ expression scope = case _ of
     <*> traverse nested arguments
   Syntax.Pipe span left right → Resolved.Pipe span <$> nested left
     <*> nested right
+  Syntax.UnitValue span → pure (Resolved.UnitValue span)
+  Syntax.Block span items value → block expression scope span items value
   where
   -- Eta-expanded: a point-free `expression scope` would recurse at once.
   nested syntax = expression scope syntax
@@ -61,11 +69,13 @@ resolveArm scope arm = do
   body ← withLocals scope arm.body matched.binders
   pure { pattern: matched.pattern, body, span: arm.span }
 
--- Later locals shadow earlier ones (findLocal searches from the end).
+-- Later locals shadow earlier ones.
 withLocals
   ∷ Scope → Syntax.Expr → Array Resolved.Local → Fresh Resolved.Expr
 withLocals scope body locals =
-  expression (scope { locals = scope.locals <> locals }) body
+  expression (scope { locals = foldl inserted scope.locals locals }) body
+  where
+  inserted found local = Map.insert local.name local.id found
 
 -- Design §2: a local wins; then a function, a value if it has parameters
 -- and E_ARITY without its call if it has none; then a constructor.
@@ -151,11 +161,7 @@ nameSpan span name = { start: span.start, end }
     }
 
 findLocal ∷ Scope → String → Maybe Resolved.LocalId
-findLocal scope name = entryId <$> Array.find named
-  (Array.reverse scope.locals)
-  where
-  named local = local.name == name
-  entryId local = local.id
+findLocal scope name = Map.lookup name scope.locals
 
 findGlobal ∷ Scope → String → Maybe Global
 findGlobal scope name = Array.find named scope.globals

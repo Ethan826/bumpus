@@ -1,4 +1,4 @@
-module Format.Go.Show (showName, showHelpers, printed) where
+module Format.Go.Show (showName, showHelpers, printed, appendsWithFmt) where
 
 import Prelude
 import Data.Array as Array
@@ -21,6 +21,18 @@ printed ∷ Ty → String → String
 printed ty call = case ty of
   TData owner → "string(" <> showName owner <> "(nil, " <> call <> "))"
   _ → call
+
+-- Whether a printer calls fmt.Append: exactly when a declared type has an
+-- Int or Bool field (showField).
+appendsWithFmt ∷ Layout → Boolean
+appendsWithFmt program = Array.any declaredUses program.types
+  where
+  declaredUses declared = Array.any memberUses declared.members
+  memberUses member = Array.any formatted member.ctor.fields
+  formatted = case _ of
+    TInt → true
+    TBool → true
+    _ → false
 
 -- Cases come from the type's members, which Format.Go.Layout joins with
 -- the constructor table itself, so every constructor of the type is printed
@@ -61,6 +73,7 @@ showField id position = case _ of
     <> ")\n"
   TInt → appended
   TBool → appended
+  TUnit → "out = " <> appendText "()"
   -- Printing is rejected at a type holding an arrow (design §3), yet every
   -- declared type gets its printer; a function field is never printed.
   TFun _ → malformed <> "\n"

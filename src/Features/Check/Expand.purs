@@ -78,6 +78,7 @@ substitute ∷ ∀ v. Array (Ty v) → Ty VarId → Lookup (Ty v)
 substitute arguments = case _ of
   TInt → Right TInt
   TBool → Right TBool
+  TUnit → Right TUnit
   TData id inner → TData id <$> traverse (substitute arguments) inner
   TVar (VarId index) → maybe' missing Right (Array.index arguments index)
   arrow@(TFun _ _) → substituteSpine (spine arrow)
@@ -102,6 +103,7 @@ spelling ∷ Key → String
 spelling = case _ of
   TInt → "i"
   TBool → "b"
+  TUnit → "u"
   TVar _ → "v"
   TData (TypeId id) arguments → show id <> "("
     <> joinWith "," (map spelling arguments)
@@ -191,6 +193,7 @@ field ∷ Map String Int → Key → Lookup (Ty VarId)
 field numbers = case _ of
   TInt → Right TInt
   TBool → Right TBool
+  TUnit → Right TUnit
   TVar _ → Right TInt
   TFun _ _ → Right TInt
   found@(TData _ _) → maybe' unexpanded (Right <<< applied)

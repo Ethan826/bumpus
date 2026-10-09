@@ -10,14 +10,15 @@ import Domain.Problem (Problem(..))
 import Domain.Resolved as Resolved
 import Domain.Syntax (Diagnostic, Span, problemAt)
 import Domain.Type (Ty)
-import Features.Check.Match (PatternEnv, Typed, patternAgainst)
+import Features.Check.Context (Locals, bindAll)
+import Features.Check.Match (PatternEnv, patternAgainst)
 import Features.Check.Require (require)
 import Features.Check.Scheme (State, Threaded, threadAll)
 
 -- Open rows let Features.Check pass its own environment through unchanged.
 -- The declarations name an arm body's under-application hint.
 type MatchEnv r = PatternEnv
-  (locals ∷ Array Typed, functions ∷ Array Resolved.FunctionDecl | r)
+  (locals ∷ Locals, functions ∷ Array Resolved.FunctionDecl | r)
 
 -- Arms' own row: Features.Check.Infer's `infer` reaches here through
 -- checkMatch with its whole Env, of which matching needs the pattern
@@ -90,7 +91,7 @@ checkArm
   → Either Diagnostic (Threaded Checked.Arm)
 checkArm infer env state ty arm = do
   matched ← patternAgainst env state ty arm.pattern
-  body ← infer (env { locals = env.locals <> matched.value.locals })
+  body ← infer (env { locals = bindAll matched.value.locals env.locals })
     matched.state
     arm.body
   pure

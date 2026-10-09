@@ -51,6 +51,7 @@ resolveType types variables = resolved
   resolved = case _ of
     Syntax.IntRef _ → pure Resolved.TInt
     Syntax.BoolRef _ → pure Resolved.TBool
+    Syntax.UnitRef _ → pure Resolved.TUnit
     Syntax.VarRef span name → maybe' (unbound UnboundTypeVariable span name)
       variable
       (Array.elemIndex name variables)

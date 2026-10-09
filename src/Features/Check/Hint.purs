@@ -19,9 +19,12 @@ type Declared r =
 -- expression is, through parentheses only (which leave no node), a direct
 -- partial application `f(a1…aj)`, 0 < j < n, of a named function or
 -- constructor, and whose expected type is neither a function nor a meta,
--- gains `MissingArguments f (n - j)`. Computed after the failure from the
--- state before it, with no further unification; the problem it wraps keeps
--- its code, span and text. Anything else is returned unchanged.
+-- gains `MissingArguments f (n - j)`. A type mismatch whose found
+-- expression is, through parentheses only, a block made Unit by a
+-- trailing `;` gains `TrailingSemicolon` (FX001 design §1), whatever was
+-- expected: Unit was not. Computed after the failure from the state
+-- before it, with no further unification; the problem it wraps keeps its
+-- code, span and text. Anything else is returned unchanged.
 hinted
   ∷ ∀ r
   . { | Declared r }
@@ -32,11 +35,24 @@ hinted
   → Diagnostic
 hinted env state expected actual diagnostic = case diagnostic.problem of
   TypeMismatch _ _
+    | trailing actual → wrap TrailingSemicolon
     | not (functionOrMeta (headOf state expected)) → maybe diagnostic wrap
         (missing env actual)
   _ → diagnostic
   where
   wrap hint = diagnostic { problem = Hinted diagnostic.problem hint }
+
+-- A block whose items end in `;` has the value `()` at its closing `}`
+-- (Domain.Syntax `Item`), so that value ends where the block does; a
+-- written value never does.
+trailing ∷ Checked.Expr → Boolean
+trailing (Checked.Expr expression) = case expression.node of
+  Checked.Block _ value → closing value
+  _ → false
+  where
+  closing (Checked.Expr found) = case found.node of
+    Checked.UnitValue → found.span.end.offset == expression.span.end.offset
+    _ → false
 
 functionOrMeta ∷ Ty Open → Boolean
 functionOrMeta = case _ of

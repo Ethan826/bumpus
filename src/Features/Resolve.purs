@@ -3,8 +3,10 @@ module Features.Resolve (resolve) where
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Map as Map
 import Data.Maybe (Maybe(..), isNothing, maybe, maybe')
 import Data.Traversable (traverse)
+import Data.Tuple (Tuple(..))
 import Domain.Problem (EntryKind(..), Problem(..))
 import Domain.Type (ground)
 import Domain.Syntax as Syntax
@@ -104,7 +106,7 @@ resolveFunction
   → Definition
   → Either Syntax.Diagnostic Resolved.FunctionDecl
 resolveFunction globals tables definition = withBody <$> runFresh
-  (Array.length locals)
+  (Array.length parameters)
   (expression scope definition.function.body)
   where
   scope =
@@ -114,9 +116,10 @@ resolveFunction globals tables definition = withBody <$> runFresh
     , types: tables.types
     , variables: definition.signature.variables
     }
-  locals = Array.mapWithIndex parameterLocal definition.signature.parameters
+  parameters = definition.signature.parameters
+  locals = Map.fromFoldable (Array.mapWithIndex parameterLocal parameters)
   parameterLocal index parameter =
-    { name: parameter.name, id: Resolved.LocalId index }
+    Tuple parameter.name (Resolved.LocalId index)
   withBody body =
     { id: Resolved.FunctionId definition.index
     , name: definition.function.name

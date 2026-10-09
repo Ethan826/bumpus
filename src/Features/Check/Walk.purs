@@ -11,8 +11,8 @@ import Domain.Type (Ty)
 -- then its instantiation, then its parts left to right; an arm's pattern
 -- before its body; a pattern's type before its fields. Each type comes with
 -- the span of the expression or pattern holding it. A lambda's parameter
--- types come before its body, with the lambda's span. A flat exhaustive
--- dispatch (BACKLOG E003).
+-- types come before its body, with the lambda's span. A block's items come
+-- in order, then its value. A flat exhaustive dispatch (BACKLOG E003).
 foldTypes ∷ ∀ b. (b → Span → Ty Open → b) → b → Checked.Expr → b
 foldTypes step found (Checked.Expr expression) = case expression.node of
   Checked.FunctionRef _ instantiation → applied instantiation []
@@ -28,6 +28,7 @@ foldTypes step found (Checked.Expr expression) = case expression.node of
   Checked.Compare _ left right → foldl recur own [ left, right ]
   Checked.If condition yes no → foldl recur own [ condition, yes, no ]
   Checked.Match scrutinee arms → foldl arm (recur own scrutinee) arms
+  Checked.Block items value → foldl recur own (Checked.blockParts items value)
   _ → own
   where
   own = step found expression.span expression.ty
@@ -69,8 +70,12 @@ retype change (Checked.Expr expression) = Checked.Expr
     Checked.Lambda parameters body → Checked.Lambda (map parameter parameters)
       (recur body)
     Checked.Pipe left right → Checked.Pipe (recur left) (recur right)
+    Checked.Block items value → Checked.Block (map item items) (recur value)
     leaf → leaf
   parameter declared = declared { ty = change declared.ty }
+  item = case _ of
+    Checked.Let local value → Checked.Let local (recur value)
+    Checked.Discard value → Checked.Discard (recur value)
   arm checked = checked
     { pattern = retypePattern change checked.pattern
     , body = recur checked.body

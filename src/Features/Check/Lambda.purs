@@ -9,11 +9,11 @@ import Domain.Checked.Internal as Checked
 import Domain.Resolved as Resolved
 import Domain.Syntax (Diagnostic, Span)
 import Domain.Type (Ty(..), arrows)
-import Features.Check.Context (CheckEnv, Infer)
+import Features.Check.Context (CheckEnv, Infer, Locals, bindAll)
 import Features.Check.Match (Typed)
 import Features.Check.Scheme (State, Threaded, threadAll)
 
-type LambdaEnv r = CheckEnv (locals ∷ Array Typed | r)
+type LambdaEnv r = CheckEnv (locals ∷ Locals | r)
 
 -- FN001 design §3: each parameter has its annotation, whose variables are
 -- the enclosing signature's and rigid, or a fresh meta; the body is
@@ -21,7 +21,7 @@ type LambdaEnv r = CheckEnv (locals ∷ Array Typed | r)
 -- `X -> Y -> E`. Lambdas are monomorphic: nothing is generalized.
 checkLambda
   ∷ ∀ r
-  . Infer (locals ∷ Array Typed | r)
+  . Infer (locals ∷ Locals | r)
   → LambdaEnv r
   → State
   → Span
@@ -30,7 +30,7 @@ checkLambda
   → Either Diagnostic (Threaded Checked.Expr)
 checkLambda infer env state span parameters body = do
   typed ← threadAll parameterType state parameters
-  checked ← infer (env { locals = env.locals <> bound typed.value })
+  checked ← infer (env { locals = bindAll (bound typed.value) env.locals })
     typed.state
     body
   pure

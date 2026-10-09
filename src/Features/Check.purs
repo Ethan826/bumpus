@@ -3,8 +3,10 @@ module Features.Check (check) where
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Map as Map
 import Data.Maybe (maybe, maybe')
 import Data.Traversable (traverse)
+import Data.Tuple (Tuple(..))
 import Domain.Checked.Internal (rigid)
 import Domain.Checked.Internal as Checked
 import Domain.Resolved as Resolved
@@ -63,11 +65,12 @@ environment program function =
   , types: program.types
   , ctors: program.ctors
   , variables: function.variables
-  , locals: Array.mapWithIndex parameterLocal function.parameters
+  , locals: Map.fromFoldable
+      (Array.mapWithIndex parameterLocal function.parameters)
   }
   where
   parameterLocal index parameter =
-    { id: Resolved.LocalId index, ty: rigid parameter.ty }
+    Tuple (Resolved.LocalId index) (rigid parameter.ty)
 
 -- Parameters bind rigid types; the body is inferred; then the result
 -- unifies; then every type in the body is bounded again (a type bounded

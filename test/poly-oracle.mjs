@@ -3,15 +3,18 @@
 // (test/poly-parse.mjs) and evaluates without types: a value is an Int (a
 // JS number kept in int32, so `+` wraps modulo 2^32), a Bool,
 // { ctor, fields } or a function value (FN001 Task 7, below). Evaluation
-// is strict and left to right. Comparison is
+// is strict and left to right; a block's items run in order, each `let`
+// in scope for the items after it (FX001 Task 2). Comparison is
 // the structural order of ADR 005: constructor declaration position, then
-// fields left to right; false < true. It shares no code with the compiler.
-import { isUpper, parseProgram } from './poly-parse.mjs';
+// fields left to right; false < true; `()` equals itself. It shares no
+// code with the compiler.
+import { isUpper, parseProgram, unit } from './poly-parse.mjs';
 
 const maximumSteps = 5_000_000;
 
 const sign = difference => Math.sign(difference);
 const compareValues = (program, left, right) => {
+  if (left === unit) return 0;
   if (typeof left !== 'object') return sign(Number(left) - Number(right));
   const order = program.ctors.get(left.ctor) - program.ctors.get(right.ctor);
   if (order !== 0) return sign(order);
@@ -72,6 +75,7 @@ const interpreter = (program, probes) => {
       case 'if': return evaluate(node.condition, locals)
         ? evaluate(node.yes, locals) : evaluate(node.no, locals);
       case 'match': return evaluateMatch(node, locals);
+      case 'block': return evaluateBlock(node, locals);
       case 'pipe': return evaluatePipe(node, locals);
       case 'applyValue':
         return applyAll(evaluate(node.callee, locals), node.args, locals);
@@ -110,6 +114,18 @@ const interpreter = (program, probes) => {
     }
     throw new Error('oracle: no arm matched');
   };
+  // Each let extends a copy of the scope, so a closure keeps the locals it
+  // saw (capture by value) when a later let shadows one.
+  const evaluateBlock = (node, locals) => {
+    let scope = locals;
+    for (const item of node.items) {
+      const value = evaluate(item.value, scope);
+      if (item.tag === 'let' && item.name !== null) {
+        scope = new Map(scope).set(item.name, value);
+      }
+    }
+    return evaluate(node.value, scope);
+  };
   // The functions being applied, innermost last, to count self calls.
   const active = [];
   const counts = { recursive: 0 };
@@ -138,7 +154,8 @@ const interpreter = (program, probes) => {
   return { enter, counts, enters };
 };
 
-export const show = value => typeof value !== 'object' ? String(value)
+export const show = value => value === unit ? '()'
+  : typeof value !== 'object' ? String(value)
   : value.fields.length === 0 ? value.ctor
     : `${value.ctor}(${value.fields.map(show).join(', ')})`;
 

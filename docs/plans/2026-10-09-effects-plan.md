@@ -197,19 +197,19 @@ Pure; runs end to end. No rows yet.
   counter with Match), captures in LocalId order; `x := e`, `_ = e`,
   `return last`. Unit is Go `struct{}`.
 
-- [ ] **Step 1: Write failing tests** in test/fx-block.test.mjs: block
+- [x] **Step 1: Write failing tests** in test/fx-block.test.mjs: block
   value; `let` scoping and shadowing; `{}` and `()` are Unit; trailing
   `;` is Unit and the hinted E_TYPE row exactly; `{ let x = 1 }` exact
   E_SYNTAX row; `main` returning Unit prints nothing; Unit compares and
   prints `()` inside an ADT; evaluation order of items (divergence probe
   as FN001's); 128 nested blocks compile, build and run, and 129 are
   E_NESTING; 20,000 `let` items compile in linear time (bounded test).
-- [ ] **Step 2: Run** `node --test test/fx-block.test.mjs`. Expected:
+- [x] **Step 2: Run** `node --test test/fx-block.test.mjs`. Expected:
   FAIL.
-- [ ] **Step 3: Implement** the files above.
-- [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0;
+- [x] **Step 3: Implement** the files above.
+- [x] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0;
   bootstrap snapshots byte-identical.
-- [ ] **Step 5: Commit** `feat: Unit, blocks and let (FX001)`; mark
+- [x] **Step 5: Commit** `feat: Unit, blocks and let (FX001)`; mark
   FN002 done in BACKLOG.
 
 ### Task 3: Rows in the type representation and scoped-label unification

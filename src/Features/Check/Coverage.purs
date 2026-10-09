@@ -48,6 +48,8 @@ covered signature (Checked.Expr expression) = case expression.node of
   Checked.Apply callee arguments → traverse_ recur (Array.cons callee arguments)
   Checked.Lambda _ body → recur body
   Checked.Pipe left right → traverse_ recur [ left, right ]
+  Checked.UnitValue → pure unit
+  Checked.Block items value → traverse_ recur (Checked.blockParts items value)
   where
   recur = covered signature
 

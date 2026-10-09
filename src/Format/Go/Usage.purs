@@ -35,6 +35,8 @@ usesBoolOrdering (IR.Expr expression) = case expression.node of
   IR.Apply applied arguments → anyOf (Array.cons applied arguments)
   IR.Lambda _ body → usesBoolOrdering body
   IR.Pipe left right → anyOf [ left, right ]
+  IR.UnitValue → false
+  IR.Block items value → anyOf (IR.blockParts items value)
   where
   anyOf = Array.any usesBoolOrdering
   armUses arm = usesBoolOrdering arm.body

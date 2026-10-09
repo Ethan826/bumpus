@@ -36,6 +36,7 @@ import Format.Parse.Grammar
   , spanned
   , token
   )
+import Format.Parse.Block (block, parenthesized)
 import Format.Parse.Lambda (lambda)
 import Format.Parse.Literal (integerLiteral, integerStart)
 import Format.Parse.Pattern (arms)
@@ -62,12 +63,14 @@ comparisons =
 -- reaches `expression` lazily, rather than naming `expression` themselves.
 -- Every use of `inner` is a nested position (ADR 006): a parenthesized
 -- expression, an `if` condition or branch, a `match` scrutinee or arm body,
--- a call or constructor argument, or a lambda body.
+-- a call or constructor argument, a lambda body, or a block's item or
+-- value (FX001).
 expression ∷ Parser Expr
 expression = dispatch
   [ on "if" (conditional inner)
   , on "match" (matchExpression inner)
   , on "fn" (lambda inner)
+  , on "{" (block inner)
   ]
   (pipeline inner)
   where
@@ -155,12 +158,13 @@ chain inner = joined <$> group <*> manyOn "(" group
   args found = found.arguments
   endOf found = found.end
 
--- Parentheses return the inner expression with its own span; `start` is
--- where the primary begins, its `(` if parenthesized, so an application
--- of `(f)` spans from that `(` (FN001 Task 4 review).
+-- Parentheses return the inner expression with its own span, and `()`
+-- the Unit value (Format.Parse.Block); `start` is where the primary
+-- begins, its `(` if parenthesized, so an application of `(f)` spans from
+-- that `(` (FN001 Task 4 review).
 primary ∷ Parser Expr → Parser Primary
 primary inner = dispatch
-  [ on "(" (grouped <$> expect "(" <*> inner <* expect ")")
+  [ on "(" (parenthesized inner)
   , on "true" (bare <<< boolean true <$> token)
   , on "false" (bare <<< boolean false <$> token)
   , onWhen integerStart (bare <<< integer <$> integerLiteral)
@@ -170,7 +174,6 @@ primary inner = dispatch
   where
   boolean value found = Boolean found.span value
   integer literal = Integer literal.span literal.value
-  grouped open value = { value, start: open.span.start }
   bare value = { value, start: (exprSpan value).start }
 
 -- Reached past the last token too, where taking reports the missing token.

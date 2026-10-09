@@ -12,6 +12,7 @@ module Format.Go.Capture
   , armFree
   , lambdaFree
   , without
+  , withoutAll
   ) where
 
 import Prelude
@@ -72,6 +73,16 @@ lambdaFree parameters body = Array.filter free body
   bound = Set.fromFoldable (Array.mapMaybe localIndex parameters)
   localIndex parameter = map index parameter.local
   free local = not (Set.member (index local.id) bound)
+
+-- The set without these locals: a block's free locals are its items' and
+-- value's, without its lets (FX001). LocalIds are unique per function, so
+-- a let can only be read inside its own block, as for armFree. A set, so
+-- a block of 20,000 lets costs no product of its lets and reads.
+withoutAll ∷ Array LocalId → Free → Free
+withoutAll bound = Array.filter free
+  where
+  removed = Set.fromFoldable (map index bound)
+  free local = not (Set.member (index local.id) removed)
 
 -- The set without one local.
 without ∷ LocalId → Free → Free

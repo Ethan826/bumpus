@@ -121,12 +121,14 @@ entryMessage = case _ of
   EntryFunction → "Expected fn main() with a printable result type"
 
 hintMessage ∷ Hint → String
-hintMessage (MissingArguments name count) = "; missing " <> counted
-  <> " to "
-  <> name
-  <> "?"
+hintMessage = case _ of
+  MissingArguments name count → "; missing " <> counted count
+    <> " to "
+    <> name
+    <> "?"
+  TrailingSemicolon → "; remove the trailing ;?"
   where
-  counted
+  counted count
     | count == 1 = "1 argument"
     | otherwise = show count <> " arguments"
 
@@ -151,6 +153,7 @@ typeName ∷ TypeName → String
 typeName = case _ of
   IntName → "Int"
   BoolName → "Bool"
+  UnitName → "Unit"
   DataName name → name
   AppliedName name arguments → name <> listed (map typeName arguments)
   VariableName name → name

@@ -97,6 +97,8 @@ foldCalls step found (Checked.Expr expression) = case expression.node of
   Checked.FunctionRef id instantiation →
     step found expression.span id instantiation
   Checked.Lambda _ body → recur found body
+  Checked.Block items value → foldl recur found
+    (Checked.blockParts items value)
   _ → found
   where
   recur = foldCalls step
