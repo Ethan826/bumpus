@@ -132,10 +132,13 @@ type FunctionDecl =
   , span ∷ Span
   }
 
+-- `syntax` keeps the parameter types', then the result's, source
+-- references, as `fieldSyntax` does for constructors (FX001 Task 6).
 type OperationInfo =
   { name ∷ String
   , parameters ∷ Array Parameter
   , result ∷ Ty VarId
+  , syntax ∷ Array TypeRef
   , span ∷ Span
   }
 

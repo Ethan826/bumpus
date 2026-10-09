@@ -10,6 +10,7 @@ import Domain.IR.Internal as IR
 import Domain.Resolved (FunctionId(..))
 import Domain.Syntax (Span)
 import Features.Specialize.Copy (modify)
+import Features.Specialize.Handlers as Handlers
 import Features.Specialize.Keys (Env, Specializing, Work, ctorAt, internal)
 import Features.Specialize.Values
   ( Scope
@@ -85,12 +86,29 @@ copyNode scope span = case _ of
   Checked.Pipe left right → IR.Pipe <$> recur left <*> recur right
   Checked.UnitValue → pure IR.UnitValue
   Checked.Print value → IR.Print <$> recur value
-  Checked.OperationRef _ _ _ → internal "unlowered effect" span unit
-  Checked.Perform _ _ _ _ → internal "unlowered effect" span unit
-  Checked.Handler _ _ _ → internal "unlowered effect" span unit
-  Checked.With _ _ → internal "unlowered effect" span unit
-  Checked.Handle _ _ → internal "unlowered effect" span unit
-  Checked.Fail _ → internal "unlowered effect" span unit
+  Checked.OperationRef effect index instantiation → Handlers.operationRef
+    scope
+    span
+    effect
+    index
+    instantiation
+  Checked.Perform effect index instantiation arguments → Handlers.perform
+    scope
+    recur
+    span
+    effect
+    index
+    instantiation
+    arguments
+  Checked.Handler effect instantiation clauses → Handlers.handlerValue scope
+    recur
+    span
+    effect
+    instantiation
+    clauses
+  Checked.With handler body → IR.Install <$> recur handler <*> recur body
+  Checked.Handle body clauses → Handlers.handle scope recur body clauses
+  Checked.Fail value → Handlers.abort recur span value
   Checked.Block items value → IR.Block <$> traverse (item scope) items
     <*> recur value
   where

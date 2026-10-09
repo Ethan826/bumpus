@@ -4,13 +4,13 @@ import Prelude
 import Data.Either (Either)
 import Domain.Syntax (Diagnostic)
 import Features.Check (check)
-import Features.Check.Unlowered (reject)
 import Features.Resolve (resolve)
 import Features.Specialize (specialize)
+import Features.Specialize.Unlowered (reject)
 import Format.Go (emit)
 import Format.Parse (parse)
 
 compile ∷ String → Either Diagnostic String
-compile = map emit <<< (parse >=> resolve >=> check >=> guarded >=> specialize)
+compile = map emit <<< (parse >=> resolve >=> check >=> specialize >=> guarded)
   where
-  guarded checked = checked <$ reject checked
+  guarded specialized = specialized <$ reject specialized

@@ -55,6 +55,7 @@ expression scope next whole@(IR.Expr term) = case term.node of
   IR.UnitValue → leaf next "struct{}{}"
   IR.Print value → printedValue (IR.typeOf value) (lower next value)
   IR.Block items value → lowerBlock scope lower next term.ty items value
+  _ → leaf next (unlowered term.ty)
   where
   lower = expression scope
   each = several lower next
@@ -68,6 +69,13 @@ joined render parts =
   , free: union parts.frees
   , wrappers: parts.wrappers
   }
+
+-- FX001 Task 7 lowers effect nodes; until then
+-- Features.Specialize.Unlowered stops every program holding one before Go
+-- generation, and this guard panics if one ever got through.
+unlowered ∷ Ty → String
+unlowered ty = "func() " <> goType ty
+  <> " { panic(\"waxwing: unlowered effect\") }()"
 
 addition ∷ String → String → String
 addition left right = "waxwingAdd(" <> left <> ", " <> right <> ")"

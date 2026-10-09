@@ -124,6 +124,8 @@ fieldComparison field = case _ of
   -- func values, so a function field is never compared and a constructor
   -- holding one, never reached, reports a malformed value.
   TFun _ → malformed <> "\n"
+  -- Handler types are refused exactly as arrows are (FX001 design §2).
+  THandler _ → malformed <> "\n"
   where
   left = "a." <> field
   right = "b." <> field

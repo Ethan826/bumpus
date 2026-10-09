@@ -38,6 +38,7 @@ usesBoolOrdering (IR.Expr expression) = case expression.node of
   IR.UnitValue → false
   IR.Print value → usesBoolOrdering value
   IR.Block items value → anyOf (IR.blockParts items value)
+  effect → anyOf (IR.effectParts effect)
   where
   anyOf = Array.any usesBoolOrdering
   armUses arm = usesBoolOrdering arm.body
@@ -60,7 +61,7 @@ prints (IR.Expr expression) = case expression.node of
   IR.Lambda _ body → prints body
   IR.Pipe left right → anyOf [ left, right ]
   IR.Block items value → anyOf (IR.blockParts items value)
-  _ → false
+  other → anyOf (IR.effectParts other)
   where
   anyOf = Array.any prints
   armPrints arm = prints arm.body

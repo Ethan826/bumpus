@@ -9,6 +9,7 @@ module Domain.Type.Parts
   , rowsOf
   , rowArguments
   , typeHead
+  , mentionsTypeVariable
   ) where
 
 import Prelude
@@ -92,6 +93,16 @@ rowArguments ∷ ∀ v. TyRow v → Array (Ty v)
 rowArguments (Row labels _) = Array.concatMap labelArguments labels
   where
   labelArguments (Label _ arguments) = arguments
+
+-- A type variable anywhere, inside rows' labels too; row tails are not
+-- type variables. Recurses only where `children` and `rowsOf` do.
+mentionsTypeVariable ∷ ∀ v. Ty v → Boolean
+mentionsTypeVariable = case _ of
+  TVar _ → true
+  ty → Array.any mentionsTypeVariable (children ty)
+    || Array.any rowMentions (rowsOf ty)
+  where
+  rowMentions row = Array.any mentionsTypeVariable (rowArguments row)
 
 -- The declared identity a Fail payload is keyed by, if the type has one.
 typeHead ∷ ∀ v. Ty v → Maybe TypeHead

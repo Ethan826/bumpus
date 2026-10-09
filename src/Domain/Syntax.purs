@@ -211,3 +211,17 @@ patternSpan = case _ of
 
 problemAt ∷ Problem → Span → Diagnostic
 problemAt problem span = { problem, span, related: [] }
+
+-- The effect reference in a handler type's source (FX001 Task 6):
+-- `Handler(L(…) with R)` is its own form; `Handler(L(…))` parses as an
+-- application, which Resolve read as a handler type.
+handlerLabelRef ∷ TypeRef → Maybe LabelRef
+handlerLabelRef = case _ of
+  THandlerRef _ label _ → Just label
+  NamedRef _ "Handler" [ TypeArgument (NamedRef span name arguments) ] →
+    Just { name, arguments: Array.mapMaybe typeArgument arguments, span }
+  _ → Nothing
+  where
+  typeArgument = case _ of
+    TypeArgument found → Just found
+    RowArgument _ → Nothing

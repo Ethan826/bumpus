@@ -15,7 +15,7 @@ module Format.Go.Data
 import Prelude
 import Data.Array as Array
 import Data.String.Common (joinWith)
-import Domain.IR.Internal (FunType, FunTypeId(..), Ty(..))
+import Domain.IR.Internal (EffectKey(..), FunType, FunTypeId(..), Ty(..))
 import Domain.Resolved (CtorId(..), FunctionId(..), LocalId(..), TypeId(..))
 import Format.Go.Layout (Declared, Layout, Member)
 
@@ -33,6 +33,9 @@ goType = case _ of
   TData (TypeId index) → "waxwingTy" <> show index
   TFun (FunTypeId index) → "waxwingFun" <> show index
   TUnit → "struct{}"
+  -- FX001 Task 7 declares one handler struct per effect layout; until then
+  -- Features.Specialize.Unlowered stops every program holding one.
+  THandler (EffectKey index) → "*waxwingEff" <> show index
 
 -- One named Go type per interned arrow, in number order (design §13 rule
 -- 8): each names its result's type by number, so the text is linear in

@@ -78,6 +78,8 @@ showField id position = case _ of
   -- Printing is rejected at a type holding an arrow (design §3), yet every
   -- declared type gets its printer; a function field is never printed.
   TFun _ → malformed <> "\n"
+  -- Handler types are refused exactly as arrows are (FX001 design §2).
+  THandler _ → malformed <> "\n"
   where
   appended = "out = fmt.Append(out, " <> field <> ")\n"
   field = "v." <> fieldName id position

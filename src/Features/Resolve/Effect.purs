@@ -40,7 +40,14 @@ effects types declarations = do
   withType declaration ty =
     { name: declaration.name, ty, span: declaration.span }
   withSignature declaration parameters result =
-    { name: declaration.name, parameters, result, span: declaration.span }
+    { name: declaration.name
+    , parameters
+    , result
+    , syntax: Array.snoc (map parameterSyntax declaration.parameters)
+        declaration.result
+    , span: declaration.span
+    }
+  parameterSyntax declaration = declaration.ty
   withOperations effect operations =
     { name: effect.name
     , parameters: map parameterName effect.parameters

@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { Right } from '../output/Data.Either/index.js';
 import {
-  TBool, TData, TFun, TInt
+  TBool, TData, TFun, THandler, TInt, TUnit
 } from '../output/Domain.Type/index.js';
 import { specializationKeys } from '../output/Features.Specialize/index.js';
 import { checkedPoly } from './phases.mjs';
@@ -26,24 +26,36 @@ const groundText = (program, type) => {
   if (type instanceof TFun) return arrowText(program, type);
   if (type instanceof TInt) return 'Int';
   if (type instanceof TBool) return 'Bool';
-  assert.ok(type instanceof TData, `not ground: ${JSON.stringify(type)}`);
-  const name = program.types[type.value0].name;
-  const args = type.value1.map(arg => groundText(program, arg));
-  return args.length ? `${name}(${args.join(', ')})` : name;
+  if (type instanceof TUnit) return 'Unit';
+  if (type instanceof THandler) {
+    return `Handler(${applied(program.effects[type.value0.value0.value0].name,
+      type.value0.value1.map(arg => groundText(program, arg)))})`;
+  }
+  // The message is built only on failure: a 5,000-parameter arrow inside
+  // an application is too deep for JSON.stringify.
+  if (!(type instanceof TData)) assert.fail(`not ground: ${type}`);
+  return applied(program.types[type.value0].name,
+    type.value1.map(arg => groundText(program, arg)));
 };
 
-// Each key as { function, name, arguments (texts), text }.
+const applied = (name, args) => args.length ? `${name}(${args.join(', ')})`
+  : name;
+
+// Effect keys (FX001 Task 6) name an effect; the others a type or function.
+const declarations = (program, key) => key.effect ? program.effects
+  : key.function ? program.functions : program.types;
+const kindOf = key => key.effect ? 'effect' : key.function ? 'fn' : 'type';
+
+// Each key as { function, effect, name, arguments (texts), text }.
 export const namedKeys = source => {
   const program = checkedPoly(source);
   const result = specializationKeys(program);
   if (!(result instanceof Right)) assert.fail(`${source}\n${JSON.stringify(result)}`);
   return result.value0.map(key => {
-    const name = (key.function ? program.functions : program.types)[
-      key.declaration].name;
+    const name = declarations(program, key)[key.declaration].name;
     const args = key.arguments.map(arg => groundText(program, arg));
-    const kind = key.function ? 'fn' : 'type';
-    return { function: key.function, name, arguments: args,
-      text: `${kind} ${name}[${args.join(', ')}]` };
+    return { function: key.function, effect: key.effect, name,
+      arguments: args, text: `${kindOf(key)} ${name}[${args.join(', ')}]` };
   });
 };
 
