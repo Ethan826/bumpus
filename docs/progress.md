@@ -2977,3 +2977,49 @@ proofs added before verify5. Full interfaces, evidence and the remaining
 Task 9 origin-provenance handoff are in
 .superpowers/sdd/2026-10-09-effects-plan/task-5-report.md. No runtime or
 specialization behavior is claimed for this task.
+
+### FX001 Task 6 — effect specialization with erased rows (2026-10-09)
+
+Resumed in a Claude Code cloud session on branch claude/vibrant-cerf-3km61i
+(fast-forwarded to fx001 at 9a6befd; no .worktrees, ruling recorded in the
+SDD ledger). The local SDD ledger of Tasks 1-5 was never committed; it was
+recreated from git and this file. Task 6 was implemented inline by the
+controller before the superpowers skills were linked into .claude/skills
+(32ee2d2); it then received an independent task review.
+
+Implemented: effect keys (EffectRef, ground type arguments) in the one
+specialization worklist, created on first reference; user effect keys fill
+their operations' types beside their source (Resolved.OperationInfo gains
+`syntax`), so they reach type keys and the effect keys of handler types;
+`Handler(L …)` lowers to L's key in bodies and constructor fields; rows are
+erased everywhere. The IR gains `THandler EffectKey`, an `effects` table and
+nodes OperationRef, Perform, HandlerValue, Install, Handle and Abort (fail;
+`handle` clauses and aborts carry the payload's declared family). Check.Nested
+judges one reference graph over type and effect declarations (constructor
+fields, operation parameters and results, `Handler(L …)` edges); Grow, the
+mutual pair and the data/effect cycle are E_SPECIALIZATION at the nested
+reference, their bare-parameter versions compile. A function whose type
+variable appears only in its own row's labels is polymorphic (it crashed
+specialization before). Features.Check.Unlowered is replaced by
+Features.Specialize.Unlowered over the emitted IR: effect layouts or effect
+nodes stop at E_INTERNAL "unlowered effect"; unused effect declarations reach
+Go unchanged. Only keys with type arguments count toward the 10,000 limit.
+Tests reach Specialize directly (test/fx-specialize.test.mjs, 18 tests);
+executable probes wait for Task 7.
+
+A Task 5 parser defect surfaced: `with R` inside `Handler(L with R)` was
+silently dropped (and rows after non-arrow types elsewhere). Fixed by a
+Sonnet implementer in 5da7865 and 3aa1217 (round 2 pending at this entry),
+reviewed by Opus; meaningless rows are now E_SYNTAX "Unexpected effect row".
+
+Evidence: RED 15/18 (.build/fx001-task6-red.log; three characterization
+tests passed before). Clean `npm run verify` at 85c5867
+(.build/fx001-task6-verify.log): zero build warnings, gates pass, 752/752
+parallel tests; serial phase 13/22 — the 9 failures are fixed timing bounds
+that fail identically on the pre-Task-6 baseline 9a6befd on this container
+(BACKLOG T007); regression proofs, run explicitly: 33/33 (.build/fx001-
+task6-regression{,2,3}.log; four duplicate-declaration rows now expect an
+accepted program because the old guard no longer masks them). Test-helper
+defect fixed: test/poly-keys.mjs built a 5,000-deep JSON message eagerly
+(stack overflow here). Task review (Opus): spec ✅, quality Approved, no
+Critical/Important; Minor items deferred in the ledger.

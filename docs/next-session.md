@@ -1,3 +1,22 @@
+# Waxwing / FX001 Task 7 next (cloud session 2026-10-09)
+
+Branch claude/vibrant-cerf-3km61i (contains fx001 through Task 6). Tasks 1-6
+complete; Task 7 (Go lowering of handlers, operations, failures) is next.
+Execution is subagent-driven per .agents/skills/subagent-driven-development
+(linked into .claude/skills so new sessions load it): Sonnet implementers,
+Opus reviews and planning (user, 2026-10-09). Pre-flight rulings F1-F19 and
+deferred Task 6 minors live in the git-ignored ledger
+.superpowers/sdd/2026-10-09-effects-plan/progress.md; if it is gone,
+recover from docs/progress.md and git log.
+
+Cloud environment notes: spago fetches through the proxy only with
+`NODE_USE_ENV_PROXY=1 npm run build` (run once to fill .spago; do not set it
+during verify, it pollutes the purs-tidy version check). Use
+`GOTOOLCHAIN=go1.26.4`. Fixed timing bounds fail on this container even at
+the pre-Task-6 baseline (BACKLOG T007); report them, never relax them.
+Open decision for the user before Task 8: confirm that a cleanup failure
+while a typed abort is pending becomes an uncatchable defect (spec §3).
+
 # Waxwing / FX001 Task 3 continuation
 
 Update 2026-10-09: Waxwing / `.wxw` rename is committed separately as
