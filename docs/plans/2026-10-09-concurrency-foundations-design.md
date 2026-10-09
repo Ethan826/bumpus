@@ -235,14 +235,13 @@ polls reach it. The condition is not checkable statically.
   children (registered at fork). Discarding a task sets its flag and,
   transitively, its live descendants' flags; a task forked by an already
   discarded task starts discarded. Exception: a task forked while its
-  parent is in cleanup (a `par` inside `defer`) is shielded: propagation
-  skips it and its own join is not a discard point until that cleanup
-  ends (P4). Example: `par let a = fail(E), b = { par let c = grow(nil),
+  parent is in cleanup (a `par` inside `defer`) is shielded, together with every task it forks: propagation skips that
+  subtree, so the cleanup's `par` runs to its normal join (P4). Example: `par let a = fail(E), b = { par let c = grow(nil),
   d = 1; c };` discards `b`, hence `c`, which stops at its next call.
 - *Polls.* Function entry and every join are poll points. A poll is a
   nil-checked load of the task pointer plus an atomic load of its flag;
   it does not fire while the task runs deferred expressions. A discarded
-  task waiting at its own join abandons it and unwinds. The join does not
+  task waiting at its own join abandons it and unwinds. Setting a flag therefore wakes a blocked join, and a fork reads its parent's flag and registers under the same lock, so a child forked concurrently with a discard is flagged either way. The join does not
   wait for discarded children; they release their budget slot on exit.
 - *Stack and memory.* A spawned child starts on a fresh stack, so per
   goroutine depth never exceeds the sequential depth, and a sequential
@@ -250,19 +249,27 @@ polls reach it. The condition is not checkable statically.
   sequential run). Out-of-memory is process-wide: up to B live stacks and
   concurrent allocation can exhaust memory the sequential run would not.
 - *Residual exposure.* A discarded task's work until its next poll; a
-  discarded task's diverging pure cleanup keeps its goroutine.
+  discarded task's diverging pure cleanup keeps its goroutine until program exit.
 
 **Discard runtime contract (extension of Task 8).** Discard unwinds with
 a distinct sentinel panic (`waxwingDiscard`), which `handle` re-panics as
 any non-owned panic; `waxwingCleanup` treats it as a pending non-defect:
 it runs the remaining cleanup, records no cause for it and re-panics the
-sentinel, even if a cleanup raised a defect meanwhile (those causes are
-dropped with the discarded outcome). A root records `X` for any panic it
+sentinel, even if a cleanup raised a defect meanwhile; those causes are
+dropped with the discarded outcome. A root records `X` for any panic it
 recovers while its task is flagged, sentinel or defect; no task identity
-is needed in the sentinel. A per-task cleanup depth, owned by the task's
+is needed in the sentinel. Dropping loses nothing the sequential run has.
+A task is flagged only when a failure was recorded to its left, or to the
+left of one of its ancestors. In the sequential run that failure unwinds
+the enclosing `par` before this task's expression starts, so neither its
+work nor its cleanup defects exist there. The selected failure keeps all
+its causes (D §3). CF001 does not report dropped causes on any channel,
+because whether a discarded task reaches a failing cleanup depends on
+scheduling. FX002 decides whether discarded or cancelled siblings get
+secondary report lines. A per-task cleanup depth, owned by the task's
 goroutine, masks its polls while deferred expressions run, and children
 forked inside that cleanup are shielded (above), so each cleanup runs
-exactly once and to completion (O6, C4).
+exactly once and, unless the process exits first (unobservable: a discarded task's cleanup is pure), to completion (O6, C4).
 
 **Failure selection (leftmost).** Let i be the least index whose child
 did not produce a value. The parent waits until children 1..i-1 recorded
@@ -344,8 +351,7 @@ incompatibility, and it is already recorded (decision 1 revision).
 x1 = e1, …, xn = en;`) whose children are Fail-only under R0 and capture
 only Shareable values (B3), with conditional sequential equivalence and
 leftmost selection (§6), bounded live tasks with inline fallback, a
-root for every child (inline included), eager discard stopped at
-function-entry polls with the discard runtime contract (§6), abort
+root for every child (inline included), eager discard, propagated to nested tasks and stopped at function-entry and join polls with the discard runtime contract (§6), abort
 transfer at the join (B1, B4), and the defect runtime emitted with `par`. No shared mutable state, no effectful children, no user laws.
 
 **Core semantics sketch.** The parent blocks at `par` with outcomes
@@ -370,7 +376,7 @@ child but also abandons the parent's join, so no selection happens.
 |---|---|---|---|---|
 | Type/effect soundness | spec §2 rows; R0 | R0 on children; B3 captures | child root; re-raise at join | children with non-Fail labels or open rigid/named tails (row-polymorphic callbacks) |
 | Data-race freedom | FX001 has no mutable values (FX001-relative); immutable context; no shared lookup cache (§10) | B3 capture check | `go`/WaitGroup publication | Console or any service in children; non-Shareable captures (FX003) |
-| Determinism | no fatal error in any goroutine (§6) | as above | leftmost selection; discard polls; bounded tasks | as above |
+| Determinism | §6 condition (no Go fatal error in the sequential run, or in the process while the construct's goroutines are live) | as above | leftmost selection; discard polls; bounded tasks | as above |
 | Deadlock freedom | each task waits only on its own children | none beyond nesting | join | none in CF001 (no other waits exist) |
 | Cancellation safety | n/a: only pure discard, whose cleanup is unobservable | none | discard poll | (all cancellation is FX002) |
 
@@ -384,10 +390,10 @@ child but also abandons the parent's join, so no selection happens.
 | O5 | Deadlock freedom: each task waits only on its own children (nested `par` included); the wait-for graph is a tree | PROPOSED PROOF (immediate) |
 | O6 | Exactly-once cleanup per child activation, including discard unwinding; child cause order as sequential | PROPOSED PROOF (spec §3 per goroutine) + TEST-ONLY |
 | O7 | Every recoverable panic on a child goroutine is recovered by its root | TEST-ONLY (injected crashes, guard panics, Go runtime panics) |
-| O8 | Publication of Γ and outcomes: `WaitGroup.Done` synchronizes before the `Wait` it unblocks | ESTABLISHED (Go `sync` documentation); the `go`-statement rule: trusted platform guarantee, not re-verified here |
+| O8 | Publication of Γ and outcomes: `WaitGroup.Done` synchronizes before the `Wait` it unblocks; the join primitive chosen must give the same publication edge (e.g. a channel send happens before the receive it unblocks) | ESTABLISHED (Go `sync` documentation); the `go`-statement rule: trusted platform guarantee, not re-verified here |
 | O9 | Per construct, any mix of spawned and inline children yields the sequential outcome (eager discard reaches inline children; roots never raise) | PROPOSED PROOF + TEST-ONLY (budgets 0, 1, B; budget 1 with a spawned failing left child and an inline divergent right child must abort) |
-| O10 | A discarded child stops at its next function entry outside cleanup; live goroutines never exceed B | TEST-ONLY (probes: `fib`, `grow`, `par let a = slow(), b = fail(E), c = grow(nil)`, nested `par let a = fail(E), b = { par let c = grow(nil), d = 1; c }`, `par` inside `defer` under discard, discard in a loop) |
-| O11 | Fatal-error exposure is limited to §6's residual cases | TEST-ONLY (documented limitation) |
+| O10 | A discarded child stops at its next poll (function entry or join) outside cleanup; live goroutines never exceed B | TEST-ONLY (probes: `fib`, `grow`, `par let a = slow(), b = fail(E), c = grow(nil)`, nested `par let a = fail(E), b = { par let c = grow(nil), d = 1; c }`, `par` inside `defer` under discard, discard in a loop) |
+| O11 | Fatal-error exposure beyond the sequential run is limited to process-wide out-of-memory (§6 *Stack and memory*) | TEST-ONLY (documented limitation) |
 
 Oracle: plan Task 10's interpreter running `par` sequentially, diffed
 against runs with injected yields and budgets 0, 1 and B.
@@ -436,11 +442,11 @@ chunking of large `par`; goroutine- versus CPS-backed one-shot resume.
    recursion or another construct into a Go loop keeps a poll in each
    iteration.
 6. Task 8 runtime contract: the discard sentinel, its non-defect
-   treatment in `waxwingCleanup`, poll masking during cleanup, and
+   treatment in `waxwingCleanup` (cleanup defects of a discarded task are dropped, see §6; D §3's rejection of "dropping the cleanup failure" is scoped to tasks whose outcome can be selected), poll masking during cleanup, and
    discard propagation to nested tasks with shielding of tasks forked in
    cleanup (§6).
 No change is needed to row erasure, markers, the `defer`-must-not-fail
-decision, or (for CF001) the report format; FX002 may change the format
+decision, or (for CF001) the report format, beyond change 6's scoping of D §3; FX002 may change the format
 if sibling defects become secondary lines.
 
 **Compatibility of Tasks 6-8.** Task 6: compatible (§8). Task 7:
@@ -528,3 +534,5 @@ both runs, out-of-memory process-wide; P3 loop-lowering poll invariant
 (change 5); P4 tasks forked in cleanup shielded; P5 roots see the
 sentinel and record `X` for anything recovered while flagged. Declined in
 all rounds: none.
+
+Round 4 (re-review 3 minors N1-N5): applied verbatim from the re-review.
