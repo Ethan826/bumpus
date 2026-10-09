@@ -21,7 +21,7 @@ import Prelude
 import Data.Array as Array
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (maybe)
+import Data.Maybe (Maybe, maybe)
 import Data.Traversable (mapAccumL)
 import Data.Tuple (Tuple(..))
 import Domain.IR.Internal as IR
@@ -128,16 +128,16 @@ ctorWrapper ∷ Shape → CtorId → Wrapper
 ctorWrapper shape id@(CtorId index) =
   maybe (missing (ctorName id)) identity (Array.index shape.ctors index)
 
--- A missing layout reads as one with no operations and a nullary
--- operation, as a missing function does.
-effectShape ∷ Shape → EffectKey → EffectShape
-effectShape shape (EffectKey index) =
-  maybe { key: 0, operations: [] } identity (Array.index shape.effects index)
+-- A missing layout is a compiler bug; each caller decides how it shows.
+effectShape ∷ Shape → EffectKey → Maybe EffectShape
+effectShape shape (EffectKey index) = Array.index shape.effects index
 
 operationWrapper ∷ Shape → EffectKey → Int → Wrapper
 operationWrapper shape key position =
   maybe (missing (performName key position)) identity
-    (Array.index (effectShape shape key).operations position)
+    (effectShape shape key >>= operationAt position)
+  where
+  operationAt index layout = Array.index layout.operations index
 
 -- Code that contains no lifted function and reads no local.
 leaf ∷ Int → String → Lowered

@@ -121,6 +121,14 @@ export const cases = [
     + 'let k = now(); let xs = Cons(1, Cons(2, Nil)); '
     + '(map(add(k), xs) |> sum) + sum(map(fn(z) => z + k, xs)) + curried(1)(2) };',
   '49\n'],
+  ['two clauses of one family: the first is innermost (payload types)',
+    'type Error(a) = Error(a); fn main(): Int = handle fail(Error(5)) '
+    + '{ fail(e: Error(Int)) => match e { Error(n) => n }, '
+    + 'fail(e: Error(Bool)) => 2 };',
+  '5\n'],
+  ['two clauses of one family: the first is innermost (result)',
+    'fn main(): Int = handle fail(3) { fail(e: Int) => e, fail(e: Int) => 2 };',
+  '3\n'],
   ['a pure main beside an unused effectful function', clock
     + 'fn unused(): Int with Clock = now(); fn main(): Int = 7;',
   '7\n']

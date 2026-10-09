@@ -19,13 +19,21 @@ import Data.Foldable (foldl)
 import Data.Tuple (Tuple(..))
 import Data.String.Common (joinWith)
 import Domain.IR.Internal as IR
-import Domain.IR.Internal (EffectKey(..), Ty(..))
+import Data.Maybe (maybe)
+import Domain.IR.Internal (Ty(..))
 import Domain.Resolved (LocalId)
 import Domain.Row (TypeHead)
 import Format.Go.Capture (Free, union, without)
 import Format.Go.Context (contextParameter, failKey)
-import Format.Go.Data (functionName, goType, localName)
-import Format.Go.Lowered (Lowered, Lowering, Scope, effectShape, several)
+import Format.Go.Data (functionName, goType, localName, malformed)
+import Format.Go.Lowered
+  ( Lowered
+  , Lowering
+  , Scope
+  , Shape
+  , effectShape
+  , several
+  )
 
 lowerInstall
   ∷ Scope → Lowering → Int → Ty → IR.Expr → IR.Expr → Lowered
@@ -44,7 +52,7 @@ lowerInstall scope lower next result handler body =
   held = lower (next + 1) handler
   inner = lower held.next body
   captured = inner.free
-  key = (effectShape scope.shape (handlerKey (IR.typeOf handler))).key
+  key = installKey scope.shape (IR.typeOf handler)
   lifted = "func " <> name <> "("
     <> joinWith ", "
       ( [ contextParameter ] <> map parameter captured
@@ -53,15 +61,21 @@ lowerInstall scope lower next result handler body =
     <> ") "
     <> goType result
     <> " {\nctx = waxwingInstall(ctx, "
-    <> show key
+    <> key
     <> ", waxwingHandler)\nreturn "
     <> inner.code
     <> "\n}\n"
 
-handlerKey ∷ Ty → EffectKey
-handlerKey = case _ of
-  THandler key → key
-  _ → EffectKey 0
+-- The key's Go text. A non-handler type or a missing layout is a compiler
+-- bug: the install panics as a malformed value would (Format.Go.Data).
+installKey ∷ Shape → Ty → String
+installKey shape = case _ of
+  THandler key → maybe malformedKey (show <<< layoutKey)
+    (effectShape shape key)
+  _ → malformedKey
+  where
+  layoutKey layout = layout.key
+  malformedKey = "func() int { " <> malformed <> " }()"
 
 lowerHandle
   ∷ Scope → Lowering → Int → Ty → IR.Expr → Array IR.FailClause → Lowered
@@ -115,9 +129,12 @@ markerLine index branch = markerName index branch
   <> " := &waxwingMarker{}\n"
 
 -- The context the body runs in: one frame per family over the `handle`'s
--- own context, the last clause innermost. The clauses run outside it.
+-- own context, the first clause innermost: the checker types the body
+-- against the first clause of a family (first occurrence wins, design §2).
+-- The clauses run outside it.
 frames ∷ Array Branch → String
-frames branches = foldl push "ctx" (Array.mapWithIndex Tuple branches)
+frames branches = foldl push "ctx"
+  (Array.reverse (Array.mapWithIndex Tuple branches))
   where
   push inner (Tuple index branch) = "waxwingFrame(" <> inner <> ", "
     <> show (failKey (familyOf branch))
