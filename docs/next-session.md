@@ -14,8 +14,8 @@ Cloud environment notes: spago fetches through the proxy only with
 during verify, it pollutes the purs-tidy version check). Use
 `GOTOOLCHAIN=go1.26.4`. Fixed timing bounds fail on this container even at
 the pre-Task-6 baseline (BACKLOG T007); report them, never relax them.
-Open decision for the user before Task 8: confirm that a cleanup failure
-while a typed abort is pending becomes an uncatchable defect (spec §3).
+User decision 2026-10-09: `defer` must not fail (spec §2/§3 revised);
+only defects can fail cleanup.
 
 # Waxwing / FX001 Task 3 continuation
 

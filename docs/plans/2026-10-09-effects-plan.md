@@ -66,7 +66,9 @@ direction decisions.
 - New problem texts, exactly (§5, §6):
   - `Unhandled <L> in main`; `<f> performs <L>, which its signature does
     not allow`; `This function must be pure, but it performs <L>`;
-    `<R1> and <R2> cannot be made equal: both end in ...<r>` (E_EFFECT)
+    `<R1> and <R2> cannot be made equal: both end in ...<r>`;
+    `defer must not fail, but it performs <L>` (user, 2026-10-09)
+    (E_EFFECT)
   - `Missing clause for <op>`; `Duplicate clause for <op>`;
     `<op> is not an operation of <E>` (E_HANDLER)
   - `Fail needs a concrete error family`; `Expected a type, found an
@@ -510,21 +512,28 @@ programs at `Features.Check.Unlowered` (Global Constraints).
 
 **Interfaces:**
 - §3 exactly: registration context; whole expression evaluated at exit;
-  LIFO; four block exits; cleanup-failure policy; `crash(value: a): b`
-  printable argument, no effect, uncatchable.
+  LIFO; four block exits; cleanup-failure policy (revised by the user
+  2026-10-09: `defer` must not fail; only defects fail cleanup);
+  `crash(value: a): b` printable argument, no effect, uncatchable.
+- §2 `defer` rule: `e : Unit` against the current row; any `Fail` label it
+  performs and does not handle inside `e` (deferred keys included) is
+  E_EFFECT `defer must not fail, but it performs <L>` at the `defer`.
 - Report lines and exit status 1 per Global Constraints; `<not
   printable>` decided statically from the payload type.
 
 - [ ] **Step 1: Write failing tests** (exact stdout, stderr, exit status):
-  LIFO order; unreached `defer` never runs; two failing defers on normal
-  exit; abort with failing cleanup (`fail(DbError): …` then `cleanup
-  failed: fail(ReleaseError): …`); `crash` in cleanup; multiple
-  recoverable defects in order; cleanup handling its own failure while
-  an outer abort is pending completes normally; a discarded normal
-  result after a cleanup failure; cleanup performing an operation under
-  nested handlers while an abort unwinds uses the registration context;
-  `crash` not caught by `handle`; non-printable payload line; a block
-  without `defer` emits no Go `defer`.
+  LIFO order; unreached `defer` never runs; two crashing defers on normal
+  exit; abort with crashing cleanup (`fail(DbError): …` then `cleanup
+  failed: crash: …`); multiple recoverable defects in order; cleanup
+  handling its own failure while an outer abort is pending completes
+  normally and the abort then reaches its `handle`; cleanup performing
+  an operation under nested handlers while an abort unwinds uses the
+  registration context; `crash` not caught by `handle`; non-printable
+  payload line; a block without `defer` emits no Go `defer`; rejections
+  (exact code, text, span): `defer` performing an unhandled `Fail`
+  directly, through a called function, and through a deferred Fail key;
+  accepted: `defer` handling its own `Fail`, and `defer` performing a
+  non-Fail effect from the current row.
 - [ ] **Step 2: Run.** Expected: FAIL.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0.
@@ -594,7 +603,7 @@ programs at `Features.Check.Unlowered` (Global Constraints).
   targeted aborts crossing an unrelated `handle`, interleaved stage
   ordering with over-application, and escaped callbacks invoked under a
   different handler; at least 25 each for every cleanup outcome (normal
-  exit, abort, defect, failing cleanup during unwinding, cleanup handling
+  exit, abort, defect, crashing cleanup during unwinding, cleanup handling
   its own failure, unreached `defer`). The census is printed with the
   run.
 - [ ] **Step 3: Run** generated comparisons of Go stdout, stderr and exit
@@ -640,6 +649,7 @@ programs at `Features.Check.Unlowered` (Global Constraints).
   isolated copy and seeing a named test fail: side condition removed;
   clauses in the inner context; abort consumed by the nearest `handle`;
   cleanup in the exit-time context; cleanup drops the pending cause;
+  `defer` failure check removed;
   closed parameter rows opened; `ctx` emitted for effect-free programs;
   `ctx` mode by reachability; layout edges omitted; provenance dropped;
   abbreviation disabled.

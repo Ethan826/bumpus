@@ -7,8 +7,9 @@ quality) added at the user's request; approved for implementation
 planning by the user 2026-10-09. Direction
 decisions and sections 1-5 were settled section by section with the user
 on 2026-10-09; only the item under "Awaiting confirmation" remains
-unconfirmed. Nothing is implemented, and no implementation
-plan exists yet. Background: docs/plans/2026-10-08-language-direction.md
+unconfirmed. Implementation status lives in the plan
+(2026-10-09-effects-plan.md) and docs/progress.md; the `defer` failure
+rule was revised by the user on 2026-10-09 (section 3). Background: docs/plans/2026-10-08-language-direction.md
 (FX001 sections) and BACKLOG.md FX001.
 
 ## Direction decisions (user, 2026-10-09)
@@ -267,8 +268,14 @@ lambda-bound parameters, Leijen 2014 §3.2).
   `Fail(E1) + … + ρ`, clauses against ρ, one shared result type; families
   not mentioned stay in ρ.
 - `fail(e)`: consumes `Fail(typeOf(e))`; result type fresh.
-- `defer e`: e : Unit, checked against the current row (failure during
-  unwinding: section 3).
+- `defer e`: e : Unit, checked against the current row, and it must not
+  fail (user decision 2026-10-09, after Swift's `defer`): a `Fail(E)` that
+  `e` performs and does not handle inside itself is E_EFFECT `defer must
+  not fail, but it performs Fail(E)` at the `defer`, whatever E's key
+  (deferred keys included). Cleanup that can fail handles its failure
+  inside the deferred expression, e.g. `defer handle release(r)
+  { fail(e: ReleaseError) => () }`. Other effects (Log, State, …) are
+  allowed and come from the current row.
 - `let x = e` is monomorphic in FX001; let-generalization would need its
   own effects-aware soundness treatment.
 
@@ -338,17 +345,25 @@ FX001 produces no discard; the event is named for general resume. Multi-
 shot resumption of continuations containing `defer` is explicitly
 unresolved and left to that milestone.
 
-**Cleanup failures.** A deferred expression may handle failures internally
-and complete normally, including during unwinding. Policy: if a typed abort
-escapes a deferred expression while another abort or defect is pending, it
-becomes a cleanup defect carrying both causes. On normal exit, the first
-escaping failure becomes the pending cause; subsequent deferred expressions
-run with it pending. If cleanup raises a recoverable defect, the pending
-cause is retained, later causes are recorded in execution order, and the
-remaining deferred expressions still run. This is a design choice that
-permits useful effectful cleanup without an absence-checking mechanism
-now; internal constraints could prevent failing cleanup statically, and
-the deferral of user-written row-constraint syntax does not forbid them.
+**Cleanup failures (revised by the user 2026-10-09).** A deferred
+expression cannot end in a typed abort: section 2 rejects a `defer` whose
+expression performs an unhandled `Fail`, so a typed failure pending while
+the block unwinds always reaches its own `handle`, and no typed error is
+ever lost or converted. Cleanup may still handle failures internally and
+complete normally, including during unwinding. What remains is defects:
+if cleanup raises a recoverable defect (`crash`, the missing-handler
+guard, a Go runtime panic), the program is already failing
+uncatchably, so nothing recoverable is lost: the pending cause (an abort
+or an earlier defect, if any) is retained as the first cause, later causes
+are recorded in execution order, the remaining deferred expressions still
+run, and the program reports once. A typed abort pending when such a
+defect occurs becomes part of that defect report rather than reaching its
+`handle`. Rejected alternatives (2026-10-09): converting a pending abort
+into an uncatchable defect on a typed cleanup failure (loses recoverability
+for a second error), dropping the cleanup failure (silent loss), letting it
+replace the original (loses the cause), and attaching it as a suppressed
+cause (needs a heterogeneous error value FX001 does not have, or out-of-row
+printing).
 
 **Defects.** A defect is any recoverable runtime panic that is not a
 targeted abort. No handler catches one; unwinding runs every deferred
@@ -565,11 +580,12 @@ delivery of realistic test doubles.
   diagnostics print it (`DbError`, `Error(Int)`). V is ADR 005's
   rendering when T is printable; when T contains a function or handler,
   V is `<not printable>` and the line keeps `fail(T)`, so typed errors
-  gain no new printability restriction. Example (abort unwinding, cleanup fails):
+  gain no new printability restriction. Example (abort unwinding, cleanup
+  crashes; a typed cleanup failure is a compile error, section 2):
 
   ```text
   fail(DbError): Timeout(3)
-  cleanup failed: fail(ReleaseError): Busy
+  cleanup failed: crash: Busy
   ```
 
 **Unifier properties** (quantified, generated inputs including repeated
@@ -595,11 +611,13 @@ a named row stays shared; the eta-expansion limitation is pinned.
    past an inner `handle` of its family.
 5. Error families and layouts: different `Fail` families; different payload
    instantiations of one family (`Error(Int)`, `Error(Bool)`).
-6. Cleanup: two failing defers on normal exit; abort with failing cleanup;
-   `crash` in cleanup; multiple recoverable defects (cause order, LIFO);
-   cleanup that handles its own failure completes normally, including
-   while an outer abort is pending; an unreached `defer` never runs; a
-   discarded normal result after a cleanup failure.
+6. Cleanup: two crashing defers on normal exit; abort with crashing
+   cleanup; multiple recoverable defects (cause order, LIFO); cleanup that
+   handles its own failure completes normally, including while an outer
+   abort is pending, and the abort then reaches its `handle`; an unreached
+   `defer` never runs; a `defer` performing an unhandled `Fail` is
+   rejected (E_EFFECT, exact text and span), also through a deferred Fail
+   key and through a called function.
 7. Cleanup invoking operations under nested handlers while an abort
    unwinds (registration context).
 8. Evaluation order traces (Console): interleaved arguments and stages,
@@ -611,7 +629,7 @@ a named row stays shared; the eta-expansion limitation is pinned.
 10. Rejections: growing-label recursion (ADR 007); `Grow`, the mutual pair
     and the data/effect cycle (section 4), with admissible variants.
 11. `crash`: not caught by `handle`; reported once after cleanup;
-    exit status 1; report lines for typed-abort-then-cleanup-failure and a
+    exit status 1; report lines for typed-abort-then-cleanup-crash and a
     non-printable payload.
 12. Handler values: comparison, `print`, `crash` and a main result
     containing a handler are rejected, including nested in an ADT.
@@ -750,7 +768,10 @@ against concrete failures.
 
 Nothing. The defect-report format, scoped-occurrence provenance and
 type-argument abbreviation were settled by the user on 2026-10-09; the
-spec is approved for implementation planning.
+spec is approved for implementation planning. Revision 2026-10-09
+(during implementation, Task 8 not yet started): the user chose that
+`defer` must not fail (section 2 `defer` rule, section 3 "Cleanup
+failures"), replacing the earlier abort-to-defect conversion.
 
 ## Deferred (not FX001)
 

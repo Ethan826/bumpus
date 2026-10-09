@@ -3023,3 +3023,16 @@ accepted program because the old guard no longer masks them). Test-helper
 defect fixed: test/poly-keys.mjs built a 5,000-deep JSON message eagerly
 (stack overflow here). Task review (Opus): spec ✅, quality Approved, no
 Critical/Important; Minor items deferred in the ledger.
+
+## FX001 spec revision: `defer` must not fail (2026-10-09)
+
+Before Task 8, the user was asked how a cleanup failure during an abort
+should behave (abort-to-defect conversion as specified, drop, replace, or
+suppressed causes). The user chose the static rule, after Swift's `defer`:
+a deferred expression that performs an unhandled `Fail` is E_EFFECT
+`defer must not fail, but it performs <L>`; cleanup that can fail handles
+its failure inside the deferred expression. Only defects can fail cleanup,
+so a pending typed abort always reaches its `handle`. Spec §2 (`defer`
+rule), §3 ("Cleanup failures", with rejected alternatives), §5 (report
+example, probes 6 and 11), plan Global Constraints and Tasks 8, 10 and 12,
+findings and the handoff were updated. Docs only; no code changed.

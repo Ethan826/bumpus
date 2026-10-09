@@ -369,7 +369,10 @@ median 2.91 s is within 10 s, so the shapes are adopted. Pitfall recorded:
 Go's build cache makes identical regenerated sources look 8x faster; vary
 the source per repetition when timing builds. Design reading to confirm in
 FX001 review: a cleanup failure of any kind while a typed abort is pending
-turns it into an uncatchable defect listing both causes.
+turns it into an uncatchable defect listing both causes. Superseded by the
+user 2026-10-09: `defer` must not fail (spec §2, §3), so only defects can
+fail cleanup and a pending typed abort is never converted by a typed
+cleanup failure.
 
 ## Waxwing migration baseline (2026-10-09)
 
