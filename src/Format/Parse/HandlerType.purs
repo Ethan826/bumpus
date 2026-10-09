@@ -2,13 +2,15 @@ module Format.Parse.HandlerType (operand) where
 
 import Prelude
 import Data.Array as Array
-import Data.Either (Either(..))
+import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe')
 import Data.Tuple (Tuple(..))
+import Data.Tuple as Tuple
 import Data.Traversable (traverse)
 import Domain.Problem (Problem(..))
 import Domain.Syntax
-  ( RowRef(..)
+  ( Diagnostic
+  , RowRef(..)
   , Span
   , TypeArgument(..)
   , TypeRef(..)
@@ -27,27 +29,43 @@ import Format.Parse.Grammar
 import Format.Parse.Row (rowArgument, rowRef)
 import Format.Lex (Token)
 
+type Rowed = { ty ∷ TypeRef, row ∷ Maybe RowRef }
+
 type Parsed =
   { arguments ∷ Array TypeArgument
+  , argumentRows ∷ Array RowRef
   , row ∷ Maybe RowRef
   , close ∷ Token
   }
 
--- `single` reads one operand and leaves a following `with` unread, so the
--- row after an effect label belongs to the handler, not to the label.
-operand ∷ Parser TypeRef → Parser TypeRef → Parser TypeRef
-operand inner single = build <$> token
+-- Arguments are full types (`rowed` reads a chain and its trailing row), as
+-- they were before rows were kept. A `with` after the sole argument is then
+-- read by that argument's chain, so `apply` lifts it to be the handler's row.
+operand ∷ Parser Rowed → Parser TypeRef → Parser TypeRef
+operand rowed inner = build <$> token
   <*> optionalOn "(" (parseArguments inner)
   where
   parseArguments parser = refine apply
     ( expect "(" *>
-        ( parsed <$> sepBy1 "," (argument single)
+        ( parsed <$> sepBy1 "," (argument rowed parser)
             <*> optionalOn "with" (rowRef parser)
             <*> expect ")"
         )
     )
-  parsed values row close = { arguments: values, row, close }
-  apply found = maybe' (ordinary found) (special found) found.row
+  parsed values row close =
+    { arguments: map Tuple.fst values
+    , argumentRows: Array.mapMaybe Tuple.snd values
+    , row
+    , close
+    }
+  apply found = either Left (withRow found) (liftedRow found)
+  withRow found row = maybe' (ordinary found) (special found) row
+  liftedRow found = maybe' (kept found) (sole found)
+    (Array.head found.argumentRows)
+  kept found _ = Right found.row
+  sole found first
+    | Array.length found.arguments == 1 = Right (Just first)
+    | otherwise = Left (unexpectedRow first)
   ordinary found _ = Right
     ( NamedRef (applicationSpan found) "Handler"
         found.arguments
@@ -98,23 +116,30 @@ operand inner single = build <$> token
       row
     _ → found
 
-argument ∷ Parser TypeRef → Parser TypeArgument
-argument inner = refine makeArgument
-  (Tuple <$> nested inner <*> optionalOn "+" (expect "+" *> rowArgument inner))
+argument
+  ∷ Parser Rowed → Parser TypeRef → Parser (Tuple TypeArgument (Maybe RowRef))
+argument rowed inner = refine makeArgument
+  (Tuple <$> nested rowed <*> optionalOn "+" (expect "+" *> rowArgument inner))
   where
-  makeArgument (Tuple found Nothing) = Right (TypeArgument found)
+  makeArgument (Tuple found Nothing) = Right
+    (Tuple (TypeArgument found.ty) found.row)
   makeArgument (Tuple found (Just row)) = rowArgumentFor found row
-  rowArgumentFor found row = case found of
-    NamedRef span name arguments → RowArgument
+  rowArgumentFor found row = case found.ty of
+    NamedRef span name arguments → withoutRow found.row
       <$> (addFirst span name <$> traverse asType arguments <*> pure row)
     _ → Left
       ( problemAt (Syntax "Expected an effect label")
-          (typeRefSpan found)
+          (typeRefSpan found.ty)
       )
+  withoutRow row built = Tuple (RowArgument built) row
   asType = case _ of
     TypeArgument reference → Right reference
     RowArgument row → Left (problemAt (RowSort false) (rowSpan row))
   rowSpan (RowRef span _ _) = span
+
+unexpectedRow ∷ RowRef → Diagnostic
+unexpectedRow (RowRef span _ _) =
+  problemAt (Syntax "Unexpected effect row") span
 
 addFirst ∷ Span → String → Array TypeRef → RowRef → RowRef
 addFirst span name arguments (RowRef rest labels tail) = RowRef

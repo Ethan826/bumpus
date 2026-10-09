@@ -81,13 +81,13 @@ operand inner = dispatch
   [ on "Int" (IntRef <$> tokenSpan)
   , on "Bool" (BoolRef <$> tokenSpan)
   , on "Unit" (UnitRef <$> tokenSpan)
-  , on "Handler" (HandlerType.operand inner (defer single))
+  , on "Handler" (HandlerType.operand (defer rowed) inner)
   , onWhen upperText (spanned appliedOf (parts <$> upperName <*> arguments))
   , onWhen lowerText (variable <$> token)
   ]
   (refine unknown token)
   where
-  single _ = operand inner
+  rowed _ = typeAndRow
   parts identifier found = { identifier, arguments: found }
   arguments = optionalOn "(" (expect "(" *> sepBy1 "," argument <* expect ")")
   argument = dispatch
@@ -153,8 +153,11 @@ startingAt start ty = { start, ty, row: Nothing }
 combined
   ∷ { init ∷ Array Segment, last ∷ Segment }
   → Either Diagnostic { ty ∷ TypeRef, row ∷ Maybe RowRef }
-combined chain = maybe' (merged chain) unexpectedRow
-  (Array.findMap segmentRow (Array.take 1 chain.init))
+combined chain = maybe' (merged chain) unexpectedRow (leadingRow chain)
+
+-- The row written on the chain's first segment, if there is an arrow after it.
+leadingRow ∷ { init ∷ Array Segment, last ∷ Segment } → Maybe RowRef
+leadingRow chain = maybe' (const Nothing) segmentRow (Array.head chain.init)
 
 merged
   ∷ { init ∷ Array Segment, last ∷ Segment }
