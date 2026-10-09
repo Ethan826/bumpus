@@ -23,7 +23,9 @@
 // this way: 50,453 cases, 0 differences.
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import {
+  existsSync, readFileSync, readdirSync, rmSync, writeFileSync
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
@@ -174,8 +176,14 @@ const regenerate = (candidate, file) => {
       NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${hook}` }
   });
   // A failing test (e.g. a timing bound under load) still harvested its
-  // sources; report it rather than discard the corpus.
-  console.log(`harvest: test run exited ${result.status}`);
+  // sources; report it rather than discard the corpus, and keep the run's
+  // output so the failure can be identified (it was once discarded).
+  const log = `${file}.log`;
+  writeFileSync(log, `${result.stdout ?? ''}${result.stderr ?? ''}`);
+  console.log(`harvest: test run exited ${result.status}; log ${log}`);
+  const failed = (result.stdout ?? '').split('\n')
+    .filter(line => line.startsWith('✖ ') && !/failing tests/.test(line));
+  for (const line of [...new Set(failed)]) console.log(`  ${line}`);
 };
 
 const sourcesIn = (tree, directory) => {

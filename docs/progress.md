@@ -2217,3 +2217,13 @@ compile, build and run. Design §13 rules 1-8 as adopted.
   5,000-parameter `go build` 7,467 ms against 10 s; the match ladder
   1,030 ms; load average 3.15 before, 5.34 after
   (.build/fn001-task6-fix-verify.log). Run once.
+
+### Differential harvest failure, unidentified (2026-10-08)
+
+During the Task 6 review fixes, `scripts/differential.mjs --regenerate`
+ran the full test suite under its harvest hook and that run exited 1;
+the tool discarded the run's output, so the failing test is unknown
+(likeliest a load-sensitive timing test, BACKLOG T003, unconfirmed). The
+tool now writes the run's output to `<harvest>.jsonl.log` and prints the
+failing test names. One rerun afterwards (load 3.3 before, 9.1 after)
+exited 0: 2,374 harvested sources, 0 differences against itself.
