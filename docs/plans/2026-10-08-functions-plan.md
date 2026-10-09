@@ -474,19 +474,19 @@ evidence.
   `test/fn-timing.test.mjs` (oracle agreement on the probes)
 - Create: `test/fn-programs.mjs` (generator)
 
-- [ ] **Step 1: Write failing tests:** the interpreter, on each Task 6
+- [x] **Step 1: Write failing tests:** the interpreter, on each Task 6
   probe program, reports the same first entered probe as the Go run; the
   generated-program property (below) runs. Both fail until Step 2.
-- [ ] **Step 2: Extend** the reference interpreter independently:
+- [x] **Step 2: Extend** the reference interpreter independently:
   closures, staged application with declared arity (a function value
   remembers its remaining stage count), constructor values, `|>` with
   left-first order, and an `enters` trace so the oracle can assert the
   same first entered probe. The generator emits higher-order functions,
   lambdas, partial and over-application and pipes over the P001 types.
-- [ ] **Step 3: Run**; the oracle property (at least 30 programs, as P001)
+- [x] **Step 3: Run**; the oracle property (at least 30 programs, as P001)
   compares Go output with the interpreter.
-- [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0.
-- [ ] **Step 5: Commit** `test: FN001 timing probes and execution oracle`.
+- [x] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0.
+- [x] **Step 5: Commit** `test: FN001 timing probes and execution oracle`.
 
 ### Task 8: Scale
 

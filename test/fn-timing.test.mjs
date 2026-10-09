@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runGoBatch } from './go-batch.mjs';
+import { run } from './poly-oracle.mjs';
 import { panicOnEntry, traceCalls } from './support.mjs';
 
 // FN001 Task 6, Step 1a: evaluation timing of function values (design §4,
@@ -80,4 +81,23 @@ for (const [name, , , label] of cases) {
 
 test('timing probe: a shared partial enters its argument once', () => {
   assert.equal(batch.run('sharing'), '30 [3 0 2 1 1]\n');
+});
+
+// FN001 Task 7: the independent interpreter (test/poly-oracle.mjs) enters
+// the same probe first as the Go run, and traces the same entries for the
+// shared partial (main, probe, twice, k3, k3 as declaration positions).
+for (const [name, source, pairs, label] of cases) {
+  test(`interpreter agrees: ${name} enters ${label} first`, () => {
+    const result = batch.result(name);
+    const entered = (result.stdout + result.stderr)
+      .match(/bumpus-probe: (\w+)/)?.[1];
+    assert.equal(run(source, pairs.map(([, probe]) => probe)).probe,
+      entered, label);
+  });
+}
+
+test('interpreter agrees: a shared partial enters its argument once', () => {
+  const result = run(sharing);
+  assert.equal(`${result.printed} [${result.enters.join(' ')}]\n`,
+    batch.run('sharing'));
 });

@@ -26,7 +26,8 @@ const tokenize = source => {
 export const isUpper = text => /^[A-Z]/.test(text);
 
 // Recursive descent; returns { ctors (name → declaration position),
-// functions (name → { parameters, body }) }.
+// fields (constructor name → field count), functions (name →
+// { parameters, body }, in declaration order) }.
 export const parseProgram = source => {
   const tokens = tokenize(source);
   let at = 0;
@@ -148,10 +149,11 @@ export const parseProgram = source => {
     return { tag: 'match', scrutinee, arms: list(arm, '}') };
   };
   const ctors = new Map();
+  const fields = new Map();
   const functions = new Map();
   const ctor = position => {
     const name = take().text;
-    if (peek('(')) { take('('); list(skipType, ')'); }
+    fields.set(name, peek('(') ? (take('('), list(skipType, ')')).length : 0);
     ctors.set(name, position);
   };
   const typeDeclaration = () => {
@@ -182,5 +184,5 @@ export const parseProgram = source => {
     if (peek('type')) typeDeclaration(); else functionDeclaration();
     take(';');
   }
-  return { ctors, functions };
+  return { ctors, fields, functions };
 };

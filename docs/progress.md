@@ -2289,3 +2289,38 @@ that read six parameters (first and last three, mixed kinds).
   533 tests, serial phase 12, zero failures or skips; serial
   5,000-parameter build 4,733 ms; match ladder 735 ms; `twenty thousand
   parameters` 221 ms.
+
+### FN001 Task 7: reference interpreter (2026-10-09)
+
+- test/poly-oracle.mjs, independently of the compiler: function values
+  (named functions and constructors with their declared arity, lambda
+  closures, `_` parameters), staged application one argument at a time
+  (a body runs exactly when its stage boundary completes), strict
+  partial application, over-application, `|>` with the left operand
+  first, then the callee and its explicit arguments, and an `enters`
+  trace (declaration positions) with optional probes that stop the run
+  on entry. test/poly-parse.mjs now records constructor field counts.
+- Step 1 (seen failing against the previous interpreter): six
+  test/fn-timing.test.mjs cases compare the interpreter's first entered
+  probe with the Go run's (all five Task 6 probes) and the shared
+  partial's printed value and entry trace (`30 [3 0 2 1 1]`); the
+  generated property failed.
+- test/fn-programs.mjs generates 30 programs (seeds 0x7a11 + index) over
+  Int, Bool, List(Int), Pair(Int, Bool), Int -> Int and Int -> Int -> Int
+  with a higher-order prelude (map, fold, compose, flip, adder):
+  lambdas (with `_`, capturing match binders), partial and
+  over-application of functions, constructors and lambdas, constructor
+  values (`flip(Cons)`, `Pair(n)(b)`, `compose(adder, f)`) and pipes.
+  test/fn-oracle.test.mjs runs them in one Go batch against the
+  interpreter (failures print seed and source) and checks every form
+  occurs. All 30 agree; no compiler bug found.
+- Mutant (scratchpad copy, non-strict build): Format.Go.Pipe always
+  splicing the left operand as the last argument (left operand
+  evaluated last) fails `interpreter agrees: pipe order` (and Task 6's
+  Go probe). The generated comparison does not see it: generated
+  programs terminate and have no effects, so pipe order is not
+  observable in their values; timing stays the probes' job.
+- `rm -rf output && npm run verify` exit 0 (load average 3.01 before,
+  5.77 after; .build/fn001-task7-verify.log): parallel phase 541 tests,
+  serial phase 12, zero failures
+  or skips.
