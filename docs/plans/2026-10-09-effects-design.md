@@ -3,7 +3,8 @@
 Status: written spec, revised after the user's whole-spec review
 (2026-10-09): FN001 evaluation order, one dependency model, `ctx` mode over
 emitted IR, handler restrictions, confirmations; section 6 (diagnostic
-quality) added at the user's request. Direction
+quality) added at the user's request; approved for implementation
+planning by the user 2026-10-09. Direction
 decisions and sections 1-5 were settled section by section with the user
 on 2026-10-09; only the item under "Awaiting confirmation" remains
 unconfirmed. Nothing is implemented, and no implementation
@@ -554,17 +555,17 @@ delivery of realistic test doubles.
   first, origin and boundary notes, distinguished kinds, bounded output).
 - Row display: labels in row order, a named tail `...e`, the ambient tail
   `...` (`with Log + ...`), the closed empty row `pure`.
-- Defect report (one stderr report after all cleanup, exit status 1,
-  confirmed 2026-10-09; line format below completed after that review and
-  awaiting its confirmation). One cause per line in execution order; the
+- Defect report (confirmed by the user 2026-10-09: one stderr report
+  after all cleanup, exit status 1, and the line format below). One cause
+  per line in execution order, embedded newlines escaped as `\n`; the
   first line is the original cause, every later line is prefixed
   `cleanup failed: `. A cause is rendered as `crash: V` for `crash(V)`,
   `fail(T): V` for a typed abort with payload type T, or
   `no handler for L` for the guard. T is the payload's type as
   diagnostics print it (`DbError`, `Error(Int)`). V is ADR 005's
   rendering when T is printable; when T contains a function or handler,
-  V is `<not printable>`, so typed errors gain no new printability
-  restriction. Example (abort unwinding, cleanup fails):
+  V is `<not printable>` and the line keeps `fail(T)`, so typed errors
+  gain no new printability restriction. Example (abort unwinding, cleanup fails):
 
   ```text
   fail(DbError): Timeout(3)
@@ -681,10 +682,13 @@ call of a named function, application of a local or function value,
 function value passed to a parameter, a handler installation, a call whose
 ambient or named row carries it), the link to that boundary is kept, so
 the path from origin to rejection can be reconstructed at report time.
-Provenance is bounded: the first origin per (row variable, label key) is
-kept, and chains are links to declarations and spans resolved when
-reporting, never lists grown during checking. Provenance never influences
-typing.
+Provenance is bounded: the first origin per scoped label *occurrence* is
+kept, not per effect key, so nested `State(Int)` and `State(Bool)`, or
+repeated entries of one `Fail` family, never inherit each other's
+provenance; matching and diagnostic attribution use the same first-
+occurrence distinction as unification (section 2). Chains are links to
+declarations and spans resolved when reporting, never lists grown during
+checking. Provenance never influences typing.
 
 **Report shape.**
 1. The headline is the row difference first: `Unhandled Database`,
@@ -711,7 +715,11 @@ generic row mismatch:
   made equal: both end in ...r`.
 
 **Abbreviation without losing relationships.** Differing labels print
-first and in full. Other labels are elided past a fixed count (`Database +
+first, always with their effect name and the mismatch; their type
+arguments are abbreviated like any type when they are large: subterms off
+the path to the differing subterm are elided (`State(Pair(…, List(Bool)))`
+against `State(Pair(…, List(Int)))`), so the character bound holds
+without hiding the effect or the relevant difference. Other labels are elided past a fixed count (`Database +
 Log + Clock + … 9 more + ...e`). Tails and named row variables are always
 printed, with the same name on both sides of a comparison, so shared-tail
 relationships stay visible. Same-key duplicates are never merged
@@ -740,9 +748,9 @@ against concrete failures.
 
 ## Awaiting confirmation
 
-- Section 5: the defect report's completed line format (`fail(T): V`,
-  `cleanup failed: ` prefix, `<not printable>` fallback). The single
-  report after cleanup and exit status 1 are confirmed.
+Nothing. The defect-report format, scoped-occurrence provenance and
+type-argument abbreviation were settled by the user on 2026-10-09; the
+spec is approved for implementation planning.
 
 ## Deferred (not FX001)
 
