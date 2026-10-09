@@ -131,8 +131,9 @@ supply X there, and an unsolved meta tail closes to empty. Diagnostics
 (E_EFFECT): `defer must not fail, but it performs <L>`; `defer must not
 fail, but it may perform any effect of <r>`; for `par` (hypothetical
 wording) `a par child may only fail, but it performs <L>` and `… but it
-may perform any effect of <r>`. Pending user confirmation: this strictness
-versus an internal "lacks X" constraint checked at instantiation sites.
+may perform any effect of <r>`. Adopted 2026-10-09: this strictness,
+rather than an internal "lacks X" constraint checked at instantiation
+sites (that relaxation is BACKLOG FX007).
 Examples, both accepted by a labels-only check:
 
 ```
@@ -405,7 +406,7 @@ discard; lawful reductions (CF002 candidate: built-in `Int` sum first).
 
 **Settle before concurrency (FX002), mutable state (FX003), resumable
 handlers (FX006):**
-1. R0, for `defer` (ruled; strictness pending user confirmation) and `par`.
+1. R0, for `defer` (ruled; strictness adopted 2026-10-09, relaxation BACKLOG FX007) and `par`.
 2. B1 (lookup inherited, unwinding local, abort transfer at join).
 3. B3 as a transitive property of handler types plus the capture check:
    before FX003, which cannot land without it.

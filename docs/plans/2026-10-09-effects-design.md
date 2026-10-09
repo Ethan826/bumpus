@@ -366,7 +366,7 @@ unresolved and left to that milestone.
 **Cleanup failures (revised by the user 2026-10-09).** A deferred
 expression cannot end in a typed abort: section 2 rejects a `defer` whose
 expression performs an unhandled `Fail` (or may, through an open row
-tail: Task 8 review ruling, pending user confirmation), so no typed cleanup
+tail: Task 8 review ruling, adopted 2026-10-09; relaxation is FX007), so no typed cleanup
 failure can replace, drop or convert a pending typed failure. A pending
 typed failure reaches its own `handle` if every deferred expression run on
 the way completes normally; if cleanup raises a recoverable defect, the

@@ -1,6 +1,6 @@
 # Waxwing / FX001 Task 9 next (cloud session 2026-10-09)
 
-Branch claude/vibrant-cerf-3km61i (contains fx001 through Task 6). Tasks 1-8
+Branch claude/vibrant-cerf-3km61i (contains fx001 through Task 8). Tasks 1-8
 complete; Tasks 9-12 are being amended (re-scan after CF001), then
 executed. CF001 (concurrency design) and FX007 (relaxing strict defer)
 await the user's review.
