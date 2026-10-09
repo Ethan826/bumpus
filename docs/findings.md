@@ -335,3 +335,38 @@ resource/cancellation semantics. Documentation only; no feature implemented.
   error; when the built code no longer has the representation a plan
   names (an uncurried value), restore the defect's effect (an eta
   adapter at the type's arity) and say so.
+
+## FX001 Task 1: runtime shapes (2026-10-09)
+
+Hand-written Go of effects design §4 (scripts/effect-probe.mjs; raw output
+in .build/fx001-task1/, run3.log is the record). Host load averages 2.6-5.8
+(`uptime` before and after each batch in the log), so timings are upper
+bounds; five runs each, median (min-max), checksums matched everywhere.
+
+| Configuration | Median ms (min-max) |
+|---|---|
+| 10^6 shallow installs | 18.3 (16.3-36.2) |
+| 10^6 performs, depth 1 | 1.65 (1.62-1.77) |
+| 10^6 performs, depth 100 | 79.8 (79.4-79.9) |
+| 10^6 performs, depth 10,000 | 11,770 (11,567-12,012) |
+| one abort across 1,000 unrelated `handle` frames | 34.9 (34.3-35.1) |
+| one abort across 1,000 cleanup frames | 27.5 (27.1-27.8) |
+| 100,000 caught aborts, depth 1 | 19.9 (19.3-20.5) |
+
+| `go build`, lifted helpers | Median s (min-max) | Ratio to previous |
+|---|---|---|
+| 1,000 | 0.83 (0.81-1.17) | |
+| 2,000 | 1.53 (1.51-1.56) | 1.84 |
+| 4,000 | 2.91 (2.88-2.97) | 1.90 |
+
+Observations, not a linearity proof: the ratios are close to 2 for 2x size.
+Lookup is linear in depth (about 1.2 ns per link; 11.8 s at depth 10,000
+justifies the cached-index follow-up for FX005, not a design change).
+Installation is about 18 ns each (one heap allocation). A caught abort is
+about 200 ns; an abort through 1,000 re-panicking frames costs about 35 us
+per frame. Decision rule: every semantic check passed and the 4,000-helper
+median 2.91 s is within 10 s, so the shapes are adopted. Pitfall recorded:
+Go's build cache makes identical regenerated sources look 8x faster; vary
+the source per repetition when timing builds. Design reading to confirm in
+FX001 review: a cleanup failure of any kind while a typed abort is pending
+turns it into an uncatchable defect listing both causes.

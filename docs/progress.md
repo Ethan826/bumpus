@@ -2540,3 +2540,30 @@ harvest failure renumbered T005); progress kept both sides. Clean `rm -rf
 output && npm run verify` on the merged tree: exit 0, 541 + 12 tests,
 twenty-two proofs (.build/fn001-merge-verify.log). main fast-forwarded to
 fn001 and pushed to origin; worktree and branch removed.
+
+## FX001 Task 1: runtime shape measurement (2026-10-09)
+
+Branch fx001. No compiler change. Added scripts/effect-probe.mjs (driver:
+explicit build 300 s / run 120 s timeouts, five repetitions, checksums
+verified, load averages before and after each batch),
+scripts/effect-runtime.mjs (Go prelude: `bumpusCtx` list, non-zero-sized
+`bumpusMarker`, `bumpusAbort`, lifted `bumpusHandle` returning
+`(result, abort)`, `bumpusCleanup`, defect report and `main` wrapper),
+scripts/effect-semantics.mjs (Step 2 programs and independently written
+expected output) and scripts/effect-programs.mjs (Step 3 loops and the
+generated lifted-helper program). Semantic checks: all 7 modes pass (clause
+reaches the outer handler; aborts cross unrelated and same-key inner
+handles to their target; clause failures after the helper returns reach
+the outer handle; nested blocks unwind LIFO; cleanup that handles a
+failure internally lets the abort continue; two cleanup failures print the
+three confirmed report lines in order, exit 1; normal-exit cleanup
+failures; crash not caught by handle with cleanup run; guard line; 1,000
+markers distinct). A first run of `abort` failed on my own expected output
+(two nested blocks give `d2 d1 d2 d1`, I had written one pair); corrected
+the expectation, not the program. Two mutants (handle catching every
+abort; clause run in its own context) each fail their check (scratchpad,
+not committed). A second full run reused Go's build cache (identical seed
+per repetition; 0.2-0.4 s builds) and was discarded; the seed now varies
+per run. Measurements (.build/fx001-task1/run3.log): median `go build` 0.83 s
+/ 1.53 s / 2.91 s at 1,000 / 2,000 / 4,000 helpers (bound 10 s). Decision:
+ADOPT the shapes. Details in findings "FX001 Task 1".
