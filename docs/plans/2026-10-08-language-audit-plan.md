@@ -66,6 +66,22 @@ turn the audit into an unbounded bibliography.
    spanning Bumpus and host dependencies. Review Effect Platform as a
    versioned precedent, separating targets from runtime capabilities.
 
+### Diagnostic research cases (added 2026-10-09 for FX001)
+
+At the user's request, PureScript's diagnostic problems are research cases
+for axis 7, feeding FX001's diagnostic-quality section
+(docs/plans/2026-10-09-effects-design.md §6). Collect concrete, reproduced
+examples (MileAhead in read-only ../trailmapper is one source) before
+characterizing them; the questions below are to investigate, not findings:
+row-unification errors that print whole rows rather than the difference;
+open-row tails shown as generated names rather than user names; reported
+spans at a declaration or a distant unification instead of the
+originating call; long "while checking/while trying to match" context
+stacks; Variant-based error rows exposing carrier types; and lacks or
+duplicate-label errors on composed records. For each, record the source
+program, the compiler version, the message, what a user needed to know,
+and the FX001 §6 rule that addresses it (or a gap).
+
 Use these axes for comparable briefs; mark absent/not applicable topics
 explicitly. Bibliography size and matching feature names are not sufficient
 evidence of coverage or semantic compatibility.

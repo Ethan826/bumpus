@@ -19,9 +19,14 @@ tier, not in verify), scripts/ladder-profile.mjs, scripts/stage-probe.mjs,
 
 Update 2026-10-09: the user chose FX001. Its written spec,
 docs/plans/2026-10-09-effects-design.md, was settled section by section
-with the user and awaits their review of the whole document (including
-its "Awaiting confirmation" list). Next: apply review changes, then
-writing-plans. No implementation is authorized.
+with the user; the whole-spec review is applied (fd625a4) and §6
+diagnostic quality was added at the user's request (provenance, row
+difference first, origin/boundary/path notes, distinguished missing-
+handler, same-key mismatch and callback-purity errors, bounded
+abbreviation, regression cases; PureScript research cases in LA001).
+Next: the user's confirmation of the defect-report line format (spec
+"Awaiting confirmation"), then writing-plans. No implementation is
+authorized.
 
 Earlier next steps (before FX001 was chosen): none authorized. Candidates, for the user to choose: C001
 and R001 (review jointly; decide whether instances are ordinary records),

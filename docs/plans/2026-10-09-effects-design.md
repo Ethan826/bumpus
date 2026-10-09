@@ -2,7 +2,8 @@
 
 Status: written spec, revised after the user's whole-spec review
 (2026-10-09): FN001 evaluation order, one dependency model, `ctx` mode over
-emitted IR, handler restrictions, confirmations. Direction
+emitted IR, handler restrictions, confirmations; section 6 (diagnostic
+quality) added at the user's request. Direction
 decisions and sections 1-5 were settled section by section with the user
 on 2026-10-09; only the item under "Awaiting confirmation" remains
 unconfirmed. Nothing is implemented, and no implementation
@@ -549,6 +550,8 @@ delivery of realistic test doubles.
   main a value whose type contains a handler (section 2).
 - E_SYNTAX `General control (ctl/resume) is not supported yet`; E_ARITY
   `Expected now()`.
+- Every effect diagnostic follows section 6 (provenance, row difference
+  first, origin and boundary notes, distinguished kinds, bounded output).
 - Row display: labels in row order, a named tail `...e`, the ambient tail
   `...` (`with Log + ...`), the closed empty row `pure`.
 - Defect report (one stderr report after all cleanup, exit status 1,
@@ -613,11 +616,14 @@ a named row stays shared; the eta-expansion limitation is pinned.
     containing a handler are rejected, including nested in an ADT.
 13. `ctx` mode: a pure `main` with an unused effectful function builds
     and runs.
+14. Diagnostic quality (section 6): long call chains, nested callbacks,
+    large rows, same-key mismatch and the side condition, asserting
+    locations, related notes and bounded output.
 
 **Acceptance scenario** (BACKLOG FX001): services with overlapping
 requirements composed without annotations; real versus stateless fake
-handler values injected at `main`; a missing-capability diagnostic when a
-handler is dropped; the scenario's specialization key count equals its
+handler values injected at `main`; a missing-capability diagnostic meeting
+section 6 (origin, boundary and path notes) when a handler is dropped; the scenario's specialization key count equals its
 effect-free baseline plus its effect keys (quantifies key and code growth).
 
 **Oracle.** An independent reference interpreter in the test tree with a
@@ -630,7 +636,8 @@ byte-identical (conditional runtime emission).
 **Regression proofs** (isolated mutants, each caught): Leijen side
 condition removed (test hits its timeout); clauses run in the inner
 context; abort consumed by the nearest `handle` instead of its target;
-cleanup in the exit-time context; cleanup drops the pending cause; closed
+cleanup in the exit-time context; cleanup drops the pending cause;
+provenance dropped; row abbreviation disabled; closed
 parameter rows opened; `ctx` emitted for effect-free programs; `ctx`
 mode chosen by reachability from `main` (the unused-effectful-function
 probe fails to build); layout edges omitted from the declaration graph.
@@ -651,6 +658,85 @@ export calling convention.
 
 Nothing here is demonstrated: these are design obligations until the
 implementation and measurements exist.
+
+## 6. Diagnostic quality (user requirement 2026-10-09; acceptance, not polish)
+
+Effect errors arise far from where they are reported: an operation deep in
+a call chain or inside a callback is rejected at a signature, a `with
+pure` parameter, a handler or `main`. FX001 diagnostics must explain that
+path. No separate milestone; these are FX001 design and acceptance
+requirements.
+
+**Diagnostic model.** Today a diagnostic is `{ problem, span }` (one
+location). FX001 adds structured related notes: `{ problem, span, related
+∷ Array Note }`, each note a span plus a reason ADT (not a string),
+rendered by Format.Diagnostic and carried on the wire as a `related` list.
+Existing diagnostics have no notes and keep their exact text and spans
+(their exact-text tests are unchanged).
+
+**Provenance.** Every label that enters a row by consumption records its
+origin: the consuming expression's span and what was consumed (operation,
+call of a named function, application of a local or function value,
+`fail` of payload type T). When a label crosses a boundary (a callback or
+function value passed to a parameter, a handler installation, a call whose
+ambient or named row carries it), the link to that boundary is kept, so
+the path from origin to rejection can be reconstructed at report time.
+Provenance is bounded: the first origin per (row variable, label key) is
+kept, and chains are links to declarations and spans resolved when
+reporting, never lists grown during checking. Provenance never influences
+typing.
+
+**Report shape.**
+1. The headline is the row difference first: `Unhandled Database`,
+   `Expected pure, found Log`, `Expected State(Bool), found State(Int)`.
+2. The primary span is the expression, in the rejecting declaration's
+   body, through which the constraint arrives (the actionable call).
+3. Notes identify the rejecting boundary (the signature's `with`, or the
+   signature when its row is ambient; the `with pure` parameter
+   annotation; the `with` installation; `main`) and the originating
+   operation, call or `fail`, with the intermediate call path between.
+
+**Distinguished kinds.** Each has its own problem and message, never one
+generic row mismatch:
+- missing handler or capability (E_EFFECT): `Unhandled Database in main`,
+  `Unhandled fail(DbError) in main`, `stamp performs Database, which its
+  signature does not allow`;
+- same-key payload mismatch (E_TYPE), naming the scoped first-occurrence
+  rule: `Expected State(Bool), found State(Int)` with a note at the
+  innermost `State(Int)` (its handler installation or signature entry);
+- callback purity (E_EFFECT): `This function must be pure, but it
+  performs Log`, at the argument, with notes at the `with pure`
+  annotation and at the operation inside the callback;
+- the scoped-labels side condition: `Clock + ...r and Log + ...r cannot be
+  made equal: both end in ...r`.
+
+**Abbreviation without losing relationships.** Differing labels print
+first and in full. Other labels are elided past a fixed count (`Database +
+Log + Clock + … 9 more + ...e`). Tails and named row variables are always
+printed, with the same name on both sides of a comparison, so shared-tail
+relationships stay visible. Same-key duplicates are never merged
+(multiplicity shows). Types inside labels use E011's elision once it
+exists. Call paths print their first and last hops with `… k more calls`
+between. Each diagnostic has fixed bounds on note count, path lines and
+total characters (named constants chosen in the plan).
+
+**Regression cases** (section 5 probe 14). Each asserts code, primary span,
+related spans and note texts, and bounded output, not just error codes:
+- a long call chain: Database required 30 calls deep and missing at
+  `main` (exact elided path, origin and boundary notes);
+- nested callbacks: an operation inside a lambda passed through three
+  higher-order functions into a `with pure` parameter;
+- large rows: a 50-label row missing one label (headline names only that
+  label; shared tail kept; output within its bound);
+- same-key payload mismatch under nested `State` handlers;
+- the side-condition failure.
+Mutants: provenance dropped (origin note missing) and abbreviation
+disabled (bound exceeded), each caught.
+
+**Research.** PureScript's row and effect diagnostics (as experienced in
+MileAhead) are recorded as LA001 research cases
+(docs/plans/2026-10-08-language-audit-plan.md), to check these rules
+against concrete failures.
 
 ## Awaiting confirmation
 
