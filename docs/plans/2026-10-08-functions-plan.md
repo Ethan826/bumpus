@@ -59,7 +59,14 @@ test runner, Go 1.26.4. No new dependency.
   build` time must be at most 10 s at 5,000 parameters (tests in `npm run
   verify`) and at most 100 s at 20,000 parameters (the milestone probe,
   run after Task 6's lowering is complete and before the final branch
-  review, its result recorded in progress).
+  review, its result recorded in progress). User decisions 2026-10-09:
+  (A) verify times these builds in a separate serial phase after the
+  parallel `node --test` run (`test/*.serial.test.mjs`), bound and
+  workload unchanged; (B) the milestone programs' bodies read a bounded
+  handful of parameters, because a 2n-term `+` chain in one Go
+  expression does not build at 20,000 even for direct calls (pre-existing
+  lowering, BACKLOG G003), so the milestone measures FN001's machinery
+  at full width.
 - Existing assertions are unchanged except the rows of §9, which change in
   the task that changes the behavior, each listed in that task's progress
   entry with its old and new code, span and text. Known rows:
@@ -490,7 +497,7 @@ evidence.
   forms), `scripts/fn-milestone.mjs` (the 20,000 tier, committed so it
   can be rerun; durability additions approved by the user 2026-10-08)
 
-- [ ] **Step 1: Write tests with time bounds**: Bumpus phases at three
+- [x] **Step 1: Write tests with time bounds**: Bumpus phases at three
   times Task 1's measured time, recorded in the test's comment, and each
   program's total `go build` at most 10 s (scale rule): a 5,000-parameter
   declaration with a mixed body, called directly, used as a value and
@@ -500,19 +507,19 @@ evidence.
   stored in a generic type (equality, ordering and interned keys end to
   end, with its Go types emitted); the existing 20,000-parameter and
   4,000-`Nil` tests unchanged.
-- [ ] **Step 1b: Commit the Task 4 review's linear-cost table as tests**
+- [x] **Step 1b: Commit the Task 4 review's linear-cost table as tests**
   in test/fn-linear.test.mjs, through Parse → Resolve → Check →
   Specialize: a value reference `g(f)`, over-application `id(f, …)`, a
   wide lambda, a mismatch `f(1)`, partial applications `f(1)` and
   `f(1…n-1)`, `(f)(1…n)` and a pipe, each at 20,000 parameters under a
   bound of three times its measured time (recorded in the test's
   comment), and each at 80,000 without stack failure.
-- [ ] **Step 2: Run** each in an isolated copy with one linear piece
+- [x] **Step 2: Run** each in an isolated copy with one linear piece
   replaced at a time (derived `Eq`/`Ord` restored; spelling-based arrow
   keys; recursive spine walk; nested closures), and record that a bound
   fails (quadratic or stack failure) for each; restore.
-- [ ] **Step 3: Run** `rm -rf output && npm run verify`. Expected: exit 0.
-- [ ] **Step 4: Run the milestone tier** with the committed
+- [x] **Step 3: Run** `rm -rf output && npm run verify`. Expected: exit 0.
+- [x] **Step 4: Run the milestone tier** with the committed
   `scripts/fn-milestone.mjs`: the Step 1 programs (and Step 1b's forms
   that reach Go) at 20,000 parameters, generated as Bumpus source,
   compiled by the CLI and built with `go build`, each build at most
@@ -520,7 +527,14 @@ evidence.
   line per program and exits non-zero on any failure. Not part of
   verify; run after Task 6's lowering is complete and before the final
   branch review, times recorded in progress.
-- [ ] **Step 5: Commit** `test: FN001 scale`.
+- [x] **Step 5: Commit** `test: FN001 scale`.
+
+Executed 2026-10-09 (docs/progress.md "FN001 Task 8: scale"): Step 1's
+Go-building tests are in test/fn-scale.serial.test.mjs (verify's serial
+phase, decision A), the 20,000-parameter milestone bodies are bounded
+(decision B), and Step 2 ran three representative mutants (derived
+`Eq`/`Ord`, recursive spine walk, spelling-based arrow keys) as the user
+limited it; nested closures were not rerun here.
 
 ### Task 9: Regression proofs and documentation
 

@@ -69,7 +69,14 @@ adding a bypass allowlist.
   (test/program.test.mjs);
 - `npm run verify` runs every test/*.test.mjs file (32 files, 302 tests at
   P001 Task 9, no skips; the list is read from the directory, never
-  hand-kept) and then
+  hand-kept) in one parallel `node --test` run, except the
+  `test/*.serial.test.mjs` files, which it runs afterwards in a second
+  run with `--test-concurrency=1` (scale tests that time `go build` or
+  long Bumpus phases against fixed bounds, so the parallel runner's own
+  load cannot fail them; user decision 2026-10-09, FN001 Task 8). A new
+  test that builds large Go programs against a time bound takes the
+  `.serial.test.mjs` suffix (review convention; the split by suffix is
+  automated in scripts/verify.mjs). Then verify runs
   scripts/regression.mjs, a table of isolated-copy mutations, each of which
   must pass on the healthy build and fail on its mutant: `branch`
   (Features.Check.Infer branch type), `nil-guard` (Format.Go.Match drops the `!= nil`

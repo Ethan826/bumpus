@@ -2227,3 +2227,65 @@ the tool discarded the run's output, so the failing test is unknown
 tool now writes the run's output to `<harvest>.jsonl.log` and prints the
 failing test names. One rerun afterwards (load 3.3 before, 9.1 after)
 exited 0: 2,374 harvested sources, 0 differences against itself.
+
+### FN001 Task 8: scale (2026-10-09)
+
+User decisions (2026-10-09): (A) the 5,000-parameter `go build` test
+failed once at 10,584 ms against 10 s under verify's own parallel load
+(4.0-4.4 s alone); bound and workload stay, and `go build`-timing scale
+tests now run in a separate serial phase: scripts/verify.mjs runs
+`test/*.serial.test.mjs` after the parallel `node --test` run with
+`--test-concurrency=1`, still discovered by pattern (docs/engineering.md).
+(B) At 20,000 parameters the mixed body's 2n-term `bumpusAdd` tree in one
+Go expression kills the Go compiler (7.4 GB) even for direct calls only,
+pre-existing lowering, not FN001 staging (BACKLOG G003, new). The
+milestone therefore tests FN001's machinery at full width with bodies
+that read six parameters (first and last three, mixed kinds).
+
+- Files: test/fn-scale.test.mjs renamed test/fn-scale.serial.test.mjs
+  (mixed-body program and its 10 s bound unchanged; now compiled in
+  process with a phase bound) plus three programs; test/fn-scale-programs.mjs
+  (generators shared with the milestone), test/go-timed.mjs (the
+  process-group `go build` timer moved out of fn-scale),
+  test/fn-linear-forms.mjs, test/fn-linear.test.mjs (20,000, parallel),
+  test/fn-linear.serial.test.mjs (80,000, serial, about 11.5 s),
+  scripts/fn-milestone.mjs, scripts/verify.mjs.
+- Step 1 (serial; phases measured, bound 3x; `go build` bound 10 s):
+  5,000-parameter mixed body, direct and value, phases 1,240-1,260 ms,
+  build 4.0-4.3 s; `f(1)(2)…(1000)` 74-85 ms, 0.40-0.45 s; a written
+  `Int -> … -> Int` of 1,000 parameters 65-77 ms, 0.41-0.44 s; a
+  5,000-parameter function type through `id` and `Box(a)`, whole and as
+  a half partial, 529-581 ms, 2.4-2.5 s. The shared partial (completed
+  twice) is in the milestone's `wide` program; the 5,000-parameter
+  mixed-body test keeps its workload, so its partial is covered at
+  5,000 by the generic program's partial instead. The existing
+  20,000-parameter and 4,000-`Nil` tests are unchanged.
+- Step 1b (Parse → Resolve → Check → Specialize, 20,000 parameters, ms
+  measured / bound): value 400/1,200, over-application 540/1,620, wide
+  lambda 515/1,545, mismatch `f(1)` (E_TYPE) 175/525, `f(1)` 310/930,
+  `f(1…n-1)` 225/675, `(f)(1…n)` 370/1,110, pipe 250/750. At 80,000 all
+  eight finish with the expected outcome, about four times as long.
+- Step 2 (scratchpad copies, non-strict build, test/fn-linear*.test.mjs):
+  recursive spine walk (`spineThrough` as recursion with `Array.cons`):
+  6 of 8 forms at 20,000 fail with RangeError (stack); spelling-based
+  arrow keys (Specialize.Intern keyed by the expanded spelling of each
+  suffix): 5 of 8 fail with RangeError; derived `Eq`/`Ord` on Domain.Type
+  `Ty` restored: survives all Task 8 tests (fn-linear at 20,000 and
+  80,000, fn-scale.serial, large-source, fn-specialize, fn-check), so
+  no Task 8 form compares long source arrows with `Eq`/`Ord` (the
+  specializer compares interned IR numbers). Not pursued further (user
+  limited Step 2 to three mutants); open for Task 9's review. Nested
+  closures were not rerun.
+- Step 4 milestone, run once (`node scripts/fn-milestone.mjs`, 20,000
+  parameters, CLI emit then `go build` with a 100 s timeout; load 3.1
+  before, 5.4 after; .build/fn001-task8-milestone.log), all ok: wide
+  (direct, value, shared partial) emit 2.4 s, build 13.7 s; chain 0.7,
+  7.6; curried 0.8, 7.5; generic 2.0, 12.1; value 0.7, 6.8; over 0.8,
+  7.0; lambda 0.8, 6.6; `f(1)` 0.7, 6.1; `f(1…n-1)` 0.5, 7.0;
+  `(f)(1…n)` 0.7, 6.8; pipe 0.4, 0.3 (the pipe is a direct call: no
+  staged wrapper is emitted).
+- Step 3: `rm -rf output && npm run verify` exit 0 in 1:53 (load average
+  3.69 before, 4.97 after; .build/fn001-task8-verify.log): parallel phase
+  533 tests, serial phase 12, zero failures or skips; serial
+  5,000-parameter build 4,733 ms; match ladder 735 ms; `twenty thousand
+  parameters` 221 ms.

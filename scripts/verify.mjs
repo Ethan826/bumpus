@@ -25,9 +25,18 @@ run('node', ['scripts/build.mjs']);
 run('node', ['scripts/strict-rebuild.mjs']);
 assert.deepEqual(await checkStructure(), [], 'structural gates');
 // Every test file runs; a hand-kept list could silently omit a new one.
-const tests = readdirSync('test').filter(name => name.endsWith('.test.mjs'))
+// `*.serial.test.mjs` files time `go build` or other heavy work against
+// fixed bounds, so they run after the parallel phase, one file at a time,
+// rather than under the parallel runner's load (user, 2026-10-09).
+const serialSuffix = '.serial.test.mjs';
+const testFiles = readdirSync('test').filter(name => name.endsWith('.test.mjs'))
   .sort().map(name => `test/${name}`);
+const tests = testFiles.filter(name => !name.endsWith(serialSuffix));
+const serialTests = testFiles.filter(name => name.endsWith(serialSuffix));
 assert.ok(tests.length > 0, 'no test files found');
 run('node', ['--test', ...tests]);
+if (serialTests.length > 0) {
+  run('node', ['--test', '--test-concurrency=1', ...serialTests]);
+}
 run('node', ['scripts/regression.mjs']);
 console.log('Verified compiler, gates, executable programs, rejection diagnostics, properties, and regression proofs.');
