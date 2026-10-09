@@ -9,7 +9,8 @@ per task, then a whole-branch review), on branch fx001 in
 Task 1's measurements reject a runtime shape. Tasks 1-5 are complete
 (Waxwing rename 40cf312). Tasks 6-8 are complete and reviewed on branch
 claude/vibrant-cerf-3km61i (cloud session, 2026-10-09; no worktree);
-Tasks 9-12 are being amended after the CF001 design work. Current evidence is in docs/progress.md and the local SDD
+Tasks 9-12 were amended 2026-10-09 after the CF001 design work and an
+Opus re-scan (ledger: rescan-9-12, rulings R1-R12); Task 9 is next. Current evidence is in docs/progress.md and the local SDD
 ledger (.superpowers/sdd/, git-ignored).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -65,10 +66,11 @@ direction decisions.
   `HandlerError`). Expanding declaration cycles reuse `E_SPECIALIZATION`.
 - New problem texts, exactly (§5, §6):
   - `Unhandled <L> in main`; `<f> performs <L>, which its signature does
-    not allow`; `This function must be pure, but it performs <L>`;
-    `<R1> and <R2> cannot be made equal: both end in ...<r>`;
-    `defer must not fail, but it performs <L>` (user, 2026-10-09)
-    (E_EFFECT)
+    not allow`; `This function must be pure, but it performs <L>`; `<R1>
+    and <R2> cannot be made equal: both end in ...<r>`; `defer must not
+    fail, but it performs <L>`; `defer must not fail, but it may perform
+    any effect of <r>` (<r> is `...` for the ambient row, `...e` for a
+    named one; Task 8 review ruling, strict adopted 2026-10-09) (E_EFFECT)
   - `Missing clause for <op>`; `Duplicate clause for <op>`;
     `<op> is not an operation of <E>` (E_HANDLER)
   - `Fail needs a concrete error family`; `Expected a type, found an
@@ -81,6 +83,8 @@ direction decisions.
     by a trailing `;` (as FN001's `Hinted` form)
   - Rows print as §5 "Row display": `Log + Clock + ...e`, ambient `...`,
     closed empty `pure`.
+  - Labels print capitalized everywhere, including `Unhandled Fail(DbError) in
+    main` (F9); spec §6's `fail(DbError)` is a typo.
 - Defect report (§5): after all cleanup, one stderr report, exit status 1,
   one cause per line in execution order with `\n` escaped; first line the
   original cause, later lines prefixed `cleanup failed: `; causes
@@ -102,10 +106,15 @@ direction decisions.
   - Task 7 deletes the guard; Task 8 adds `defer` and `crash` through
     every phase in one task.
   Each progress entry states how far its tests reach.
-- Every task: each new behavioral test seen failing before its code;
-  `npm run verify` exits 0; an evidence entry in docs/progress.md; commit
-  on branch fx001 in .worktrees/fx001. Never push. Timing failures under
-  load are recorded in BACKLOG (T003/T004), never hidden by a rerun.
+- Every task: each new behavioral test seen failing before its code; `npm run
+  verify` exits 0, or fails only in its serial phase on the BACKLOG T007
+  timing set, named in the progress entry and failing identically at the
+  task's base commit; verify then stops before the regression proofs, so `node
+  scripts/regression.mjs` is run explicitly and must exit 0. No bound is
+  raised and no rerun hides a failure. An evidence entry in docs/progress.md;
+  commit on branch claude/vibrant-cerf-3km61i (ruling F15; no worktree). Never
+  push. Timing failures under load are recorded in BACKLOG (T003/T004), never
+  hidden by a rerun.
 
 ## Review Focus
 
@@ -121,6 +130,10 @@ direction decisions.
    emitted and does. Task 7.
 5. A 50-label row diagnostic stays within its character bound while still
    naming the missing label and the shared tail. Task 9.
+6. No accepted program ends a deferred expression in a typed abort (strict
+   `defer` rule, including rigid row tails and Fail keys settled after the
+   `defer`); a pending abort reaches its `handle` only when every cleanup on
+   the way completes normally. Tasks 8, 10.
 
 ---
 
@@ -542,10 +555,21 @@ programs at `Features.Check.Unlowered` (Global Constraints).
 ### Task 9: Diagnostic quality
 
 **Files:**
-- Modify: `src/Features/Check/Consume.purs`, `UnifyRow.purs` (origin
-  hooks), `src/Format/Diagnostic.purs`
-- Create: `src/Features/Check/Provenance.purs`,
+- Modify: `src/Features/Check/Subst.purs` (occurrence links, merged on
+  composition), `src/Features/Check/UnifyRow.purs` (only calls into the
+  hook module; no net growth, 249 lines), `src/Features/Check/Unify.purs`
+  (`settleRows` retries record links: deferred `Fail` keys, F13),
+  `src/Features/Check/Consume.purs` (`consumeAt` records the consuming
+  origin), `src/Features/Check/Defer.purs` and `src/Features/Check.purs`
+  (deferred-row origins and the `defer` boundary), the consuming
+  checkers that pass a `Consumed` (Operation, Call, Apply, Failure,
+  Lambda as needed, compile-guided as F19), `src/Domain/Syntax.purs`
+  (`NoteReason`), `src/Format/Diagnostic.purs` (calls only; 232 lines),
+  `src/Format/Wire.purs` (`related` as rendered `{ span, message }`)
+- Create: `src/Features/Check/Provenance.purs` (origins and links),
+  `src/Features/Check/Origin.purs` (row-event hooks, ruling F13),
   `src/Format/Diagnostic/Row.purs` (abbreviation),
+  `src/Format/Diagnostic/Note.purs` (note texts, paths),
   `test/fx-diagnostics.test.mjs`
 
 **Interfaces:**
@@ -557,112 +581,289 @@ programs at `Features.Check.Unlowered` (Global Constraints).
   written or extended, without extending any meta) records the origin for
   `existing` if it has none yet, and links `o` to `existing` so later
   attribution follows the matched occurrence. First origin per
-  occurrence wins; occurrences are never merged by effect key. Reports
-  reconstruct paths from these links; nothing grows per call during
-  checking.
+    occurrence wins; occurrences are never merged by effect key. Links are
+  recorded by every row unification, not only by `unifyRowsTraced` callers:
+  they live in the substitution (`links ∷ Map OccurrenceId OccurrenceId`,
+  first link per occurrence wins, merged when substitutions compose). That
+  covers rows nested in arrow types (a callback's row reaching a `with pure`
+  parameter) and `settleRows` retries of deferred `Fail` keys (Unify.purs).
+  Origins (`Map OccurrenceId Origin`, in checker state) are recorded where a
+  label is consumed. Neither map is read by unification. A test runs every
+  pre-FX001 rejection and acceptance test unchanged, and one asserts that all
+  non-effect diagnostics have `related: []`. Reports reconstruct paths from
+  these links; nothing grows per call during checking.
 - Abbreviation constants (named, in Format.Diagnostic.Row):
   `visibleLabels = 4`, `pathHops = 2` at each end, `maxNotes = 4`,
   `maxCharacters = 2000`; type arguments elided off the path to the
-  differing subterm.
+    differing subterm.
+- Deferred rows (Task 8): `defer e` is checked against its own row, separate
+  from the function row. Origins of its labels are recorded inside `e`.
+  Consuming them into the enclosing row (in `checkDefer`, and for labels that
+  arrive later in `settleDeferred`) links each enclosing occurrence to its
+  deferred occurrence with boundary `DeferItem`. `defer must not fail, but it
+  performs <L>` keeps the `defer` item as primary span and gets an origin note
+  at the operation, call or `fail` inside `e` that introduced L, following
+  links through a called function's row and a `Fail` key settled after the
+  `defer`. `defer must not fail, but it may perform any effect of <r>` gets a
+  note at the application whose row carried the rigid tail (a callback
+  parameter, or a local lambda also called outside the `defer`) and a boundary
+  note at <r>'s declaration (the enclosing signature for `...`, the `...e`
+  annotation for a named row). Provenance adds no unification after
+  `settleDeferred` (an unsolved deferred tail is not bound; see §3 R11).
+- `Consumed = Operation String | CallOf String | Application | FailOf String`;
+  `Boundary = Signature String | AmbientSignature String | PureParameter |
+  Installation String | Main | DeferItem`. `NoteReason` (Domain.Syntax;
+  replaces the unused `RequiredBy`) and texts, rendered in
+  Format.Diagnostic.Note: origin `<L> is performed here` / `<L> comes from
+  this call of <f>` / `<L> comes from this function value` / `Fail(<T>) is
+  raised here`; path `through <f>`, elision `… <k> more calls`; boundary `the
+  signature of <f> does not allow <L>` / `the signature of <f> has an ambient
+  row` / `this parameter must be pure` / `<L> is handled here` / `main may
+  perform only Console` / `cleanup registered here must not fail` / `<r> is
+  declared here`; same-key `the innermost <L> is here`. The wire's `related`
+  is `[{ span, message }]`.
 
-- [ ] **Step 1: Write failing tests** asserting code, primary span,
-  each note's span and text, and output length: a 30-deep call chain
-  missing Database at `main`; an operation in a lambda passed through
-  three higher-order functions into a `with pure` parameter; a 50-label
-  row missing one label (Review Focus 5); a same-key payload mismatch
-  under nested `State` handlers with a note at the innermost occurrence;
-  the side condition; repeated `Fail` families attribute each origin to
-  its own occurrence; a label consumed into a signature-written row
-  (match without extension) and one consumed into an already-extended
-  meta row both get origin notes.
+- [ ] **Step 1: Write failing tests** asserting code, primary span, each
+  note's span and text, and output length: a 30-deep call chain missing
+  Database at `main`; an operation in a lambda passed through three
+  higher-order functions into a `with pure` parameter; a 50-label row missing
+  one label (Review Focus 5; its labels carry type arguments so that the
+  unabbreviated rendering exceeds `maxCharacters` (asserted first, through a
+  test-only full renderer exported by Format.Diagnostic.Row), and the
+  abbreviated diagnostic is within it); a same-key payload mismatch under
+  nested `State` handlers with a note at the innermost occurrence; the side
+  condition; repeated `Fail` families attribute each origin to its own
+  occurrence; a label consumed into a signature-written row (match without
+  extension) and one consumed into an already-extended meta row both get
+  origin notes; `Unhandled Fail(DbError) in main` (F9 spelling) with an origin
+  note at the `fail`; the existing headline `Unhandled <L> in main` is kept
+  and "(required by …)" is an origin note (F10); `defer must not fail, but it
+  performs Fail(E)` through a called function and through a `Fail` key settled
+  after the `defer`, each with its origin note inside the deferred expression;
+  `defer must not fail, but it may perform any effect of ...` (callback
+  parameter) and `... of ...e` (named row), with notes at the application and
+  at the row's declaration; every pre-FX001 diagnostic keeps `related: []`.
 - [ ] **Step 2: Run** `node --test test/fx-diagnostics.test.mjs`.
   Expected: FAIL.
 - [ ] **Step 3: Implement.**
-- [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0.
+- [ ] **Step 4: Run** `rm -rf output && npm run verify`. `npm run verify`
+  exits 0, or fails only in its serial phase on the BACKLOG T007 timing set,
+  named in the progress entry and failing identically at the task's base
+  commit; verify then stops before the regression proofs, so `node
+  scripts/regression.mjs` is run explicitly and must exit 0. No bound is
+  raised and no rerun hides a failure.
 - [ ] **Step 5: Commit** `feat: effect diagnostic provenance (FX001)`.
 
 ### Task 10: Reference interpreter and differential execution
 
 **Files:**
-- Create: `test/fx-oracle.mjs` (independent parser extension and
-  interpreter: evidence context, clause context, targeted aborts, block
-  exits, cleanup policy, report lines; no compiler code imported),
-  `test/fx-programs.mjs` (generator), `test/fx-oracle.test.mjs`
-- Modify: `scripts/differential-corpus.mjs` (effect corpus)
+- Create: `test/fx-oracle-parse.mjs` (independent parser for the effect
+  forms; extends test/poly-parse.mjs by import, which stays unedited at
+  226 lines; parses zero-argument calls `f()`, FN006 (1)),
+  `test/fx-oracle.mjs` (interpreter; no compiler code imported; split
+  further to stay within 250 lines), `test/fx-programs.mjs` (generator,
+  census), `test/fx-shrink.mjs`, `test/fx-oracle.test.mjs` (hand-trace
+  validation, shrinker test, sensitivity check; parallel phase),
+  `test/fx-differential.serial.test.mjs` (generated comparisons, serial
+  phase, ruling F11), `test/fx-cleanup-programs.mjs` (Task 8's run cases
+  moved unchanged out of test/fx-cleanup.test.mjs)
+- Modify: `test/fx-cleanup.test.mjs` and any other probe file whose run
+  cases are inline (import them instead), `docs/engineering.md` (the
+  corpus knobs)
 
 - [ ] **Step 1: Write** the interpreter. Validate it first against
-  hand-derived traces: every executable probe of Tasks 2 and 4-8 has a
-  hand-written expected stdout, stderr and exit status (already in those
-  tasks' tests); the interpreter must reproduce each exactly before any
-  differential result is trusted. A disagreement there is an interpreter
-  or probe defect, investigated before Step 3.
+  hand-derived traces: every executable probe of Tasks 2, 4, 7 and 8
+  (fx-block-programs `runs`, the Console probes, fx-run-programs `cases` with
+  empty stderr and status 0, fx-cleanup-programs with stdout, stderr and
+  status), imported, never copied. Task 5 tests are check-only and Task 6 has
+  no executable probes (F12). Cases whose Go is transformed after emission
+  (fx-cleanup `injected`: missing-handler guard, newline escaping) are outside
+  the interpreter's language and are listed by name as excluded in the test. A
+  disagreement there is an interpreter or probe defect, investigated before
+  Step 3.
+
+  The interpreter models the shipped semantics exactly: handler lookup by
+  runtime key, user effects by effect identity regardless of type arguments
+  (innermost State wins for State(Int) and State(Bool)), and `Fail` by the
+  payload's declared head (Error(Int) and Error(Bool) share a key). The
+  clauses of one `handle` are frames with the first clause innermost. A clause
+  runs in its `with`'s outer context. Aborts target their frame. `defer`
+  registers when reached and runs LIFO, once per exiting activation, in the
+  registration context. A pending abort reaches its `handle` only if every
+  cleanup on the way completes normally. If a cleanup crashes, the pending
+  abort heads the report as `fail(T): V` and its `handle` never runs. With no
+  pending cause, the first cleanup crash is the unprefixed first line. Later
+  causes follow with `cleanup failed: `, in execution order. Payloads print by
+  ADR 005, or `<not printable>` when T contains a function or handler, with
+  `\n` escaped; output goes to stderr and the exit status is 1. A deferred
+  expression that ends in a typed abort is an interpreter error, "typed abort
+  escaped cleanup", reported as a difference: it witnesses a hole in the
+  strict `defer` rule. Go runtime panics and the missing-handler guard cannot
+  be produced by generated programs and are not modeled.
 - [ ] **Step 2: Write** a generator of well-typed programs over two user
   effects with Console traces, and a per-program feature census. Required
-  coverage per run, failing the run when unmet: at least 50 programs each
-  with nested same-key handlers (including intercept-and-forward),
-  targeted aborts crossing an unrelated `handle`, interleaved stage
-  ordering with over-application, and escaped callbacks invoked under a
-  different handler; at least 25 each for every cleanup outcome (normal
-  exit, abort, defect, crashing cleanup during unwinding, cleanup handling
-  its own failure, unreached `defer`). The census is printed with the
-  run.
-- [ ] **Step 3: Run** generated comparisons of Go stdout, stderr and exit
-  status against the interpreter: at least 500 programs and the coverage
-  above. Expected: 0 differences. Every program's seed is recorded; a
-  differing program's seed and source are written to
+  coverage per run, failing the run when unmet: at least 50 programs each with
+  nested same-key handlers (including intercept-and-forward), targeted aborts
+  crossing an unrelated `handle`, interleaved stage ordering with
+  over-application, and escaped callbacks invoked under a different handler;
+  at least 25 each for every cleanup outcome (normal exit, abort, defect,
+  crashing cleanup on normal exit, crashing cleanup while an abort is pending
+  (the abort heads the report), several crashing cleanups (order), cleanup
+  handling its own failure while an abort is pending (the abort then reaches
+  its `handle`), cleanup performing an operation under nested handlers while
+  an abort unwinds (registration context), unreached `defer`). The census is
+  printed with the run. Generated `defer` items obey the strict rule (spec
+  §2). They perform only non-`Fail` labels from operations or named functions
+  with written rows, or they handle their `Fail` inside (`defer handle … {
+  fail(error: E) => … }`). They never call a callback parameter, or a local
+  lambda also called outside the `defer` in a non-`main` function (FX007).
+  Every generated program must compile, and a rejection fails the run with its
+  seed (a generator defect). In addition, 25 generated rejection variants (a
+  `defer` failing directly, through a called function, through a callback
+  parameter with an ambient row, and through one with a named row) must give
+  E_EFFECT with the exact Task 8 texts and the `defer` span. Payload types are
+  monomorphic, or derivable from constructors and literals, so the interpreter
+  can name T as diagnostics print it.
+- [ ] **Step 3: Run** in test/fx-differential.serial.test.mjs (F11), generated
+  comparisons of Go stdout, stderr and exit status against the interpreter:
+  500 programs by default from a fixed seed, with `WAXWING_FX_SEED` and
+  `WAXWING_FX_PROGRAMS` for larger runs outside verify (documented in
+  docs/engineering.md), built in go-batches of at most 100 programs each (a
+  batch-level Go failure names its chunk; go-batch's build timeout is 300 s),
+  with the coverage above. Expected: 0 differences. Every program's seed is
+  recorded; a differing program's seed and source are written to
   .build/fx001-differential/, and a shrinker (drop block items, handlers,
-  clauses and defers; replace subexpressions by literals of their type;
-  keep only while still well-typed and still differing) writes the
-  minimized source beside it.
-- [ ] **Step 4: Commit** `test: FX001 reference interpreter and
-  differential corpus`.
+  clauses and defers; replace subexpressions by literals of their type; keep
+  only while still well-typed and still differing) writes the minimized source
+  beside it. test/fx-oracle.test.mjs proves the shrinker on a synthetic
+  "differs" predicate: it removes items and keeps the program well-typed. It
+  also runs a sensitivity check: 50 generated programs against an interpreter
+  flag that runs clauses in the inner context must give at least one
+  difference.
+- [ ] **Step 4: Run** `rm -rf output && npm run verify` (G1) and add the
+  progress entry (census, seed, counts, run time).
+- [ ] **Step 5: Commit** `test: FX001 reference interpreter and differential
+  corpus`.
 
 ### Task 11: Scale and the acceptance scenario
 
 **Files:**
-- Create: `test/fx-scale.serial.test.mjs`, `examples/services.wxw`,
+- Create: `test/fx-services.test.mjs` (scenario output, snapshot,
+  dropped-handler diagnostic, key counts; parallel phase),
+  `test/fx-scale.serial.test.mjs` (timing only), `examples/services.wxw`,
   `bootstrap/services.go`
 
-- [ ] **Step 1: Write** the acceptance scenario (§5): services with
-  overlapping requirements composed without annotations; real and
-  stateless fake handlers injected at `main`; dropping one handler gives
-  the §6 diagnostic with origin, boundary and path notes; its key count
-  equals the effect-free baseline plus its effect keys (asserted).
-- [ ] **Step 2: Write** serial timing tests using Task 1's attribution
-  (installation, lookup at fixed depth, unwinding, 100,000 caught
-  failures) and `go build` of the scenario, bounds fixed from Task 1's
-  measurements with the scale rule's headroom; 1,000-label rows and
-  20,000 `let` items through the CLI.
-- [ ] **Step 3: Run** `rm -rf output && npm run verify`. Expected: exit 0.
+- [ ] **Step 1: Write** the acceptance scenario (§5) as examples/services.wxw,
+  with snapshot bootstrap/services.go compared byte for byte in a test (F18):
+  services with overlapping requirements, composed with no row annotations
+  beyond each service function's own written labels; real and stateless fake
+  handler values built inline in `main` and selected there. Cleanup goes only
+  through `defer` of operations or of named functions with written non-`Fail`
+  rows. There is no effect-polymorphic cleanup callback, because the bracket
+  idiom is rejected by the strict rule (FX007). A variant with one handler
+  dropped gives the §6 diagnostic, and its Task 9 origin, boundary and path
+  notes are asserted by exact span and text; its specialization keys
+  (`specializationKeys`) equal those of a hand-written baseline plus its
+  effect keys (ruling F6). In the baseline, each operation is a plain function
+  parameter and each inline handler value is inline lambdas of the operations'
+  types, passed where the handler was installed. The test asserts equal type
+  keys, equal function keys by declaration name, and that the extra keys are
+  exactly the effect keys, and it prints the breakdown.
+- [ ] **Step 2: Write** serial timing tests of Waxwing-emitted programs,
+  attributed separately (installation: repeated shallow `with`; lookup: one
+  context of fixed depth 100 built once, then a measured loop of operations;
+  unwinding: one `fail` across 1,000 frames, separately from 100,000 caught
+  failures), each folding its results into checked output, and `go build` of
+  the scenario. Bounds: measure each five times on the executing host (median,
+  minimum and maximum, load averages, in the progress entry) and set the bound
+  at 3× the median (the fx-block.serial convention). Compare the medians with
+  Task 1's hand-written figures as an observation for FX005. A later failure
+  under load goes to BACKLOG T003/T007 and is never hidden by a rerun or a
+  raised bound; through the CLI, a declaration with a 1,000-label written row
+  compiles (`emit`), and a rejection involving a 1,000-label row prints within
+  Task 9's `maxCharacters`; the 20,000-`let` case is the existing
+  test/fx-block.serial.test.mjs (ruling F18), not duplicated.
+- [ ] **Step 3: Run** `rm -rf output && npm run verify`. `npm run verify`
+  exits 0, or fails only in its serial phase on the BACKLOG T007 timing set,
+  named in the progress entry and failing identically at the task's base
+  commit; verify then stops before the regression proofs, so `node
+  scripts/regression.mjs` is run explicitly and must exit 0. No bound is
+  raised and no rerun hides a failure.
 - [ ] **Step 4: Commit** `test: FX001 acceptance scenario and scale`.
 
 ### Task 12: Regression proofs and documentation
 
 **Files:**
-- Create: `scripts/regression-fx.mjs`, `docs/adr/010-effects.md`
-- Modify: `scripts/regression.mjs`, `docs/language.md` (Effects),
-  `docs/architecture.md`, `docs/engineering.md` if a rule changed,
-  `BACKLOG.md`, `docs/findings.md`, `docs/progress.md`,
-  `docs/next-session.md`
+- Create: `scripts/regression-fx.mjs` (rows, spread into
+  scripts/regression.mjs like `fnRows`), `test/regression-fx.mjs`
+  (probes, merged into test/regression.mjs's external probes like
+  `fnProbes`; ruling F17), `docs/adr/010-effects.md`
+- Modify: `scripts/regression.mjs`, `test/regression.mjs` (243 lines;
+  import only), `docs/language.md` (Effects), `docs/architecture.md`
+  (Check.Defer, provenance modules, Format.Go Context, Effect, Handle,
+  Block, Cleanup and Report), `docs/engineering.md` (regression-fx; FX
+  knobs if Task 10 did not), `BACKLOG.md`, `docs/findings.md`,
+  `docs/progress.md`, `docs/next-session.md`,
+  `docs/sdd/2026-10-09-effects-plan/` (ledger snapshot)
 
-- [ ] **Step 1: Add regression rows**, each restoring one defect in an
-  isolated copy and seeing a named test fail: side condition removed;
-  clauses in the inner context; abort consumed by the nearest `handle`;
-  cleanup in the exit-time context; cleanup drops the pending cause;
-  `defer` failure check removed;
-  closed parameter rows opened; `ctx` emitted for effect-free programs;
-  `ctx` mode by reachability; layout edges omitted; provenance dropped;
-  abbreviation disabled.
-- [ ] **Step 2: Write** ADR 010 and the language section, including the
-  documented limits: `with pure` promises neither termination nor
-  freedom from defects; Go fatal errors skip cleanup; eta-expansion for
-  pure locals; no generic Result-to-failure helper.
-- [ ] **Step 3: Update BACKLOG:** FX001 done pending review; FN002 done;
-  new FX002 (concurrency), FX003 (local state), FX006 (general resume,
-  CPS confinement), FX005 (`ctx` elimination, cached lookup); D001 user
-  Console handlers; R001 value-level error sums; STD001 limitation;
-  I001 callback boundary; PKG001 export calling convention.
-- [ ] **Step 4: Run** `rm -rf output && npm run verify`. Expected: exit 0
-  with the new regression proofs.
+- [ ] **Step 1: Add regression rows** in scripts/regression-fx.mjs, each
+  restoring one defect in an isolated copy; its probe in
+  test/regression-fx.mjs passes on the healthy compiler and fails on the
+  mutant with a named message. Rows: side condition removed (the probe
+  compiles in a child process with its own 20 s timeout and reports the
+  timeout as the detected defect, so the runner's 180 s spawn timeout never
+  fires; F17); clauses in the inner context; abort consumed by the nearest
+  `handle`; `handle` clauses installed last-innermost (Task 7 Critical);
+  cleanup in the exit-time context; cleanup drops the pending cause; pending
+  abort delivered despite a cleanup defect; `defer` Fail-label check removed;
+  `defer` rigid-tail check removed (a callback parameter with an ambient row
+  accepted in a `defer`); deferred row unified with the current row (a closure
+  whose `Fail` arrives after the `defer` accepted); closed parameter rows
+  opened; `ctx` mode by reachability; layout edges omitted; provenance dropped
+  (origin note missing); abbreviation disabled (bound exceeded). `ctx` emitted
+  for effect-free programs is the existing row `effect-free-ctx` (Task 7), not
+  duplicated.
+- [ ] **Step 2: Write** ADR 010 (as shipped: row erasure revising decision 1;
+  runtime keys, EffectId+1 for user effects and `Fail` by declared head; first
+  clause innermost; ctx mode over the emitted IR; only keys with type
+  arguments count toward the 10,000 limit (F5); the strict `defer` rule (CF
+  R0) and its accepted costs (FX007); report conventions: no pending cause
+  gives an unprefixed first cleanup crash, Go runtime panics print `panic:
+  <text>`; empty Handler(Console)/Handler(Fail(E)) structs (F3); Task 11's
+  key-count and timing evidence) and the language Effects section, including
+  the documented limits: `with pure` promises neither termination nor freedom
+  from `crash` or other recoverable defects; Go fatal errors (stack
+  exhaustion, out of memory) skip cleanup; a pending typed abort reaches its
+  `handle` only if every cleanup on the way completes normally (a cleanup
+  defect makes it head the report, and a diverging cleanup never delivers it);
+  `defer` must not fail, including through a rigid row tail, so a deferred
+  callback parameter must be `with pure`, and a local lambda also called
+  outside the `defer` in a non-`main` function is rejected there (FX007);
+  block exits are normal completion, typed abort and recoverable defect, with
+  continuation discard (FX006) and cancellation (FX002, CF001) as future exit
+  reasons; no mutable state (stateless fakes; FX003); `let` is monomorphic;
+  eta-expansion for pure locals; no generic Result-to-failure helper.
+- [ ] **Step 3: Update BACKLOG:** FX001 "Done pending whole-branch review";
+  FN002 stays Done. New rows: FX002 (concurrency: builds on CF001; first
+  settle CF §10 items 1-8, including R0 for `par`, B1 and cancellation C1-C4,
+  and apply CF §10 necessary changes 3, 5 and 6), FX003 (local state,
+  recording fakes; first B3: sharability as a transitive property of handler
+  types plus the capture check, CF §10.3), FX005 (`ctx` elimination and cached
+  lookup; Task 1 lookup at depth 10,000 took 11.8 s per 10^6; caches are per
+  task or immutable at publication, never written into a node reachable from
+  another goroutine, CF §10.4; before FX002), FX006 (general resume `ctl`;
+  continuation ownership C6 and discard as an exit reason; multi-shot `defer`
+  unresolved; no capture across a foreign frame, I001; confining CPS without
+  row-keyed specialization, since rows are erased, spec §4). Update CF001
+  (state that FX002, FX003 and FX006 depend on its §10 list) and FX007 (link
+  ADR 010). Add notes to D001 (user Console handlers;
+  Handler(Console)/Handler(Fail(E)) are uninhabited, F3), R001 (value-level
+  error sums; `Failure(A + B + ...)` as possible row sugar), STD001 (no
+  generic Result-to-failure helper), I001 (callback boundary; injected
+  foreign-panic tests), PKG001 (export calling convention: `ctx *waxwingCtx`
+  first in ctx mode), and FN006 (1) if Task 10's parser closed it. FX004 keeps
+  the Task 5 row (F14).
+- [ ] **Step 4: Run** per G1; every new regression proof prints 'fixed
+  compiler passes; restored defect fails'.
 - [ ] **Step 5: Commit** `docs: FX001 ADR 010, language and regression
   proofs`.

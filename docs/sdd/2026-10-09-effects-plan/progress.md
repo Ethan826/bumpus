@@ -93,3 +93,11 @@ CF001: accepted after 3 review rounds + verbatim minors (8e38aa0, 538 lines). Pe
 User 2026-10-09: proceed through the rest of the epic (Tasks 9-12) after updating the plan per recent planning (supersedes "stop after Task 8"). Strict defer ruling stands (user did not choose the lacks-Fail constraint; flagged). Sequence: close Task 8 → opus re-scan Tasks 9-12 → plan amendments (docs) → Tasks 9-12 SDD → final whole-branch review (opus) → handoff.
 Task 8 fix round 1: d5bfa8d (sound defer check per ruling, payloadName loop); verify 818/818 parallel, T007 serial only, regression 33/33. Re-review (opus) dispatched.
 Task 8 re-review r1: all ADDRESSED; precision regressions accepted as documented limitations (FX007). Task 8: complete (041cb31, d5bfa8d).
+Re-scan 9-12 (opus): 27 amendments (rescan-9-12.md). Rulings — all 12 adopted as proposed:
+Ruling R1: per-task verify passes when the only failures are the named BACKLOG T007 set (identical at base) plus an explicit `node scripts/regression.mjs` exit 0.
+Ruling R2: strict defer is adopted (user proceeded 2026-10-09 without requesting the lacks-Fail constraint); "pending user confirmation" wording → "adopted 2026-10-09; relaxation is FX007".
+Ruling R3: Task 9 stores occurrence links in Subst (every unification path), new modules Provenance/Origin; deferred-row origins separate.
+Ruling R4: Task 9 note reasons/texts as proposed in rescan T9-4; wire `related` = [{span, message}]; user may reword at review.
+Ruling R5-R8: Task 10 files/interpreter/generator/runs as proposed (serial file, env knobs, batches ≤100, shrinker + sensitivity tests).
+Ruling R9-R11: Task 11 no bracket idiom; hand-written inline baseline; host-measured bounds at 3× median; acceptance in parallel fx-services.test.mjs, timing serial.
+Ruling R12: Task 12 adds 4 regression rows + test/regression-fx.mjs; side-condition probe with own timeout; reuse effect-free-ctx; BACKLOG updates existing FX007/CF001 rows.
