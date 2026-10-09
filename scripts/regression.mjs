@@ -126,7 +126,10 @@ const rows = [
       + '    (Array.index declarations index)',
     replacement: 'effectAt index = if index < 0 then maybe (Right unit)'
       + ' duplicate\n    (Array.index declarations index) else Right unit',
-    probe: 'duplicate-effect', message: /duplicate effect: wrong diagnostic code/
+    // FX001 Task 6: with the check restored away, the unused duplicate now
+    // passes the post-specialization guard (it leaves no effect node), so the
+    // probe sees an accepted program instead of the old guard's E_INTERNAL.
+    probe: 'duplicate-effect', message: /duplicate effect: program was accepted/
   },
   {
     name: 'duplicate-operation', file: 'src/Features/Resolve/Effect.purs',
@@ -136,7 +139,7 @@ const rows = [
       + '        declaration.span\n    )',
     replacement: 'duplicateOperation _ = Right unit',
     probe: 'duplicate-operation',
-    message: /duplicate operation: wrong diagnostic code/
+    message: /duplicate operation: program was accepted/
   },
   {
     name: 'duplicate-effect-parameter',
@@ -147,7 +150,7 @@ const rows = [
       + '        parameter.span\n    )',
     replacement: 'duplicateEffectParameter _ = Right unit',
     probe: 'duplicate-effect-parameter',
-    message: /duplicate effect parameter: wrong diagnostic code/
+    message: /duplicate effect parameter: program was accepted/
   },
   {
     name: 'duplicate-operation-parameter',
@@ -158,7 +161,7 @@ const rows = [
       + '        parameter.span\n    )',
     replacement: 'duplicateParameter _ = Right unit',
     probe: 'duplicate-operation-parameter',
-    message: /duplicate operation parameter: wrong diagnostic code/
+    message: /duplicate operation parameter: program was accepted/
   },
   {
     name: 'deferred-fail-effect', file: 'src/Features/Check/Failure.purs',
