@@ -81,6 +81,7 @@ data Problem
   | RowSort Boolean
   | NotPrintable TypeName
   | DeferMayFail String
+  | DeferMayPerform String
   | RowEquality String String String
   | HandlerMissing String
   | HandlerDuplicate String

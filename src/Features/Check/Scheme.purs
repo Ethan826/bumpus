@@ -28,7 +28,7 @@ import Data.Traversable (traverse)
 import Domain.Checked.Internal (Open(..))
 import Domain.Checked.Internal as Checked
 import Domain.Syntax (Diagnostic, Span)
-import Domain.Type (Ty(..), VarId(..))
+import Domain.Type (Ty(..), TyRow, VarId(..))
 import Domain.Row (Row(..), isPure)
 import Domain.Type.Parts (children, rowArguments, rowsOf)
 import Features.Check.Unify (Flex, Subst, exceedsLimit, resolve, walk)
@@ -38,12 +38,13 @@ import Features.Check.Walk (foldTypes, retype)
 -- One function's checking state: its substitution and next fresh meta.
 -- While a function is checked, a checked-IR type's `Hole m` is the meta m;
 -- `holes` renumbers the ones still unsolved once the function is done.
--- `deferrals` are the `defer`s whose Fail label had no settled key when
--- they were checked, for Features.Check.Defer to judge once it is.
+-- `deferrals` are the rows of the `defer`ed expressions, for
+-- Features.Check.Defer to judge once the function's keys are settled.
 type State =
   { subst ∷ Subst, next ∷ Int, deferrals ∷ Array Deferral }
 
-type Deferral = { span ∷ Span, payload ∷ Ty Open }
+-- `current` is the row the `defer` was checked in, which later labels join.
+type Deferral = { span ∷ Span, row ∷ TyRow Open, current ∷ TyRow Open }
 
 type Threaded a = { value ∷ a, state ∷ State }
 

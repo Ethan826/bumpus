@@ -1,37 +1,34 @@
-module Features.Check.Defer (checkDefer, rejectDeferred) where
+module Features.Check.Defer (checkDefer, settleDeferred) where
 
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Foldable (traverse_)
-import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.Foldable (foldM, traverse_)
+import Data.Maybe (Maybe(..), maybe)
 import Domain.Checked.Internal (Open(..))
 import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
 import Domain.Resolved as Resolved
 import Domain.Row (EffectRef(..), Label(..), Row(..), openRow)
 import Domain.Syntax (Diagnostic, Span, problemAt)
-import Domain.Type (Ty(..), TyRow)
-import Domain.Type.Parts (typeHead)
+import Domain.Type (Ty(..), TyRow, VarId(..))
 import Features.Check.Consume (consumeAt)
 import Features.Check.Context (CheckEnv, Infer, Locals)
 import Features.Check.Entry (resolvedRow)
 import Features.Check.RowName (labelName)
 import Features.Check.Require (require)
-import Features.Check.Scheme (State, Threaded, flexible, opened, resolved)
-import Features.Check.Unify (Subst(..), resolve)
+import Features.Check.Scheme (State, Threaded, flexible)
+import Features.Check.Unify (Subst)
 
 type DeferEnv r = CheckEnv (locals ∷ Locals | r)
 
 -- FX001 design §2: `defer e` has type Unit and must not fail. `e` is
--- checked against a row of its own, so what it performs is known apart
--- from what the enclosing function performs; a `Fail` there is E_EFFECT at
--- the item. Only then is that row consumed into the current one, which
--- makes the other effects of `e` the function's own. A `Fail` whose key
--- is not settled yet is not in that row: unification set its pair aside
--- (Features.Check.UnifyRow). Those pairs `e` added are noted, and
--- `rejectDeferred` judges them once the key is settled, so the message
--- names the payload.
+-- checked against a row of its own, whose tail is never unified with the
+-- enclosing row: its labels are consumed into the enclosing row (with a
+-- fresh tail), so the other effects of `e` are the function's own, but
+-- what `e` performs stays known apart from the rest. A `Fail` already
+-- there is E_EFFECT at the item. Anything that reaches the row later (a
+-- shared meta, a deferred key) is judged by `settleDeferred`.
 checkDefer
   ∷ ∀ r
   . Infer (locals ∷ Locals | r)
@@ -44,65 +41,66 @@ checkDefer infer env state span value = do
   inferred ← infer (env { current = row }) (state { next = state.next + 1 })
     value
   typed ← require env inferred.state TUnit inferred.value
-  maybe (Right unit) (refuse env span) (Array.find keyed (performed typed))
-  consumed ← consumeAt env typed span row
+  let Row labels _ = resolvedRow typed.subst row
+  traverse_ (refuseFail env span) labels
+  consumed ← consumeAt env typed span (Row labels (Just (Hole typed.next)))
   pure
     { value: inferred.value
     , state: consumed
-        { deferrals = consumed.deferrals
-            <> map (deferral span) (unsettled typed)
+        { next = consumed.next + 1
+        , deferrals = Array.snoc consumed.deferrals
+            { span, row, current: env.current }
         }
     }
   where
   row = openRow (Hole state.next)
-  performed found = failures (resolvedRow found.subst row)
-  keyed = isJust <<< typeHead
-  unsettled found = Array.filter (not <<< keyed) (performed found)
-    <> postponedPayloads found.subst (postponedCount state.subst)
-  deferral at payload = { span: at, payload }
 
--- The deferred `Fail`s, once their keys are settled (after
--- Features.Check.Failure.settleKeys): the first one fails the function.
-rejectDeferred
-  ∷ ∀ r
-  . CheckEnv r
-  → Subst
-  → Array { span ∷ Span, payload ∷ Ty Open }
-  → Either Diagnostic Unit
-rejectDeferred env subst = traverse_ rejected
+-- After the function's keys are settled: each deferred row, resolved, may
+-- hold no `Fail` and must not end in a rigid row variable, which a caller
+-- may fill with one; an unsolved tail closes to empty. What reached a row
+-- after its `defer` is consumed into the enclosing row now. The result is
+-- the substitution to settle once more.
+settleDeferred
+  ∷ ∀ r. DeferEnv r → State → Either Diagnostic Subst
+settleDeferred env state = do
+  traverse_ judged state.deferrals
+  finished ← foldM later state state.deferrals
+  pure finished.subst
   where
-  rejected found = refuse env found.span (resolved subst found.payload)
+  judged found = judge env found.span (resolvedRow state.subst found.row)
+  later reached found = bumped <$> consumeAt (env { current = found.current })
+    reached
+    found.span
+    (laterRow reached found)
+  bumped reached = reached { next = reached.next + 1 }
+  laterRow reached found = Row
+    (Array.filter (not <<< failing) (rowLabels reached found))
+    (Just (Hole reached.next))
+  rowLabels reached found = case resolvedRow reached.subst found.row of
+    Row labels _ → labels
 
--- How many row pairs the substitution has set aside.
-postponedCount ∷ Subst → Int
-postponedCount (Subst bindings) = Array.length bindings.postponed
+judge ∷ ∀ r. DeferEnv r → Span → TyRow Open → Either Diagnostic Unit
+judge env span (Row labels tail) = do
+  traverse_ (refuseFail env span) labels
+  maybe (Right unit) (rigidTail env span) tail
 
--- The payloads of the `Fail` labels with no settled key in the pairs set
--- aside after the first `before` of them.
-postponedPayloads ∷ Subst → Int → Array (Ty Open)
-postponedPayloads subst@(Subst bindings) before = Array.mapMaybe unsettled
-  (Array.concatMap labelsOf (Array.drop before bindings.postponed))
+-- A hole is an unsolved tail, closed to empty; a rigid variable is the
+-- ambient row or a named one, spelled as Row display spells it.
+rigidTail ∷ ∀ r. DeferEnv r → Span → Open → Either Diagnostic Unit
+rigidTail env span = case _ of
+  Hole _ → Right unit
+  Rigid (VarId index) → Left (problemAt (DeferMayPerform (spread index)) span)
   where
-  labelsOf pair = rowLabels pair.left <> rowLabels pair.right
-  rowLabels (Row labels _) = labels
-  unsettled (Label FailEffect arguments) = Array.head arguments
-    >>= unkeyed
-  unsettled _ = Nothing
-  unkeyed payload =
-    if isJust (typeHead found) then Nothing
-    else Just (opened found)
-    where
-    found = resolve subst payload
+  spread index = "..." <> maybe "" identity (Array.index env.variables index)
 
--- The payloads of the `Fail` labels of a row, in order.
-failures ∷ TyRow Open → Array (Ty Open)
-failures (Row labels _) = Array.concatMap payloads labels
+failing ∷ ∀ v. Label (Ty v) → Boolean
+failing (Label effect _) = effect == FailEffect
+
+refuseFail
+  ∷ ∀ r. DeferEnv r → Span → Label (Ty Open) → Either Diagnostic Unit
+refuseFail env span label@(Label _ arguments) =
+  if failing label then named else Right unit
   where
-  payloads (Label FailEffect arguments) = Array.take 1 arguments
-  payloads _ = []
-
-refuse
-  ∷ ∀ r a. CheckEnv r → Span → Ty Open → Either Diagnostic a
-refuse env span payload = do
-  name ← labelName env span (Label FailEffect [ flexible payload ])
-  Left (problemAt (DeferMayFail name) span)
+  named = labelName env span (Label FailEffect (map flexible payload))
+    >>= (Left <<< flip problemAt span <<< DeferMayFail)
+  payload = Array.take 1 arguments

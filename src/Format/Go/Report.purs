@@ -15,7 +15,7 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Set (Set)
 import Data.Set as Set
 import Domain.IR.Internal as IR
-import Domain.IR.Internal (EffectKey(..), FunTypeId(..), Ty(..))
+import Domain.IR.Internal (EffectKey(..), Ty(..))
 import Domain.Problem (TypeName(..))
 import Domain.Resolved (TypeId(..))
 import Format.Diagnostic (typeName)
@@ -56,15 +56,17 @@ payloadName shape ty = case ty of
   TBool → BoolName
   TUnit → UnitName
   TData (TypeId index) → maybe unknown named (Array.index shape.types index)
-  TFun (FunTypeId index) → maybe unknown arrow
-    (Array.index shape.funTypes index)
+  TFun _ → arrow (IR.spine shape.funTypes ty)
   THandler (EffectKey index) → maybe unknown handler
     (Array.index shape.effectInfos index)
   where
   recur = payloadName shape
   unknown = DataName "?"
   named info = applied info.name (map recur info.arguments)
-  arrow found = FunctionName (recur found.parameter) (recur found.result)
+  -- The spine is walked by a loop (IR.spine), then folded, so an arrow of
+  -- thousands of parameters costs no stack.
+  arrow found = Array.foldr FunctionName (recur found.result)
+    (map recur found.parameters)
   handler info = AppliedName "Handler"
     [ applied info.name (map recur info.arguments) ]
 

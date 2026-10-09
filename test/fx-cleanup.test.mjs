@@ -152,6 +152,58 @@ test('a defer performing a Fail whose key is deferred is rejected', () => {
   'Fail(E)', 'defer fail(p)');
 });
 
+const refuseTail = (source, tail, span) => {
+  const diagnostic = rejectedAt(source + ' fn main(): Unit = ();', 'E_EFFECT',
+    span);
+  assert.equal(diagnostic.message, 'defer must not fail, but it may perform '
+    + `any effect of ${tail}`);
+};
+
+test('a defer calling an ambient-row callback is rejected (P1)', () => {
+  refuseTail(unit + 'fn bracket(release: Unit -> Unit): Unit = '
+    + '{ defer release(()); () };', '...', 'defer release(())');
+});
+
+test('a defer calling a named-row callback is rejected (P2)', () => {
+  refuseTail(unit + 'fn bracket(release: Unit -> Unit with ...e): '
+    + 'Unit with ...e = { defer release(()); () };', '...e',
+  'defer release(())');
+});
+
+test('a Fail reaching a closure after its key settles is rejected (P3)', () => {
+  refuse(unit + 'fn work(): Unit with Console = handle { '
+    + 'let f = fn(x) => fail(x); let g = fn(y) => { defer f(y); () }; g(E) } '
+    + '{ fail(error: E) => print(9) };', 'Fail(E)', 'defer f(y)');
+});
+
+test('a Fail reaching a shared lambda meta later is rejected (P4)', () => {
+  refuse(unit + 'fn work(): Unit with Console = handle { '
+    + 'let run = fn(h) => { defer h(()); () }; run(fn(_) => fail(E)) } '
+    + '{ fail(error: E) => print(9) };', 'Fail(E)', 'defer h(())');
+});
+
+test('a pending abort cannot meet a failing cleanup (P5d)', () => {
+  refuseTail(unit + 'fn bracket(release: Unit -> Unit with ...e, '
+    + 'body: Unit -> Unit with ...e): Unit with ...e = '
+    + '{ defer release(()); body(()) };', '...e', 'defer release(())');
+});
+
+test('a defer handling a Fail of a key settled later is accepted', () => {
+  const go = checked(unit + 'fn pick(): a = crash(0); '
+    + 'fn main(): Unit with Console = { let p = pick(); '
+    + 'defer handle fail(p) { fail(error: E) => print(1) }; match p '
+    + '{ E => () } };');
+  assert.ok(go.includes('waxwingCleanup'), go);
+});
+
+test('a payload with a 5,000-arrow type is named by a loop', () => {
+  const arrow = 'Int -> '.repeat(5000) + 'Int';
+  const go = checked('type Error(a) = Error(a); fn work(f: ' + arrow
+    + '): Unit with Fail(Error(' + arrow + ')) = '
+    + '{ defer crash(1); fail(Error(f)) }; fn main(): Unit = ();');
+  assert.ok(go.includes('waxwingCleanup'));
+});
+
 test('a defer must have type Unit', () => {
   const diagnostic = rejectedAt('fn main(): Unit = { defer 5; () };',
     'E_TYPE', '5');
