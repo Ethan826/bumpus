@@ -64,8 +64,11 @@ operand rowed inner = build <$> token
     (Array.head found.argumentRows)
   kept found _ = Right found.row
   sole found first
-    | Array.length found.arguments == 1 = Right (Just first)
+    | Array.length found.arguments == 1 = maybe' (lifted first)
+        (Left <<< unexpectedRow)
+        found.row
     | otherwise = Left (unexpectedRow first)
+  lifted first _ = Right (Just first)
   ordinary found _ = Right
     ( NamedRef (applicationSpan found) "Handler"
         found.arguments

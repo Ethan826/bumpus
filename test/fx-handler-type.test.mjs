@@ -111,6 +111,16 @@ test('a row on one of several Handler arguments is rejected', () => {
   assert.equal(spanText(source, found), 'with Log');
 });
 
+for (const [first, second] of [['Log', 'pure'], ['pure', 'Log']])
+  test(`a second row is rejected: with ${first} with ${second}`, () => {
+    const source = prelude + `fn t(h: Handler(Clock with ${first} `
+      + `with ${second})): Int = 0;`;
+    const found = rejection(source);
+    assert.equal(found.code, 'E_SYNTAX');
+    assert.equal(found.message, 'Unexpected effect row');
+    assert.equal(spanText(source, found), `with ${second}`);
+  });
+
 test('kept rows still parse: results, operations, arrows', () => {
   accepted(prelude + 'effect Q { fn op(): Int with Log; }; '
     + 'fn a(): Int with Log = 0; '
