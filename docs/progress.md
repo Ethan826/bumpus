@@ -2388,7 +2388,143 @@ interpreter including entry order; 2,300 extra generator seeds matched;
 main accepts, none newly rejected, every non-syntax diagnostic change a
 design §9 row. Minors fixed: language.md hint condition (M1), generator
 label (M3), ADR 008 note on syntax diagnostics of invalid sources (M6),
-BACKLOG T004 for the unidentified harvest failure (M5); deferred to
+BACKLOG T005 for the unidentified harvest failure (M5; renumbered at
+the merge because main had added its own T004); deferred to
 BACKLOG FN006: interpreter zero-argument calls (M2), splitting the
 value-edge row (M4), fn-linear bounds in the parallel phase (M7).
 Awaiting the user's merge decision.
+
+## FX001 sequencing discussion recorded (2026-10-08)
+
+At the user's request, language-direction records proposed `do` notation
+as an expression elaborated into bind and lambdas, with an illustrative
+block and its expansion. Result binding, discarded results, final
+computation and the distinction between constructing and running deferred
+effects are explained. Service/error inference is a goal; bind/pure
+selection, binding rules and monadic versus algebraic effects stay open.
+This is direction only, with no compiler change or implementation
+authorization. Next-session and the FX001 backlog row point to the proposal.
+Verification: `npm run verify` exited 0 with 318 tests, no failures or
+skips, and all twelve regression proofs; evidence:
+`.build/fx001-do-docs-verify.log`. The proposed notation is not implemented
+or behaviorally verified by this suite.
+
+## Effect-row notation and constraint scope recorded (2026-10-08)
+
+The user asked to preserve the algebraic-effect/open-row discussion and
+defer explicit effect-row constraint syntax to a future feature. The
+language-direction document now records direct-style handler evaluation,
+candidate `Log + ...effects` notation, inferred higher-order effect
+relationships and proposed implicit universal row quantification. It
+distinguishes record rows and R001's lacks constraints from effect rows.
+Outer syntax, quantifier scope and handler semantics remain design work;
+no compiler change or implementation authorization. BACKLOG and the
+next-session handoff record the future constraint-syntax scope.
+Verification: `npm run verify` exited 0 with 318 tests, no failures or
+skips, and twelve regression proofs; evidence:
+`.build/fx001-row-direction-verify.log`. This verifies the existing
+compiler, not the proposed effects or notation.
+
+## MileAhead error-row pattern captured (2026-10-08)
+
+The user's error-widening question revealed that earlier direction only
+mentioned extensible errors generically. Read-only inspection of MileAhead
+(../trailmapper, as recorded in provenance) confirmed open error-family
+rows, caller composition without conversion wrappers, context-only
+wrapping, and closure at handling/test boundaries. Language-direction now
+records this brief and independent Bumpus syntax candidates hiding Variant
+and injection plumbing. FX001/R001 must resolve error-sum support against
+the current general-variant deferral; no feature scope or code changed.
+Provenance, BACKLOG and the next-session handoff track the design work.
+Clarified after the user's follow-up: `errors` is an ordinary implicitly
+universally quantified row-variable name, not reserved or existential;
+only the spread punctuation is special syntax in the proposal.
+Verification: `npm run verify` exited 0 with 318 tests, no failures or
+skips, and twelve regression proofs; evidence:
+`.build/fx001-error-rows-verify.log`. Proposed error sums remain unimplemented.
+
+## Standard-library helper direction recorded (2026-10-08)
+
+The user requested planning for common PureScript/Haskell FP helpers with
+approachable Rust-informed names. Added STD001 and a dedicated direction
+document covering optional/result eliminators, defaults, transformations,
+functions, sequences, text, maps/sets and generic collection operations.
+Candidate names distinguish getOrElse from full branch elimination and
+make eager/lazy evaluation explicit. Delivery follows FN001 and stages
+other APIs by their prerequisites; no compiler or helper implementation.
+Acceptance requires an upstream coverage matrix, readable examples,
+behavioral/law tests and explicit deferrals. Handoff and language-direction
+link the brief; exact public names still need reviewed API designs.
+Verification: `npm run verify` exited 0 with 318 tests, no failures or
+skips, and twelve regression proofs; evidence:
+`.build/std001-direction-verify.log`. Helpers are planned, not implemented.
+
+## STD001 generic rigor clarified (2026-10-08)
+
+The user clarified that approachable naming must preserve theoretical
+rigor and HKT-based shared operations. STD001 now pins generic bimap over
+any lawful Bifunctor, shared Functor/Applicative/Monad contracts, required
+constructor kinds and partial type application, and coherent instance
+evidence under the current rank-1/specialization constraints. Concrete
+helpers are incremental delivery, not completion of the generic library.
+Acceptance includes generic clients, user-defined product/sum instances,
+algebraic law properties and cross-operation coherence; pure callback laws
+remain distinct from FX001 effectful sequencing. BACKLOG and handoff track
+the clarification. No language or library implementation changed.
+Verification: `npm run verify` exited 0 with 318 tests, no failures or
+skips, and twelve regression proofs; evidence:
+`.build/std001-generic-rigor-verify.log`. Generic APIs and laws above are
+future acceptance requirements, not implemented or proven by this run.
+
+## Cross-language audit planned (2026-10-08)
+
+The user asked for a structured audit of leading language specifications
+and library/runtime designs. Existing STD001 only audited helper coverage;
+there was no broader systematic plan. Added LA001 covering all twelve
+named references, a versioned primary-source/section ledger, comparative
+briefs, decision and interaction matrices, practical application scenarios,
+independent review and durable scope decisions. Primary landing pages were
+checked to assemble the roster; detailed reading/audit is not complete.
+Relevant findings feed upcoming designs without expanding FN001 or revoking
+existing advanced-feature deferrals. BACKLOG and handoff track the plan.
+Verification: `npm run verify` exited 1 with 316 of 318 tests passing,
+no skips, and two large-source timing failures (6.572 s and 5.633 s against
+5 s bounds). Regression proofs were not reached. Evidence is
+`.build/la001-plan-verify.log`; BACKLOG T004 records the cases, unconfirmed
+cause and diagnostic next action. No checks or assertions were changed,
+and no rerun concealed the failures. The audit itself remains planned.
+
+## Developer tooling direction recorded (2026-10-08)
+
+The user requested highlighting/IDE support, first-class doctests,
+property-based testing, possible literate capabilities, and LLM
+skills/discoverability. Added distinct IDE001, DOC001, PBT001, LIT001 and
+AI001 entries with docs/plans/2026-10-08-tooling-direction.md. The brief
+records outcomes, proposed acceptance and dependencies without selecting
+syntax, tool protocols or implementations; literate capabilities remain
+exploratory. LA001 now includes these concerns in its comparison axes and
+application scenarios. Updated language direction and next-session handoff.
+No language/compiler code changed and FN001's delivery is unchanged.
+Verification: `npm run verify` exited 0 with 318 tests passing, no failures
+or skips, and all twelve isolated regression proofs passing; evidence:
+`.build/tooling-direction-verify.log`. This checks the existing compiler,
+not the proposed tooling. T004's earlier timing failures remain recorded
+and unresolved; this successful run does not establish their cause.
+
+## Libraries, platform services and packages direction (2026-10-08)
+
+The user requested distinguishing Bumpus libraries compiled to the host
+target, FFI bindings and dependency-inverted services implemented through
+host-language libraries, then added package management. Recorded PKG001
+in the tooling brief and backlog; updated LA001, language direction and
+handoff. Planning includes source packages/host-callable export assessment,
+service contract/provider substitution, combined host/Bumpus dependency
+resolution, manifests/locks, identity, compatibility and target/runtime
+availability. Effect Platform's primary introduction was checked as a
+conceptual precedent; its mechanisms are not adopted. No compiler code,
+package manager, binary ABI or provider mechanism is implemented/selected,
+and FN001 scope is unchanged.
+Verification: `npm run verify` exited 0 with 318 tests passing, no failures
+or skips, and twelve isolated regression proofs passing; evidence:
+`.build/pkg001-direction-verify.log`. This validates existing behavior,
+not the proposed package/interop features. T003/T004 remain open.

@@ -5,6 +5,19 @@ PureScript, Rust MIR, ZIO and Koka are recorded with primary-source links in
 docs/plans/2026-10-08-language-direction.md. No external implementation or
 reference code copied; no platform backend or effect design implemented.
 
+2026-10-08 open error rows: inspected trailmapper/AGENTS.md "Errors are
+rows, combined like the environment", src/Domain/Units/Error.purs,
+src/Domain/Geo/Types.purs, src/Domain/Route/Build.purs and
+src/Program/Headless.purs. Recorded conceptual influence in language-direction:
+open family rows, caller composition without conversion wrappers, context-only
+wrapping and closure at handling boundaries. Bumpus signatures are independent
+syntax proposals; no reference implementation copied or modified.
+
+2026-10-08 standard-library direction: inspected official Rust Option/Result,
+PureScript Maybe/Either and Haskell List API documentation for naming and
+helper semantics. STD001 records an independently written coverage brief
+and candidate names; no library implementation copied.
+
 Inspected 2026-10-07. ~/Desktop/mileahead was absent; the current MileAhead
 reference was ~/Desktop/trailmapper. Syllogic was ~/Desktop/lsatchapelhill.
 The destination workspace was empty. Reference projects were read-only;

@@ -3,7 +3,7 @@
 Recorded 2026-10-08 at the user's request to commit the current discussion.
 Status: durable direction and hypotheses, not an implementation spec.
 Each subsystem needs its own reviewed design and implementation plan.
-P001 remains the active approved delivery; this adds no work to its scope.
+P001 is complete; this adds no work to its scope or FN001's approved delivery.
 
 ## Intended language and audience
 
@@ -20,6 +20,18 @@ Rust-like pragmatics here mean Result-style errors, exhaustive matching,
 useful diagnostics and dependable tooling. They do not settle ownership,
 borrowing, or memory management.
 Haskell influence does not settle laziness or every advanced type feature.
+
+Developer experience also includes the user's requested syntax highlighting
+and IDE support (IDE001), first-class doctests (DOC001), property-based
+testing for Bumpus programs (PBT001), and LLM skills/discoverability (AI001).
+Literate capabilities (LIT001) remain exploratory. See
+[tooling direction](2026-10-08-tooling-direction.md) for intended outcomes,
+dependencies and proposed acceptance; no tooling implementation is selected.
+PKG001 adds library/package integration: Bumpus source libraries compiled
+to the selected host target, typed FFI bindings, and dependency-inverted
+services fulfilled by host-library adapters or fakes. Review package/host
+dependency resolution, locks and compiled exports with M001/I001/FX001;
+Effect Platform is a precedent, not a selected implementation mechanism.
 
 ## Early-release priorities
 
@@ -41,6 +53,14 @@ FN001 should supply function values for service records, continuations for
 bind, deferred computations, and explicitly passed instance values.
 
 ## Function values and joint class/record design
+
+The user requires common FP standard-library helpers with approachable
+names informed by Rust, rather than historical abbreviations or joke
+names. STD001's coverage/naming brief is
+[standard-library direction](2026-10-08-standard-library-direction.md).
+Deliver supported helpers after FN001 and coordinate generic operations,
+modules and practical data APIs with K001/C001, M001 and D001 respectively;
+this adds no work to FN001's approved scope.
 
 Bumpus currently has no function values, lambdas or closures. Design FN001
 as its own milestone. Go closures offer a lowering route, but the design
@@ -133,6 +153,170 @@ I001 retains foreign-value validation and Go integration; FX001 owns the
 language effect semantics. Effects must respect ADR 001's explicit
 sequencing requirement rather than rely on incidental Go evaluation.
 
+### Proposed `do` notation
+
+Recorded 2026-10-08 at the user's request. This is a sequencing proposal
+for FX001, not approved syntax or authorization to implement effects.
+Make `do` an expression elaborated into bind and lambdas. Illustrative
+syntax, including block punctuation and `<-`, remains subject to design:
+
+```bumpus
+fn profile(id) =
+  do {
+    user <- fetchUser(id);
+    preferences <- fetchPreferences(user.id);
+    logAccess(user.id);
+    pure(renderProfile(user, preferences))
+  };
+```
+
+Its proposed meaning is:
+
+```bumpus
+bind(fetchUser(id), fn(user) =>
+  bind(fetchPreferences(user.id), fn(preferences) =>
+    bind(logAccess(user.id), fn(_) =>
+      pure(renderProfile(user, preferences))
+    )
+  )
+)
+```
+
+`name <- computation` scopes a successful result over the rest of the
+block. A computation without a binding discards its result. The final
+expression supplies the resulting computation; `pure` lifts an ordinary
+value. The selected abstraction determines sequencing: Result-like bind
+bypasses later continuations on failure; a deferred effect constructs a
+computation that performs the operations when run. `do` itself provides
+neither scheduling nor resource cleanup. The effect design must explain
+how Bumpus's strict evaluation distinguishes construction from execution.
+
+For service-oriented effects, aim to infer the combined service
+requirements and typed failures, with real or fake services supplied at
+the execution boundary and no user-assembled transformer stack. How rows
+combine, and whether errors use variants, remain separate design choices.
+
+FX001 must decide how a block selects bind/pure evidence, coordinated with
+C001's explicit instance selection. Also decide local pure bindings,
+pattern bindings and their failure behavior, and diagnostics for mixing
+incompatible computations. FN001's deferred local-binding form is not
+implicitly authorized by this proposal.
+
+If FX001 chooses algebraic effects with handlers, ordinary sequential
+calls may be the natural effects syntax; generic monadic `do` can remain
+a separate facility. Do not assume the effect representation or either
+surface syntax is selected by recording this discussion.
+
+### Algebraic effects and open-row syntax direction
+
+Recorded 2026-10-08 at the user's request following the Koka discussion.
+Evaluate direct-style algebraic effects: functions request typed
+operations, scoped handlers provide their implementation, and effect rows
+track requirements. This aligns with service substitution without
+user-assembled transformer stacks. Generic monadic `do` can remain a
+separate facility. Handler continuation behavior (normal return, abort,
+or multiple resumptions), deferred computations, and runtime lowering
+still require FX001's design; no implementation is authorized here.
+
+The user favors familiar composition/spread notation over single-letter
+open-row tails. Candidate effect syntax is `with Log + ...effects`:
+`+` combines requirements and `effects` names the remaining row. The
+outer annotation syntax is still provisional. It denotes requirements,
+not execution order, environment mutation, or automatic handler setup.
+
+The named rest connects requirements across higher-order APIs. A callback
+requiring Database would give a logging wrapper Log plus Database; a pure
+callback would give it only Log. Inferred row polymorphism should normally
+establish that relationship without explicit source annotations. Widening
+can permit extra effects but does not itself specify which callback's
+requirements an output preserves. An alternative shorthand such as
+`requiring Log` could implicitly introduce an open row; whether bare
+annotations are open or closed remains a design decision.
+
+Proposed quantification: `effects` is a user-chosen row-variable name,
+not a reserved word. Generic function signatures may implicitly quantify
+it universally, as ordinary type variables are quantified, rather than
+requiring a written `forall`. It can be instantiated with different rows
+at different calls; it is not an existentially hidden fixed row. Explicit
+quantifier syntax and variable scoping remain to be designed.
+
+Keep record rows separate. `forall r. { log: Log | r }` describes a record
+with a named field; a familiar candidate spelling is
+`{ log: Log, ...services }`. Under R001's unique-label direction, the rest
+must lack `log`. The compiler should infer routine well-formedness
+constraints; record merging may need additional row relationships.
+Record labels and lack constraints do not automatically apply to effect
+rows, whose duplicate/handler semantics require their own decision.
+
+User decision: explicit constraint syntax on effect rows is a future
+feature, outside the initial FX001 scope. Preserve the possibility of
+constraints on a named rest, but do not implement an effect-row `where`
+language or general traits over rows in the first effects release.
+Internal row inference and well-formedness remain necessary. This
+deferral does not remove R001's planned record-row lacks constraints.
+
+### MileAhead's open error rows and Bumpus surface syntax
+
+Inspected 2026-10-08 at the user's request. The MileAhead reference is
+`../trailmapper` (`../mileahead` is absent). Its AGENTS.md section
+"Errors are rows, combined like the environment", Domain.Units.Error,
+Domain.Geo.Types, Domain.Route.Build and Program.Headless establish a
+specific pattern not previously captured by the general typed-error
+discussion here. Conceptual influence only; reference files remain
+read-only and no implementation is copied.
+
+Preserve these properties as a design brief:
+
+- Each domain defines a concrete error family and one row label carrying
+  that whole family, rather than a label for every failure case.
+- Leaf functions leave the error row open. Callers instantiate compatible
+  rows so composing fallible operations combines families without
+  conversion wrappers or a global application-error ADT.
+- Errors pass through unchanged. Wrap only when adding real context,
+  such as an input position; the contextual error may contain an inner
+  composed error row.
+- Close the row where errors are handled exhaustively, or in tests that
+  need closed comparison/rendering. Partial handling should preserve and
+  forward the unhandled remainder.
+
+Candidate Bumpus syntax avoids exposing PureScript's `Variant` carrier,
+`inj`, proxies and `on`/`case_` plumbing. An error-type expression could
+denote a tagged open sum directly:
+
+```bumpus
+fn validateName(text: Text): Result(ValidationError + ...errors, Name);
+fn saveWidget(widget: Widget): Result(DbError + ...errors, Widget);
+fn createWidget(text: Text):
+  Result(ValidationError + DbError + ...errors, Widget)
+  with Clock + Random + Database;
+```
+
+These are schematic signatures, not implemented syntax. `errors` is an
+ordinary user-chosen error-row variable name, not a reserved word or an
+existential. Generic signatures implicitly quantify it universally; each
+caller can instantiate a compatible row. Only the spread punctuation has
+special syntax. The closed form omits the spread. `Err` should infer
+injection of an ordinary
+error-family value into the required sum; ordinary `match` should expose
+its cases with exhaustiveness checking. The compiler must retain distinct
+family identity and payloads, reject incompatible row compositions, and
+avoid requiring explicit widening calls. Hiding the carrier does not
+eliminate tagged-sum semantics or runtime layout work.
+
+In the direct-style effects candidate the same error sum can parameterize
+`Failure(ValidationError + DbError + ...errors)`. A handling boundary can
+reify that channel as Result. Expected typed failures remain distinct from
+runtime defects, and value-level error rows remain distinct from operation
+requirements and service-record rows.
+
+R001 currently defers general extensible variants. This brief exposes a
+specific need for open error sums; FX001/R001 must review whether to add
+error-specific support or broader extensible sums and explicitly revise
+scope before implementation. Type-identity versus label-based family
+selection, sum syntax, contextual nesting, matching, inference, Go layouts
+and specialization growth are open design questions. Explicit effect-row
+constraint syntax remains deferred; internal error-row solving is separate.
+
 ## Intermediate representations and future targets
 
 The user clarified that "hostable" referred to the inspectable intermediate
@@ -178,14 +362,21 @@ by an additional emitter alone.
 
 ## Planning sequence and evidence
 
-Continue P001 as approved. Do not expand its implementation with effects,
-rows, function values, a VM, or another backend. Design each subsystem,
+LA001 adds a structured cross-language/library/runtime audit:
+[audit plan](2026-10-08-language-audit-plan.md). It covers the user's twelve
+references with a primary-source/section ledger, comparative briefs,
+feature and interaction matrix, concrete scenarios, independent review and
+adopt/adapt/defer/reject decisions. Feed its relevant findings into upcoming
+designs; no audit or feature adoption is claimed by writing this plan.
+
+Keep FN001's approved delivery fixed. Do not expand it with effects,
+rows, a VM, or another backend. Design each subsystem,
 with C001/R001 considered together to avoid overlapping mechanisms,
 with exact interfaces, negative cases, properties, meaningful regression
 mutants, and the existing verification discipline. Updated planning order:
 FN001 follows P001 and precedes C001, R001 and FX001. Their joint-design and
 other prerequisite dependencies must be resolved before implementation;
-the current P001 delivery and its execution method are unchanged.
+existing approved implementation plans and execution methods are unchanged.
 
 Recommended planning probes: the overlapping-service scenario above, then
 a small full-stack example exercising rows, effects, shared pure logic and
