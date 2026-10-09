@@ -1,9 +1,11 @@
 # Effects, handlers and typed failures: design (FX001)
 
-Status: written spec awaiting the user's review (2026-10-09). Direction
+Status: written spec, revised after the user's whole-spec review
+(2026-10-09): FN001 evaluation order, one dependency model, `ctx` mode over
+emitted IR, handler restrictions, confirmations. Direction
 decisions and sections 1-5 were settled section by section with the user
-on 2026-10-09; the items under "Awaiting confirmation" were proposed but
-not explicitly confirmed. Nothing is implemented, and no implementation
+on 2026-10-09; only the item under "Awaiting confirmation" remains
+unconfirmed. Nothing is implemented, and no implementation
 plan exists yet. Background: docs/plans/2026-10-08-language-direction.md
 (FX001 sections) and BACKLOG.md FX001.
 
@@ -147,18 +149,19 @@ handle Ok(risky()) {                    // lexical, answer-type-dependent
   clauses, one per family, now; `ctl` later. Reifying into Result needs no
   construct, but success must be wrapped explicitly (`Ok(risky())`).
 - `defer e` is a block item. Deferred expressions run LIFO when the block
-  exits by normal completion, typed abort or defect. Proposed (awaiting
-  confirmation): the whole expression, callee and arguments, is evaluated
+  exits by normal completion, typed abort or defect. Confirmed by the user
+  2026-10-09: the whole expression, callee and arguments, is evaluated
   at exit (`finally` semantics), unlike Go, which evaluates arguments at
   registration; locals are immutable, so the difference is only when the
   argument expressions' own effects or divergence happen.
 - Blocks, `handler`, `with` and `handle` join `if`/`match`/lambda in the
   loosest expression dispatch (`{` never starts an expression today).
-- Proposed (awaiting confirmation): `{}` is E_SYNTAX `Expected an
-  expression`; a trailing `;` discards the last value and makes the block
-  `()` (Rust rule), with a `remove the trailing ;` hint when that causes
-  `Expected T, found Unit`; `{ let x = 1 }` is E_SYNTAX `Expected ;`;
-  discarding non-Unit values mid-block is allowed.
+- Confirmed by the user 2026-10-09: `{}` evaluates to `()` (a no-op,
+  consistent with semicolon-terminated blocks); a trailing `;` discards
+  the last value and makes the block `()` (Rust rule), with a `remove the
+  trailing ;` hint when that causes `Expected T, found Unit`;
+  `{ let x = 1 }` is E_SYNTAX `Expected ;`; discarding non-Unit values
+  mid-block is allowed.
 - Entry: `fn main(): T with Console` or effect-free; its row is checked
   closed. `main` prints its result after its effects, except a Unit result
   prints nothing.
@@ -213,17 +216,23 @@ or annotated without a spread, use it (`with L1 + L2` is
 quantified row variable, instantiated fresh per use, because those stages
 perform nothing (FN001 staging).
 
-**Execution boundaries.** Evaluating an application evaluates its callee
-and supplied arguments, contributing their ordinary effects, and then
-executes one stage per supplied argument. Executing a stage consumes that
-arrow's row: applying a value of type `A ->r1 B ->r2 C` to two arguments
-consumes r1 and r2; over-application continues into the arrows of the
-result type, consuming each executed one. For a named callee with declared
-arity n, stages 1..n-1 have inert fresh rows; stage n carries the body's
-row. So partial application contributes no latent body effects, but
-`take(now())` still performs Clock. A one-parameter function whose result
-is a function performs its row when applied once; the returned function's
-row is consumed only when it is applied.
+**Execution boundaries.** Evaluation order is FN001's (design §5),
+unchanged: `e(a1, …, aj)` evaluates `e`, then `a1`, then applies, then
+`a2`, then applies, and so on; arguments and stage executions interleave.
+Each application that completes a stage boundary runs that stage and
+consumes its arrow's row: applying a value of type `A ->r1 B ->r2 C`
+consumes r1 when its first argument is applied and r2 when its second is,
+with `a2` evaluated between the two. For a named callee with declared
+arity n, stages 1..n-1 have inert fresh rows and stage n carries the
+body's row, so a saturated call is still "all arguments, then the body".
+Over-application `f(a, b, c)` with `f` of arity 2 is `a`, `b`, `f`'s body
+(consuming its row), then `c`, then applying the result (consuming that
+arrow's row): an arity-one function returning a function runs its body
+before the second argument is evaluated. Partial application evaluates its
+supplied arguments, with their ordinary effects, immediately and once, and
+contributes no latent body effects (`take(now())` performs Clock).
+`a |> e` follows FN001's pipe order (left operand first). Required:
+Console-trace probes of these orders, including over-application and `|>`.
 
 **Consumption and opening.** The current row is the final-stage row of the
 enclosing declaration, a lambda's fresh row meta, or a handler's clause
@@ -245,6 +254,11 @@ lambda-bound parameters, Leijen 2014 §3.2).
 **Expression rules.**
 - `handler L { op(x) => e, … }` performs nothing; clauses check against
   its row R; exactly one clause per operation of L; type `Handler(L with R)`.
+- Handler types are neither comparable nor printable, directly or nested
+  in a declared type, exactly like function types (FN001): comparison,
+  `print`, `crash` and main's result reject them. Pointer or struct
+  comparison would otherwise expose handler identity, which section 3
+  forbids observing. Required rejection tests for all four.
 - `with h { body }`, `h : Handler(L with R)`, current row ρ: body checks
   against `L + ρ`; R is unified with ρ (opened if closed, as consumption).
 - `handle body { fail(error: E1) => r1, … }`: body checks against
@@ -394,32 +408,39 @@ a perform function type-asserts the frame's handler to its own struct
 parameters are types only in FX001; a row cannot be a label or an effect
 argument.
 
-**Remaining specialization keys.** Type keys (TypeId, ground types),
-function keys (FunctionId, ground types) as today, plus *effect keys*
-(EffectId, ground types), one per perform-function and handler-struct
-layout. Effect keys are collected from operation invocations, handler
-constructions and handler types in specialized bodies and types; they
-instantiate no declarations, so they add no edges, and they count toward
-the existing 10,000-key limit.
+**Specialization keys and dependencies.** Keys are type keys (TypeId,
+ground types) and function keys (FunctionId, ground types) as today, plus
+*effect keys* (EffectId, ground types), one per perform-function and
+handler-struct layout. One worklist (Features.Specialize) builds all three;
+creating a key enqueues the layouts it depends on:
+- a function key: the keys reached from its body (calls, function values,
+  constructions, operation invocations, handler constructions, handler
+  types and the types of its locals), as today plus effect keys;
+- a type key: the type and effect keys of its constructor fields
+  (`Handler(L …)` in a field reaches L's effect key);
+- an effect key: the type and effect keys of its operations' parameter and
+  result types (`Handler(L …)` there reaches L's effect key).
+Rows are erased everywhere, so labels and types occurring only inside rows
+create no key and no dependency. Every key counts toward the existing
+10,000-key limit.
 
-**Finiteness argument (to be checked as a proof in the plan).** (1) Row
-structure never appears in a key, so recursion that extends rows
-(`with h { loop(n + 1) }`) creates no keys. (2) Every type that reaches a
-key through a row is a type argument of a label; inside a declaration,
-such types are built from the declaration's signature type variables,
-which become part of every call's Instantiation: Resolve's signature
-variables include lowercase names inside labels, and label arguments are
-unified like any type. (3) So a type growing through a row, e.g.
-`fn r(): Unit with State(a) + ...e = with listState(…) { r() };` forcing
-`a := List(a)` within a component, is a type instantiation that ADR 007's
-existing rule already rejects. (4) Holes in label arguments default to the
-representative (Int) as elsewhere. Required probes: recursive handler
-installation, function values with effectful rows, rows nested in data
-types, and the growing-label recursion above (rejected).
+**Finiteness argument (to be checked as a proof in the plan).** Two
+static rules bound this worklist. (A) Function keys: ADR 007's
+instantiation rule, unchanged. Row structure never enters a key, so
+recursion that extends rows (`with h { loop(n + 1) }`) creates none. Every
+type that reaches a key through a label is built from the declaration's
+signature type variables, which are part of every call's Instantiation
+(Resolve's signature variables include lowercase names inside labels;
+label arguments unify like any type), so a type growing through a row,
+e.g. `fn r(): Unit with State(a) + ...e = with listState(…) { r() };`
+forcing `a := List(a)` within a component, is rejected by the existing
+rule. Holes default to the representative (Int). (B) Layout keys: the
+declaration-graph rule below, over types and effects together. Required
+probes: recursive handler installation, function values with effectful
+rows, rows nested in data types, growing-label recursion (rejected).
 
-**Layout dependencies (user review 2026-10-09).** Effect layouts do
-introduce dependencies: a handler struct's fields need the Go types of its
-operations' parameters and results, which may name further layouts.
+**Layout dependencies (user review 2026-10-09).** Effect layouts introduce
+dependencies, as the worklist above records:
 
 ```
 type Box(a) = Box(a);
@@ -429,27 +450,29 @@ effect Grow(a) { fn next(): Handler(Grow(Box(a))); };
 Constructing a `Grow(Int)` handler, even one whose `next` clause crashes,
 demands `Grow(Box(Int))`, `Grow(Box(Box(Int)))`, … with no recursive call.
 Fix: P001's nested-declaration rule (Features.Check.Nested, design §4.1)
-extends to one reference graph over type *and* effect declarations. Edges
-run from a declaration to every declared type or effect its layout
-requires: types in constructor fields; types in operation parameters and
-results; and the effect named by every `Handler(L …)` occurring in either.
-Types and labels occurring only inside rows add no edge, because rows are
-erased from layouts (the arrow's Go type ignores them), and body-level
-effect keys come from instantiations already judged by the function rule.
-Inside a component, every type argument of a reference must be a bare
-parameter of the referring declaration or ground; violations are reported
-at the nested reference as today. Required rejection probes: `Grow` above;
-a mutually recursive pair (`effect A(x) { fn f(): Handler(B(Box(x))); };
-effect B(y) { fn g(): Handler(A(y)); };`); a cycle crossing data and effects
-(`type T(a) = T(Handler(G(List(a))));` with `effect G(a) { fn h(): T(a); };`);
-and the admissible bare-parameter versions of each, which must compile.
-With this rule, finiteness (1)-(4) above plus the declaration-graph rule
-together bound effect keys; the 10,000-key guard remains a backstop, not
-the argument.
+extends to one reference graph over type *and* effect declarations, with
+exactly the dependency edges of the worklist's type and effect keys: types
+in constructor fields; types in operation parameters and results; and the
+effect named by every `Handler(L …)` in either. Inside a component, every
+type argument of a reference must be a bare parameter of the referring
+declaration or ground; a violation is E_SPECIALIZATION (the existing
+nested-declaration problem, extended to effects) at the nested reference.
+Required rejection probes: `Grow`; a mutually recursive pair
+(`effect A(x) { fn f(): Handler(B(Box(x))); };
+effect B(y) { fn g(): Handler(A(y)); };`); a cycle crossing data and
+effects (`type T(a) = T(Handler(G(List(a))));` with
+`effect G(a) { fn h(): T(a); };`); and the admissible bare-parameter
+version of each, which must compile. Rules (A) and (B) together are the
+finiteness argument; the 10,000-key guard is a backstop, not the argument.
 
-**Uniform `ctx` (backend choice, within the whole-program model).** A
-program whose reachable code performs no user-declared operation, `fail`,
-`with` or `handle` threads no context. Otherwise every function, stage,
+**Uniform `ctx` (backend choice, within the whole-program model).** The
+mode is chosen over the *emitted* IR, not over code reachable from `main`:
+specialization emits every monomorphic function, used or not, and an
+unused function performing Clock must still compile. A program whose
+emitted IR contains no operation invocation, handler construction or
+handler type, `fail`, `with` or `handle` threads no context. Required
+test: a pure `main` beside an unused effectful function emits `ctx` code
+that builds and runs. Changing dead-code emission is a separate choice. Otherwise every function, stage,
 lambda and function value takes `ctx *bumpusCtx` first, giving function
 values one calling convention regardless of latent effects. All new
 runtime support (context, cleanup helper, defect reporting and `main`'s
@@ -520,16 +543,30 @@ delivery of realistic test doubles.
   `put is not an operation of Clock`.
 - E_TYPE: `Fail needs a concrete error family`; sort errors `Expected a
   type, found an effect row` and the converse; the trailing-`;` hint.
-- E_NESTING-style rejection of nested effect/type layouts (section 4).
+- E_SPECIALIZATION for expanding type/effect declaration cycles (the
+  existing nested-declaration problem extended, section 4).
+- Rejections of comparing, printing, crashing with, or returning from
+  main a value whose type contains a handler (section 2).
 - E_SYNTAX `General control (ctl/resume) is not supported yet`; E_ARITY
   `Expected now()`.
 - Row display: labels in row order, a named tail `...e`, the ambient tail
   `...` (`with Log + ...`), the closed empty row `pure`.
-- Defect report (proposed, awaiting confirmation): after all cleanup, one
-  report on stderr, one cause per line in execution order: `crash: V`
-  for `crash(V)`, `cleanup failed: fail(V)` for a typed abort escaping
-  cleanup while a cause is pending, `no handler for L` for the guard;
-  exit status 1. Rendering is ADR 005's.
+- Defect report (one stderr report after all cleanup, exit status 1,
+  confirmed 2026-10-09; line format below completed after that review and
+  awaiting its confirmation). One cause per line in execution order; the
+  first line is the original cause, every later line is prefixed
+  `cleanup failed: `. A cause is rendered as `crash: V` for `crash(V)`,
+  `fail(T): V` for a typed abort with payload type T, or
+  `no handler for L` for the guard. T is the payload's type as
+  diagnostics print it (`DbError`, `Error(Int)`). V is ADR 005's
+  rendering when T is printable; when T contains a function or handler,
+  V is `<not printable>`, so typed errors gain no new printability
+  restriction. Example (abort unwinding, cleanup fails):
+
+  ```text
+  fail(DbError): Timeout(3)
+  cleanup failed: fail(ReleaseError): Busy
+  ```
 
 **Unifier properties** (quantified, generated inputs including repeated
 keys with differing arguments, shared tails and rigid variables, not only
@@ -561,14 +598,21 @@ a named row stays shared; the eta-expansion limitation is pinned.
    discarded normal result after a cleanup failure.
 7. Cleanup invoking operations under nested handlers while an abort
    unwinds (registration context).
-8. Escaped and partially applied function values: a lambda created under
+8. Evaluation order traces (Console): interleaved arguments and stages,
+   over-application of an arity-one function returning a function, `|>`.
+   Escaped and partially applied function values: a lambda created under
    one handler runs under another at invocation; supplied argument effects
    happen immediately and exactly once.
 9. Recursive handler installation: one key.
 10. Rejections: growing-label recursion (ADR 007); `Grow`, the mutual pair
     and the data/effect cycle (section 4), with admissible variants.
 11. `crash`: not caught by `handle`; reported once after cleanup;
-    non-zero exit.
+    exit status 1; report lines for typed-abort-then-cleanup-failure and a
+    non-printable payload.
+12. Handler values: comparison, `print`, `crash` and a main result
+    containing a handler are rejected, including nested in an ADT.
+13. `ctx` mode: a pure `main` with an unused effectful function builds
+    and runs.
 
 **Acceptance scenario** (BACKLOG FX001): services with overlapping
 requirements composed without annotations; real versus stateless fake
@@ -587,8 +631,9 @@ byte-identical (conditional runtime emission).
 condition removed (test hits its timeout); clauses run in the inner
 context; abort consumed by the nearest `handle` instead of its target;
 cleanup in the exit-time context; cleanup drops the pending cause; closed
-parameter rows opened; `ctx` emitted for effect-free programs; layout
-edges omitted from the declaration graph.
+parameter rows opened; `ctx` emitted for effect-free programs; `ctx`
+mode chosen by reachability from `main` (the unused-effectful-function
+probe fails to build); layout edges omitted from the declaration graph.
 
 **Scale, attributed separately** (serial phase; fixed bounds, tuned
 workloads, T003): installation cost (repeated shallow installs); lookup
@@ -609,10 +654,9 @@ implementation and measurements exist.
 
 ## Awaiting confirmation
 
-- Section 1: `defer` evaluates its whole expression at exit; `{}` is
-  E_SYNTAX; the Rust trailing-`;` rule and its hint; `{ let x = 1 }` is
-  E_SYNTAX `Expected ;`.
-- Section 5: the defect report's exact lines and exit status 1.
+- Section 5: the defect report's completed line format (`fail(T): V`,
+  `cleanup failed: ` prefix, `<not printable>` fallback). The single
+  report after cleanup and exit status 1 are confirmed.
 
 ## Deferred (not FX001)
 
