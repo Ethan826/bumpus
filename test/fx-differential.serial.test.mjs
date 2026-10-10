@@ -52,9 +52,10 @@ test(`${rejectionVariants} failing defers are rejected with the Task 8 texts`, (
 });
 
 // A differing program: evidence on disk, a minimized source beside it, and
-// a failure naming the seed. Shrinking runs Go for every well-typed
+// a failure naming the seed. Shrinking (at most 3 minutes) runs Go for every well-typed
 // candidate, so only the first few differences of a run are shrunk.
 const shrinkLimit = 3;
+const shrinkMs = 180_000;
 let shrunk = 0;
 const report = (found, index, expected, actual) => {
   const name = `seed-${found.seed}-index-${index}`;
@@ -63,12 +64,13 @@ const report = (found, index, expected, actual) => {
     try { checked(source); } catch { return false; }
     return !same(outcome(source), goOutcome(source));
   };
-  const files = { '.wxw': found.source,
-    '.json': JSON.stringify({ expected, actual }, null, 2) };
+  // The evidence goes to disk first, so a failing shrink cannot lose it.
+  saveEvidence(name, { '.wxw': found.source,
+    '.json': JSON.stringify({ expected, actual }, null, 2) });
   if (shrunk++ < shrinkLimit) {
-    files['-min.wxw'] = render(shrink(found.program, differs));
+    const smallest = shrink(found.program, differs, 600, shrinkMs);
+    saveEvidence(name, { '-min.wxw': render(smallest) });
   }
-  saveEvidence(name, files);
   return `${label(found, index)} differs; see .build/fx001-differential/${name}`;
 };
 

@@ -32,7 +32,7 @@ const clauseBody = (ctx, effect, forward) => {
 const bindN = ctx => ({ ...ctx, locals: [...ctx.locals, 'n'] });
 
 const layer = (ctx, effect, depth) => {
-  const forward = depth > 0 && ctx.r.chance(60);
+  const forward = depth > 0 && ctx.r.chance(80);
   const clause = clauseBody(bindN(ctx), effect, forward);
   const make = effect === 'Log' ? logHandler : tickHandler;
   const inside = extend(ctx, effect);

@@ -43,7 +43,8 @@ export const runCleanups = (state, items, defers, outcome) => {
   for (const deferred of [...defers].reverse()) {
     const before = causes.length;
     const caught = state.caught;
-    state.pendingAbort.push(pending instanceof Abort ? pending : null);
+    state.pendingAbort.push(pending instanceof Abort
+      ? { abort: pending, registered: deferred.ctx } : null);
     try {
       evaluate(deferred.expression, deferred.env, deferred.ctx);
     } catch (thrown) {

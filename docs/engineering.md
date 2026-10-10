@@ -238,8 +238,8 @@ rejection variants of strict `defer` are generated from the same seed.
 test/fx-oracle.test.mjs validates the interpreter against the hand-derived
 traces of Tasks 2, 4, 7 and 8 (imported from their program modules), the
 shrinker, and a sensitivity check (clauses run in the operation's context
-must change some of 50 programs). Both are review conventions beyond the
-tests.
+must change some of 50 programs). Both run in verify; the differential test
+is in the serial phase.
 
 ## Definition of done and handoff
 

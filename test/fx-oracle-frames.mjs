@@ -8,18 +8,22 @@ import { count, find } from './fx-oracle-context.mjs';
 import { isHandler } from './fx-oracle-values.mjs';
 
 // What the census counts about an operation: scoped same-key frames, a
-// clause performing its own effect, a closure run under a handler other
-// than the one it was made under, a cleanup using its registration context.
+// clause performing its own effect, a callback whose handler comes from
+// where it is called and differs from the one in force where it was made,
+// and a cleanup whose handler comes from its registration context and
+// differs from the one in force where the abort was raised.
 const note = (state, effect, frame, ctx) => {
   const { events, lambdas, clauses } = state;
   if (count(ctx, effect) >= 2) events.add('nested-same-key');
   if (clauses.includes(effect)) events.add('forward');
-  const created = lambdas.at(-1);
-  if (created !== undefined && find(created, 'with', effect) !== frame) {
+  const callback = lambdas.at(-1);
+  if (callback && find(callback.called, 'with', effect) === frame
+    && find(callback.created, 'with', effect) !== frame) {
     events.add('escaped-callback');
   }
   const unwinding = state.pendingAbort.findLast(Boolean);
-  if (unwinding && find(unwinding.ctx, 'with', effect) !== frame) {
+  if (unwinding && find(unwinding.registered, 'with', effect) === frame
+    && find(unwinding.abort.ctx, 'with', effect) !== frame) {
     events.add('cleanup-registration-context');
   }
 };

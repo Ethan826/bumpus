@@ -8,6 +8,7 @@ const cleanup = 25;
 // [name, interpreter events (any of them counts), minimum programs]
 export const categories = [
   ['nested same-key handlers', ['nested-same-key', 'forward'], scoped],
+  ['intercept-and-forward (counted within the row above)', ['forward'], scoped],
   ['aborts crossing an unrelated handle', ['abort-crosses-handle'], scoped],
   ['stage order with over-application', ['over-application'], scoped],
   ['escaped callbacks under another handler', ['escaped-callback'], scoped],

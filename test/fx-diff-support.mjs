@@ -14,7 +14,8 @@ export const goOutcome = source => {
   try {
     const go = join(work, 'main.go');
     writeFileSync(go, checked(source));
-    const env = { ...process.env, GOCACHE: resolve('.build/go-cache') };
+    const env = { ...process.env, GOCACHE: resolve('.build/go-cache'),
+      GOWORK: 'off' };
     const built = spawnSync('go', ['build', '-o', join(work, 'program'), go],
       { encoding: 'utf8', timeout: 120000, env });
     if (built.status !== 0) throw new Error(`go build: ${built.stderr}`);

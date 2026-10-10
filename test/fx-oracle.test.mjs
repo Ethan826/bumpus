@@ -5,6 +5,7 @@ import { runs, silent, orders } from './fx-block-programs.mjs';
 import { cases as consoleCases, values } from './fx-console-programs.mjs';
 import { cases as cleanupCases } from './fx-cleanup-programs.mjs';
 import { cases as runCases } from './fx-run-programs.mjs';
+import { checkedRuns, specialized } from './fx-task7-programs.mjs';
 import { add, block, call, doItem, lit, print, text } from './fx-gen-ast.mjs';
 import { outcome } from './fx-oracle.mjs';
 import { generate, render } from './fx-programs.mjs';
@@ -39,6 +40,11 @@ for (const [name, source, expected] of runCases) {
     assert.deepEqual(seen(source), { stdout: expected, stderr: '', status: 0 });
   });
 }
+for (const [name, source, expected] of [...specialized, ...checkedRuns]) {
+  test(`hand trace, Task 7 end to end: ${name}`, () => {
+    assert.deepEqual(seen(source), { stdout: expected, stderr: '', status: 0 });
+  });
+}
 for (const [name, prelude, body, status, stdout, stderr] of cleanupCases) {
   test(`hand trace, cleanup: ${name}`, () => {
     assert.deepEqual(seen(prelude + body), { stdout, stderr, status });
@@ -48,13 +54,14 @@ for (const [name, prelude, body, status, stdout, stderr] of cleanupCases) {
 // Cases whose Go is transformed after emission lie outside the interpreter's
 // language; each is named here and must still exist where it is defined.
 const excluded = [
-  ['test/fx-cleanup.test.mjs', 'the missing-handler guard is a cause line'],
-  ['test/fx-cleanup.test.mjs', 'an embedded newline is escaped'],
-  ...orders.map(([name]) => ['test/fx-block-programs.mjs', name])
+  ['fx-cleanup.test.mjs', 'the missing-handler guard is a cause line'],
+  ['fx-cleanup.test.mjs', 'an embedded newline is escaped'],
+  ...orders.map(([name]) => ['fx-block-programs.mjs', name])
 ];
 test('the cases excluded from the interpreter are the transformed ones', () => {
   for (const [file, name] of excluded) {
-    assert.ok(readFileSync(file, 'utf8').includes(name), `${file}: ${name}`);
+    const text = readFileSync(new URL(file, import.meta.url), 'utf8');
+    assert.ok(text.includes(name), `${file}: ${name}`);
   }
 });
 

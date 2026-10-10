@@ -88,7 +88,7 @@ export const interpret = (source, options = {}) => {
     if (callee.kind === 'fn') {
       return evaluate(program.functions.get(callee.name).body, bound, ctx);
     }
-    lambdas.push(callee.ctx);
+    lambdas.push({ created: callee.ctx, called: ctx });
     try { return evaluate(callee.body, bound, ctx); } finally { lambdas.pop(); }
   };
 

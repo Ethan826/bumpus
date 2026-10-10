@@ -6,6 +6,7 @@ import { resolve } from '../output/Features.Resolve/index.js';
 import { check } from '../output/Features.Check/index.js';
 import { wire } from '../output/Format.Diagnostic/index.js';
 import { compile } from '../output/Program.Compile/index.js';
+import { checkedRuns } from './fx-task7-programs.mjs';
 import { runGo } from './support.mjs';
 
 const checked = source => {
@@ -174,27 +175,11 @@ test('duplicate handler binders use the parameter diagnostic span', () => {
     source.indexOf('add(x, x)') + 5);
 });
 
-test('a checked handler runs end to end', () => {
-  assert.equal(runGo(clock + 'fn main(): Int = '
-    + 'with handler Clock { now() => 1 } { now() };'), '1\n');
-});
-
-test('a checked failure runs end to end', () => {
-  assert.equal(runGo('fn main(): Int = '
-    + 'handle fail(1) { fail(problem: Int) => 0 };'), '0\n');
-});
-
 // A handler type holds an effect layout; Console and Fail layouts have no
 // operations and still emit an empty handler struct (Task 7, ruling F3).
-test('a handler type in a signature builds and runs', () => {
-  assert.equal(runGo('fn f(h: Handler(Console with pure)): Int = 0;' + main),
-    '0\n');
-});
-
-test('a handler type in a later constructor field builds and runs', () => {
-  assert.equal(runGo('type H = H(Int, Handler(Console with pure));' + main),
-    '0\n');
-});
+for (const [name, source, output] of checkedRuns) {
+  test(name, () => assert.equal(runGo(source), output));
+}
 
 test('long function-type spines are lowered without recursive traversal', () => {
   const arrows = Array.from({ length: 20000 }, () => 'Int').join(' -> ');

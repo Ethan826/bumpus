@@ -92,14 +92,15 @@ function* programVariants(program) {
 }
 
 // The smallest program found that `keep` still accepts, within `budget`
-// calls of `keep`.
-export const shrink = (program, keep, budget = 600) => {
+// calls of `keep` and `limitMs` of wall time (the best so far is returned).
+export const shrink = (program, keep, budget = 600, limitMs = Infinity) => {
+  const deadline = Date.now() + limitMs;
   let current = program;
   let calls = 0;
   for (let progress = true; progress;) {
     progress = false;
     for (const candidate of programVariants(current)) {
-      if (++calls > budget) return current;
+      if (++calls > budget || Date.now() > deadline) return current;
       if (keep(candidate)) { current = candidate; progress = true; break; }
     }
   }

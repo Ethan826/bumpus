@@ -5,6 +5,7 @@ import { specialize } from '../output/Features.Specialize/index.js';
 import { compile } from '../output/Program.Compile/index.js';
 import { checkedPoly, checkRejectedAt } from './phases.mjs';
 import { keyTexts } from './poly-keys.mjs';
+import { specialized } from './fx-task7-programs.mjs';
 import { runGo } from './support.mjs';
 
 // FX001 Task 6 (design §4 "Specialization keys and dependencies", "Layout
@@ -138,14 +139,9 @@ test('a type variable only in the effect row makes a function generic', () => {
 // Task 7 deleted the post-Specialize guard: each program it stopped now
 // builds and prints exactly what its handlers say.
 test('programs holding every effect node but print run end to end', () => {
-  for (const [source, output] of [
-    [clock + 'fn main(): Int = with handler Clock { now() => 1 } { now() };',
-      '1\n'],
-    [clock + 'fn unused(): Int with Clock = now();' + main, '0\n'],
-    ['fn main(): Int = handle fail(1) { fail(problem: Int) => 0 };', '0\n'],
-    [clock + 'fn f(c: Int -> Int with Clock): Int = 0; fn main(): Int = '
-      + 'with handler Clock { now() => 1 } { f(fn(x) => now()) };', '0\n']
-  ]) assert.equal(runGo(source), output);
+  for (const [, source, output] of specialized) {
+    assert.equal(runGo(source), output);
+  }
 });
 
 test('declared but unused effects reach Go unchanged', () => {
