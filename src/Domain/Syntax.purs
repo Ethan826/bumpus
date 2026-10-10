@@ -28,7 +28,6 @@ data NoteReason
   | HandledHere String
   | MainOnlyConsole
   | CleanupMustNotFail
-  | NoFamilyHere
   | FailAlternatives
   | DeclaredHere String
   | InnermostHere String

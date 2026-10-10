@@ -103,7 +103,6 @@ noteText = case _ of
   HandledHere label → shortLabel label <> " is handled here"
   MainOnlyConsole → "main may perform only Console"
   CleanupMustNotFail → "cleanup registered here must not fail"
-  NoFamilyHere → "this failure has no concrete error family"
   FailAlternatives →
     "use ...e to pass through what a callback performs, a concrete "
       <> "family such as Fail(DbError), or return a Result"

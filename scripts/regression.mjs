@@ -172,13 +172,23 @@ const rows = [
     message: /deferred Fail capability: wrong diagnostic code/
   },
   {
-    // FX009: a Fail whose family is a type variable is refused where the
-    // signature writes it. Without that, the program is still rejected
-    // (by the set-aside pair guard), but at the call, not the annotation.
+    // FX009: a Fail payload with no family key is refused where it is
+    // written. Without the check each program is rejected later or panics:
+    // the probes pin the error to the annotation (or clause) itself.
     name: 'signature-fail', file: 'src/Features/Resolve/Row.purs',
-    needle: '  FailEffect, [ TVar _ ] → Left',
-    replacement: '  FailEffect, [ TVar (VarId (-1)) ] → Left',
-    probe: 'signature-fail', message: /signature Fail family:/
+    needle: '    TVar _ → true', replacement: '    TVar _ → false',
+    probe: 'signature-fail', message: /Fail family \(variable\):/
+  },
+  {
+    name: 'keyless-fail', file: 'src/Features/Resolve/Row.purs',
+    needle: '    TFun _ _ _ → true', replacement: '    TFun _ _ _ → false',
+    probe: 'keyless-fail', message: /Fail family \(function\):/
+  },
+  {
+    name: 'clause-fail', file: 'src/Features/Resolve/HandlerExpression.purs',
+    needle: '        >>= failFamily (Syntax.typeRefSpan clause.ty)\n',
+    replacement: '',
+    probe: 'clause-fail', message: /Fail family \(clause\):/
   },
   {
     // FX001 Task 7: the mode is chosen over the emitted IR; threading the

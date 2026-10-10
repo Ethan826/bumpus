@@ -14,6 +14,7 @@ import Domain.Row (EffectRef(..), Label(..))
 import Domain.Syntax as Syntax
 import Features.Resolve.Fresh (Fresh, fresh, liftEither)
 import Features.Resolve.Handler as Handler
+import Features.Resolve.Row (failFamily)
 import Features.Resolve.Scope (Scope)
 import Features.Resolve.Types as Types
 
@@ -98,6 +99,7 @@ failureClause resolveExpression scope clause = do
         scope.variables
         Nothing
         clause.ty
+        >>= failFamily (Syntax.typeRefSpan clause.ty)
     )
   local ← fresh
   let locals = Map.insert clause.name local scope.locals

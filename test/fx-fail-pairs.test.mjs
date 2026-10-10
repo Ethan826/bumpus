@@ -22,46 +22,66 @@ const hint = 'use ...e to pass through what a callback performs, a concrete '
   + 'family such as Fail(DbError), or return a Result';
 const job = 'type Job(a, ...effects) = Job(Int -> a with ...effects); ';
 
-// A Fail label whose payload is a type variable is rejected where it is
-// written, in every position a signature has rows (user decision on FX009
-// review M1), with a hint at the same label.
-const written = [
-  ['an own row', 'fn f(e: a): Int with Fail(a) = 0;', 'Fail(a)'],
-  ['a parameter row', 'fn g(h: Int -> Unit with Fail(a)): Unit = ();',
-    'Fail(a)'],
-  ['a nested arrow row', 'fn g(h: Int -> (Int -> Unit with Fail(a))): Unit '
-    + '= ();', 'Fail(a)'],
-  ['a result row', 'fn g(): Int -> Unit with Fail(a) = fn(n: Int) => ();',
-    'Fail(a)'],
-  ['a handler type', 'fn g(h: Handler(Fail(a))): Unit = ();', 'Fail(a)'],
-  ['a row argument', job + 'fn g(j: Job(Int, Console + Fail(a))): Int = 1;',
-    'Fail(a)']
+// A Fail whose payload has no family key (a type variable, a function or a
+// handler type; keys are Int, Bool, Unit or a declared type) is refused
+// where it is written, in every position a signature has rows (user
+// decisions on FX009 review M1 and N1), with a hint at the same label.
+const positions = [
+  ['an own row', 'fn f(e: a): Int with Fail(P) = 0;'],
+  ['a parameter row', 'fn g(h: Int -> Unit with Fail(P)): Unit = ();'],
+  ['a nested arrow row', 'fn g(h: Int -> (Int -> Unit with Fail(P))): Unit '
+    + '= ();'],
+  ['a result row', 'fn g(): Int -> Unit with Fail(P) = fn(n: Int) => ();'],
+  ['a handler type', 'fn g(h: Handler(Fail(P))): Unit = ();'],
+  ['a row argument', job + 'fn g(j: Job(Int, Console + Fail(P))): Int = 1;']
 ];
-for (const [name, body, fragment] of written) {
-  test(`Fail(a) written in ${name} is rejected there`, () => {
-    const source = body + ' fn main(): Int = 0;';
-    const offset = source.indexOf(fragment);
-    const diagnostic = expectDiagnostic(source, {
-      code: 'E_TYPE', message: family, at: [source, fragment],
-      notes: [[source, fragment, hint]]
+const payloads = ['a', 'Int -> Int', 'Handler(Console)'];
+const expectWritten = (source, fragment, container = source, from = 0) =>
+  expectDiagnostic(source, {
+    code: 'E_TYPE', message: family, at: [container, fragment, from],
+    notes: [[container, fragment, hint, from]]
+  });
+for (const [name, template] of positions) {
+  for (const payload of payloads) {
+    test(`Fail(${payload}) written in ${name} is rejected there`, () => {
+      const source = template.replace('P', payload) + ' fn main(): Int = 0;';
+      expectWritten(source, `Fail(${payload})`);
     });
-    assert.equal(diagnostic.span.start.offset, offset);
+  }
+}
+
+// The same payloads in a handle clause, which is not a signature row.
+const clauses = [
+  ['a variable', 'fn f(x: a): Int = handle 0 { fail(e: a) => 1 }; ', 'a'],
+  ['a function type', 'fn f(): Int = handle 0 { fail(e: Int -> Int) => 1 }; ',
+    'Int -> Int']
+];
+for (const [name, head, payload] of clauses) {
+  test(`a handle clause payload that is ${name} is rejected there`, () => {
+    const source = head + 'fn main(): Int = 0;';
+    const clause = `fail(e: ${payload})`;
+    expectWritten(source, payload, clause, 'fail(e: '.length);
   });
 }
+
+test('the keyless-payload program from review N1 is rejected at Fail', () => {
+  const source = 'type E = E; fn g(h: Int -> Unit with Fail(Int -> Int)): '
+    + 'Unit = h(1); fn main(): Unit with Console = '
+    + 'g(fn(n: Int) => fail(E));';
+  expectWritten(source, 'Fail(Int -> Int)');
+});
+
+test('Fail(Unit) and Fail(Error(a)) are still allowed', () => {
+  const result = checked('type Error(a) = Error(a); fn raise(e: a): Int '
+    + 'with Fail(Error(a)) + Fail(Unit) = fail(Error(e)); '
+    + 'fn main(): Int = 0;');
+  assert.ok(result instanceof Right, JSON.stringify(result));
+});
 
 test('the reported program is rejected at Fail(a) in the signature', () => {
   const source = 'type E = E; fn g(h: Int -> Unit with Fail(a)): Unit = h(1); '
     + 'fn main(): Unit with Console = g(fn(n: Int) => fail(E));';
-  expectDiagnostic(source, {
-    code: 'E_TYPE', message: family, at: [source, 'Fail(a)'],
-    notes: [[source, 'Fail(a)', hint]]
-  });
-});
-
-test('a concrete head with a variable inside is still allowed', () => {
-  const result = checked('type Error(a) = Error(a); fn raise(e: a): Int '
-    + 'with Fail(Error(a)) = fail(Error(e)); fn main(): Int = 0;');
-  assert.ok(result instanceof Right, JSON.stringify(result));
+  expectWritten(source, 'Fail(a)');
 });
 
 test('a concrete Fail(E) parameter row is accepted and runs', () => {

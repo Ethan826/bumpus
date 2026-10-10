@@ -1,4 +1,4 @@
-module Features.Resolve.Row (resolveRow, label) where
+module Features.Resolve.Row (resolveRow, label, failFamily) where
 
 import Prelude
 import Data.Array as Array
@@ -45,20 +45,35 @@ label effects resolve reference = do
     Left (Syntax.problemAt (TypeArguments reference.name) reference.span)
   else traverse resolve reference.arguments >>= concrete effect.ref reference
 
--- A Fail whose family is a type variable has no key to be matched by: it
--- is refused where it is written (design §2, FX009).
 concrete
   ∷ EffectRef
   → Syntax.LabelRef
   → Array (Ty VarId)
   → Either Syntax.Diagnostic (Label (Ty VarId))
 concrete effect reference arguments = case effect, arguments of
-  FailEffect, [ TVar _ ] → Left
-    { problem: FailNeedsConcrete
-    , span: reference.span
-    , related: [ { span: reference.span, reason: Syntax.FailAlternatives } ]
-    }
+  FailEffect, [ payload ] → toLabel <$> failFamily reference.span payload
   _, _ → Right (Label effect arguments)
+  where
+  toLabel payload = Label effect [ payload ]
+
+-- A Fail payload needs a family key: Int, Bool, Unit or a declared type.
+-- A type variable, a function or a handler type has none, so nothing it is
+-- matched against could ever be decided: it is refused where it is written
+-- (design §2, FX009).
+failFamily ∷ Syntax.Span → Ty VarId → Either Syntax.Diagnostic (Ty VarId)
+failFamily span payload =
+  if keyless payload then Left
+    { problem: FailNeedsConcrete
+    , span
+    , related: [ { span, reason: Syntax.FailAlternatives } ]
+    }
+  else Right payload
+  where
+  keyless = case _ of
+    TVar _ → true
+    TFun _ _ _ → true
+    THandler _ _ → true
+    _ → false
 
 lookupEffect
   ∷ Effects
