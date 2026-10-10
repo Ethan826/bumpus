@@ -218,6 +218,29 @@ behavior-preserving refactor or performance change.
 scripts/ladder-profile.mjs times the match-lift ladder cold and per phase,
 alternating with a baseline build. Both are review conventions.
 
+The FX001 differential corpus (Task 10) is a test-side reference
+interpreter (test/fx-oracle*.mjs, written from the design, no compiler code)
+and a seeded generator of well-typed programs over two user effects, two
+failure families and Console traces (test/fx-programs.mjs, fx-gen-*.mjs).
+test/fx-differential.serial.test.mjs (serial phase, ruling F11) builds the
+programs in go-batches of at most 100 and compares Go stdout, stderr and exit
+status with the interpreter exactly; the census (test/fx-census.mjs counts
+what the interpreter observed, not what the generator intended) must meet its
+minimums (50 programs per scoped-handler scenario, 25 per cleanup outcome) or
+the run fails, and so does a generated program the compiler rejects, with its
+seed. Knobs, outside verify: `WAXWING_FX_SEED` (default 20261010; program
+`i` has seed SEED+i, reproduced with `generate(SEED + i, i)`) and
+`WAXWING_FX_PROGRAMS` (default 500; the minimums need about 400, so a
+smaller count fails by design; larger counts build in more batches). A
+differing program's source, both outcomes and a shrunk source
+(test/fx-shrink.mjs) are written to .build/fx001-differential/. The 25
+rejection variants of strict `defer` are generated from the same seed.
+test/fx-oracle.test.mjs validates the interpreter against the hand-derived
+traces of Tasks 2, 4, 7 and 8 (imported from their program modules), the
+shrinker, and a sensitivity check (clauses run in the operation's context
+must change some of 50 programs). Both are review conventions beyond the
+tests.
+
 ## Definition of done and handoff
 
 Acceptance criteria must run through the actual CLI/backend, with typed
