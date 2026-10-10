@@ -3312,3 +3312,25 @@ two structural changes, which remove the merge and forwarding limitations
 Mark solving becomes a path check over a two-point lattice with rigid
 mark variables. One Opus review of the whole note is in progress. FX009
 is being fixed test-first in parallel, on branch fx009 in a worktree.
+
+FX009 review (Opus, review-fx009-result.md): Needs fixes.
+- I1: the check ran in the first `settleKeys` as well, and rejected a
+  program accepted today.
+- I2: the span heuristic misleads, and the requested note is missing.
+- M1: callers were now rejected even when nothing fails. The user
+  decided (2026-10-10) that a `Fail` whose payload head is a type
+  variable is E_TYPE at the written annotation.
+- The fix round is in progress on branch fx009.
+
+FX008 revision 6 review (Opus, review-fx008-rev6-result.md): no Critical
+findings and no unsound acceptance found. The path check is correct, and
+the revision 5 loop holds with installation entries.
+- I1: consuming the clause row at `with` lost type inference. meta2.wxw,
+  accepted today, would be rejected, and hole2c.wxw's Go output would
+  change.
+- Revision 7 keeps R as today's inference row, unified with marks
+  ignored, and adds an internal clause row C for marks. It also applies
+  I2-I4 and M1-M9.
+- New BACKLOG FX011: `handler Console` gives E_INTERNAL.
+
+Revision 7 is unreviewed.

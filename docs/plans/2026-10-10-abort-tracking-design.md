@@ -1,7 +1,7 @@
 # Tracking handlers that may fail: design (FX008)
 
-Status: design note, revision 6 (2026-10-10). Awaiting one Opus review,
-then the user's written-spec approval. Not implemented. It amends the
+Status: design note, revision 7 (2026-10-10). Awaiting the user's
+written-spec approval. Not implemented. It amends the
 effects spec (docs/plans/2026-10-09-effects-design.md) §2 and §3, and
 CF001 §5/O-2/§8A (D4), when approved.
 
@@ -23,6 +23,18 @@ History:
 
   Mark solving becomes a path check over a two-point lattice with rigid
   variables (§3.5 step 5).
+- Revision 7 applies the review of revision 6
+  (review-fx008-rev6-result.md: no Critical findings; I1-I4, M1-M9).
+  - I1: consuming R lost type inference and could change Go output.
+    Revision 7 keeps R as today's inference row, unified with contexts
+    and ignoring marks, and adds an internal clause row C that carries
+    the marks.
+  - I2: a label added by extension gets a fresh mark with an edge.
+  - I3: the examples are corrected.
+  - I4: unmarked labels in local annotations get fresh mark metas; l4b is
+    pinned as L4.
+
+  Revision 7 has not been reviewed.
 
 ## 0. Understanding
 
@@ -165,12 +177,23 @@ ordinary name.
 - It is allowed anywhere in a function signature: own rows, parameter
   rows, handler types and row arguments.
 - It is not allowed in `type` or `effect` declarations in FX008 (L6).
+- Grammar: `nofail` `(` lowercase name `)` label. Mark variables have
+  their own namespace, so `x: k` beside `nofail(k)` refers to a type
+  variable `k`, a distinct thing. Lambda annotations in a body may name
+  the enclosing signature's k (rigid there).
+- `nofail(k) Console` is accepted and means N. `nofail(k) Fail(E)` is
+  E_TYPE, as `nofail Fail(E)` is.
+- An example trap: `Handler(nofail Log)` written without `with pure` ends
+  in the callee's rigid ambient row (spec §1). Every installation of it
+  inside the callee is then M, so a parameter meant for fail-free
+  installation is written `Handler(nofail Log with pure)` or with its
+  clause row closed.
 
 ```
 fn work(): Unit with nofail Log = { defer log(1); () };
-fn prefix(): Handler(nofail Log with Log) =          // own-abort free
+fn prefix(): Handler(nofail Log with Log) with pure =  // own-abort free
   handler Log { log(n) => log(n + 100) };
-fn around(body: Unit -> Unit with nofail(k) Log + ...e)
+fn around(body: Unit -> Unit with nofail(k) Log + nofail(k) Log + ...e)
   : Unit with nofail(k) Log + ...e = with prefix() { body(()) };
 ```
 
@@ -185,12 +208,16 @@ marks print plain.
 ### 3.3 Representation
 
 - `Label EffectRef (Array t)` gains a mark: N, M, a rigid mark variable,
-  or a mark meta. Mark metas live in the checker substitution, and
-  `resolvedRow` resolves them.
+  or a mark meta. Mark metas live in the checker substitution, so
+  equalities are bindings, not edges. `resolvedRow` resolves them, and
+  every edge is read on resolved marks.
 - A declaration reference instantiates the declaration's mark variables
   with one fresh meta each, shared across its signature.
 - Console labels are normalized to N at resolution, including the label
-  `print` consumes. `Fail` labels carry a fixed placeholder that is never
+  `print` consumes, copies of Console labels (§3.4), and a Console frame
+  installed from a `Handler(Console …)` value (accepted today, though no
+  such value can be built; `handler Console {}` is E_INTERNAL today,
+  BACKLOG FX011). User Console handlers (D001) revisit this. `Fail` labels carry a fixed placeholder that is never
   compared.
 - Label keys are unchanged.
 - Marks are stripped at the Check-to-IR boundary. This includes the
@@ -204,8 +231,11 @@ a type) and by inequalities x ⊑ y, read "x is at least as strong as y",
 with N ⊑ M. Every rule below is one of these two forms. §3.5 step 5 solves
 them.
 
-**Written labels** are M unless written `nofail` or `nofail(k)`, except
-Console (§3.3).
+**Written labels in signatures** are M unless written `nofail` or
+`nofail(k)`, except Console (§3.3). **Labels in local annotations**
+(lambda parameters, let annotations) that carry no written mark get a
+fresh mark meta instead, because locals are inferred and constrained by
+their uses (review rev6 I4, annotb.wxw). A written `nofail` there is N.
 
 **Consumption is directional (D7).** Consuming a stage row s into the
 current row ρ (spec §2 "Consumption and opening") matches labels by first
@@ -216,8 +246,15 @@ are fresh *copies* of ρ's remaining prefix labels: the same effect and
 arguments, each with a fresh mark meta c and an edge ρ-mark ⊑ c. ρ's tail
 itself stays shared. Without copies, a monomorphic local's row would
 share marks with the first context it is used in, and so merge unrelated
-handlers (review I1). Outside consumption, rows inside types unify with
-equality, as today (function types are invariant).
+handlers (review I1). The converse case: when consumption extends the
+*target's* tail meta with a stage label, the new target label gets a
+fresh mark t with t ⊑ (the stage label's mark), never the stage label's
+mark itself. Sharing it would reject safe programs and make acceptance
+depend on feeder order (review rev6 I2, extb.wxw). Copies that would land
+only on a throwaway fresh tail (the tail of loop step (d), or the `pure ⊆
+ρ` coercion) are never read, and are not made (rev6 M9). Outside
+consumption, rows inside types unify with equality, as today (function
+types are invariant).
 
 **Opening at declaration use** (Use `declarationUse`, Stages
 `openedRow`) applies only to handler types (D3), because types unify by
@@ -229,29 +266,51 @@ Each becomes a fresh meta. Directional consumption covers the former
 "own-row M" position, so it needs no opening. Callback rows in
 parameters are never opened, which would be unsound.
 
-**`handler L { clauses }`** has type `Handler(m L with R)`, with m and R
-fresh:
-- Each clause is checked against its own row, consumed into R. This is
-  the R0 technique; late labels are consumed in §3.5 steps 1-3, and
-  `Fail` is kept.
-- R is therefore exactly the clauses' effects. Its unsolved tail closes to
-  empty. A rigid clause tail binds R's tail (the clause-tail pass, §3.5).
-- Own-abort constraint: a `Fail` label or a rigid tail in a clause row
-  imposes M ⊑ m, so m cannot be N.
-- Requirement marks flow by consumption: R ⊑ c for each clause row c.
+**Two clause rows in a handler type (revision 7, review rev6 I1).**
+Internally a handler type is `Handler(m L with R | C)`. Written syntax is
+unchanged: a written `Handler(m L with R)` has C = R.
+- R is the *inference row*. It behaves exactly as today: clause effects
+  reach it, and `with` unifies it with the context ρ. So inference, and
+  with it acceptance of programs without `defer` and Go output, are
+  unchanged.
+  - The unification R ≡ ρ ignores marks: it equates types, effects and
+    tails, never marks.
+  - Revision 6 instead consumed R, which lost inference that flows
+    through R ≡ ρ ≡ ρ′ when one handler value is installed twice (review
+    meta2.wxw: an `Opt(_)` comparison becomes ambiguous; hole2c.wxw: a
+    second `Opt(Int)` layout in Go).
+- C is the *clause row*: exactly the clauses' effects, with their
+  assumption marks. It is never unified with a context; installations
+  consume it as a restricted row. Two handler types unify C with C, marks
+  included.
 
-**`with h { body }`**, with `h : Handler(m L with R)`, under current row ρ:
-- R is consumed into ρ as a restricted row (§3.5). It is no longer
-  unified with ρ. That keeps R the clause effects, not the context's
-  effects; it accepts at least what equality accepted.
+**`handler L { clauses }`** has type `Handler(m L with R | C)`, with m, R
+and C fresh:
+- Each clause is checked against its own row c. Each c is consumed into R
+  (inference, as clause effects reach R today) and into C (marks). Late
+  labels reach both through §3.5 steps 1-3, and `Fail` is kept.
+- C's unsolved tail closes to empty after the tail pass. A rigid clause
+  tail binds C's tail through that pass, and R's through ordinary
+  unification as today.
+- Own-abort constraint: a `Fail` label, or a rigid tail, in a clause row
+  imposes M ⊑ m, so m cannot be N.
+- Requirement marks: C ⊑ c for each clause row c.
+
+**`with h { body }`**, with `h : Handler(m L with R | C)`, under current
+row ρ:
+- R unifies with ρ as today, ignoring marks.
+- C is consumed into ρ as a restricted row (§3.5), so requirement edges
+  ρ ⊑ C come from that consumption.
 - The body checks against `f L + ρ`, where f is a fresh *frame mark* for
   this installation. Constraints:
   - m ⊑ f (an own-abort-capable handler gives an M frame);
-  - for each label of R resolved at settling, the mark of the ρ
-    occurrence it was matched with ⊑ f (the clauses reach those outer
-    frames);
-  - if R's resolved tail is rigid ϱ, then M ⊑ f, and ρ must end in ϱ
+  - for each label of C resolved at settling, the mark of the ρ
+    occurrence it was matched with, by first occurrence, ⊑ f (the clauses
+    reach those outer frames);
+  - if C's resolved tail is rigid ϱ, then M ⊑ f, and ρ must end in ϱ
     (§3.5 tail pass).
+  - These constraints are generated after the loop and the tail pass,
+    from resolved rows (rev6 M2).
 - So the same handler value can give an N frame in one installation and
   an M frame in another (review I1, second program). A forwarding helper
   needs no mark variable (review I2).
@@ -264,14 +323,19 @@ resolved own row d imposes d ⊑ N.
 
 ### 3.5 Settling
 
-The order follows Check.purs:116-121, with steps 2, 4, 5 and 6 new.
-*Restricted rows* are deferred own rows (target: the current row at the
-`defer`), clause own rows (target: their handler's R), and each
-installation's R (target: the installation's ρ). One handler can thus be
-several restricted entries.
+The order follows Check.purs:116-121. Steps 1-3 are one loop, which
+replaces `settleKeys`, `settleDeferred`, `settleKeys`. Step 4 exists today
+and moves after the loop. Steps 5 and 6 are new.
+
+*Restricted rows* are:
+- deferred own rows (target: the current row at the `defer`);
+- clause own rows (targets: their handler's R and C);
+- each installation's C (target: the installation's ρ).
+
+One handler can thus be several restricted entries.
 
 1–3. **Settle keys and consume late labels, as one loop** (revision 5;
-   in revision 6 it also covers each installation's R).
+   since revision 6 it also covers each installation's C).
    This is the corrected procedure of the focused termination review,
    review-fx008-termination-result.md. It replaces revision 4, which
    failed P3 and P4, could hang (rule (c) on duplicates), and dropped
@@ -293,7 +357,7 @@ several restricted entries.
      test of key presence alone hangs on duplicates (review dup.wxw).
    - (d) In that order, consume each row's resolved labels into its
      target, with a fresh tail, directionally (§3.4: target ⊑ row on
-     matched pairs; copies at tail binding). Clause rows and installed R
+     matched pairs; copies at tail binding). Clause rows and installed C
      keep `Fail`; deferred rows leave it out, as today.
    - **Exit** after a round in which (a) decided no pair and no restricted
      row's resolved label count changed, whatever binding caused the
@@ -303,12 +367,15 @@ several restricted entries.
      needs a concrete error family`. Then run the clause-tail pass.
    - **Tail pass (review T1; revision 6 generalizes it).** A clause row
      whose resolved tail is a rigid ϱ (for example, a clause calling an
-     ambient-row callback) needs R to end in ϱ. In turn, an installed R
-     whose tail is ϱ needs its installation's ρ to end in ϱ.
-     - Bind R's unbound tail meta to ϱ. If R is closed, or ends in another
-       variable, report the missing-capability error.
-     - Repeat while that gives another clause row a rigid tail. Each
-       repetition binds a distinct meta.
+     ambient-row callback) needs R and C to end in ϱ. In turn, an
+     installed C whose tail is ϱ needs its installation's ρ to end in ϱ.
+     The pass repeats while a binding gives any clause row or installed C
+     a rigid tail; deferred rows are left to step 4. Then unsolved C tails
+     close to empty.
+     - Bind the target's unbound tail meta to ϱ. If the target is
+       closed, or ends in another variable, report the missing-capability
+       error.
+     - Each repetition binds a distinct meta.
      - This pass runs after the loop, never inside it, so acceptance does
        not depend on order.
      - It adds no labels, so it cannot reopen the loop.
@@ -319,7 +386,9 @@ several restricted entries.
    Properties (the user's conditions, established by the focused review
    with this correction; argument in the review file):
    1. **Occurrence and multiplicity.** Rows grow only at their tails, and
-      keys are fixed after the first round. So the r-th occurrence of a key
+      a key, once decided, never changes; labels whose keys are still
+      undecided are set aside whole until a later round decides them
+      (rev6 M4). So the r-th occurrence of a key
       in a restricted row always pairs with the r-th occurrence in its
       target. Re-consuming the whole row is required: consuming only new
       labels would pair a late duplicate with the wrong frame. No
@@ -362,7 +431,8 @@ several restricted entries.
    or a rigid tail is E_EFFECT.
 5. **Mark check.** The constraints form a graph whose nodes are mark
    metas plus *atoms*: N, M, and the declaration's own rigid mark
-   variables. Its edges are x ⊑ y, with equalities as two edges.
+   variables. Its edges are x ⊑ y, read on resolved marks; equalities are
+   substitution bindings, not edges (§3.3).
    - The constraints are satisfiable for every value of the mark
      variables exactly when no path runs from atom a to atom b with
      a ≠ b, where a is not N and b is not M. The forbidden paths are
@@ -371,9 +441,11 @@ several restricted entries.
    - The algorithm propagates, for each node, the set of atoms that reach
      it (at most |variables| + 2 per node, so O(edges × atoms)). It then
      checks every edge into an atom.
-   - Each node records its first incoming edge, so a violating path is
-     reported with its sources (§3.6).
-6. **Close** every remaining mark meta to M (they are erased).
+   - Each node keeps a predecessor per (node, atom), still O(edges ×
+     atoms), so the path from a particular atom can be rebuilt and
+     reported with its sources (§3.6, rev6 M3).
+6. **Close** every remaining mark meta to M. This affects only erasure
+   and display, not the argument (§5 gives the witness).
 7. The comparable and printable checks, then the entry check (for
    `main`), unchanged.
 
@@ -407,13 +479,16 @@ mode, finiteness and the snapshots are unchanged.
 - Key definition and the side condition are unchanged.
 - The unifier properties gain marks and directional pairs.
 
-**4.3 Handler types.** `Handler(m L with R)`: m is own-abort freedom and R
-is the clause effects with their assumptions. An N handler type promises
-no escaping `fail` and no unknown calls; installations add the outer
-frames.
-- The change from unifying R with ρ to consuming it accepts strictly
-  more. A handler value installed under two different rows no longer
-  forces those rows equal.
+**4.3 Handler types.** `Handler(m L with R | C)`:
+- m is own-abort freedom;
+- R is the inference row, unified with contexts as today and ignoring
+  marks;
+- C is the clause effects with their assumptions.
+
+An N handler type promises no escaping `fail` and no unknown calls;
+installations add the outer frames. Written types have C = R. Because R
+still unifies, a handler value installed under two rows still makes them
+equal for types, as today, but not for marks.
 - Handler values stay neither comparable nor printable.
 
 **4.4 CF001 R0 (D4, applied with the spec amendment).**
@@ -446,8 +521,17 @@ Claim: in a well-typed program no deferred expression ends in a typed
 abort.
 
 Satisfiability (§3.5 step 5) quantifies over all values of the mark
-variables. So it is enough to argue for one instantiation, with every
-mark a constant.
+variables. So it is enough to argue for one valuation, with every rigid
+variable a constant.
+
+Witness (rev6 M1): for that valuation, set each meta to M exactly when an
+M-valued atom reaches it, and to N otherwise. This is the least
+solution:
+- every edge x ⊑ y holds, because whatever reaches x also reaches y;
+- edges into atoms hold by the path check.
+
+The arguments below use this solution. Step 6's closing affects only
+erasure.
 
 1. **Frames are honest.** Take the frame installed by `with h` with frame
    mark f = N.
@@ -487,7 +571,8 @@ consumption rules, so those probes must be re-run against it.
 
 ## 6. Compatibility
 
-Newly rejected. Each case depends on a handler that may fail:
+Newly rejected. Each case below depends on a handler that may fail,
+except the last, which is imprecision:
 - A `defer` of an operation of a signature label written without
   `nofail`. One existing test pins this as accepted:
   test/fx-cleanup-programs.mjs `a defer performing a non-Fail effect`. It
@@ -496,28 +581,36 @@ Newly rejected. Each case depends on a handler that may fail:
 - A `defer` reaching a frame whose handler fails, or whose clause reaches
   a failing outer handler.
 - A `defer` reaching a frame whose handler calls a callback with an
-  unknown row (the clause or R has a rigid tail).
+  unknown row (the clause or C has a rigid tail).
 - **`nofail` assumptions spread up call chains**, to the declaration that
   installs the handler. `nofail(k)` lets wrappers pass the assumption
   through without fixing it.
 - A late-label system with no finite solution (review N1 and dup.wxw,
   both accepted today with a spurious label): the side-condition error.
+- **The residual merge (L4).** Review rev6 l4b.wxw, accepted today and
+  printing `0`: a no-op lambda `k` shares a tail with a function whose
+  `defer log(0)` runs under a fail-free handler. `k` is also called
+  under a failing one. The defer's `Log` lands in the shared tail, so the
+  failing frame's mark reaches the defer's demand.
 
-No longer rejected in revision 6:
+No longer rejected since revision 6:
 - Review I1's two programs (a local lambda, and a let-bound handler, each
   used under a fail-free and a failing handler).
 - I2's forwarding helper.
 - N5's `run`.
+- Review rev6 annotb.wxw (a lambda annotated `x: Handler(Log)` and a
+  `defer` under the same handler value), because local annotations get
+  mark metas.
 - Revision 5 rejected all of these.
 
 Unchanged:
-- programs without `defer` keep their acceptance, or gain acceptance
-  where `with` used to force rows equal;
+- programs without `defer` keep their acceptance and meaning (`with`
+  still unifies R with ρ as today, ignoring marks);
 - run-time behaviour.
 
-Some exact diagnostic texts without `defer` may move, because clause and
-installation rows are now separate; affected tests are updated with the
-reason recorded.
+Some exact diagnostic texts without `defer` may move, because clause rows
+are now checked separately; affected tests are updated with the reason
+recorded.
 
 ## 7. Limitations (proposed, recorded)
 
@@ -529,8 +622,9 @@ reason recorded.
 - **L3.** Bracket-style cleanup through `...e` stays rejected until FX007.
 - **L4 (residual).** Copies are made when a tail is bound. Labels that
   later reach a *shared* tail are shared by identity, so their marks are
-  equal. This is sound but less precise. Example to pin: the plan must
-  produce one, or show that none is reachable.
+  equal. This is sound but less precise. Example to pin: review rev6
+  l4b.wxw (§6). Fixing it would need copies on every later arrival at a
+  shared tail, which is a follow-up if real programs hit it.
 - **L6.** Mark variables are not allowed in `type` or `effect`
   declarations. Row arguments carry marks inside rows.
 
@@ -546,7 +640,8 @@ L5 (no mark polymorphism) is resolved by per-installation frames and
     and handler-type opening only.
   - `handler` rule: `Handler(m L with R)`, own rows, exact R, own-abort
     constraint.
-  - `with` rule: R consumed, not unified; frame mark f and its
+  - `with` rule: R unified as today, ignoring marks; C consumed; frame
+    mark f and its
     constraints.
   - `defer` rule: append "every other label it performs must be marked
     `nofail` …", with the E_EFFECT text.
@@ -560,7 +655,7 @@ L5 (no mark polymorphism) is resolved by per-installation frames and
 
 Rejections, each asserted with exact text, primary span and notes:
 - the pinned program and the §1 cross-function form;
-- a `Handler(nofail Log)` parameter given a failing handler;
+- a `Handler(nofail Log with pure)` parameter given a failing handler;
 - `mk(): Handler(nofail Log) = handler Log { log(n) => fail(E) }`;
 - a `nofail` call under an M signature;
 - a frame whose handler's clause logs to a failing outer handler, under a
@@ -569,7 +664,8 @@ Rejections, each asserted with exact text, primary span and notes:
 - `nofail Fail(E)`;
 - a rigid `nofail(k)` demanded N;
 - review C2's late `Fail` and T1's rigid tail (both still rejected);
-- review dup and n1 (side-condition error, under a timeout).
+- review dup and n1 (side-condition error, under a timeout);
+- review rev6 l4b.wxw (the pinned L4 limitation).
 
 Acceptances, with run output:
 - an N signature under a fail-free handler;
@@ -577,6 +673,9 @@ Acceptances, with run output:
 - `around` (§3.2) under a fail-free and under a failing outer handler,
   the former with a `defer` in `body`;
 - one handler value installed under two different rows;
+- review rev6 meta2.wxw (accepted, as today) and hole2c.wxw (Go output
+  byte-identical to today: one `Opt(Bool)` layout);
+- review rev6 extb.wxw (prints `12 0 9`) and annotb.wxw (prints `1 2`);
 - cycle2open, f1, f2, f3 and argbind;
 - Console cleanup;
 - the migrated fx-cleanup program.
@@ -589,7 +688,12 @@ Other checks:
 Isolated regression mutants, each caught:
 - equality instead of directional pairs (I1 fails);
 - no copies at tail binding (the I1 lambda fails);
-- R unified with ρ at `with` (the two-row install fails);
+- C unified with ρ at `with` (the two-row install fails);
+- R consumed instead of unified (meta2 becomes ambiguous; hole2c's Go
+  changes);
+- marks equated by R ≡ ρ (I1's let-bound handler is rejected);
+- the extension label sharing the stage label's mark (extb is rejected);
+- written M in local annotations (annotb is rejected);
 - per-installation frame replaced by m (I2 fails);
 - m ⊑ f dropped (a failing handler under a `defer` is accepted);
 - outer-occurrence ⊑ f dropped (a forwarding clause into a failing outer
@@ -611,7 +715,7 @@ Differential testing:
 | Unify, UnifyRow | mark equality in types; directional pairs and copies when consuming |
 | Consume | directional consumption |
 | Use, Stages | instantiation of mark variables, handler-type opening |
-| Handler | clause own rows; `with` consumes R; frame marks |
+| Handler | clause own rows into R and C; `with` unifies R (marks ignored) and consumes C; frame marks |
 | Defer and a new Settle module | the rev 5 loop over all restricted rows, tail pass |
 | Features.Check.Mark (new) | the edge graph and the path check |
 | DeferNotes, RowName, Domain.Problem, Format.Diagnostic | notes, printing, kinds |
@@ -646,7 +750,9 @@ unaffected.
 - D1: a mark per label occurrence (approach A).
 - D2: `nofail`, contextual. It means no escaping typed abort; defects
   and divergence remain possible.
-- D3: all three opening positions (§3.4).
+- D3: all three opening positions (§3.4). Since revision 6, directional
+  consumption subsumes the own-row position, so two remain written as
+  opening rules.
 - D4: CF001 changes to "abort-free" now, in the same change as the spec
   amendment.
 - D5: FX007 is re-scoped to written abort-free row constraints
