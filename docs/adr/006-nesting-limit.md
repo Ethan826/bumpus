@@ -60,7 +60,7 @@ and Go emission to walk chains iteratively first (BACKLOG O001).
 
 ## Measurement
 
-`node scripts/depth-probe.mjs` (cold `node scripts/bumpus.mjs emit` per run,
+`node scripts/depth-probe.mjs` (cold `node scripts/waxwing.mjs emit` per run,
 Node 26.6, default stack, macOS arm64) binary-searches the smallest
 overflowing depth per form, with the limit disabled (constant temporarily
 10⁹, not committed).

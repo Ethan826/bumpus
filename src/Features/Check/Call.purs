@@ -2,20 +2,23 @@ module Features.Check.Call
   ( checkCall
   , checkConstruct
   , saturatedResult
+  , named
   , fixedResult
   ) where
 
 import Prelude
 import Data.Array as Array
-import Data.Either (Either(..))
+import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..))
 import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
 import Domain.Resolved (CtorId(..), FunctionId(..), Ty(..), VarId)
 import Domain.Resolved as Resolved
 import Domain.Syntax (Diagnostic, Span, problemAt)
-import Domain.Type (arrows)
+import Features.Check.Stages (arrowType)
+import Features.Check.Consume (consumeAt)
 import Features.Check.Apply (applyAll, functionLike)
+import Features.Check.Argument (refused)
 import Features.Check.Context (CheckEnv, Infer)
 import Features.Check.Require (require)
 import Features.Check.Scheme (State, Threaded, threadAll)
@@ -70,7 +73,7 @@ saturatedResult env = case _ of
     (Array.length declared.parameters)
     declared.result
   ctor arguments info = counted arguments (Array.length info.fields)
-    (TData info.owner [])
+    (TData info.owner [] [])
   counted arguments count result =
     if Array.length arguments == count then Just result else Nothing
 
@@ -78,7 +81,7 @@ saturatedResult env = case _ of
 -- type, whatever the instantiation.
 fixedResult ∷ Ty VarId → Boolean
 fixedResult = case _ of
-  TFun _ _ → false
+  TFun _ _ _ → false
   TVar _ → false
   _ → true
 
@@ -141,24 +144,35 @@ supplied
 supplied infer env span node use arguments = do
   checked ← threadAll (infer env) use.state arguments
   unified ← threadAll checkArgument checked.state
-    (Array.zipWith argumentPair use.value.fields checked.value)
+    ( Array.mapWithIndex indexed
+        (Array.zipWith argumentPair use.value.fields checked.value)
+    )
+  consumed ←
+    if count == Array.length use.value.fields then
+      consumeAt env unified.state span use.value.consumed use.value.row
+    else pure unified.state
   pure
     { value: Checked.Expr
         { ty: resultType
         , span
         , node: node use.value.scheme.arguments checked.value
         }
-    , state: unified.state
+    , state: consumed
     }
   where
   count = Array.length arguments
   -- A saturated call (every call before FN001) builds no arrow.
   resultType
     | count == Array.length use.value.fields = use.value.result
-    | otherwise = arrows (Array.drop count use.value.fields) use.value.result
-  argumentPair ty actual = { ty, actual }
-  checkArgument reached pair = threadedUnit <$> require env reached pair.ty
-    pair.actual
+    | otherwise = arrowType (Array.drop count use.value.fields)
+        (Array.drop count use.value.rows)
+        use.value.result
+  argumentPair ty actual = { ty, actual, index: 0 }
+  indexed index pair = pair { index = index }
+  checkArgument reached pair = either
+    (Left <<< refused env reached use.value pair.index pair.ty pair.actual)
+    (Right <<< threadedUnit)
+    (require env reached pair.ty pair.actual)
   threadedUnit reached = { value: unit, state: reached }
 
 arityAt ∷ ∀ a. Span → Either Diagnostic a

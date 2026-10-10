@@ -19,7 +19,7 @@ Use FN001's data-last, curried, pipe-friendly direction consistently.
 Coordinate module organization and namespace collisions with M001, and
 overloaded/generic helpers and instance selection with K001/C001. Ordinary
 specialized helpers should not all wait for the generic class machinery.
-Public Bumpus names do not rename the compiler's PureScript APIs or relax
+Public Waxwing names do not rename the compiler's PureScript APIs or relax
 its current maybe/either source-style conventions.
 
 ## Generic abstractions and theoretical rigor
@@ -103,13 +103,13 @@ K001/C001 permit the shared contracts and user-defined-instance tests.
   signatures with K001/C001; explain sequencing, order and error behavior.
 
 Audit the upstream common APIs against this inventory before declaring
-coverage complete. Every common operation must have a proposed Bumpus
+coverage complete. Every common operation must have a proposed Waxwing
 equivalent or a documented reason/dependency for deferral. This is broad
 coverage, not a promise to clone all packages or every specialized API.
 
 ## Candidate names and distinctions
 
-| Operation | Candidate Bumpus name | Familiar equivalent |
+| Operation | Candidate Waxwing name | Familiar equivalent |
 |---|---|---|
 | Extract a value or use a supplied default | getOrDefault | fromMaybe; Rust unwrap_or |
 | Extract a value or compute a fallback only when needed | getOrElse | fromMaybe'; Rust unwrap_or_else |

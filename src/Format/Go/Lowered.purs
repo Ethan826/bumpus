@@ -2,12 +2,15 @@ module Format.Go.Lowered
   ( Scope
   , Shape
   , Wrapper
+  , EffectShape
   , Lowered
   , Lowering
   , Several
   , shapeOf
   , functionWrapper
   , ctorWrapper
+  , operationWrapper
+  , effectShape
   , leaf
   , variable
   , both
@@ -18,26 +21,47 @@ import Prelude
 import Data.Array as Array
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (maybe)
+import Data.Maybe (Maybe, maybe)
 import Data.Traversable (mapAccumL)
 import Data.Tuple (Tuple(..))
 import Domain.IR.Internal as IR
-import Domain.IR.Internal (CtorInfo, FunType, FunTypeId(..), Ty(..))
+import Domain.IR.Internal
+  ( CtorInfo
+  , EffectKey(..)
+  , FunType
+  , FunTypeId(..)
+  , Ty(..)
+  )
 import Domain.Resolved (CtorId(..), FunctionId(..), LocalId)
 import Format.Go.Capture (Free, none, read, union)
-import Format.Go.Data (ctorName, functionName)
+import Format.Go.Cleanup (usesDefects)
+import Format.Go.Context (effectKey, usesContext)
+import Format.Go.Data (ctorName, functionName, performName)
 import Format.Go.Layout (Layout)
 
 -- What lowering reads about the whole program (FN001): each function's and
 -- constructor's signature by id, for arity and staged wrappers, and the
 -- interned arrows, as a table and by (parameter, result), so a stage's Go
 -- type is found by number, never by spelling a type (design §13 rule 8).
+-- `context` is the program's mode (Format.Go.Context) and `effects` holds
+-- each effect layout's runtime key and operations, by EffectKey. `defects`
+-- is whether `defer` or `crash` occurs (Format.Go.Cleanup); the report
+-- names a payload type by `types` and `effectInfos`.
 type Shape =
   { signatures ∷ Array Wrapper
   , ctors ∷ Array Wrapper
   , funTypes ∷ Array FunType
   , arrows ∷ Map (Tuple Ty Ty) FunTypeId
+  , context ∷ Boolean
+  , defects ∷ Boolean
+  , effects ∷ Array EffectShape
+  , types ∷ Array IR.TypeInfo
+  , effectInfos ∷ Array IR.EffectInfo
   }
+
+-- An effect layout: its runtime key, and each operation as the n-ary
+-- perform function `waxwingEff{N}Op{k}` (Format.Go.Effect).
+type EffectShape = { key ∷ Int, operations ∷ Array Wrapper }
 
 -- What lowering one function body reads: the layout, the program's shape,
 -- and the function whose matches, lambdas, pipes and application helpers
@@ -73,11 +97,16 @@ type Several =
   }
 
 shapeOf ∷ IR.Program → Shape
-shapeOf (IR.Program program) =
+shapeOf program'@(IR.Program program) =
   { signatures: map signature program.functions
   , ctors: Array.mapWithIndex constructor program.ctors
   , funTypes: program.funTypes
   , arrows: Map.fromFoldable (Array.mapWithIndex numbered program.funTypes)
+  , context: usesContext program'
+  , defects: usesDefects program'
+  , effects: Array.mapWithIndex layout program.effects
+  , types: program.types
+  , effectInfos: program.effects
   }
   where
   signature definition =
@@ -87,6 +116,15 @@ shapeOf (IR.Program program) =
     }
   numbered index arrow =
     Tuple (Tuple arrow.parameter arrow.result) (FunTypeId index)
+  layout index info =
+    { key: effectKey info.effect
+    , operations: Array.mapWithIndex (operation index) info.operations
+    }
+  operation index position info =
+    { name: performName (EffectKey index) position
+    , parameters: info.parameters
+    , result: info.result
+    }
 
 -- Output ids index the tables. A missing id (a compiler bug) reads as a
 -- nullary signature, so its uses lower as calls, as before FN001.
@@ -98,6 +136,17 @@ functionWrapper shape id@(FunctionId index) =
 ctorWrapper ∷ Shape → CtorId → Wrapper
 ctorWrapper shape id@(CtorId index) =
   maybe (missing (ctorName id)) identity (Array.index shape.ctors index)
+
+-- A missing layout is a compiler bug; each caller decides how it shows.
+effectShape ∷ Shape → EffectKey → Maybe EffectShape
+effectShape shape (EffectKey index) = Array.index shape.effects index
+
+operationWrapper ∷ Shape → EffectKey → Int → Wrapper
+operationWrapper shape key position =
+  maybe (missing (performName key position)) identity
+    (effectShape shape key >>= operationAt position)
+  where
+  operationAt index layout = Array.index layout.operations index
 
 -- Code that contains no lifted function and reads no local.
 leaf ∷ Int → String → Lowered

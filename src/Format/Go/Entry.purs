@@ -15,6 +15,7 @@ import Data.String.Common (joinWith)
 import Data.Traversable (mapAccumL)
 import Data.Tuple (Tuple(..))
 import Domain.IR.Internal (Ty)
+import Format.Go.Context (parameterList, passed)
 import Format.Go.Data (goType)
 
 -- Where one argument lands: its type's index among the function's
@@ -22,19 +23,22 @@ import Format.Go.Data (goType)
 type Placed = { kind ∷ Int, slot ∷ Int }
 
 nodeName ∷ Int → String
-nodeName number = "bumpusNode" <> show number
+nodeName number = "waxwingNode" <> show number
 
 -- `nodes` numbers each argument type's node (design §13 rule 2).
 entry
-  ∷ Map Ty Int
+  ∷ Boolean
+  → Map Ty Int
   → { name ∷ String, parameters ∷ Array Ty, result ∷ Ty }
   → String
-entry nodes wrapper =
+entry context nodes wrapper =
   table wrapper.name "Kinds" (map kindOf placed.value)
     <> table wrapper.name "Slots" (map slotOf placed.value)
     <> "\nfunc "
     <> wrapper.name
-    <> "Entry(e any) "
+    <> "Entry("
+    <> parameterList context [ "e any" ]
+    <> ") "
     <> goType wrapper.result
     <> " {\n"
     <> joinWith "" (Array.mapWithIndex (array placed.accum) distinct)
@@ -47,7 +51,7 @@ entry nodes wrapper =
     <> "}\n}\nreturn "
     <> wrapper.name
     <> "("
-    <> joinWith ", " (map argument placed.value)
+    <> joinWith ", " (passed context (map argument placed.value))
     <> ")\n}\n"
   where
   distinct = Array.nub wrapper.parameters

@@ -1,12 +1,12 @@
 // Harvest hook for scripts/differential.mjs: loaded with
 // `--import` into every test process, it appends each source that
-// Format.Parse's `parse` receives to $BUMPUS_HARVEST, one JSON string per
+// Format.Parse's `parse` receives to $WAXWING_HARVEST, one JSON string per
 // line. Only that file's own copy of `parse` is instrumented; compiler
 // output on disk is never changed.
 import { appendFileSync } from 'node:fs';
 import { registerHooks } from 'node:module';
 
-const target = process.env.BUMPUS_HARVEST;
+const target = process.env.WAXWING_HARVEST;
 const entry = 'var parse = function (source) {';
 
 const record = source => {
@@ -21,7 +21,7 @@ const instrumented = text => {
       + '`parse` as expected; update the hook');
   }
   return text.replace(entry,
-    `${entry}\n    globalThis.bumpusHarvest(source);`);
+    `${entry}\n    globalThis.waxwingHarvest(source);`);
 };
 
 const load = (url, context, nextLoad) => {
@@ -31,6 +31,6 @@ const load = (url, context, nextLoad) => {
 };
 
 if (target !== undefined) {
-  globalThis.bumpusHarvest = record;
+  globalThis.waxwingHarvest = record;
   registerHooks({ load });
 }

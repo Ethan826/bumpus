@@ -60,7 +60,7 @@ const rows = [
   },
   {
     // P001: a meta must not bind to a type that properly contains it.
-    name: 'occurs', file: 'src/Features/Check/Unify.purs',
+    name: 'occurs', file: 'src/Features/Check/Binding.purs',
     needle: 'if mentions meta resolved then',
     replacement: 'if false then',
     probe: 'occurs', message: /occurs check missing/
@@ -80,6 +80,105 @@ const rows = [
     needle: ', state: state { next = state.next + Array.length variables }',
     replacement: ', state: state',
     probe: 'instantiate', message: /scheme metas shared across uses/
+  },
+  {
+    name: 'nested-fail', file: 'src/Features/Check/Failure.purs',
+    needle: 'Checked.Fail payload → maybe\'\n'
+      + '    (unkeyedPayload payload expression.span)\n'
+      + '    Just\n    (firstUnkeyed subst payload)',
+    replacement: 'Checked.Fail payload → unkeyedPayload payload'
+      + ' expression.span unit',
+    probe: 'nested-fail', message: /nested Fail payload:/
+  },
+  {
+    name: 'duplicate-binder', file: 'src/Features/Resolve/Handler.purs',
+    needle: '  validateClauseParameters clauses\n', replacement: '',
+    probe: 'duplicate-binder',
+    message: /duplicate handler binder:/
+  },
+  {
+    name: 'duplicate-row-tail', file: 'src/Format/Parse/Row.purs',
+    needle: 'ordinary = gathered <$> validatedParts inner',
+    replacement: 'ordinary = gathered <$> sepBy1 "+" (rowPart inner)',
+    probe: 'duplicate-row-tail', message: /duplicate row tail:/
+  },
+  {
+    name: 'constructor-function', file: 'src/Features/Resolve/TypeValidation.purs',
+    needle: 'globalFlags = repeated (map globalName globals)',
+    replacement: 'globalFlags = Array.replicate (Array.length globals) false',
+    probe: 'constructor-function',
+    message: /constructor and function collision: program was accepted/
+  },
+  {
+    name: 'duplicate-scan-timing',
+    file: 'src/Features/Resolve/TypeValidation.purs',
+    needle: 'uniqueCtor { repeats, entry }\n'
+      + '    | repeats = reportEarliest globals entry.name\n'
+      + '    | otherwise = Right unit',
+    replacement: 'uniqueCtor { repeats, entry } = when repeats\n'
+      + '    (reportEarliest globals entry.name)',
+    probe: 'duplicate-scan-timing',
+    message: /large-source duplicate regression took/
+  },
+  {
+    name: 'duplicate-effect', file: 'src/Features/Resolve/Effect.purs',
+    needle: 'effectAt index = maybe (Right unit) duplicate\n'
+      + '    (Array.index declarations index)',
+    replacement: 'effectAt index = if index < 0 then maybe (Right unit)'
+      + ' duplicate\n    (Array.index declarations index) else Right unit',
+    // FX001 Task 6: with the check restored away, the unused duplicate now
+    // passes the post-specialization guard (it leaves no effect node), so the
+    // probe sees an accepted program instead of the old guard's E_INTERNAL.
+    probe: 'duplicate-effect', message: /duplicate effect: program was accepted/
+  },
+  {
+    name: 'duplicate-operation', file: 'src/Features/Resolve/Effect.purs',
+    needle: 'duplicateOperation declaration = Left\n'
+      + '    ( Syntax.problemAt\n'
+      + '        (Duplicate DuplicateOperation declaration.name)\n'
+      + '        declaration.span\n    )',
+    replacement: 'duplicateOperation _ = Right unit',
+    probe: 'duplicate-operation',
+    message: /duplicate operation: program was accepted/
+  },
+  {
+    name: 'duplicate-effect-parameter',
+    file: 'src/Features/Resolve/Effect.purs',
+    needle: 'duplicateEffectParameter parameter = Left\n'
+      + '    ( Syntax.problemAt\n'
+      + '        (Duplicate DuplicateTypeParameter parameter.name)\n'
+      + '        parameter.span\n    )',
+    replacement: 'duplicateEffectParameter _ = Right unit',
+    probe: 'duplicate-effect-parameter',
+    message: /duplicate effect parameter: program was accepted/
+  },
+  {
+    name: 'duplicate-operation-parameter',
+    file: 'src/Features/Resolve/Effect.purs',
+    needle: 'duplicateParameter parameter = Left\n'
+      + '    ( Syntax.problemAt\n'
+      + '        (Duplicate DuplicateParameter parameter.name)\n'
+      + '        parameter.span\n    )',
+    replacement: 'duplicateParameter _ = Right unit',
+    probe: 'duplicate-operation-parameter',
+    message: /duplicate operation parameter: program was accepted/
+  },
+  {
+    name: 'deferred-fail-effect', file: 'src/Features/Check/Failure.purs',
+    needle: '_ → rejected env state origin failure',
+    replacement: '_ → Left (problemAt (Internal'
+      + ' "Failure row settlement failed") span)',
+    probe: 'deferred-fail-effect',
+    message: /deferred Fail capability: wrong diagnostic code/
+  },
+  {
+    // FX001 Task 7: the mode is chosen over the emitted IR; threading the
+    // context through every program breaks Console-only output.
+    name: 'effect-free-ctx', file: 'src/Format/Go/Context.purs',
+    needle: '  || Array.any inFunction program.functions',
+    replacement: '  || not (Array.null program.functions)',
+    probe: 'effect-free-ctx',
+    message: /ctx emitted for an effect-free program/
   },
   {
     // P001 (R15): a key's arguments are numbered output types (FN001 Task

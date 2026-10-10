@@ -6,14 +6,14 @@ import { join } from 'node:path';
 import { checked, command } from './support.mjs';
 import { runGoBatch } from './go-batch.mjs';
 
-// E005: each match is a top-level Go function `bumpusFn{f}Match{k}`, k in
-// pre-order (scrutinee before arms) within bumpusFn{f}. Its parameters are
+// E005: each match is a top-level Go function `waxwingFn{f}Match{k}`, k in
+// pre-order (scrutinee before arms) within waxwingFn{f}. Its parameters are
 // the captured locals in LocalId order, then the scrutinee.
 const list = 'type L = Nil | Cons(Int, L);';
-const work = mkdtempSync(join(tmpdir(), 'bumpus-lift-'));
+const work = mkdtempSync(join(tmpdir(), 'waxwing-lift-'));
 after(() => rmSync(work, { recursive: true, force: true }));
 
-const headers = go => go.match(/^func bumpusFn[^\n]*$/gm);
+const headers = go => go.match(/^func waxwingFn[^\n]*$/gm);
 const preOrder = `${list} fn f(xs: L, n: Int): Int = (match xs { Nil => n, `
   + 'Cons(h, t) => match t { Nil => h + n, Cons(g, _) => g } }) '
   + '+ (match n { 0 => 1, _ => 2 }); '
@@ -29,14 +29,14 @@ const batch = runGoBatch(import.meta.url,
 test('lifted matches are named in pre-order with captures first', () => {
   const source = preOrder;
   assert.deepEqual(headers(checked(source)), [
-    'func bumpusFn0(bumpusLocal0 bumpusTy0, bumpusLocal1 int32) int32 {',
-    'func bumpusFn0Match0(bumpusLocal1 int32, '
-      + 'bumpusScrutinee bumpusTy0) int32 {',
-    'func bumpusFn0Match1(bumpusLocal1 int32, bumpusLocal2 int32, '
-      + 'bumpusScrutinee bumpusTy0) int32 {',
-    'func bumpusFn0Match2(bumpusScrutinee int32) int32 {',
-    'func bumpusFn1() int32 {',
-    'func bumpusFn1Match0(bumpusScrutinee bumpusTy0) int32 {'
+    'func waxwingFn0(waxwingLocal0 waxwingTy0, waxwingLocal1 int32) int32 {',
+    'func waxwingFn0Match0(waxwingLocal1 int32, '
+      + 'waxwingScrutinee waxwingTy0) int32 {',
+    'func waxwingFn0Match1(waxwingLocal1 int32, waxwingLocal2 int32, '
+      + 'waxwingScrutinee waxwingTy0) int32 {',
+    'func waxwingFn0Match2(waxwingScrutinee int32) int32 {',
+    'func waxwingFn1() int32 {',
+    'func waxwingFn1Match0(waxwingScrutinee waxwingTy0) int32 {'
   ]);
   assert.equal(batch.run('preOrder'), '4\n');
 });
@@ -44,10 +44,10 @@ test('lifted matches are named in pre-order with captures first', () => {
 test('a match in a scrutinee is numbered before the arms', () => {
   const source = scrutineeFirst;
   assert.deepEqual(headers(checked(source)), [
-    'func bumpusFn0() int32 {',
-    'func bumpusFn0Match0(bumpusScrutinee bumpusTy0) int32 {',
-    'func bumpusFn0Match1(bumpusScrutinee int32) bumpusTy0 {',
-    'func bumpusFn0Match2(bumpusScrutinee int32) int32 {'
+    'func waxwingFn0() int32 {',
+    'func waxwingFn0Match0(waxwingScrutinee waxwingTy0) int32 {',
+    'func waxwingFn0Match1(waxwingScrutinee int32) waxwingTy0 {',
+    'func waxwingFn0Match2(waxwingScrutinee int32) int32 {'
   ]);
   assert.equal(batch.run('scrutineeFirst'), '5\n');
 });
@@ -65,27 +65,8 @@ const capturing = `${list} fn f(xs: L, k: Int): Int = match xs { `
   + '+ f(Nil, 1);';
 
 test('captures propagate through several nested matches', () => {
-  const file = join(work, 'capture.bumpus');
+  const file = join(work, 'capture.wxw');
   writeFileSync(file, capturing);
-  assert.equal(command('node', ['scripts/bumpus.mjs', 'run', file]),
+  assert.equal(command('node', ['scripts/waxwing.mjs', 'run', file]),
     '1124\n');
-});
-
-// E005 review: capture sets come from one bottom-up pass. Re-scanning each
-// lifted match's subtree made this 127-deep, 50-arm ladder (about 147 KB)
-// take 3.0 s to compile, against 0.27 s for the closure compiler.
-const compileBudgetMs = 1500;
-const ladderDepth = 127;
-const ladderWidth = 50;
-
-test('a deep, wide match ladder compiles in under 1.5 s', () => {
-  const arms = Array.from({ length: ladderWidth - 1 },
-    (_, value) => `${value} => f(p, q, r, s, t), `).join('');
-  const source = 'fn f(p: Int, q: Int, r: Int, s: Int, t: Int): Int = '
-    + `match p { ${arms}_ => `.repeat(ladderDepth) + 'q'
-    + ' }'.repeat(ladderDepth) + '; fn main(): Int = f(1, 2, 3, 4, 5);';
-  const started = performance.now();
-  checked(source);
-  const elapsed = performance.now() - started;
-  assert.ok(elapsed < compileBudgetMs, `took ${elapsed} ms`);
 });

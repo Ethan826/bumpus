@@ -1,5 +1,5 @@
 // Measures, per nesting form, the smallest depth at which a cold
-// `node scripts/bumpus.mjs emit` overflows the JavaScript stack (ADR 006).
+// `node scripts/waxwing.mjs emit` overflows the JavaScript stack (ADR 006).
 // Run with the depth limit disabled: `node scripts/depth-probe.mjs [form…]`
 // after temporarily setting `nestingLimit` in Format.Parse.Grammar to 10⁹
 // and rebuilding; ADR 006 "Measurement" gives the exact, uncommitted steps.
@@ -18,7 +18,7 @@ const named = forms;
 const timeout = 120000;
 const start = 64;
 const ceiling = 1 << 16;
-const work = mkdtempSync(join(tmpdir(), 'bumpus-depth-'));
+const work = mkdtempSync(join(tmpdir(), 'waxwing-depth-'));
 
 const classify = (result) => {
   const output = `${result.stdout}${result.stderr}`;
@@ -33,10 +33,10 @@ const classify = (result) => {
 };
 
 const outcome = (form, depth) => {
-  const input = join(work, 'probe.bumpus');
+  const input = join(work, 'probe.wxw');
   writeFileSync(input, named[form](depth).source);
   const result = spawnSync('node',
-    ['scripts/bumpus.mjs', 'emit', input, join(work, 'probe.go')],
+    ['scripts/waxwing.mjs', 'emit', input, join(work, 'probe.go')],
     { encoding: 'utf8', timeout });
   return { depth, kind: classify(result), detail: result.stderr.trim() };
 };

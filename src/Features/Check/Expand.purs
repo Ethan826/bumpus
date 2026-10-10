@@ -20,7 +20,9 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Domain.Checked.Internal (Open)
 import Domain.Problem (Problem(..))
 import Domain.Resolved (CtorId(..), CtorInfo, TypeId(..), TypeInfo)
-import Domain.Type (Ty(..), VarId(..), arrows, children, ground, spine)
+import Domain.Row (Label(..), closedRow)
+import Domain.Type (Ty(..), VarId(..))
+import Domain.Type.Parts (arrows, children, ground, spine)
 import Features.Check.Tables (Lookup, ctorInfo, typeInfo)
 
 -- An application with its variables forgotten: rigid variables and holes
@@ -74,14 +76,22 @@ application expansion ty = maybe' unexpanded (typeInfo expansion.types)
   (TypeId <$> Map.lookup (spelling (key ty)) expansion.numbers)
 
 -- A declared field type with the owner's arguments put for its variables.
+-- Coverage never reads a row (an arrow or handler is abstract to it), so
+-- rows are left out: arrows pure, applications without row arguments.
 substitute ∷ ∀ v. Array (Ty v) → Ty VarId → Lookup (Ty v)
 substitute arguments = case _ of
   TInt → Right TInt
   TBool → Right TBool
-  TData id inner → TData id <$> traverse (substitute arguments) inner
+  TUnit → Right TUnit
+  TData id inner _ → rowless id <$> traverse (substitute arguments) inner
   TVar (VarId index) → maybe' missing Right (Array.index arguments index)
-  arrow@(TFun _ _) → substituteSpine (spine arrow)
+  THandler (Label effect inner) _ → handler effect <$> traverse
+    (substitute arguments)
+    inner
+  arrow@(TFun _ _ _) → substituteSpine (spine arrow)
   where
+  rowless id inner = TData id inner []
+  handler effect inner = THandler (Label effect inner) closedRow
   missing _ = Left (Internal "Invalid type argument")
   substituteSpine found = arrows
     <$> traverse (substitute arguments) found.parameters
@@ -102,11 +112,16 @@ spelling ∷ Key → String
 spelling = case _ of
   TInt → "i"
   TBool → "b"
+  TUnit → "u"
   TVar _ → "v"
-  TData (TypeId id) arguments → show id <> "("
+  TData (TypeId id) arguments _ → show id <> "("
     <> joinWith "," (map spelling arguments)
     <> ")"
-  arrow@(TFun _ _) → "f(" <> joinWith "," (map spelling (children arrow))
+  arrow@(TFun _ _ _) → "f(" <> joinWith "," (map spelling (children arrow))
+    <> ")"
+  handler@(THandler _ _) → "h("
+    <> joinWith ","
+      (map spelling (children handler))
     <> ")"
 
 closedKey ∷ Array CtorInfo → Tuple Int TypeInfo → Lookup (Maybe Key)
@@ -115,7 +130,7 @@ closedKey ctors (Tuple index info) = judge <$> traverse (ctorInfo ctors)
   where
   judge found = if all closedCtor found then Just root else Nothing
   closedCtor ctor = all (isJust <<< ground) ctor.fields
-  root = TData (TypeId index) []
+  root = TData (TypeId index) [] []
 
 -- Numbers the data applications not seen before, in first-seen order.
 admit ∷ Discovery → Array Key → Discovery
@@ -149,7 +164,7 @@ discover types ctors state =
 -- An application's declared constructors with its arguments substituted.
 unfold ∷ Array TypeInfo → Array CtorInfo → Key → Lookup Unfolded
 unfold types ctors = case _ of
-  TData id arguments → typeInfo types id >>= unfoldInfo ctors arguments
+  TData id arguments _ → typeInfo types id >>= unfoldInfo ctors arguments
   _ → Left (Internal "Expanded a type that is not data")
 
 unfoldInfo ∷ Array CtorInfo → Array Key → TypeInfo → Lookup Unfolded
@@ -191,16 +206,18 @@ field ∷ Map String Int → Key → Lookup (Ty VarId)
 field numbers = case _ of
   TInt → Right TInt
   TBool → Right TBool
+  TUnit → Right TUnit
   TVar _ → Right TInt
-  TFun _ _ → Right TInt
-  found@(TData _ _) → maybe' unexpanded (Right <<< applied)
+  TFun _ _ _ → Right TInt
+  THandler _ _ → Right TInt
+  found@(TData _ _ _) → maybe' unexpanded (Right <<< applied)
     (Map.lookup (spelling found) numbers)
   where
-  applied number = TData (TypeId number) []
+  applied number = TData (TypeId number) [] []
 
 isData ∷ Key → Boolean
 isData = case _ of
-  TData _ _ → true
+  TData _ _ _ → true
   _ → false
 
 unexpanded ∷ ∀ a. Unit → Lookup a

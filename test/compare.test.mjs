@@ -57,11 +57,11 @@ const traced = (type, op, left, right) => {
   const result = goTest(source, `package main
 import "testing"
 import "fmt"
-var bumpusTrace []string
+var waxwingTrace []string
 func TestTrace(t *testing.T) {
-  bumpusFn2()
+  waxwingFn2()
   // The first entry is main itself; the rest are its operands in order.
-  if got := fmt.Sprint(bumpusTrace[1:]); got != "[0 1]" {
+  if got := fmt.Sprint(waxwingTrace[1:]); got != "[0 1]" {
     t.Fatalf("trace %s", got)
   }
 }
@@ -77,7 +77,7 @@ test('comparison operands evaluate once each, left first', () => {
 });
 
 test('Bool helper appears only when needed', () => {
-  const helper = /func bumpusCmpBool/g;
+  const helper = /func waxwingCmpBool/g;
   assert.equal(checked(bool('false < true')).match(helper).length, 1);
   assert.equal(checked(bool('true == true')).match(helper), null);
   assert.equal(checked(bool('1 < 2')).match(helper), null);
@@ -85,7 +85,7 @@ test('Bool helper appears only when needed', () => {
 
 test('existing bootstrap output is unchanged', () => {
   assert.equal(
-    checked(readFileSync('examples/answer.bumpus', 'utf8')),
+    checked(readFileSync('examples/answer.wxw', 'utf8')),
     readFileSync('bootstrap/answer.go', 'utf8')
   );
 });

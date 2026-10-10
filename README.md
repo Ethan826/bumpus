@@ -1,12 +1,11 @@
 <p align="center">
-  <img src="assets/branding/bumpus-logo.png" alt="Bumpus hound logo" width="240">
+  <img src="assets/branding/waxwing-logo.png" alt="Waxwing bird logo" width="240">
 </p>
 
-# Bumpus bootstrap
+# Waxwing bootstrap
 
-Bumpus is a provisional small functional language targeting ordinary Go.
-The name is for the Bumpus hounds of *A Christmas Story*, chosen because
-"Sprig" collided with Masterminds/sprig in the Go ecosystem.
+Waxwing is a small functional language targeting ordinary Go. Waxwing source
+files use the `.wxw` extension.
 Stage 0 is implemented in PureScript. This repository implements one checked
 vertical slice plus closed algebraic data types with exhaustive nested
 `match` (A001), structural comparison operators `== != < <= > >=` on every
@@ -14,7 +13,7 @@ type, and printing of whatever `main` returns (A003, in final review).
 P001 implements rank-1 polymorphism: parameterized types and generic
 functions, lowered by whole-program specialization
 ([ADR 007](docs/adr/007-specialization.md),
-examples/lists.bumpus). FN001 adds first-class functions: function types,
+examples/lists.wxw). FN001 adds first-class functions: function types,
 partial application, lambdas, closures and `|>`, staged by declared arity
 ([ADR 008](docs/adr/008-functions.md)). HKTs, classes, and rows are
 planned.
@@ -54,17 +53,17 @@ That environment limit is recorded as F001 in BACKLOG.md.
 
 ```sh
 npm run build
-node scripts/bumpus.mjs emit examples/answer.bumpus .build/answer.go
-node scripts/bumpus.mjs build examples/answer.bumpus .build/answer
+node scripts/waxwing.mjs emit examples/answer.wxw .build/answer.go
+node scripts/waxwing.mjs build examples/answer.wxw .build/answer
 .build/answer
-node scripts/bumpus.mjs run examples/answer.bumpus
-node scripts/bumpus.mjs run examples/tree.bumpus
+node scripts/waxwing.mjs run examples/answer.wxw
+node scripts/waxwing.mjs run examples/tree.wxw
 ```
 
 Both execution paths print `42` for the answer example. `main` may return any
 type: the executable prints the value in the coverage-witness format (`5`,
 `true`, `Node(Leaf, 1, Node(...))`, negative integers with `-`), and
-examples/tree.bumpus prints a binary search tree. Comparisons are built in,
+examples/tree.wxw prints a binary search tree. Comparisons are built in,
 non-chaining and looser than `+`, with one structural order (constructor
 declaration order, then fields left to right; ADR 005). `emit` writes
 canonical deterministic Go; `build` invokes Go on a temporary source file;
@@ -95,7 +94,7 @@ PureScript modules, not yet a native Go compiler executable.
 
 Closed ADTs and exhaustive matching are implemented (see
 [ADR 003](docs/adr/003-closed-adts.md), [ADR 004](docs/adr/004-five-layers.md)
-and examples/shapes.bumpus). The compiler is organized in five layers: Domain,
+and examples/shapes.wxw). The compiler is organized in five layers: Domain,
 Features, Format, Runtime, Program ([architecture](docs/architecture.md)).
 Comparison and printing are specified in [language](docs/language.md) and
 [ADR 005](docs/adr/005-structural-order.md). Milestone A003 is merged. G001

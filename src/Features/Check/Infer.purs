@@ -1,31 +1,49 @@
 module Features.Check.Infer (Env, infer) where
 
 import Prelude
-import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Maybe (maybe')
+import Data.Map as Map
+import Data.Maybe (Maybe, maybe')
 import Domain.Checked.Internal (Open)
 import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
 import Domain.Resolved (Ty(..))
 import Domain.Resolved as Resolved
 import Domain.Syntax (Diagnostic, Operator, Span, problemAt)
+import Domain.Type (TyRow)
+import Features.Check.Operation
+  ( operationCall
+  , operationRef
+  , printCall
+  , printRef
+  , crashCall
+  , crashRef
+  )
 import Features.Check.Apply (checkApply)
 import Features.Check.Arms (checkMatch)
+import Features.Check.Block (checkBlock)
+import Features.Check.Handler as Handler
+import Features.Check.Failure as Failure
 import Features.Check.Call (checkCall, checkConstruct)
+import Features.Check.Context (Locals)
 import Features.Check.Lambda (checkLambda)
 import Features.Check.Pipe (checkPipe)
 import Features.Check.Use (checkCtorRef, checkFunctionRef)
-import Features.Check.Match (Typed)
 import Features.Check.Require (bounded, require)
-import Features.Check.Scheme (State, Threaded)
+import Features.Check.Scheme (Site, State, Threaded)
 
 type Env =
-  { functions ∷ Array Resolved.FunctionDecl
+  { current ∷ TyRow Open
+  , sites ∷ Array Site
+  , functionName ∷ String
+  , functionSpan ∷ Span
+  , rowSpan ∷ Maybe Span
+  , effects ∷ Array Resolved.EffectInfo
+  , functions ∷ Array Resolved.FunctionDecl
   , types ∷ Array Resolved.TypeInfo
   , ctors ∷ Array Resolved.CtorInfo
   , variables ∷ Array String
-  , locals ∷ Array Typed
+  , locals ∷ Locals
   }
 
 type Inferred = Either Diagnostic (Threaded Checked.Expr)
@@ -74,6 +92,28 @@ inferNode env state expression = case expression of
     callee
     arguments
   Resolved.Pipe span left right → checkPipe infer env state span left right
+  Resolved.UnitValue span → typed state span TUnit Checked.UnitValue
+  Resolved.OperationRef span effect index → operationRef env state span effect
+    index
+  Resolved.Perform span effect index arguments →
+    operationCall infer env state span effect index arguments
+  Resolved.PrintRef span → printRef env state span
+  Resolved.Print span arguments → printCall infer env state span arguments
+  Resolved.CrashRef span → crashRef env state span
+  Resolved.Crash span arguments → crashCall infer env state span arguments
+  Resolved.Block span items value → checkBlock infer env state span items
+    value
+  Resolved.Handler span label clauses → Handler.handler infer env state span
+    label
+    clauses
+  Resolved.With span handler body → Handler.withHandler infer env state span
+    handler
+    body
+  Resolved.Handle span body clauses → Handler.handleFailure infer env state
+    span
+    body
+    clauses
+  Resolved.Fail span value → Failure.failExpression infer env state span value
 
 typed ∷ State → Span → Ty Open → Checked.Node → Inferred
 typed state span ty node = pure
@@ -123,8 +163,7 @@ checkConditional env state span condition branches = do
 
 checkLocal ∷ Env → State → Span → Resolved.LocalId → Inferred
 checkLocal env state span id = maybe' missing found
-  (Array.find named env.locals)
+  (Map.lookup id env.locals)
   where
   missing _ = Left (problemAt (Internal "Invalid resolved local") span)
-  found local = typed state span local.ty (Checked.Local id)
-  named local = local.id == id
+  found ty = typed state span ty (Checked.Local id)

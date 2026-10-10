@@ -13,6 +13,7 @@ import Data.String.Common (joinWith)
 import Domain.IR.Internal as IR
 import Format.Go.Apply (applied, walked)
 import Format.Go.Capture (none, union)
+import Format.Go.Context (passed)
 import Format.Go.Lowered (Lowered, Lowering, Scope, Wrapper, several)
 import Format.Go.Stage (stageTypes, valueName)
 import Format.Go.Data (goType)
@@ -27,7 +28,9 @@ named scope lower next wrapper expression arguments =
   else call (several lower next arguments)
   where
   call parts =
-    { code: wrapper.name <> "(" <> joinWith ", " parts.codes <> ")"
+    { code: wrapper.name <> "("
+        <> joinWith ", " (passed scope.shape.context parts.codes)
+        <> ")"
     , next: parts.next
     , lifted: parts.lifted
     , free: union parts.frees

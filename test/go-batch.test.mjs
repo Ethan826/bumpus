@@ -12,12 +12,12 @@ import { asCasePackage, batchId, runGoBatch } from './go-batch.mjs';
 
 const answer = 'fn main(): Int = 42;';
 const nullary = 'type N = A | B; fn main(): N = A;';
-// Builds a constructor no Bumpus program can: tag 9 of a two-constructor
+// Builds a constructor no Waxwing program can: tag 9 of a two-constructor
 // type, so printing main's value panics.
 const malformed = go => {
-  const ctor = 'return bumpusTy0{tag: 1}';
+  const ctor = 'return waxwingTy0{tag: 1}';
   assert.equal(go.split(ctor).length, 2, 'one tag-1 constructor');
-  return go.replace(ctor, 'return bumpusTy0{tag: 9}');
+  return go.replace(ctor, 'return waxwingTy0{tag: 9}');
 };
 const thrown = action => {
   try { action(); } catch (error) { return error; }
@@ -54,7 +54,7 @@ test('a panicking case matches its standalone program', () => {
     ['sibling', answer], ['panics', { source: nullary, transform: malformed }]
   ], 'panic');
   assert.equal(batch.run('sibling'), '42\n');
-  const work = mkdtempSync(join(tmpdir(), 'bumpus-batch-test-'));
+  const work = mkdtempSync(join(tmpdir(), 'waxwing-batch-test-'));
   try {
     writeFileSync(join(work, 'main.go'), malformed(checked(nullary)));
     command('go', ['build', '-o', join(work, 'program'), 'main.go'],
@@ -65,10 +65,10 @@ test('a panicking case matches its standalone program', () => {
     assert.equal(batched.status, alone.status);
     assert.equal(batched.stdout, alone.stdout);
     const first = text => text.split('\n')[0];
-    assert.equal(first(alone.stderr), 'panic: bumpus: malformed value');
+    assert.equal(first(alone.stderr), 'panic: waxwing: malformed value');
     assert.equal(first(batched.stderr), first(alone.stderr));
     assert.match(thrown(() => batch.run('panics')).message,
-      /panic: bumpus: malformed value/);
+      /panic: waxwing: malformed value/);
   } finally { rmSync(work, { recursive: true, force: true }); }
 });
 
@@ -131,4 +131,13 @@ test('duplicate case names are refused when the batch is declared', () => {
     [[1, answer], ['1', answer]], 'dup numeric'), /duplicate case name "1"/);
   assert.equal(runGoBatch(import.meta.url, unique(1, 'same'), 'no dup')
     .run('same'), '42\n');
+});
+
+test('Unit entries batch without printing their result', () => {
+  const batch = runGoBatch(import.meta.url, [
+    ['quiet', 'fn main(): Unit = ();'],
+    ['console', 'fn main(): Unit with Console = print(42);']
+  ], 'unit');
+  assert.equal(batch.run('quiet'), '');
+  assert.equal(batch.run('console'), '42\n');
 });

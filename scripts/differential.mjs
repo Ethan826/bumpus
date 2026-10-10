@@ -172,7 +172,7 @@ const regenerate = (candidate, file) => {
   const hook = new URL('./differential-hook.mjs', import.meta.url).href;
   const result = spawnSync(process.execPath, ['--test', ...tests], {
     cwd: candidate, encoding: 'utf8',
-    env: { ...process.env, BUMPUS_HARVEST: file,
+    env: { ...process.env, WAXWING_HARVEST: file,
       NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${hook}` }
   });
   // A failing test (e.g. a timing bound under load) still harvested its

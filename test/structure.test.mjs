@@ -13,7 +13,7 @@ test('layer gate rejects effects, reverse dependencies, and unchecked IR access'
   assert.deepEqual(graphFindings({ 'Features.Check': { path: 'src/check.purs', depends: ['Domain.Syntax', 'Domain.Checked.Internal', 'Data.Array'] } }), []);
   assert.deepEqual(graphFindings({ 'Program.Main': { path: 'src/main.purs', depends: ['Effect'] } }), []);
   assert.equal(graphFindings({ 'Unknown': { path: 'src/unknown.purs', depends: [] } }).length, 1);
-  assert.equal(graphFindings({ 'Bumpus.Old': { path: 'src/Bumpus/Old.purs', depends: [] } }).length, 1);
+  assert.equal(graphFindings({ 'Waxwing.Old': { path: 'src/Waxwing/Old.purs', depends: [] } }).length, 1);
 });
 
 // Two IRs, two allowlists: checking produces the checked IR, specialization
@@ -36,7 +36,7 @@ test('length gate counts blank lines and includes tooling and tests', () => {
 });
 
 test('escape gate rejects partiality and test suppression', () => {
-  assert.equal(textFindings('src/Bumpus/Foo.purs', 'unsafePartial\n').length, 1);
+  assert.equal(textFindings('src/Waxwing/Foo.purs', 'unsafePartial\n').length, 1);
   assert.equal(textFindings('test/x.mjs', 'test.' + 'skip("x")\n').length, 1);
 });
 

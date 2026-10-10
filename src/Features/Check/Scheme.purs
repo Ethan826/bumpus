@@ -1,5 +1,7 @@
 module Features.Check.Scheme
   ( State
+  , Site
+  , Deferral
   , Threaded
   , Scheme
   , start
@@ -7,6 +9,7 @@ module Features.Check.Scheme
   , instantiate
   , at
   , flexible
+  , flexibleRow
   , opened
   , resolved
   , headOf
@@ -16,6 +19,7 @@ module Features.Check.Scheme
   ) where
 
 import Prelude
+import Prim hiding (Row)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Foldable (foldl)
@@ -26,7 +30,10 @@ import Data.Traversable (traverse)
 import Domain.Checked.Internal (Open(..))
 import Domain.Checked.Internal as Checked
 import Domain.Syntax (Diagnostic, Span)
-import Domain.Type (Ty(..), VarId(..), children)
+import Domain.Type (Ty(..), TyRow, VarId(..))
+import Domain.Row (Row(..), isPure, openRow)
+import Domain.Type.Parts (children, rowArguments, rowsOf)
+import Features.Check.Provenance (Origins, noOrigins)
 import Features.Check.Unify (Flex, Subst, exceedsLimit, resolve, walk)
 import Features.Check.Unify as Unify
 import Features.Check.Walk (foldTypes, retype)
@@ -34,7 +41,33 @@ import Features.Check.Walk (foldTypes, retype)
 -- One function's checking state: its substitution and next fresh meta.
 -- While a function is checked, a checked-IR type's `Hole m` is the meta m;
 -- `holes` renumbers the ones still unsolved once the function is done.
-type State = { subst ∷ Subst, next ∷ Int }
+-- `deferrals` are the rows of the `defer`ed expressions, for
+-- Features.Check.Defer to judge once the function's keys are settled.
+-- `origins`: where each label occurrence entered a row (design §6), read
+-- only when a rejection is reported.
+type State =
+  { subst ∷ Subst
+  , next ∷ Int
+  , deferrals ∷ Array Deferral
+  , origins ∷ Origins
+  }
+
+-- Where the leading labels of the current row were written (a signature,
+-- a `with` installation, a `handle`): `count` labels from `span`, the
+-- innermost site first. A label's occurrence is then the site's span and
+-- its position within the site, whatever has been installed around it.
+type Site = { span ∷ Span, count ∷ Int }
+
+-- `current` is the row the `defer` was checked in, which later labels join,
+-- and `sites` where its own labels were written. `body` is the deferred
+-- expression, searched when a rejection is reported.
+type Deferral =
+  { span ∷ Span
+  , row ∷ TyRow Open
+  , current ∷ TyRow Open
+  , sites ∷ Array Site
+  , body ∷ Checked.Expr
+  }
 
 type Threaded a = { value ∷ a, state ∷ State }
 
@@ -66,7 +99,7 @@ instance applicativeThread ∷ Applicative (Thread s) where
     threaded state = Right { value, state }
 
 start ∷ State
-start = { subst: Unify.empty, next: 0 }
+start = { subst: Unify.empty, next: 0, deferrals: [], origins: noOrigins }
 
 threadAll
   ∷ ∀ s a b
@@ -101,6 +134,12 @@ flexible = map toFlex
     Checked.Rigid id → Unify.Rigid id
     Hole meta → Unify.Meta meta
 
+-- A row of the checked IR's types as the unifier's.
+flexibleRow ∷ TyRow Open → TyRow Flex
+flexibleRow found = case flexible (TFun TUnit found TUnit) of
+  TFun _ result _ → result
+  _ → openRow (Unify.Meta 0)
+
 opened ∷ Ty Flex → Ty Open
 opened = map toOpen
   where
@@ -127,6 +166,7 @@ tooDeep ∷ Subst → Ty Open → Boolean
 tooDeep subst = case _ of
   TInt → false
   TBool → false
+  TUnit → false
   TVar (Checked.Rigid _) → false
   ty → exceedsLimit subst (flexible ty)
 
@@ -160,7 +200,20 @@ numberHole found meta =
   if Map.member meta found.seen then found
   else { next: found.next + 1, seen: Map.insert meta found.next found.seen }
 
+-- A type's holes: its parts', then its rows' (each row's tail, then its
+-- label arguments). Type and row metas share one numbering, so a row
+-- meta stays apart from every type meta.
 foldHoles ∷ ∀ b. (b → Int → b) → b → Ty Open → b
 foldHoles step found = case _ of
   TVar (Hole meta) → step found meta
-  ty → foldl (foldHoles step) found (children ty)
+  ty → foldl foldRow (foldl (foldHoles step) found (children ty))
+    (rowsOf ty)
+  where
+  foldRow reached row@(Row _ tail)
+    | isPure row = reached
+    | otherwise = foldl (foldHoles step)
+        (maybe reached (tailHole reached) tail)
+        (rowArguments row)
+  tailHole reached = case _ of
+    Hole meta → step reached meta
+    Checked.Rigid _ → reached

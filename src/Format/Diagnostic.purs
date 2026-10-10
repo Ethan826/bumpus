@@ -3,26 +3,29 @@ module Format.Diagnostic
   , code
   , codeName
   , message
+  , typeName
   , wire
   ) where
 
 import Prelude
-import Control.Monad.Rec.Class (Step(..), tailRec)
-import Data.Array as Array
-import Data.String (joinWith)
 import Domain.Problem
   ( DuplicateKind(..)
   , EntryKind(..)
   , Hint(..)
   , Problem(..)
-  , TypeName(..)
+  , TypeName
   , UnboundKind(..)
   , Witness(..)
   )
 import Domain.Syntax (Diagnostic, ErrorCode, Span)
 import Domain.Syntax as Code
+import Format.Diagnostic.Name (listed)
+import Format.Diagnostic.Name as Name
+import Format.Diagnostic.Note (WireNote, wireNotes)
+import Format.Diagnostic.Row (equalityMessage, mismatchMessage, shortLabel)
 
-type WireDiagnostic = { code ∷ String, message ∷ String, span ∷ Span }
+type WireDiagnostic =
+  { code ∷ String, message ∷ String, span ∷ Span, related ∷ Array WireNote }
 
 code ∷ Problem → ErrorCode
 code = case _ of
@@ -52,6 +55,20 @@ code = case _ of
   NonExhaustive _ → Code.NonExhaustive
   Internal _ → Code.InternalError
   Hinted problem _ → code problem
+  EffectNotAllowed _ _ → Code.EffectError
+  UnhandledEffect _ → Code.EffectError
+  MustBePure _ → Code.EffectError
+  RowEquality _ _ _ → Code.EffectError
+  LabelMismatch _ _ → Code.TypeMismatch
+  RowSort _ → Code.TypeMismatch
+  NotPrintable _ → Code.TypeMismatch
+  DeferMayFail _ → Code.EffectError
+  DeferMayPerform _ → Code.EffectError
+  HandlerMissing _ → Code.HandlerError
+  HandlerDuplicate _ → Code.HandlerError
+  HandlerOperation _ _ → Code.HandlerError
+  FailNeedsConcrete → Code.TypeMismatch
+  ExpectedHandler _ → Code.TypeMismatch
 
 codeName ∷ ErrorCode → String
 codeName = case _ of
@@ -69,6 +86,8 @@ codeName = case _ of
   Code.Redundant → "E_REDUNDANT"
   Code.NonExhaustive → "E_NON_EXHAUSTIVE"
   Code.SpecializationError → "E_SPECIALIZATION"
+  Code.EffectError → "E_EFFECT"
+  Code.HandlerError → "E_HANDLER"
 
 message ∷ Problem → String
 message = case _ of
@@ -105,13 +124,53 @@ message = case _ of
   NonExhaustive witness → "Missing pattern: " <> pattern witness
   Internal text → text
   Hinted problem hint → message problem <> hintMessage hint
+  EffectNotAllowed name label → name <> " performs " <> shortLabel label
+    <> ", which its signature does not allow"
+  UnhandledEffect label → "Unhandled " <> shortLabel label <> " in main"
+  MustBePure label → "This function must be pure, but it performs "
+    <> shortLabel label
+  RowSort true → "Expected an effect row, found a type"
+  RowSort false → "Expected a type, found an effect row"
+  NotPrintable ty → "Expected a printable value, found " <> typeName ty
+  DeferMayFail label → "defer must not fail, but it performs "
+    <> shortLabel label
+  DeferMayPerform tail →
+    "defer must not fail, but it may perform any effect of "
+      <> tail
+  RowEquality left right tail → equalityMessage left right tail
+  LabelMismatch expected found → mismatchMessage expected found
+  HandlerMissing operation → "Missing clause for " <> operation
+  HandlerDuplicate operation → "Duplicate clause for " <> operation
+  HandlerOperation operation effect → operation
+    <> " is not an operation of "
+    <> effect
+  FailNeedsConcrete → "Fail needs a concrete error family"
+  ExpectedHandler _ → "Expected a handler"
 
 wire ∷ Diagnostic → WireDiagnostic
 wire diagnostic =
   { code: codeName (code diagnostic.problem)
-  , message: message diagnostic.problem
+  , message: text
   , span: diagnostic.span
+  , related: notes
   }
+  where
+  text = message diagnostic.problem
+  -- Only the effect and label diagnostics carry notes; the rest never read
+  -- the field, so a diagnostic built without it still renders.
+  notes =
+    if noted diagnostic.problem then wireNotes text diagnostic.related else []
+
+noted ∷ Problem → Boolean
+noted = case _ of
+  EffectNotAllowed _ _ → true
+  UnhandledEffect _ → true
+  MustBePure _ → true
+  RowEquality _ _ _ → true
+  LabelMismatch _ _ → true
+  DeferMayFail _ → true
+  DeferMayPerform _ → true
+  _ → false
 
 entryMessage ∷ EntryKind → String
 entryMessage = case _ of
@@ -121,12 +180,14 @@ entryMessage = case _ of
   EntryFunction → "Expected fn main() with a printable result type"
 
 hintMessage ∷ Hint → String
-hintMessage (MissingArguments name count) = "; missing " <> counted
-  <> " to "
-  <> name
-  <> "?"
+hintMessage = case _ of
+  MissingArguments name count → "; missing " <> counted count
+    <> " to "
+    <> name
+    <> "?"
+  TrailingSemicolon → "; remove the trailing ;?"
   where
-  counted
+  counted count
     | count == 1 = "1 argument"
     | otherwise = show count <> " arguments"
 
@@ -138,6 +199,8 @@ duplicateWord = case _ of
   DuplicateParameter → "parameter"
   DuplicateBinder → "binder"
   DuplicateTypeParameter → "type parameter"
+  DuplicateEffect → "effect"
+  DuplicateOperation → "operation"
 
 unboundWord ∷ UnboundKind → String
 unboundWord = case _ of
@@ -148,41 +211,12 @@ unboundWord = case _ of
   UnboundTypeVariable → "type variable"
 
 typeName ∷ TypeName → String
-typeName = case _ of
-  IntName → "Int"
-  BoolName → "Bool"
-  DataName name → name
-  AppliedName name arguments → name <> listed (map typeName arguments)
-  VariableName name → name
-  HoleName → "_"
-  arrow@(FunctionName _ _) → arrowName arrow
+typeName = Name.typeName
 
--- Right-associative: `(Int -> Int) -> List(Int) -> List(Int)`, a parameter
--- that is itself an arrow parenthesized. The spine of results is followed
--- by a loop, so a name of thousands of parameters costs no stack.
-arrowName ∷ TypeName → String
-arrowName name = tailRec step { written: "", rest: name }
-  where
-  step pending = case pending.rest of
-    FunctionName parameter result → Loop
-      { written: pending.written <> parameterName parameter <> " -> "
-      , rest: result
-      }
-    result → Done (pending.written <> typeName result)
-  parameterName = case _ of
-    parameter@(FunctionName _ _) → "(" <> arrowName parameter <> ")"
-    parameter → typeName parameter
-
--- Witnesses print as Bumpus patterns: `_`, literals, `Name(field, …)`.
+-- Witnesses print as Waxwing patterns: `_`, literals, `Name(field, …)`.
 pattern ∷ Witness → String
 pattern = case _ of
   WAny → "_"
   WInt value → show value
   WBool value → show value
   WCtor name fields → name <> listed (map pattern fields)
-
--- `(a, b)`, or nothing for no items: `Nil`, not `Nil()`.
-listed ∷ Array String → String
-listed items =
-  if Array.null items then ""
-  else "(" <> joinWith ", " items <> ")"

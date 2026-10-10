@@ -29,7 +29,7 @@ const groupBuild = (go, binary, timeoutMs) => new Promise((done, fail) => {
 // `write(dir)` puts the program's Go in dir and returns its path. Returns
 // { buildMs, killed, status, errors, stdout } with stdout from running it.
 export const timedBuild = async (write, timeoutMs) => {
-  const work = mkdtempSync(join(tmpdir(), 'bumpus-fn-scale-'));
+  const work = mkdtempSync(join(tmpdir(), 'waxwing-fn-scale-'));
   try {
     const go = write(work);
     appendFileSync(go, `// cache nonce ${process.pid} ${Date.now()}\n`);

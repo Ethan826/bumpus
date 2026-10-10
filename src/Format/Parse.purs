@@ -11,10 +11,12 @@ import Domain.Syntax
   , Position
   , Program
   , TypeDecl
+  , EffectDecl
   )
 import Format.Lex (Token, endPosition, lex)
 import Format.Parse.Declaration (typeDeclaration)
-import Format.Parse.Type (typeRef)
+import Format.Parse.Type (typeRef, typeAndRow)
+import Format.Parse.Effect (effectDeclaration)
 import Format.Parse.Expression (expression)
 import Format.Parse.Grammar
   ( Parser
@@ -33,7 +35,11 @@ import Format.Stack as Stack
 
 -- Declarations parsed so far; Stack keeps accumulation linear.
 type Found =
-  { rest ∷ State, types ∷ Stack TypeDecl, functions ∷ Stack FunctionDecl }
+  { rest ∷ State
+  , types ∷ Stack TypeDecl
+  , functions ∷ Stack FunctionDecl
+  , effects ∷ Stack EffectDecl
+  }
 
 parse ∷ String → Either Diagnostic Program
 parse source = either Left (program (endPosition source)) (lex source)
@@ -42,6 +48,7 @@ program ∷ Position → Array Token → Either Diagnostic Program
 program eof tokens = tailRecM declarations
   { rest: initialState tokens eof
   , types: Stack.empty
+  , effects: Stack.empty
   , functions: Stack.empty
   }
 
@@ -55,12 +62,16 @@ declarations found = map resume (run declaration found.rest)
 -- What the next declaration adds to those found so far.
 declaration ∷ Parser (Found → Step Found Program)
 declaration = dispatch
-  [ on "<end>" (pure finished), on "type" (addType <$> typeDeclaration) ]
+  [ on "<end>" (pure finished)
+  , on "type" (addType <$> typeDeclaration)
+  , on "effect" (addEffect <$> effectDeclaration)
+  ]
   (addFunction <$> function)
 
 finished ∷ Found → Step Found Program
 finished found = Done
-  { types: Array.fromFoldable found.types
+  { effects: Array.fromFoldable found.effects
+  , types: Array.fromFoldable found.types
   , functions: Array.fromFoldable found.functions
   }
 
@@ -72,12 +83,16 @@ addFunction ∷ FunctionDecl → Found → Step Found Program
 addFunction parsed found =
   Loop found { functions = Stack.push parsed found.functions }
 
+addEffect ∷ EffectDecl → Found → Step Found Program
+addEffect parsed found =
+  Loop found { effects = Stack.push parsed found.effects }
+
 function ∷ Parser FunctionDecl
 function = functionOf <$> expect "fn" <*> name <* expect "("
   <*> commaList parameter
   <* expect ")"
   <* expect ":"
-  <*> typeRef
+  <*> typeAndRow
   <* expect "="
   <*> rooted expression
   <*> expect ";"
@@ -85,7 +100,8 @@ function = functionOf <$> expect "fn" <*> name <* expect "("
   functionOf keyword identifier parameters result body semicolon =
     { name: identifier.text
     , parameters
-    , result
+    , result: result.ty
+    , row: result.row
     , body
     , span: { start: keyword.span.start, end: semicolon.span.end }
     }

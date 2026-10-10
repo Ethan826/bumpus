@@ -1,11 +1,15 @@
 module Domain.Checked.Internal where
 
 import Prelude
+import Data.Array as Array
 import Data.Maybe (Maybe)
 import Domain.Syntax (Operator, Span)
+import Domain.Type (TyRow)
+import Domain.Ids (EffectId)
 import Domain.Resolved
   ( CtorId
   , CtorInfo
+  , EffectInfo
   , FunctionId
   , LocalId
   , Ty
@@ -28,7 +32,8 @@ derive instance ordOpen ∷ Ord Open
 type Instantiation = Array (Ty Open)
 
 newtype Program = Program
-  { types ∷ Array TypeInfo
+  { effects ∷ Array EffectInfo
+  , types ∷ Array TypeInfo
   , ctors ∷ Array CtorInfo
   , functions ∷ Array FunctionDecl
   , entry ∷ FunctionId
@@ -40,6 +45,7 @@ type FunctionDecl =
   , name ∷ String
   , parameters ∷ Array (Ty Open)
   , result ∷ Ty Open
+  , row ∷ TyRow Open
   , body ∷ Expr
   , span ∷ Span
   }
@@ -67,11 +73,30 @@ data Node
   | Apply Expr (Array Expr)
   | Lambda (Array Param) Expr
   | Pipe Expr Expr
+  | UnitValue
+  | Block (Array Item) Expr
+  | Print Expr
+  | Crash Expr
+  | OperationRef EffectId Int Instantiation
+  | Perform EffectId Int Instantiation (Array Expr)
+  | Handler EffectId Instantiation (Array HandlerClause)
+  | With Expr Expr
+  | Handle Expr (Array FailClause)
+  | Fail Expr
+
+-- A block item (FX001): a monomorphic `let` of a local or `_`, a deferred
+-- expression of type Unit, or a discarded value.
+data Item = Let (Maybe LocalId) Expr | Defer Expr | Discard Expr
 
 -- A lambda parameter: a typed local, or a typed discard (`_`).
 type Param = { local ∷ Maybe LocalId, ty ∷ Ty Open }
 
 type Arm = { pattern ∷ Pattern, body ∷ Expr, span ∷ Span }
+type HandlerClause =
+  { operation ∷ Int, parameters ∷ Array Param, body ∷ Expr, span ∷ Span }
+
+type FailClause =
+  { payload ∷ Ty Open, local ∷ LocalId, body ∷ Expr, span ∷ Span }
 
 -- A pattern carries the type it was checked against.
 data Pattern = Pattern { ty ∷ Ty Open, span ∷ Span, shape ∷ Shape }
@@ -93,3 +118,13 @@ typeOf (Expr expression) = expression.ty
 
 spanOf ∷ Expr → Span
 spanOf (Expr expression) = expression.span
+
+itemValue ∷ Item → Expr
+itemValue = case _ of
+  Let _ value → value
+  Defer value → value
+  Discard value → value
+
+-- A block's expressions in evaluation order: its items', then its value.
+blockParts ∷ Array Item → Expr → Array Expr
+blockParts items value = Array.snoc (map itemValue items) value

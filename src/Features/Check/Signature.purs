@@ -47,15 +47,18 @@ buildSignature types ctors roots = do
 -- Heads whose presence makes a column complete, in declaration order.
 -- A type with no inhabited constructor has none, so it is vacuously
 -- complete. A rigid variable or a hole is abstract (design §5), and so is
--- an arrow, which only `_` and binders match (FN001 design §3): none has
--- heads, and `complete` never reads one as complete.
+-- an arrow, which only `_` and binders match (FN001 design §3), as is
+-- Unit (FX001): none has heads, and `complete` never reads one as
+-- complete.
 candidates ∷ Signature → Ty Open → Lookup (Array Head)
 candidates tables ty = case ty of
   TInt → Right []
   TBool → Right [ HBool true, HBool false ]
-  TData id _ → applied tables id ty
+  TUnit → Right []
+  TData id _ _ → applied tables id ty
   TVar _ → Right []
-  TFun _ _ → Right []
+  TFun _ _ _ → Right []
+  THandler _ _ → Right []
 
 -- The declared constructors whose expanded counterparts are inhabited.
 applied ∷ Signature → TypeId → Ty Open → Lookup (Array Head)
@@ -75,7 +78,7 @@ fieldTypes tables ty = case _ of
   fieldsOf ctor = arguments >>= substituted ctor
   substituted ctor values = traverse (substitute values) ctor.fields
   arguments = case ty of
-    TData _ values → Right values
+    TData _ values _ → Right values
     _ → Left (Internal "Constructor head on a type that is not data")
 
 arity ∷ Signature → Head → Lookup Int

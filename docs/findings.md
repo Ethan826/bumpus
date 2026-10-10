@@ -335,3 +335,150 @@ resource/cancellation semantics. Documentation only; no feature implemented.
   error; when the built code no longer has the representation a plan
   names (an uncurried value), restore the defect's effect (an eta
   adapter at the type's arity) and say so.
+
+## FX001 Task 1: runtime shapes (2026-10-09)
+
+Hand-written Go of effects design §4 (scripts/effect-probe.mjs; raw output
+in .build/fx001-task1/, run3.log is the record). Host load averages 2.6-5.8
+(`uptime` before and after each batch in the log), so timings are upper
+bounds; five runs each, median (min-max), checksums matched everywhere.
+
+| Configuration | Median ms (min-max) |
+|---|---|
+| 10^6 shallow installs | 18.3 (16.3-36.2) |
+| 10^6 performs, depth 1 | 1.65 (1.62-1.77) |
+| 10^6 performs, depth 100 | 79.8 (79.4-79.9) |
+| 10^6 performs, depth 10,000 | 11,770 (11,567-12,012) |
+| one abort across 1,000 unrelated `handle` frames | 34.9 (34.3-35.1) |
+| one abort across 1,000 cleanup frames | 27.5 (27.1-27.8) |
+| 100,000 caught aborts, depth 1 | 19.9 (19.3-20.5) |
+
+| `go build`, lifted helpers | Median s (min-max) | Ratio to previous |
+|---|---|---|
+| 1,000 | 0.83 (0.81-1.17) | |
+| 2,000 | 1.53 (1.51-1.56) | 1.84 |
+| 4,000 | 2.91 (2.88-2.97) | 1.90 |
+
+Observations, not a linearity proof: the ratios are close to 2 for 2x size.
+Lookup is linear in depth (about 1.2 ns per link; 11.8 s at depth 10,000
+justifies the cached-index follow-up for FX005, not a design change).
+Installation is about 18 ns each (one heap allocation). A caught abort is
+about 200 ns; an abort through 1,000 re-panicking frames costs about 35 us
+per frame. Decision rule: every semantic check passed and the 4,000-helper
+median 2.91 s is within 10 s, so the shapes are adopted. Pitfall recorded:
+Go's build cache makes identical regenerated sources look 8x faster; vary
+the source per repetition when timing builds. Design reading to confirm in
+FX001 review: a cleanup failure of any kind while a typed abort is pending
+turns it into an uncatchable defect listing both causes. Superseded by the
+user 2026-10-09: `defer` must not fail (spec §2, §3), so only defects can
+fail cleanup and a pending typed abort is never converted by a typed
+cleanup failure.
+
+## Waxwing migration baseline (2026-10-09)
+
+The existing isolated FX001 worktree was clean at 3481468 (Tasks 1-3
+committed), while main remained at 2084638 with its pre-existing editor
+settings change. Rename work uses the FX001 checkpoint, not main.
+Before production edits, `npm run verify` exited 1: 638/640 parallel tests
+passed. fn-linear lambda took 1604.135291 ms against 1545 ms; mismatch
+819.499333 ms against 525 ms. Serial tests and regression proofs were not
+reached. Evidence `.build/waxwing-baseline-verify.log`; FN006 owns the
+existing parallel-timing exposure and next action, with no bounds changed.
+Historical findings and paths above remain unchanged by the rename.
+
+Concurrent FX001 checker edits appeared during rename validation, outside
+its source scope (Binding, Require, Subst, Unify, UnifyRow). Preserved their
+diff/hashes under .build/waxwing-concurrent-*; do not revert or attribute
+them to the rename. A later harvest smoke could not import Format.Parse
+because output was absent; this is not evidence of a hook defect. Require a
+paused worker and stable build before combined-tree validation. The rename
+verify's twenty-thousand-declaration timing failure is recorded in T004.
+
+The user confirmed the FX001 worker paused. Its eight modified files are
+preserved (the previous five plus Domain.Type.Parts, Features.Resolve and
+Features.Specialize.Seeds). Combined-tree verification builds cleanly but
+fails test/unify-row.test.mjs:57: deferred Fail now returns Subst rather
+than the test's RowMissing. R003 records the exact test and next action for
+FX001; no assertion was changed by the rename. Five fn-linear timing
+failures are recorded in FN006. An accidental extra combined-tree verify
+ran from the wrong working directory; its separate failure log is
+.build/waxwing-paused-extra-verify.log (636/640 pass). A subsequent log-move
+command used that same wrong relative-path assumption and failed; the log
+was then preserved at its correct path. These are execution mistakes, not
+additional compiler defects. Isolated rename validation uses the original
+3481468 versions of the eight worker files in a copy only, leaving live
+files intact (.build/waxwing-validation-scope.json).
+
+
+## FX001 Task 3 fix continuation (2026-10-09)
+
+The inherited matching-path postponement still immediately rejected a
+left-over deferred right label in finish. New row-deferred regression ran
+first: 9/10 passed; the left-over case failed with RowExtra
+(.build/fx001-task3-fix-red.log). Guarding that path by the resolved key
+now postpones the entire pair with rollback, just like the matching path.
+Focused post-fix run passed 44/44 (.build/fx001-task3-fix-focused.log).
+The eight inherited source edits were preserved and completed; no fresh
+RED history is claimed for their already-implemented behavior. Isolated
+source mutants supply regression proof for those inherited fixes.
+
+Operational failures: an exploratory read requested nonexistent
+scripts/test.mjs (verify is scripts/verify.mjs); no check was omitted.
+After the user interruption, the former focused-run session identifier no
+longer existed; its complete 44-test TAP summary confirmed completion.
+No duplicate build/verification was started. FN006's timing suite is
+renamed to fn-linear-timing.serial.test.mjs with identical file contents,
+under the user's authorized existing serial-runner policy.
+
+The continuation's single clean-output full verify exited 1
+(.build/fx001-task3-fix-verify.log): zero build warnings/errors, tidy,
+strict-rebuild and structural gates passed; 643/644 parallel tests passed.
+The sole failure was the existing match-lift ladder timing bound:
+1670.670250 ms >1500. T003 records the exact evidence and next profiling
+step; no bound/runner change or unchanged rerun hides it. Host load observed
+afterward was 5.89/5.64/4.54, which does not establish causation. Serial
+verification and regression proofs are run explicitly as the unreached
+remainder, with separate logs and statuses.
+
+Controller ruling after this reproduced T003 failure: apply the existing
+fixed-bound scheduling policy by extracting only the deep/wide ladder
+block into match-lift-timing.serial.test.mjs with its required imports.
+All semantic match-lift tests remain parallel; the extracted block/source,
+constants, assertion and 1500 ms bound are byte-identical
+(.build/fx001-task3-fix-ladder-identity.txt). First serial continuation
+passed 21/21 (.build/fx001-task3-fix-serial.log). A second clean-output full
+verify follows the actual scheduling change, preserving the first failed
+log; it is not an unchanged retry. No further scheduling iteration is
+authorized blindly if another timing failure appears.
+
+After the authorized scheduling extraction, the changed-tree clean-output
+npm run verify exited 0: 643 parallel + 22 serial tests, no failures/skips,
+zero build warnings/errors and all 22 existing regression proofs
+(.build/fx001-task3-fix-verify-serial-scheduling.log). The ladder test took
+410.995667 ms total against its unchanged 1500 ms timed-compilation bound.
+The original failed log remains. No later-task effect syntax/runtime
+behavior is claimed; deferred origin/provenance retention remains Task 9.
+
+
+FX001 Task 4: omitted rows in lambda annotations cannot resolve as pure.
+Resolve marks them with the signature's unwriteable ambient variable;
+Check substitutes only that row slot with the lambda's fresh row. Named
+row variables and type variables remain rigid. New Console callback and
+legacy comparison diagnostics verify the distinction. Collecting signature
+row variables must loop over long arrow spines, just as type collection
+already did; a 20,000-arrow regression and restored-source mutant pin it.
+Full verification: 672 parallel +22 serial tests, 22 existing proofs and
+four new isolated source sensitivity checks (docs/progress.md).
+
+FX001 Task 5: handler checking is complete through Check only. Rowless
+`Handler(Name)` is ambiguous with an ADT application, so resolution prefers
+a declared type named Handler and uses the effect interpretation only when
+no such type exists. Explicit `with` makes the special type unambiguous.
+Repeated duplicate scanning exposed a strictness trap: `when predicate
+ (expensive Either)` evaluates the diagnostic computation even when the
+predicate is false. Guarded branches keep it limited to actual collisions;
+one combined repeated-name pass preserves constructor/function namespace
+checking. The 20,000-type duplicate test is 475 ms after the fix (same 5 s
+bound); an isolated restored-strictness mutation fails that workload's
+timing assertion. Full Task 5 evidence and Task 9 deferred-row provenance
+handoff: .superpowers/sdd/2026-10-09-effects-plan/task-5-report.md.

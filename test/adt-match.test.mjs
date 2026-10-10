@@ -89,17 +89,17 @@ test('a binder shadows a parameter only in its arm', () => {
 // Pins resolver numbering: parameters 0..n-1, then binders in source
 // pre-order (scrutinee before arms, pattern before body), shadowing per arm:
 // x = 2, t = 3 (inner scrutinee), h = 4, t = 5, x = 6, y = 7. Since E005 the
-// text runs through bumpusFn0 and its lifted matches 0-3 in number order,
+// text runs through waxwingFn0 and its lifted matches 0-3 in number order,
 // so it also pins each match's captured parameters and call arguments.
 test('LocalIds in emitted Go follow source pre-order', () => {
   const source = sources.localIds;
   const go = checked(source);
-  const body = go.slice(go.indexOf('func bumpusFn0'),
-    go.indexOf('func bumpusFn1'));
-  const ids = body.match(/bumpusLocal\d+/g)
-    .map(name => Number(name.slice('bumpusLocal'.length)));
+  const body = go.slice(go.indexOf('func waxwingFn0'),
+    go.indexOf('func waxwingFn1'));
+  const ids = body.match(/waxwingLocal\d+/g)
+    .map(name => Number(name.slice('waxwingLocal'.length)));
   assert.deepEqual(ids, [
-    0, 1, 0, 1, 1, 1, // bumpusFn0
+    0, 1, 0, 1, 1, 1, // waxwingFn0
     0, 1, 4, 4, 5, 5, 0, 4, 5, 0, 1, // Match0
     1, 2, 2, 3, 3, 3, 1, // Match1, the scrutinee's match
     0, 4, 6, 6, 6, 4, 0, 4, // Match2
@@ -157,10 +157,10 @@ ${call}
 `;
 
 test('malformed values reach the unmatched panic, never a nil error', () => {
-  const check = 'if r != "bumpus: unmatched value" '
+  const check = 'if r != "waxwing: unmatched value" '
     + '{ t.Fatalf("recovered %v", r) }';
-  for (const value of ['bumpusTy0{}', 'bumpusTy0{tag: 2}']) {
-    const go = recovering('TestUnmatched', `bumpusFn0(${value})`, check);
+  for (const value of ['waxwingTy0{}', 'waxwingTy0{tag: 2}']) {
+    const go = recovering('TestUnmatched', `waxwingFn0(${value})`, check);
     const result = goTest(second, go);
     assert.equal(result.status, 0, result.output);
   }
@@ -170,7 +170,7 @@ test('wildcards skip validation of a nil field', () => {
   const source = `${list} fn head(xs: IntList): Int = `
     + 'match xs { Cons(h, _) => h, Nil => 0 }; fn main(): Int = head(Nil);';
   const go = recovering('TestHead',
-    'if v := bumpusFn0(bumpusTy0{tag: 2, c1f0: 5}); v != 5 '
+    'if v := waxwingFn0(waxwingTy0{tag: 2, c1f0: 5}); v != 5 '
     + '{ t.Fatalf("got %v", v) }',
     'if r != nil { t.Fatalf("panicked %v", r) }');
   const result = goTest(source, go);
@@ -178,8 +178,8 @@ test('wildcards skip validation of a nil field', () => {
 });
 
 test('shapes example matches its snapshot and runs', () => {
-  const source = readFileSync('examples/shapes.bumpus', 'utf8');
+  const source = readFileSync('examples/shapes.wxw', 'utf8');
   assert.equal(checked(source), readFileSync('bootstrap/shapes.go', 'utf8'));
-  assert.equal(command('node', ['scripts/bumpus.mjs', 'run',
-    'examples/shapes.bumpus']), '120\n');
+  assert.equal(command('node', ['scripts/waxwing.mjs', 'run',
+    'examples/shapes.wxw']), '120\n');
 });

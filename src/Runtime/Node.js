@@ -21,7 +21,7 @@ const external = (results, command, args, done) => {
 const withBuilt = (results, go, binaryIn, after) => () => {
   let work;
   try {
-    work = mkdtempSync(join(tmpdir(), 'bumpus-'));
+    work = mkdtempSync(join(tmpdir(), 'waxwing-'));
     const source = join(work, 'main.go');
     const binary = binaryIn(work);
     writeFileSync(source, go);

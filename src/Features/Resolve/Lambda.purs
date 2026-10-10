@@ -4,19 +4,23 @@ import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Foldable (for_)
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 import Domain.Problem (DuplicateKind(..), Problem(..))
 import Domain.Resolved as Resolved
 import Domain.Syntax as Syntax
 import Features.Resolve.Fresh (Fresh, fresh, liftEither)
 import Features.Resolve.Repeated (repeated)
-import Features.Resolve.Types (resolveType)
+import Features.Resolve.Types (resolveTypeWith)
 
 -- What an annotation may name: the declared types, and the enclosing
 -- signature's variables (rigid; FN001 design §2).
 type Annotations r =
-  { types ∷ Array Resolved.TypeInfo, variables ∷ Array String | r }
+  { types ∷ Array Resolved.TypeInfo
+  , effects ∷ Array { name ∷ String, arity ∷ Int }
+  , variables ∷ Array String
+  | r
+  }
 
 type Named = { name ∷ String, span ∷ Syntax.Span }
 type Bound = { param ∷ Resolved.Param, local ∷ Maybe Resolved.Local }
@@ -45,7 +49,10 @@ parameter annotations syntax = boundOf <$> liftEither annotation
   <*> traverse issue syntax.name
   where
   annotation = traverse
-    (resolveType annotations.types annotations.variables)
+    ( resolveTypeWith annotations.types annotations.effects
+        annotations.variables
+        (Just (Resolved.VarId (Array.length annotations.variables - 1)))
+    )
     syntax.ty
   issue name = localNamed name <$> fresh
   boundOf ty found =

@@ -48,8 +48,21 @@ covered signature (Checked.Expr expression) = case expression.node of
   Checked.Apply callee arguments → traverse_ recur (Array.cons callee arguments)
   Checked.Lambda _ body → recur body
   Checked.Pipe left right → traverse_ recur [ left, right ]
+  Checked.UnitValue → pure unit
+  Checked.Print value → recur value
+  Checked.Crash value → recur value
+  Checked.OperationRef _ _ _ → pure unit
+  Checked.Perform _ _ _ arguments → traverse_ recur arguments
+  Checked.Handler _ _ clauses → traverse_ (recur <<< handlerBody) clauses
+  Checked.With handler body → traverse_ recur [ handler, body ]
+  Checked.Handle body clauses → traverse_ recur
+    (Array.cons body (map failureBody clauses))
+  Checked.Fail value → recur value
+  Checked.Block items value → traverse_ recur (Checked.blockParts items value)
   where
   recur = covered signature
+  handlerBody clause = clause.body
+  failureBody clause = clause.body
 
 -- A match is judged before the matches nested in its scrutinee and arms.
 coverMatch
@@ -101,7 +114,7 @@ roots functions = Array.fromFoldable (foldl body Set.empty functions)
   where
   body found function = foldTypes collect found function.body
   collect found _ ty = case ty of
-    TData _ _ → Set.insert ty found
+    TData _ _ _ → Set.insert ty found
     _ → found
 
 armRow ∷ Checked.Arm → Array Checked.Pattern

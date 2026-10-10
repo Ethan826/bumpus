@@ -11,15 +11,15 @@ import { nestingLimit } from '../output/Format.Parse.Grammar/index.js';
 // builds and runs; depth = limit + 1 is E_NESTING at the token that would
 // exceed it. No run may print a raw RangeError or JavaScript stack frames.
 const limit = nestingLimit;
-const work = mkdtempSync(join(tmpdir(), 'bumpus-depth-'));
+const work = mkdtempSync(join(tmpdir(), 'waxwing-depth-'));
 after(() => rmSync(work, { recursive: true, force: true }));
 
 const cli = (verb, source, timeout = 120000) => {
-  const input = join(work, 'input.bumpus');
+  const input = join(work, 'input.wxw');
   writeFileSync(input, source);
   const extra = verb === 'emit' ? [join(work, 'output.go')] : [];
   const result = spawnSync('node',
-    ['scripts/bumpus.mjs', verb, input, ...extra],
+    ['scripts/waxwing.mjs', verb, input, ...extra],
     { encoding: 'utf8', timeout,
       env: { ...process.env, GOCACHE: resolve('.build/go-cache') } });
   assert.ifError(result.error);
@@ -121,7 +121,7 @@ test(`a match nested ${limit} deep builds and runs in under 10 s`,
   async () => {
     const source = 'fn main(): Int = ' + 'match 0 { _ => '.repeat(limit)
       + '7' + ' }'.repeat(limit) + ';';
-    const own = mkdtempSync(join(tmpdir(), 'bumpus-budget-'));
+    const own = mkdtempSync(join(tmpdir(), 'waxwing-budget-'));
     try {
       const started = performance.now();
       assert.equal(cli('emit', source, buildBudgetMs).status, 0);

@@ -7,7 +7,7 @@ import Data.String as String
 data Invocation = Emit String String | Build String String | Run String
 
 usage ∷ String
-usage = "bumpus emit|build INPUT OUTPUT; bumpus run INPUT"
+usage = "waxwing emit|build INPUT OUTPUT; waxwing run INPUT"
 
 -- An empty input or output counts as missing, as in the original Node CLI,
 -- so `run INPUT ""` is a run and `emit INPUT ""` is a usage error.

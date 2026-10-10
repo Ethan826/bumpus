@@ -21,6 +21,7 @@ import Data.String.Common (joinWith)
 import Data.Traversable (mapAccumR)
 import Data.Tuple (Tuple(..))
 import Domain.IR.Internal (Ty(..))
+import Format.Go.Context (parameterList, passed, typeList)
 import Format.Go.Data (goType)
 import Format.Go.Entry (entry, nodeName)
 import Format.Go.Lowered (Shape, Wrapper)
@@ -45,7 +46,8 @@ valueName wrapper = wrapper.name <> "Value"
 -- the wrapper itself agree on each name.
 stageTypes ∷ Shape → String → Array Ty → Ty → Array String
 stageTypes shape name parameters after =
-  namedTypes name parameters after (interned shape parameters after)
+  namedTypes shape.context name parameters after
+    (interned shape parameters after)
 
 -- Node types, then each wrapper once, in first-request order.
 staged ∷ Shape → Array Wrapper → { nodes ∷ String, code ∷ String }
@@ -71,12 +73,16 @@ interned shape parameters after =
   lookup ty result = map TFun (Map.lookup (Tuple ty result) shape.arrows)
   found arrow = { accum: arrow, value: arrow }
 
-namedTypes ∷ String → Array Ty → Ty → Array (Maybe Ty) → Array String
-namedTypes name parameters after known = Array.mapWithIndex named known
+namedTypes
+  ∷ Boolean → String → Array Ty → Ty → Array (Maybe Ty) → Array String
+namedTypes context name parameters after known =
+  Array.mapWithIndex named known
   where
   named index = maybe (own index) goType
   own index
-    | index == 0 = "func(" <> maybe "" goType (Array.head parameters) <> ") "
+    | index == 0 = "func("
+        <> typeList context [ maybe "" goType (Array.head parameters) ]
+        <> ") "
         <> maybe (goType after) identity (Array.index names 1)
     | otherwise = arrowName name (index + 1)
   names = Array.mapWithIndex later known
@@ -91,7 +97,12 @@ nodeType index ty = "type " <> nodeName index <> " struct { value "
   <> "; previous any }\n\n"
 
 -- One wrapper and the Go types of its stage values (`stageTypes`).
-type Staging = { wrapper ∷ Wrapper, types ∷ Array String, nodes ∷ Nodes }
+type Staging =
+  { wrapper ∷ Wrapper
+  , types ∷ Array String
+  , nodes ∷ Nodes
+  , context ∷ Boolean
+  }
 
 wrapperCode ∷ Shape → Nodes → Wrapper → String
 wrapperCode shape nodes wrapper =
@@ -101,13 +112,16 @@ wrapperCode shape nodes wrapper =
       ( map (laterStage staging)
           (Array.range 2 (Array.length wrapper.parameters))
       )
-    <> entry nodes wrapper
+    <> entry shape.context nodes wrapper
   where
   known = interned shape wrapper.parameters wrapper.result
   staging =
     { wrapper
-    , types: namedTypes wrapper.name wrapper.parameters wrapper.result known
+    , types: namedTypes shape.context wrapper.name wrapper.parameters
+        wrapper.result
+        known
     , nodes
+    , context: shape.context
     }
 
 -- A stage value no interned arrow names gets its own type; the first is
@@ -120,15 +134,15 @@ ownType staging index
       position = index + 1
       declaration = "\ntype " <> arrowName staging.wrapper.name position
         <> " func("
-        <> parameter staging position
+        <> typeList staging.context [ parameter staging position ]
         <> ") "
         <> awaiting staging (position + 1)
         <> "\n"
       none _ = Nothing
 
 firstStage ∷ Staging → String
-firstStage staging = "\nfunc " <> valueName staging.wrapper <> "(x "
-  <> parameter staging 1
+firstStage staging = "\nfunc " <> valueName staging.wrapper <> "("
+  <> parameterList staging.context [ "x " <> parameter staging 1 ]
   <> ") "
   <> awaiting staging 2
   <> " { return "
@@ -145,16 +159,17 @@ laterStage staging position = "\nfunc "
   <> stageName staging.wrapper position
   <> "(e any) "
   <> awaiting staging position
-  <> " { return func(x "
-  <> parameter staging position
+  <> " { return func("
+  <> parameterList staging.context [ "x " <> parameter staging position ]
   <> ") "
   <> awaiting staging (position + 1)
   <> " { return "
   <> next
   <> "("
-  <> node staging position "e"
+  <> joinWith ", " (passed (staging.context && last) [ chain ])
   <> ") } }\n"
   where
+  chain = node staging position "e"
   last = position == Array.length staging.wrapper.parameters
   next =
     if last then staging.wrapper.name <> "Entry"

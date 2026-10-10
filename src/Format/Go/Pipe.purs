@@ -4,8 +4,8 @@
 -- its last argument (a saturated call stays a direct Go call). A literal
 -- or a local is that argument itself: evaluating it has no effect. Any
 -- other left operand is held in a temporary: the pipe is lifted, as a
--- match is (E005), to bumpusFn{f}Pipe{k}, taking the free locals of the
--- application and then the operand's value, `bumpusPipe`. The call site
+-- match is (E005), to waxwingFn{f}Pipe{k}, taking the free locals of the
+-- application and then the operand's value, `waxwingPipe`. The call site
 -- evaluates only locals before the operand, so the operand runs first; no
 -- closure is nested, however long a chain of pipes is.
 module Format.Go.Pipe (lowerPipe) where
@@ -15,6 +15,7 @@ import Data.Array as Array
 import Data.String.Common (joinWith)
 import Domain.IR.Internal as IR
 import Format.Go.Capture (union, without)
+import Format.Go.Context (declared, passed)
 import Format.Go.Data (functionName, goType, localName, pipeLocal)
 import Format.Go.Lowered
   ( Lowered
@@ -34,7 +35,8 @@ lowerPipe scope lower next pipe left right =
 held ∷ Scope → Lowering → Int → IR.Expr → IR.Expr → IR.Expr → Lowered
 held scope lower next pipe left right =
   { code: name <> "("
-      <> joinWith ", " (map capturedName captured <> [ operand.code ])
+      <> joinWith ", "
+        (passed context (map capturedName captured <> [ operand.code ]))
       <> ")"
   , next: application.next
   , lifted: [ lifted ] <> operand.lifted <> application.lifted
@@ -42,6 +44,7 @@ held scope lower next pipe left right =
   , wrappers: operand.wrappers <> application.wrappers
   }
   where
+  context = scope.shape.context
   name = functionName scope.owner <> "Pipe" <> show next
   operand = lower (next + 1) left
   temporary = IR.Expr
@@ -52,7 +55,11 @@ held scope lower next pipe left right =
   parameter local = localName local.id <> " " <> goType local.ty
   lifted = "func " <> name <> "("
     <> joinWith ", "
-      (map parameter captured <> [ localName pipeLocal <> " " <> operandType ])
+      ( declared context
+          ( map parameter captured
+              <> [ localName pipeLocal <> " " <> operandType ]
+          )
+      )
     <> ") "
     <> goType (IR.typeOf pipe)
     <> " {\nreturn "

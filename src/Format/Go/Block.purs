@@ -1,0 +1,100 @@
+-- Blocks (FX001 design §4). Each block is lifted, as a match is (E005),
+-- to a top-level function of the locals its items and value read but do
+-- not bind (ascending LocalId, Format.Go.Capture). The k-th lifted
+-- function of waxwingFn{f}, numbered in pre-order with the block before its
+-- items, sharing the counter with matches, lambdas, pipes and application
+-- helpers, is waxwingFn{f}Block{k}. Its body runs the items in order, a
+-- `let` as a typed `var` (also discarded, so Go never reports an unused
+-- variable), `let _` and discarded items as `_ = e`, and returns the
+-- value. The `var` is typed because an arity-one function value is the
+-- lifted function itself, whose Go type is unnamed. A `defer e` registers
+-- a closure of the whole expression, run at exit with the context the
+-- block was entered in (Format.Go.Cleanup); only a block with one has the
+-- Go `defer` that runs them.
+module Format.Go.Block (lowerBlock) where
+
+import Prelude
+import Data.Array as Array
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.String.Common (joinWith)
+import Domain.IR.Internal as IR
+import Domain.IR.Internal (Ty)
+import Domain.Resolved (LocalId)
+import Format.Go.Capture (Captured, union, withoutAll)
+import Format.Go.Context (declared, passed)
+import Format.Go.Data (functionName, goType, localName)
+import Format.Go.Lowered (Lowered, Lowering, Scope, several)
+
+lowerBlock
+  ∷ Scope → Lowering → Int → Ty → Array IR.Item → IR.Expr → Lowered
+lowerBlock scope lower next result items value =
+  { code: name <> "("
+      <> joinWith ", " (passed context (map capturedName captured))
+      <> ")"
+  , next: parts.next
+  , lifted: [ lifted ] <> parts.lifted
+  , free: captured
+  , wrappers: parts.wrappers
+  }
+  where
+  context = scope.shape.context
+  name = functionName scope.owner <> "Block" <> show next
+  parts = several lower (next + 1) (IR.blockParts items value)
+  captured = withoutAll (Array.mapMaybe letLocal items) (union parts.frees)
+  capturedName local = localName local.id
+  lifted = blockFunction context name captured result
+    (Array.any isDefer items)
+    (Array.zipWith statement items parts.codes)
+    (fromMaybe "" (Array.last parts.codes))
+
+blockFunction
+  ∷ Boolean
+  → String
+  → Array Captured
+  → Ty
+  → Boolean
+  → Array String
+  → String
+  → String
+blockFunction context name captured result deferring statements value =
+  "func " <> name <> "("
+    <> joinWith ", " (declared context (map parameter captured))
+    <> ") "
+    <> goType result
+    <> " {\n"
+    <> (if deferring then registry else "")
+    <> joinWith "" statements
+    <> "return "
+    <> value
+    <> "\n}\n"
+  where
+  parameter local = localName local.id <> " " <> goType local.ty
+
+registry ∷ String
+registry =
+  "var waxwingCleanups []func()\ndefer waxwingCleanup(&waxwingCleanups)\n"
+
+isDefer ∷ IR.Item → Boolean
+isDefer = case _ of
+  IR.Defer _ → true
+  _ → false
+
+statement ∷ IR.Item → String → String
+statement item code = case item of
+  IR.Defer _ → "waxwingCleanups = append(waxwingCleanups, func() { _ = "
+    <> code
+    <> " })\n"
+  IR.Let (Just id) bound → "var " <> localName id <> " "
+    <> goType (IR.typeOf bound)
+    <> " = "
+    <> code
+    <> "\n_ = "
+    <> localName id
+    <> "\n"
+  _ → "_ = " <> code <> "\n"
+
+letLocal ∷ IR.Item → Maybe LocalId
+letLocal = case _ of
+  IR.Let local _ → local
+  IR.Defer _ → Nothing
+  IR.Discard _ → Nothing

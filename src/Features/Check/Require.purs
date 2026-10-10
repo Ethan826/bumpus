@@ -1,7 +1,6 @@
 module Features.Check.Require
-  ( Names
+  ( module Features.Check.TypeName
   , Requiring
-  , typeName
   , require
   , expectType
   , bounded
@@ -9,26 +8,28 @@ module Features.Check.Require
   ) where
 
 import Prelude
-import Data.Array as Array
 import Data.Either (Either(..), either)
-import Data.Maybe (maybe')
-import Data.Traversable (traverse)
+import Data.Maybe (Maybe(..))
 import Domain.Checked.Internal (Open(..))
 import Domain.Checked.Internal as Checked
-import Domain.Problem (Problem(..), TypeName(..))
-import Domain.Resolved (TypeInfo)
+import Domain.Problem (Problem(..))
+import Domain.Resolved (EffectInfo)
+import Domain.Row (Row(..), isPure)
+import Features.Check.Provenance (trail)
+import Features.Check.Report (crossingNotes, originNotes)
+import Features.Check.RowName (labelName, rowConflict)
+import Features.Check.TypeName (Names, typeName)
 import Domain.Syntax (Diagnostic, Span, problemAt)
-import Domain.Type (Ty(..), TypeId(..), VarId(..), spine)
+import Domain.Type (Ty(..))
 import Features.Check.Hint (Declared, hinted)
 import Features.Check.Scheme (State, flexible, opened, resolved, tooDeep)
 import Features.Check.Unify (Failure(..), inferredTypeLimit, unify)
 
 -- What a diagnostic needs to name a type: the declared types, and the
 -- enclosing function's variables (`VarId i` is the i-th).
-type Names r = { types ∷ Array TypeInfo, variables ∷ Array String | r }
 
 -- What `require` needs: names for its message, declarations for its hint.
-type Requiring r = Names (Declared r)
+type Requiring r = Names (effects ∷ Array EffectInfo | Declared r)
 
 -- The expression's type must unify with the expected one. A mismatch may
 -- gain the under-application hint (Features.Check.Hint).
@@ -48,10 +49,11 @@ require env state expected actual = either hint Right
 
 -- A failure names the whole expected and found types, resolved under the
 -- substitution before this comparison, as monomorphic checking always did;
--- the unifier's own pair is only the innermost one that differs.
+-- the unifier's own pair is only the innermost one that differs. A row
+-- failure is reported so too until rows are written (FX001 Task 4).
 expectType
   ∷ ∀ r
-  . Names r
+  . Names (effects ∷ Array EffectInfo | r)
   → State
   → Ty Open
   → Ty Open
@@ -65,10 +67,32 @@ expectType env state expected actual span = do
   where
   bound subst = Right (state { subst = subst })
   failed = case _ of
-    Mismatch _ _ → reported TypeMismatch (resolved state.subst expected)
-      (resolved state.subst actual)
     Occurs meta whole → reported InfiniteType (TVar (Hole meta)) (opened whole)
     TooDeep → tooDeepAt span
+    Mismatch _ _ → mismatched unit
+    RowMissing label row occurrence → rowFailure label row occurrence
+    RowExtra label occurrence → rowFailure label (Row [] Nothing) occurrence
+    RowSharedTail left right → rowConflict env span left right
+    RowMismatch _ _ → mismatched unit
+    RowPayload _ _ _ → mismatched unit
+    RowOccurs _ _ → mismatched unit
+  -- The label's trail is where it arose, as far as the state knows it.
+  rowFailure label row occurrence = do
+    name ← labelName env span label
+    Left
+      { problem: rowProblem name row
+      , span
+      , related: originNotes span name (walk occurrence)
+          <> crossingNotes name (walk occurrence)
+      }
+  rowProblem name row =
+    if isPure row then MustBePure name
+    else EffectNotAllowed "This function" name
+  walk = trail state.subst state.origins
+
+  -- A function: `where` bindings are strict, and this resolves both types.
+  mismatched _ = reported TypeMismatch (resolved state.subst expected)
+    (resolved state.subst actual)
   reported problem one other = do
     first ← typeName env span one
     second ← typeName env span other
@@ -82,26 +106,3 @@ bounded state ty span =
 
 tooDeepAt ∷ ∀ a. Span → Either Diagnostic a
 tooDeepAt span = Left (problemAt (TypeTooDeep inferredTypeLimit) span)
-
--- Names appear only in diagnostics, never in generated Go. An arrow's
--- spine is named parameter by parameter, by a loop (Array.foldr).
-typeName ∷ ∀ r. Names r → Span → Ty Open → Either Diagnostic TypeName
-typeName env span = case _ of
-  TInt → Right IntName
-  TBool → Right BoolName
-  TData (TypeId index) arguments → maybe' missing (named arguments)
-    (Array.index env.types index)
-  TVar (Rigid (VarId index)) → maybe' unnamed (Right <<< VariableName)
-    (Array.index env.variables index)
-  TVar (Hole _) → Right HoleName
-  arrow@(TFun _ _) → arrowName (spine arrow)
-  where
-  missing _ = Left (problemAt (Internal "Invalid resolved type") span)
-  unnamed _ = Left (problemAt (Internal "Unnamed type variable") span)
-  named arguments info
-    | Array.null arguments = Right (DataName info.name)
-    | otherwise = AppliedName info.name <$> traverse (typeName env span)
-        arguments
-  arrowName found = curried <$> traverse (typeName env span) found.parameters
-    <*> typeName env span found.result
-  curried parameters result = Array.foldr FunctionName result parameters

@@ -10,7 +10,7 @@ import { runGoBatch } from './go-batch.mjs';
 
 // P001 Task 7: polymorphic programs compile through the whole pipeline
 // (Specialize included) and run. Every execution here is one Go batch.
-const lists = readFileSync('examples/lists.bumpus', 'utf8');
+const lists = readFileSync('examples/lists.wxw', 'utf8');
 const library = lists.slice(0, lists.indexOf('fn main()'));
 const withMain = (result, body) => `${library}fn main(): ${result} = ${body};`;
 const xs = 'Cons(1, Cons(2, Cons(3, Nil)))';
@@ -82,11 +82,11 @@ const keysOf = source => {
   assert.ok(result instanceof Right, JSON.stringify(result));
   return result.value0;
 };
-const listOf = argument => TData.create(0)([argument]);
+const listOf = argument => TData.create(0)([argument])([]);
 const typeKey = (declaration, args) =>
-  ({ declaration, function: false, arguments: args });
+  ({ declaration, function: false, effect: false, arguments: args });
 const functionKey = (declaration, args) =>
-  ({ declaration, function: true, arguments: args });
+  ({ declaration, function: true, effect: false, arguments: args });
 
 // List is type 0, length function 0 and main function 1 in `library`.
 test('length(Nil) shares the length key at Int', () => {
@@ -116,8 +116,8 @@ test('a polymorphic declaration never instantiated is not emitted', () => {
     + ' fn main(): Int = 0;';
   assert.deepEqual(keysOf(source), [functionKey(1, [])]);
   const go = checked(source);
-  assert.ok(!go.includes('bumpusFn1'), 'id was emitted');
-  assert.ok(!go.includes('bumpusTy0'), 'Box was emitted');
+  assert.ok(!go.includes('waxwingFn1'), 'id was emitted');
+  assert.ok(!go.includes('waxwingTy0'), 'Box was emitted');
 });
 
 // The limit counts only keys of polymorphic declarations (global

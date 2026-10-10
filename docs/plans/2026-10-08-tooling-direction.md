@@ -42,7 +42,7 @@ diagnostic both fail; examples are discoverable, attributable to their
 source, and exercised by the normal verification workflow. This is a
 language-user feature, distinct from today's compiler test suite.
 
-## PBT001: Property-based testing for Bumpus programs
+## PBT001: Property-based testing for Waxwing programs
 
 Provide supported generators, combinators, shrinking, reproducible seeds
 and replay, useful minimal-counterexample reports, and ordinary test-runner
@@ -64,7 +64,7 @@ milestone by themselves.
 
 ## LIT001: Literate capabilities (exploratory)
 
-Explore writing explanations and checked Bumpus code together. The user's
+Explore writing explanations and checked Waxwing code together. The user's
 "maybe" remains an open adoption decision. Compare executable Markdown
 fences using DOC001 with a dedicated literate source mode; do not assume
 new file extensions, tangling, notebooks or embedded evaluation are needed.
@@ -81,7 +81,7 @@ has defined equivalence to ordinary source, and IDE/doctest workflows agree.
 Make authoritative, versioned language and tooling guidance easy for both
 people and coding agents to find. Provide a clear documentation entry point,
 searchable API/reference material and concise worked examples. Evaluate
-task-oriented skills for writing, checking and debugging Bumpus, with
+task-oriented skills for writing, checking and debugging Waxwing, with
 explicit tool commands, supported versions, limitations and source links.
 
 Favor information generated or checked against compiler/library metadata
@@ -102,9 +102,9 @@ The user requires an ecosystem that distinguishes three composable roles:
 
 | Role | Responsibility | Proposed example |
 |---|---|---|
-| Bumpus library | Bumpus source compiled with the application to its selected target; portable when its dependencies and semantics are portable | Domain validation, collection operations, shared application logic |
+| Waxwing library | Waxwing source compiled with the application to its selected target; portable when its dependencies and semantics are portable | Domain validation, collection operations, shared application logic |
 | FFI binding | Typed access to a specific host library/API, with explicit conversion and foreign-value validation | A Go logger or AWS SDK binding |
-| Service implementation | Fulfill a Bumpus-owned capability contract using a binding, Bumpus code or a test fake | Logging or object storage implemented by a chosen host library |
+| Service implementation | Fulfill a Waxwing-owned capability contract using a binding, Waxwing code or a test fake | Logging or object storage implemented by a chosen host library |
 
 These are roles, not mandatory package kinds: a package may contain several,
 and an adapter may use FFI internally. A dependency-inverted application
@@ -117,19 +117,19 @@ Effect's [Platform introduction](https://effect.website/docs/v4/platform/introdu
 is a conceptual precedent: abstract services are fulfilled by implementations
 selected for the runtime. Review its versioned sources in LA001; this is
 not adoption of Effect's specific layer, context or runtime mechanisms.
-For Bumpus, service records versus effect handlers remains C001/R001/FX001
+For Waxwing, service records versus effect handlers remains C001/R001/FX001
 design work. Separate compilation targets from runtime availability: one
 target can have several hosts, and a host may lack a required capability.
 
-Design library consumption in both directions. Bumpus applications should
-consume Bumpus source and typed host bindings. Also assess whether compiled
-Bumpus libraries can expose usable APIs to host-language callers, including
+Design library consumption in both directions. Waxwing applications should
+consume Waxwing source and typed host bindings. Also assess whether compiled
+Waxwing libraries can expose usable APIs to host-language callers, including
 export names, generic instantiation, data/function representation, errors,
 effect execution and required runtime support. This does not select a stable
 binary ABI or change M001's separate-compilation deferral.
 
 Package management must describe and resolve the combined dependency graph:
-Bumpus modules/packages, service contracts/implementations and host packages.
+Waxwing modules/packages, service contracts/implementations and host packages.
 Evaluate a manifest and lockfile with compiler/language compatibility,
 target/runtime support, package versions, source identity and selected
 host-dependency versions. Prefer integrating Go's dependency tooling for Go
@@ -137,7 +137,7 @@ libraries, and evaluate the corresponding ecosystem tooling for later
 targets, rather than independently reimplementing their resolvers.
 
 Define who owns generated host manifests and how applications reconcile
-host constraints from multiple Bumpus dependencies. Decide version conflict
+host constraints from multiple Waxwing dependencies. Decide version conflict
 rules, transitive resolution, duplicate package/type identity, adapter versus
 contract compatibility, workspace/path dependencies and reproducible cached
 builds. Give unsupported target/runtime combinations and missing providers
@@ -153,13 +153,13 @@ conformance tests; availability and operational differences must be explicit.
 
 Proposed acceptance scenarios:
 
-- Compile a Bumpus library into a Go application and verify its host-facing
+- Compile a Waxwing library into a Go application and verify its host-facing
   API if library export support is chosen. Later targets require their own
   equivalent proof before portability is claimed.
 - Run one application against a fake logger/storage provider and a real
   host-library adapter without changing its domain logic. Test malformed
   foreign values, typed failures and provider contract behavior.
-- Resolve an application with multiple Bumpus packages and shared host
+- Resolve an application with multiple Waxwing packages and shared host
   dependencies; reproduce the build from the lockfile in a fresh workspace
   and from a prepared offline cache. Diagnose conflicts and unsupported
   capabilities, and deliberately change an adapter/contract version to test

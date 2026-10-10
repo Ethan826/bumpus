@@ -60,3 +60,15 @@ files are upstream material from obra/superpowers, pinned to
 skills-lock.json; MIT copyright/license notice is preserved in
 .agents/skills/SUPERPOWERS-LICENSE. These files are licensed upstream copies,
 separate from independently written Bumpus code and read-only reference projects.
+
+## Waxwing branding (2026-10-09)
+
+The user supplied assets/branding/waxwing-{logo,mark}.svg, the transparent
+logo PNG, white preview and waxwing-README.md during the naming migration.
+They were copied byte-for-byte from the main checkout to the FX001 worktree.
+The supplied notes describe an editable vector recreation of the user's
+minimal-flight-lines concept (concept 4), with an outlined Times New Roman
+wordmark approximation, navy #10212D and coral #BD6048. These supplied notes
+are preserved; no new artwork or third-party source code was generated or
+copied for this migration. Historical Bumpus branding provenance remains in
+assets/branding/bumpus-README.md with the original image.

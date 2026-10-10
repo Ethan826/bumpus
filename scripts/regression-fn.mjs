@@ -85,16 +85,16 @@ export const fnRows = [
   {
     // A helper evaluates its whole block of arguments, then applies.
     name: 'block-order', file: 'src/Format/Go/Apply.purs',
-    needle: '    <> " {\\nreturn bumpusValue"\n'
-      + '    <> joinWith "" (map parenthesized parts.codes)',
+    needle: '    <> " {\\nreturn waxwingValue"\n'
+      + '    <> joinWith "" (map (parenthesized context) parts.codes)',
     replacement: '    <> " {\\n"\n'
-      + '    <> joinWith "" (Array.mapWithIndex (\\i c → "var bumpusArg"\n'
+      + '    <> joinWith "" (Array.mapWithIndex (\\i c → "var waxwingArg"\n'
       + '      <> show i <> " " <> joinWith "" (map (goType <<< IR.typeOf)\n'
       + '        (Array.fromFoldable (Array.index (Array.slice first\n'
       + '          (first + blockSize) arguments) i))) <> " = " <> c <> "\\n")\n'
       + '        parts.codes)\n'
-      + '    <> "return bumpusValue"\n'
-      + '    <> joinWith "" (Array.mapWithIndex (\\i _ → "(bumpusArg" <> show i\n'
+      + '    <> "return waxwingValue"\n'
+      + '    <> joinWith "" (Array.mapWithIndex (\\i _ → "(waxwingArg" <> show i\n'
       + '      <> ")") parts.codes)',
     probe: 'block-order', message: /helper evaluated its block early/
   },

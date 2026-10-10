@@ -94,7 +94,7 @@ constructor globals span name = maybe' unbound fromGlobal
     (Syntax.problemAt (Unbound UnboundConstructor name) span)
   fromGlobal global = case global.ref of
     GlobalCtor id → Right id
-    GlobalFunction _ _ → unbound unit
+    _ → unbound unit
 
 -- A repeated binder is never an equality test; report its first occurrence.
 uniqueBinders ∷ Array Binder → Either Syntax.Diagnostic Unit

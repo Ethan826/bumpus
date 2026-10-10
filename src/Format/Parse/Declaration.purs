@@ -2,13 +2,22 @@ module Format.Parse.Declaration (typeDeclaration) where
 
 import Prelude
 import Data.Maybe (Maybe, fromMaybe)
-import Domain.Syntax (CtorDecl, Span, TypeDecl, TypeParameter, TypeRef)
+import Domain.Syntax
+  ( CtorDecl
+  , Sort(..)
+  , Span
+  , TypeDecl
+  , TypeParameter
+  , TypeRef
+  )
 import Format.Lex (Token, isName, isUpper)
 import Format.Parse.Grammar
   ( Parser
   , dispatch
   , expect
   , failWith
+  , name
+  , on
   , onWhen
   , optionalOn
   , sepBy1
@@ -34,10 +43,15 @@ typeDeclaration = typeOf <$> expect "type" <*> upperName
     }
 
 typeParameter ∷ Parser TypeParameter
-typeParameter = dispatch [ onWhen lowerText (parameterOf <$> token) ]
-  (failWith "Expected a type parameter")
+typeParameter = dispatch [ on "..." rowParameter ]
+  ( dispatch [ onWhen lowerText (typedParameter <$> token) ]
+      (failWith "Expected a type parameter")
+  )
   where
-  parameterOf found = { name: found.text, span: found.span }
+  typedParameter found =
+    { name: found.text, sort: TypeSort, span: found.span }
+  rowParameter = expect "..." *> (rowParameterOf <$> name)
+  rowParameterOf found = { name: found.text, sort: RowSort, span: found.span }
 
 lowerText ∷ String → Boolean
 lowerText text = isName text && not (isUpper text)

@@ -8,6 +8,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { polyProbes } from './regression-poly.mjs';
 import { fnProbes } from './regression-fn.mjs';
+import { task5Probes } from './regression-task5.mjs';
 const [compilerPath, outputDir, probe] = process.argv.slice(2);
 const { compile } = await import(pathToFileURL(resolve(compilerPath)));
 const load = name => import(pathToFileURL(resolve(outputDir, name, 'index.js')));
@@ -32,14 +33,14 @@ const recovering = `package main
 import ("fmt"; "testing")
 func TestNilField(t *testing.T) {
 defer func() { fmt.Println("recovered:", recover()) }()
-bumpusFn0(bumpusTy0{tag: 2})
+waxwingFn0(waxwingTy0{tag: 2})
 }
 `;
 
 const nilGuard = () => {
   const result = compile(second);
   assert.ok(result instanceof Right, 'nil-guard probe program was rejected');
-  const work = mkdtempSync(join(tmpdir(), 'bumpus-regression-'));
+  const work = mkdtempSync(join(tmpdir(), 'waxwing-regression-'));
   let output;
   let status;
   try {
@@ -53,7 +54,7 @@ const nilGuard = () => {
     output = run.stdout + run.stderr;
     status = run.status;
   } finally { rmSync(work, { recursive: true, force: true }); }
-  if (status !== 0 || !output.includes('recovered: bumpus: unmatched value')) {
+  if (status !== 0 || !output.includes('recovered: waxwing: unmatched value')) {
     console.error(`nil guard missing\n${output}`);
     process.exit(1);
   }
@@ -66,6 +67,80 @@ const exhaustive = () => {
   const code = result instanceof Left && result.value0.problem.constructor.name;
   assert.ok(code === 'NonExhaustive', 'non-exhaustive match was accepted');
   console.log('exhaustive regression detects the defect');
+};
+
+const expectsDiagnostic = (source, code, message, label) => {
+  const result = compile(source);
+  assert.ok(result instanceof Left, `${label}: program was accepted`);
+  const found = wire(result.value0);
+  assert.equal(found.code, code, `${label}: wrong diagnostic code`);
+  assert.equal(found.message, message, `${label}: wrong diagnostic message`);
+};
+
+const nestedFail = () => expectsDiagnostic(
+  'fn id(x: Int): Int = x; '
+    + 'fn f(e: a): Int with Fail(a) + Fail(Int) = fail(id(fail(e))); '
+    + 'fn main(): Int = 0;',
+  'E_TYPE', 'Fail needs a concrete error family', 'nested Fail payload'
+);
+
+const duplicateBinder = () => expectsDiagnostic(
+  'effect Add { fn add(x: Int, y: Int): Int; }; '
+    + 'fn main(): Int = with handler Add { add(x, x) => x } { add(1, 2) };',
+  'E_DUPLICATE', 'Duplicate parameter x', 'duplicate handler binder'
+);
+
+const duplicateRowTail = () => expectsDiagnostic(
+  'fn f(): Int with ...e + ...r = 0; fn main(): Int = 0;',
+  'E_SYNTAX', 'Only one row tail is allowed', 'duplicate row tail'
+);
+
+const constructorFunction = () => expectsDiagnostic(
+  'fn F(): Int = 0; type T = F; fn main(): Int = 0;',
+  'E_DUPLICATE', 'Duplicate function F', 'constructor and function collision'
+);
+
+const duplicateEffect = () => expectsDiagnostic(
+  'effect Clock { fn now(): Int; }; effect Clock { fn later(): Int; }; '
+    + 'fn main(): Int = 0;',
+  'E_DUPLICATE', 'Duplicate effect Clock', 'duplicate effect'
+);
+
+const duplicateOperation = () => expectsDiagnostic(
+  'effect Clock { fn now(): Int; fn now(): Int; }; fn main(): Int = 0;',
+  'E_DUPLICATE', 'Duplicate operation now', 'duplicate operation'
+);
+
+const duplicateEffectParameter = () => expectsDiagnostic(
+  'effect State(a, a) { fn get(): a; }; fn main(): Int = 0;',
+  'E_DUPLICATE', 'Duplicate type parameter a', 'duplicate effect parameter'
+);
+
+const duplicateOperationParameter = () => expectsDiagnostic(
+  'effect State { fn put(a: Int, a: Bool): Unit; }; '
+    + 'fn main(): Int = 0;',
+  'E_DUPLICATE', 'Duplicate parameter a', 'duplicate operation parameter'
+);
+
+const deferredFailEffect = () => expectsDiagnostic(
+  'type DbError = DbError; fn f(): Int with pure = { '
+    + 'let raise = fn(error) => fail(error); raise(DbError) }; '
+    + 'fn main(): Int = 0;',
+  'E_EFFECT', 'f performs Fail(DbError), which its signature does not allow',
+  'deferred Fail capability'
+);
+
+// FX001 Task 7: the evidence context is threaded only when the emitted IR
+// has an effect node or layout (design §4), so a Console-only program's Go
+// stays free of `ctx` and byte-identical to its snapshot.
+const effectFreeContext = () => {
+  const result = compile('fn main(): Unit with Console = print(1);');
+  assert.ok(result instanceof Right, 'effect-free probe program was rejected');
+  if (result.value0.includes('ctx')) {
+    console.error('ctx emitted for an effect-free program');
+    process.exit(1);
+  }
+  console.log('effect-free-ctx regression detects the defect');
 };
 
 // Runs the probe program's `main` and returns what it printed. The work
@@ -134,7 +209,7 @@ const capture = () => {
 // Grammar's apply is the only place the remaining input is threaded; if the
 // second parser restarts from the first's state, no program parses as written.
 const stateThread = () => {
-  const result = compile(readFileSync('examples/answer.bumpus', 'utf8'));
+  const result = compile(readFileSync('examples/answer.wxw', 'utf8'));
   const expected = readFileSync('bootstrap/answer.go', 'utf8');
   if (!(result instanceof Right) || result.value0 !== expected) {
     console.error(`parser state not threaded: ${JSON.stringify(result.value0)}`);
@@ -145,6 +220,14 @@ const stateThread = () => {
 
 const probes = {
   branch, 'nil-guard': nilGuard, exhaustive,
+  'nested-fail': nestedFail, 'duplicate-binder': duplicateBinder,
+  'duplicate-row-tail': duplicateRowTail, 'duplicate-effect': duplicateEffect,
+  'constructor-function': constructorFunction,
+  'duplicate-operation': duplicateOperation,
+  'duplicate-effect-parameter': duplicateEffectParameter,
+  'duplicate-operation-parameter': duplicateOperationParameter,
+  'deferred-fail-effect': deferredFailEffect,
+  'effect-free-ctx': effectFreeContext,
   'ctor-order': ordered('Nil < Cons(0, Nil)', 'constructor order wrong'),
   'first-field': ordered('Cons(1, Nil) > Cons(0, Cons(5, Nil))',
     'first differing field ignored'),
@@ -153,7 +236,7 @@ const probes = {
   'state-thread': stateThread, capture
 };
 const context = { compile, Left, Right, wire, printed, ran, probe };
-const external = { ...polyProbes, ...fnProbes };
+const external = { ...polyProbes, ...fnProbes, ...task5Probes };
 const delegated = name => () => external[name](context);
 for (const name of Object.keys(external)) probes[name] = delegated(name);
 assert.ok(probe in probes, `unknown probe: ${probe}`);

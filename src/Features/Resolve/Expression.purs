@@ -1,31 +1,27 @@
-module Features.Resolve.Expression (Scope, expression) where
+module Features.Resolve.Expression (expression) where
 
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Foldable (foldl)
+import Data.Map as Map
 import Data.Maybe (Maybe, maybe')
 import Data.String as String
 import Data.Traversable (traverse)
 import Domain.Problem (Problem(..), UnboundKind(..))
 import Domain.Syntax as Syntax
+import Domain.Resolved (Global)
+import Features.Resolve.Block (block)
 import Features.Resolve.Fresh (Fresh, failure, liftEither)
+import Features.Resolve.HandlerExpression as HandlerExpression
 import Features.Resolve.Lambda (lambda)
 import Features.Resolve.Pattern (resolvePattern)
-import Domain.Resolved (Global)
+import Features.Resolve.Scope (Scope)
 import Domain.Resolved as Resolved
 
--- `types` and `variables` (the enclosing signature's) are what a lambda
--- annotation may name.
-type Scope =
-  { globals ∷ Array Global
-  , ctors ∷ Array Resolved.CtorInfo
-  , locals ∷ Array Resolved.Local
-  , types ∷ Array Resolved.TypeInfo
-  , variables ∷ Array String
-  }
-
 -- Binders are numbered in source pre-order: scrutinee before arms, each
--- arm's pattern before its body, a lambda's parameters before its body.
+-- arm's pattern before its body, a lambda's parameters before its body,
+-- a block's items in order, each `let` before its expression.
 -- A flat exhaustive dispatch (BACKLOG E003).
 expression ∷ Scope → Syntax.Expr → Fresh Resolved.Expr
 expression scope = case _ of
@@ -50,6 +46,18 @@ expression scope = case _ of
     <*> traverse nested arguments
   Syntax.Pipe span left right → Resolved.Pipe span <$> nested left
     <*> nested right
+  Syntax.HandlerExpr span reference clauses →
+    HandlerExpression.handlerExpression expression scope span reference clauses
+  Syntax.With span handler body → Resolved.With span <$> nested handler
+    <*> nested body
+  Syntax.Handle span body clauses → HandlerExpression.failureHandler expression
+    scope
+    span
+    body
+    clauses
+  Syntax.Fail span value → Resolved.Fail span <$> nested value
+  Syntax.UnitValue span → pure (Resolved.UnitValue span)
+  Syntax.Block span items value → block expression scope span items value
   where
   -- Eta-expanded: a point-free `expression scope` would recurse at once.
   nested syntax = expression scope syntax
@@ -61,11 +69,13 @@ resolveArm scope arm = do
   body ← withLocals scope arm.body matched.binders
   pure { pattern: matched.pattern, body, span: arm.span }
 
--- Later locals shadow earlier ones (findLocal searches from the end).
+-- Later locals shadow earlier ones.
 withLocals
   ∷ Scope → Syntax.Expr → Array Resolved.Local → Fresh Resolved.Expr
 withLocals scope body locals =
-  expression (scope { locals = scope.locals <> locals }) body
+  expression (scope { locals = foldl inserted scope.locals locals }) body
+  where
+  inserted found local = Map.insert local.name local.id found
 
 -- Design §2: a local wins; then a function, a value if it has parameters
 -- and E_ARITY without its call if it has none; then a constructor.
@@ -83,6 +93,12 @@ bareName scope span name = maybe' otherwise found (findLocal scope name)
   global entry = case entry.ref of
     Resolved.GlobalCtor id → bareConstructor scope span id
     Resolved.GlobalFunction id arity → bareFunction span name id arity
+    Resolved.Operation effect index arity →
+      if arity == 0 then Left
+        (Syntax.problemAt (FunctionNeedsCall name) span)
+      else pure (Resolved.OperationRef span effect index)
+    Resolved.BuiltinPrint → pure (Resolved.PrintRef span)
+    Resolved.BuiltinCrash → pure (Resolved.CrashRef span)
 
 bareFunction
   ∷ Syntax.Span
@@ -126,6 +142,10 @@ callName scope span name arguments = maybe' globalCall localCall
   dispatch global = case global.ref of
     Resolved.GlobalFunction id _ → Resolved.Call span id <$> resolved
     Resolved.GlobalCtor id → constructorCall scope span name id resolved
+    Resolved.Operation effect index _ → Resolved.Perform span effect index
+      <$> resolved
+    Resolved.BuiltinPrint → Resolved.Print span <$> resolved
+    Resolved.BuiltinCrash → Resolved.Crash span <$> resolved
   resolved = traverse (expression scope) arguments
 
 constructorCall
@@ -151,11 +171,7 @@ nameSpan span name = { start: span.start, end }
     }
 
 findLocal ∷ Scope → String → Maybe Resolved.LocalId
-findLocal scope name = entryId <$> Array.find named
-  (Array.reverse scope.locals)
-  where
-  named local = local.name == name
-  entryId local = local.id
+findLocal scope name = Map.lookup name scope.locals
 
 findGlobal ∷ Scope → String → Maybe Global
 findGlobal scope name = Array.find named scope.globals

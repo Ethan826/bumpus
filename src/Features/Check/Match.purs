@@ -17,6 +17,7 @@ import Domain.Syntax (Diagnostic, Span, problemAt)
 import Domain.Resolved
   ( CtorId(..)
   , CtorInfo
+  , EffectInfo
   , LocalId
   , Tables
   , Ty(..)
@@ -25,6 +26,7 @@ import Domain.Resolved
   )
 import Domain.Resolved as Resolved
 import Features.Check.Require (expectType)
+import Features.Check.Tables (ownerType)
 import Features.Check.Scheme
   ( Scheme
   , State
@@ -40,7 +42,8 @@ type Typed = { id ∷ LocalId, ty ∷ Ty Open }
 type Matched = { pattern ∷ Checked.Pattern, locals ∷ Array Typed }
 
 type PatternEnv r =
-  { types ∷ Array TypeInfo
+  { effects ∷ Array EffectInfo
+  , types ∷ Array TypeInfo
   , ctors ∷ Array CtorInfo
   , variables ∷ Array String
   | r
@@ -55,7 +58,8 @@ checkPattern tables expected pattern = valueOf <$> patternAgainst env start
   expected
   pattern
   where
-  env = { types: tables.types, ctors: tables.ctors, variables: [] }
+  env =
+    { effects: [], types: tables.types, ctors: tables.ctors, variables: [] }
   valueOf threaded = threaded.value
 
 -- Patterns are checked top-down against the scrutinee's type. On a rigid
@@ -104,7 +108,7 @@ checkCtor env state expected span id@(CtorId index) fields = maybe' missing
   found ctor = do
     when (Array.length ctor.fields /= Array.length fields) (Left arityBug)
     owner ← ownerOf env span ctor.owner
-    matchCtor env (instantiate owner.parameters state) expected span id
+    matchCtor env (instantiate owner.parameters state) owner expected span id
       { ctor, fields }
   arityBug = problemAt (Internal "Resolved constructor arity mismatch") span
 
@@ -112,14 +116,15 @@ matchCtor
   ∷ ∀ r
   . PatternEnv r
   → Threaded Scheme
+  → TypeInfo
   → Ty Open
   → Span
   → CtorId
   → { ctor ∷ CtorInfo, fields ∷ Array Resolved.Pattern }
   → Either Diagnostic (Threaded Matched)
-matchCtor env scheme expected span id use = do
+matchCtor env scheme owner expected span id use = do
   reached ← expectType env scheme.state expected
-    (TData use.ctor.owner scheme.value.arguments)
+    (at scheme.value (ownerType use.ctor.owner owner))
     span
   checked ← fieldsAgainst env reached
     (map (at scheme.value) use.ctor.fields)

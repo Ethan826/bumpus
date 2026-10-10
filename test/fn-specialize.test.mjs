@@ -169,6 +169,6 @@ const batch = runGoBatch(import.meta.url, [['phantom', phantom]]);
 test('a phantom arrow argument compiles and runs', () => {
   const result = compile(phantom);
   if (!(result instanceof Right)) assert.fail(JSON.stringify(result));
-  assert.ok(result.value0.includes('type bumpusFun0 func(int32) int32\n'));
+  assert.ok(result.value0.includes('type waxwingFun0 func(int32) int32\n'));
   assert.equal(batch.run('phantom'), '0\n');
 });

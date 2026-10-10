@@ -81,7 +81,7 @@ test('generic calls check at each use: pair(id(1), id(true))', () => {
   assert.deepEqual(call.value2.map(argument => argument.value0.node.value1),
     [[TInt.value], [TBool.value]]);
   assert.deepEqual(body(program, 2).ty,
-    TData.create(1)([TInt.value, TBool.value]));
+    TData.create(1)([TInt.value, TBool.value])([]));
   // Inside its own declaration a variable is rigid.
   assert.deepEqual(node(program, 1).value1, [rigid(0), rigid(1)]);
 });
@@ -100,7 +100,7 @@ test('an undetermined type argument becomes a hole: length(Nil)', () => {
   const call = node(program, 1);
   assert.deepEqual(call.value1, [hole(0)]);
   assert.deepEqual(call.value2[0].value0.node.value1, [hole(0)]);
-  assert.deepEqual(call.value2[0].value0.ty, TData.create(0)([hole(0)]));
+  assert.deepEqual(call.value2[0].value0.ty, TData.create(0)([hole(0)])([]));
 });
 
 test('holes are numbered densely per function, first occurrence first',
@@ -108,9 +108,9 @@ test('holes are numbered densely per function, first occurrence first',
     const program = checkedPoly(prelude + 'fn f(x: a, y: b): Int = 0;'
       + ' fn g(): Int = f(Nothing, Nil); fn main(): Int = f(Nil, Proxy);');
     assert.deepEqual(node(program, 1).value1,
-      [TData.create(2)([hole(0)]), TData.create(0)([hole(1)])]);
+      [TData.create(2)([hole(0)])([]), TData.create(0)([hole(1)])([])]);
     assert.deepEqual(node(program, 2).value1,
-      [TData.create(0)([hole(0)]), TData.create(3)([hole(1)])]);
+      [TData.create(0)([hole(0)])([]), TData.create(3)([hole(1)])([])]);
   });
 
 // Coverage of a constructor's fields at an applied type is Task 6, so the
@@ -120,6 +120,6 @@ test('a pattern carries its instantiated type', () => {
     + ' match m { Just(n) => n, _ => 0 };' + main);
   const [arm] = node(program, 0).value1;
   const pattern = arm.pattern.value0;
-  assert.deepEqual(pattern.ty, TData.create(2)([TInt.value]));
+  assert.deepEqual(pattern.ty, TData.create(2)([TInt.value])([]));
   assert.deepEqual(pattern.shape.value1[0].value0.ty, TInt.value);
 });

@@ -10,6 +10,7 @@ import Domain.IR.Internal as IR
 import Domain.Resolved (FunctionId(..))
 import Domain.Syntax (Span)
 import Features.Specialize.Copy (modify)
+import Features.Specialize.Handlers as Handlers
 import Features.Specialize.Keys (Env, Specializing, Work, ctorAt, internal)
 import Features.Specialize.Values
   ( Scope
@@ -24,7 +25,7 @@ import Features.Specialize.Values
 -- The signature first, then the body in pre-order (design §6): an
 -- expression's type, then a reference's instantiation and callee, then
 -- its parts left to right; an arm's pattern before its body; a lambda's
--- parameters before its body.
+-- parameters before its body; a block's items in order, then its value.
 fillFunction ∷ Env → Work → Specializing Unit
 fillFunction env work = maybe'
   (internal "Invalid function id" work.span)
@@ -83,9 +84,43 @@ copyNode scope span = case _ of
     <*> each arguments
   Checked.Lambda parameters body → lambda scope recur span parameters body
   Checked.Pipe left right → IR.Pipe <$> recur left <*> recur right
+  Checked.UnitValue → pure IR.UnitValue
+  Checked.Print value → IR.Print <$> recur value
+  Checked.Crash value → IR.Crash <$> recur value
+  Checked.OperationRef effect index instantiation → Handlers.operationRef
+    scope
+    span
+    effect
+    index
+    instantiation
+  Checked.Perform effect index instantiation arguments → Handlers.perform
+    scope
+    recur
+    span
+    effect
+    index
+    instantiation
+    arguments
+  Checked.Handler effect instantiation clauses → Handlers.handlerValue scope
+    recur
+    span
+    effect
+    instantiation
+    clauses
+  Checked.With handler body → IR.Install <$> recur handler <*> recur body
+  Checked.Handle body clauses → Handlers.handle scope recur body clauses
+  Checked.Fail value → Handlers.abort recur span value
+  Checked.Block items value → IR.Block <$> traverse (item scope) items
+    <*> recur value
   where
   recur = expression scope
   each = traverse recur
+
+item ∷ Scope → Checked.Item → Specializing IR.Item
+item scope = case _ of
+  Checked.Let local value → IR.Let local <$> expression scope value
+  Checked.Defer value → IR.Defer <$> expression scope value
+  Checked.Discard value → IR.Discard <$> expression scope value
 
 arm ∷ Scope → Checked.Arm → Specializing IR.Arm
 arm scope checked = do

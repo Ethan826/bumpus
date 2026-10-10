@@ -1,4 +1,4 @@
-module Format.Go.Show (showName, showHelpers, printed) where
+module Format.Go.Show (showName, showHelpers, printed, appendsWithFmt) where
 
 import Prelude
 import Data.Array as Array
@@ -9,7 +9,7 @@ import Format.Go.Data (fieldName, goType, malformed)
 import Format.Go.Layout (Declared, Layout, Member)
 
 showName ∷ TypeId → String
-showName (TypeId index) = "bumpusShow" <> show index
+showName (TypeId index) = "waxwingShow" <> show index
 
 -- One printer per declared type, in TypeId order, whether or not used.
 showHelpers ∷ Layout → String
@@ -19,8 +19,21 @@ showHelpers program = joinWith "" (map showHelper program.types)
 -- output is unchanged; a declared value is rendered by its printer.
 printed ∷ Ty → String → String
 printed ty call = case ty of
+  TUnit → "func(_ struct{}) string { return \"()\" }(" <> call <> ")"
   TData owner → "string(" <> showName owner <> "(nil, " <> call <> "))"
   _ → call
+
+-- Whether a printer calls fmt.Append: exactly when a declared type has an
+-- Int or Bool field (showField).
+appendsWithFmt ∷ Layout → Boolean
+appendsWithFmt program = Array.any declaredUses program.types
+  where
+  declaredUses declared = Array.any memberUses declared.members
+  memberUses member = Array.any formatted member.ctor.fields
+  formatted = case _ of
+    TInt → true
+    TBool → true
+    _ → false
 
 -- Cases come from the type's members, which Format.Go.Layout joins with
 -- the constructor table itself, so every constructor of the type is printed
@@ -40,7 +53,7 @@ showCase ∷ Member → String
 showCase member = "case " <> show member.tag <> ":\n"
   <> ctorBody member.id member.ctor
 
--- Printed values are Bumpus expressions: `Name` or `Name(f1, f2)`.
+-- Printed values are Waxwing expressions: `Name` or `Name(f1, f2)`.
 ctorBody ∷ CtorId → CtorInfo → String
 ctorBody id ctor
   | Array.null ctor.fields = "return " <> appendText ctor.name
@@ -61,9 +74,12 @@ showField id position = case _ of
     <> ")\n"
   TInt → appended
   TBool → appended
+  TUnit → "out = " <> appendText "()"
   -- Printing is rejected at a type holding an arrow (design §3), yet every
   -- declared type gets its printer; a function field is never printed.
   TFun _ → malformed <> "\n"
+  -- Handler types are refused exactly as arrows are (FX001 design §2).
+  THandler _ → malformed <> "\n"
   where
   appended = "out = fmt.Append(out, " <> field <> ")\n"
   field = "v." <> fieldName id position

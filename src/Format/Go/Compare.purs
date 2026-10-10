@@ -41,11 +41,11 @@ isBoolOrdering operator left = isOrdering operator
 -- Go has no ordering on bool; false < true is expressed through -1, 0, 1.
 boolHelper ∷ String
 boolHelper =
-  "func bumpusCmpBool(a bool, b bool) int { "
+  "func waxwingCmpBool(a bool, b bool) int { "
     <> "if a == b { return 0 }; if b { return -1 }; return 1 }\n\n"
 
 compareName ∷ TypeId → String
-compareName (TypeId index) = "bumpusCmp" <> show index
+compareName (TypeId index) = "waxwingCmp" <> show index
 
 -- One helper per declared type, in TypeId order, whether or not used.
 compareHelpers ∷ Layout → String
@@ -58,7 +58,8 @@ compareHelpers program = joinWith "" (map compareHelper program.types)
 comparison ∷ Operator → Ty → String → String → String
 comparison operator ty left right = case ty of
   TData owner → viaHelper (compareName owner)
-  TBool | isOrdering operator → viaHelper "bumpusCmpBool"
+  TBool | isOrdering operator → viaHelper "waxwingCmpBool"
+  TUnit | isOrdering operator → viaHelper unitOrder
   _ → "(" <> left <> " " <> symbol <> " " <> right <> ")"
   where
   symbol = goOperator operator
@@ -66,6 +67,12 @@ comparison operator ty left right = case ty of
     <> ") "
     <> symbol
     <> " 0)"
+
+-- Unit has one value, so any two are equal (ADR 005); Go has no ordering
+-- on struct{}, and this literal still evaluates both operands in order,
+-- with no helper to emit.
+unitOrder ∷ String
+unitOrder = "func(struct{}, struct{}) int { return 0 }"
 
 -- Tags are 1-based declaration positions, so comparing tags orders
 -- constructors. An out-of-range tag is malformed (I001 foreign values).
@@ -105,7 +112,9 @@ fieldComparison field = case _ of
     <> " > "
     <> right
     <> " { return 1 }\n"
-  TBool → decide ("bumpusCmpBool(" <> left <> ", " <> right <> ")")
+  TBool → decide ("waxwingCmpBool(" <> left <> ", " <> right <> ")")
+  -- Two Unit fields are always equal.
+  TUnit → ""
   TData owner → "if " <> left <> " == nil || " <> right <> " == nil { "
     <> malformed
     <> " }\n"
@@ -115,6 +124,8 @@ fieldComparison field = case _ of
   -- func values, so a function field is never compared and a constructor
   -- holding one, never reached, reports a malformed value.
   TFun _ → malformed <> "\n"
+  -- Handler types are refused exactly as arrows are (FX001 design §2).
+  THandler _ → malformed <> "\n"
   where
   left = "a." <> field
   right = "b." <> field

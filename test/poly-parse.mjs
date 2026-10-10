@@ -1,7 +1,8 @@
 // The surface syntax for the reference interpreter (test/poly-oracle.mjs),
 // type parameters, applied and function types, lambdas, postfix
-// application and pipes included (FN001). Types are read and dropped: the
-// interpreter evaluates without them. Shares no code with the compiler.
+// application and pipes included (FN001), and Unit, blocks and `let`
+// (FX001 Task 2). Types are read and dropped: the interpreter evaluates
+// without them. Shares no code with the compiler.
 
 // An integer (a minus belongs to its literal), a word, or punctuation.
 const token = new RegExp(String.raw`\s*(?:(-\s*\d+|\d+)|`
@@ -24,6 +25,10 @@ const tokenize = source => {
 };
 
 export const isUpper = text => /^[A-Z]/.test(text);
+
+// The one Unit value, `()` (and `{}`, and a block ending in `;`).
+export const unit = Object.freeze({ unit: true });
+const unitNode = { tag: 'value', value: unit };
 
 // Recursive descent; returns { ctors (name → declaration position),
 // fields (constructor name → field count), functions (name →
@@ -100,6 +105,7 @@ export const parseProgram = source => {
     if (next.text === 'true' || next.text === 'false') {
       return { tag: 'value', value: next.text === 'true' };
     }
+    if (next.text === '(' && peek(')')) { take(')'); return unitNode; }
     if (next.text === '(') {
       const inner = expression();
       take(')');
@@ -110,7 +116,9 @@ export const parseProgram = source => {
         : { tag: 'local', name: next.text };
     }
     take('(');
-    return { tag: 'apply', name: next.text, args: list(expression, ')') };
+    // `f()` calls a function of no parameters (FX001 Task 2's `u()`).
+    const args = peek(')') ? (take(')'), []) : list(expression, ')');
+    return { tag: 'apply', name: next.text, args };
   };
   const addition = () => {
     let left = atom();
@@ -132,7 +140,37 @@ export const parseProgram = source => {
     }
     return left;
   };
+  // `let name = e`, `let _ = e` (name null) or `e`; a `;` after the last
+  // item makes the block's value `()`; a let must be followed by `;`.
+  const item = () => {
+    if (!peek('let')) return { tag: 'discard', value: expression() };
+    take('let');
+    const name = take().text;
+    take('=');
+    return { tag: 'let', name: name === '_' ? null : name,
+      value: expression() };
+  };
+  const block = () => {
+    take('{');
+    if (peek('}')) { take('}'); return unitNode; }
+    const items = [];
+    for (;;) {
+      const found = item();
+      if (!peek(';')) {
+        take('}');
+        if (found.tag === 'let') throw new Error('oracle: expected ;');
+        return { tag: 'block', items, value: found.value };
+      }
+      take(';');
+      items.push(found);
+      if (peek('}')) {
+        take('}');
+        return { tag: 'block', items, value: unitNode };
+      }
+    }
+  };
   const expression = () => {
+    if (peek('{')) return block();
     if (peek('fn')) return lambda();
     if (peek('if')) {
       take('if');

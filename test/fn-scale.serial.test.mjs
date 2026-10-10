@@ -54,7 +54,7 @@ const source = 'type List(a) = Nil | Cons(a, List(a)); '
   + `fn apply(g: (${indices.map(kindOf).join(', ')}) -> Int): Int = `
   + `g(${call(1)}); fn main(): Int = f(${call(0)}) + apply(f);`;
 
-// Each program's Bumpus phases (Parse through Go emission, in process)
+// Each program's Waxwing phases (Parse through Go emission, in process)
 // are bounded at three times their time measured 2026-10-09 on the
 // author's laptop (cold, one process per file); `go build` at 10 s.
 const scaleTest = (title, program, phaseBoundMs) => test(title, async t => {

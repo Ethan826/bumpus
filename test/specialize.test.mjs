@@ -16,10 +16,12 @@ const succeeded = (result, source) => {
   return result.value0;
 };
 
-// A checked type must be a ground TData with no arguments, and a checked call
+// A checked type must be a ground TData with no arguments (type or row),
+// and a checked call
 // or construction must record no instantiation; both are dropped, so what
 // remains must equal the monomorphic IR exactly.
-const emptyField = new Set(['TData:value1', 'Call:value1', 'Construct:value1']);
+const emptyField = new Set(['TData:value1', 'TData:value2', 'Call:value1',
+  'Construct:value1']);
 const plain = (node, checked) => {
   if (Array.isArray(node)) return node.map(item => plain(item, checked));
   if (node === null || typeof node !== 'object') return node;
@@ -36,24 +38,44 @@ const plain = (node, checked) => {
 
 // Type parameters and field syntax are resolution data the monomorphic IR
 // does not carry: a monomorphic type has no parameters, and each field keeps
-// its one source reference. Both are checked, then dropped.
-const typeInfo = ({ parameters, ...info }) => {
+// its one source reference. Both are checked, then dropped. The IR instead
+// carries the arguments its key was made at (FX001 Task 8, the defect
+// report names a payload type by them): none for a monomorphic type.
+const typeInfo = ({ parameters, rowParameters, sorts, sourceSorts, variables,
+  ...info }) => {
   assert.deepEqual(parameters, [], `${info.name} has parameters`);
-  return info;
+  assert.deepEqual(rowParameters, [], `${info.name} has row parameters`);
+  assert.deepEqual(sorts, [], `${info.name} has sorts`);
+  assert.deepEqual(sourceSorts, [], `${info.name} has source sorts`);
+  assert.deepEqual(variables, [], `${info.name} has variables`);
+  return { ...info, arguments: [] };
 };
 const ctorInfo = ({ fieldSyntax, ...info }) => {
   assert.equal(fieldSyntax.length, info.fields.length, info.name);
   return info;
 };
-const withoutResolution = program => ({ ...program,
-  types: program.types.map(typeInfo), ctors: program.ctors.map(ctorInfo) });
+const functionInfo = ({ row, ...info }) => {
+  assert.deepEqual(row.value0, [], `${info.name} has effect labels`);
+  assert.equal(row.value1.constructor.name, 'Just');
+  assert.equal(row.value1.value0.constructor.name,
+    info.name === 'main' ? 'Hole' : 'Rigid');
+  return info;
+};
+const withoutResolution = ({ effects, ...program }) => {
+  assert.deepEqual(effects, [], 'effect declarations');
+  return { ...program, functions: program.functions.map(functionInfo),
+    types: program.types.map(typeInfo), ctors: program.ctors.map(ctorInfo) };
+};
 
 const identical = source => {
   const resolved = succeeded(resolve(succeeded(parse(source), source)), source);
   const program = succeeded(check(resolved), source);
-  const { funTypes, ...specialized } = succeeded(specialize(program), source);
-  // A monomorphic program without arrows interns none (FN001 Task 5).
+  const { funTypes, effects, ...specialized } =
+    succeeded(specialize(program), source);
+  // A monomorphic program without arrows interns none (FN001 Task 5), and
+  // one without effects has no effect layout (FX001 Task 6).
   assert.deepEqual(funTypes, [], 'arrow table');
+  assert.deepEqual(effects, [], 'effect layouts');
   for (const table of ['types', 'ctors', 'functions']) {
     assert.equal(specialized[table].length, program[table].length, table);
   }
@@ -61,11 +83,11 @@ const identical = source => {
     plain(withoutResolution(program), true), source);
 };
 
-// examples/lists.bumpus is polymorphic (P001 Task 7), so specialization
+// examples/lists.wxw is polymorphic (P001 Task 7), so specialization
 // copies it rather than returning it; test/poly-run.test.mjs runs it. So
-// is examples/functions.bumpus (FN001 Task 6; test/compiler.test.mjs).
-const polymorphicExamples = new Set(['functions.bumpus', 'lists.bumpus']);
-const examples = readdirSync('examples').filter(name => name.endsWith('.bumpus'))
+// is examples/functions.wxw (FN001 Task 6; test/compiler.test.mjs).
+const polymorphicExamples = new Set(['functions.wxw', 'lists.wxw']);
+const examples = readdirSync('examples').filter(name => name.endsWith('.wxw'))
   .filter(name => !polymorphicExamples.has(name))
   .sort().map(name => readFileSync(join('examples', name), 'utf8'));
 

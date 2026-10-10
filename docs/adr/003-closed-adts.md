@@ -19,7 +19,7 @@ proposed, not verified.
 2. **Nil-guard safety policy.** Every pointer projection is preceded by a
    `!= nil` test earlier in the same `&&` chain, so generated code never makes
    an unguarded nil dereference. A malformed value (tag 0, tag past the owner,
-   nil field under a valid tag) reaches `panic("bumpus: unmatched value")` only
+   nil field under a valid tag) reaches `panic("waxwing: unmatched value")` only
    if a match inspects the malformed part. **Limit:** wildcards and binders do
    not validate what they skip; `malformed values reach the unmatched panic,
    never a nil error` and `wildcards skip validation of a nil field`
@@ -44,11 +44,11 @@ proposed, not verified.
    lowers to a top-level Go function, not an immediately invoked closure,
    because Go's inliner expands nested closures exponentially (24 nested
    matches took 34.6 s and 7.5 GB to build; 128 were killed). The k-th match
-   of `bumpusFn{f}`, numbered from 0 in one pre-order walk of the body that
-   visits a match's scrutinee before its arms, is `bumpusFn{f}Match{k}`; a
+   of `waxwingFn{f}`, numbered from 0 in one pre-order walk of the body that
+   visits a match's scrutinee before its arms, is `waxwingFn{f}Match{k}`; a
    counter is threaded through expression lowering (Format.Go.Lowered). Its
    parameters are the locals its arms capture, ascending by LocalId and named
-   `bumpusLocal{id}` with their IR types, then `bumpusScrutinee`; the call
+   `waxwingLocal{id}` with their IR types, then `waxwingScrutinee`; the call
    site passes the same locals, then the scrutinee expression, so the
    scrutinee is still evaluated once at the same point. The captures are
    every local read anywhere in the arms, nested scrutinees and nested arms
@@ -58,7 +58,7 @@ proposed, not verified.
    locals (Format.Go.Capture), an arm's are its body's minus its pattern's
    binders, and a match's are its scrutinee's plus its captures. Re-scanning
    each match's subtree instead made a 127-deep, 50-arm ladder compile in
-   3.0 s rather than 0.3 s. Lifted functions follow their `bumpusFn{f}` in number order,
+   3.0 s rather than 0.3 s. Lifted functions follow their `waxwingFn{f}` in number order,
    each preceded by a blank line. `if` keeps its closure. Checked by
    test/match-lift.test.mjs (exact signatures and order; captures through
    nested matches; the ladder compiles in under 1.5 s), test/depth.test.mjs (match-arm and compare-matches at the

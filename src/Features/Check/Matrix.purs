@@ -43,7 +43,8 @@ column tys q = maybe' noTypes withTypes (Array.uncons tys)
     { ty: types.head, tys: types.tail, pat: patterns.head, rest: patterns.tail }
 
 -- Int has unboundedly many heads, and a rigid variable, a hole or an arrow
--- is abstract (design §5), so none of them is ever complete.
+-- is abstract (design §5), so none of them is ever complete. Unit has no
+-- pattern but `_` and binders (FX001), so it is abstract too.
 complete ∷ Signature → Ty Open → Array Head → Lookup Boolean
 complete signature ty heads =
   if open ty then Right false
@@ -52,8 +53,10 @@ complete signature ty heads =
   present head = Array.elem head heads
   open = case _ of
     TInt → true
+    TUnit → true
     TVar _ → true
-    TFun _ _ → true
+    TFun _ _ _ → true
+    THandler _ _ → true
     _ → false
 
 -- Resolution enforces constructor arity, so a head whose field count

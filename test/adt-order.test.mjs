@@ -60,7 +60,7 @@ const recovering = call => `package main
 import ("fmt"; "testing")
 func TestMalformed(t *testing.T) {
   defer func() {
-    if got := fmt.Sprint(recover()); got != "bumpus: malformed value" {
+    if got := fmt.Sprint(recover()); got != "waxwing: malformed value" {
       t.Fatalf("recovered %q", got)
     }
   }()
@@ -82,15 +82,15 @@ const passes = (
 };
 
 test('malformed values panic only when visited', () => {
-  passes(recovering('bumpusCmp0(bumpusTy0{tag: 2}, bumpusTy0{tag: 2})'));
-  passes(recovering('bumpusCmp0(bumpusTy0{}, bumpusTy0{})'));
+  passes(recovering('waxwingCmp0(waxwingTy0{tag: 2}, waxwingTy0{tag: 2})'));
+  passes(recovering('waxwingCmp0(waxwingTy0{}, waxwingTy0{})'));
   // One past the last tag: an off-by-one range check would return 0 here.
-  passes(recovering('bumpusCmp0(bumpusTy0{tag: 3}, bumpusTy0{tag: 3})'));
+  passes(recovering('waxwingCmp0(waxwingTy0{tag: 3}, waxwingTy0{tag: 3})'));
   passes(returning(
-    'bumpusCmp0(bumpusTy0{tag: 2, c1f0: 1}, bumpusTy0{tag: 2, c1f0: 2})', -1
+    'waxwingCmp0(waxwingTy0{tag: 2, c1f0: 1}, waxwingTy0{tag: 2, c1f0: 2})', -1
   ));
   passes(recovering(
-    'bumpusCmp0(bumpusTy0{tag: 2, c1f0: 1}, bumpusTy0{tag: 2, c1f0: 1})'
+    'waxwingCmp0(waxwingTy0{tag: 2, c1f0: 1}, waxwingTy0{tag: 2, c1f0: 1})'
   ));
 });
 
@@ -101,10 +101,10 @@ test('declared operands evaluate once each, left first', () => {
     // Function 2 is main; its operands l and r follow, once each.
     passes(`package main
 import ("fmt"; "testing")
-var bumpusTrace []string
+var waxwingTrace []string
 func TestTrace(t *testing.T) {
-  bumpusFn2()
-  if got := fmt.Sprint(bumpusTrace); got != "[2 0 1]" {
+  waxwingFn2()
+  if got := fmt.Sprint(waxwingTrace); got != "[2 0 1]" {
     t.Fatalf("trace %s", got)
   }
 }
@@ -175,7 +175,7 @@ const fragment = (system, pair, index) => {
 // One program per seed; pair k declares l, r, then p: p is function 3k + 2.
 const agrees = (system, pairs, orders) => {
   const fragments = pairs.map((pair, index) => fragment(system, pair, index));
-  const calls = pairs.map((_, index) => `bumpusFn${3 * index + 2}()`);
+  const calls = pairs.map((_, index) => `waxwingFn${3 * index + 2}()`);
   const masks = orders.map(implied);
   const source = `${system.declarations} ${fragments.join(' ')} `
     + 'fn main(): Int = 0;';

@@ -40,7 +40,7 @@ const cases = programs.flatMap(({ source, reversed }, index) => [
 const batch = runGoBatch(import.meta.url, cases);
 
 test('the reference interpreter agrees with known outputs', () => {
-  const lists = readFileSync('examples/lists.bumpus', 'utf8');
+  const lists = readFileSync('examples/lists.wxw', 'utf8');
   assert.equal(interpret(lists),
     'Pair(Cons(Pair(3, true), Cons(Pair(2, false), Nil)), Just(6))');
   assert.equal(interpret('fn main(): Int = 2147483647 + 1;'), '-2147483648');

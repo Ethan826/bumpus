@@ -1,3 +1,43 @@
+# Waxwing / FX001 paused before Task 10 for the user's review (2026-10-10)
+
+Branch claude/vibrant-cerf-3km61i (fx001 + Tasks 6-9, all pushed). FX001
+Tasks 1-9 are complete and reviewed; Tasks 10-12 are amended in the plan
+(rulings R1-R12) and not started. The user asked to stop here for review.
+
+Awaiting the user's review:
+- CF001 concurrency foundations, docs/plans/2026-10-09-concurrency-
+  foundations-design.md: recommended fork-join subset (`par let`),
+  R0 "performs no X" rule, task-boundary rules, failure selection, discard
+  contract, and the 2026-10-10 operational addendum (§8A: supervision vs
+  structured concurrency, defect boundaries, state ownership, overload,
+  observability, host boundaries, tooling) with decisions O-1..O-7. Four
+  Opus review rounds plus addendum reviews; not authorized for
+  implementation.
+- BK001 Go backend maintainability, docs/plans/2026-10-10-backend-syntax-
+  proposal.md: Tier 1 (total plan records, Signature/Callee by call kind,
+  Go-correct quoting, Lines/Inline helpers) after FX001; migration steps
+  0, 1, 6 before FX005/FX002 lowering. Not authorized.
+- FX007: strict `defer must not fail` (adopted 2026-10-09; bracket idiom
+  needs `with pure` callbacks) vs a future lacks-Fail constraint.
+- Task 12 ADR 010 wording additions from CF001 §10/§8A (cause kinds an
+  open set; report and exit 1 are main's root policy; Go fatal errors are
+  Go's behaviour, not a Waxwing guarantee; `cleanup failed:` means a cause
+  raised by cleanup).
+
+Execution: superpowers subagent-driven-development (skills linked under
+.claude/skills): Sonnet implementers, Opus reviews; Haiku/Sonnet for
+mechanical edits and small re-reviews. Ledger and every brief/report/review
+are snapshotted in docs/sdd/2026-10-09-effects-plan/ (the live workspace
+.superpowers/sdd/ is git-ignored).
+
+Cloud environment notes: run `NODE_USE_ENV_PROXY=1 npm run build` once to
+fill .spago (not during verify). Use `GOTOOLCHAIN=go1.26.4`. On this
+container fixed timing bounds fail at unchanged baselines (BACKLOG T007,
+T004); per ruling R1 a verify passes when only those fail and
+`node scripts/regression.mjs` exits 0. Never relax a bound. The container
+restarted twice during this session; work in flight was recovered or
+re-dispatched.
+
 # FN001 merged into main
 
 Workspace: /Users/ethan/Desktop/gofuncyourself, branch main (FN001 merged
@@ -54,7 +94,7 @@ future feature outside initial FX001; keep record-row constraints separate.
 
 Language-direction now also captures MileAhead's open error-row pattern
 from read-only ../trailmapper: family rows compose without wrappers, stay
-open until handling, and wrap only to add context. Candidate Bumpus error
+open until handling, and wrap only to add context. Candidate Waxwing error
 sums hide `Variant`/injection plumbing. FX001/R001 must resolve the open
 error-sum need against R001's deferred general variants before changing scope.
 
@@ -83,8 +123,8 @@ LLM skills/discovery, and exploratory LIT001 literate capabilities. Feed
 these into LA001 and focused subsystem designs; no tooling implementation
 is authorized or added to FN001. Existing compiler properties do not
 complete PBT001. Preserve the tentative status of literate capabilities.
-PKG001 extends that direction with portable Bumpus libraries, host FFI,
-service implementations/fakes and package management over both Bumpus and
+PKG001 extends that direction with portable Waxwing libraries, host FFI,
+service implementations/fakes and package management over both Waxwing and
 host dependencies. Review exports, source/type identity, target/runtime
 support, manifests/locks and host resolver integration with M001/I001/FX001.
 Effect Platform is conceptual influence; no package manager, ABI or provider

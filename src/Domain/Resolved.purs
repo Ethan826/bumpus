@@ -5,8 +5,10 @@ module Domain.Resolved
 
 import Prelude
 import Data.Maybe (Maybe)
-import Domain.Syntax (Operator, Span, TypeRef)
-import Domain.Type (Ty(..), TypeId(..), VarId(..))
+import Domain.Syntax (Operator, Sort, Span, TypeRef)
+import Domain.Ids (EffectId)
+import Domain.Type (Ty(..), TyRow, TypeId(..), VarId(..))
+import Domain.Row (Label)
 
 newtype FunctionId = FunctionId Int
 newtype LocalId = LocalId Int
@@ -14,12 +16,17 @@ newtype CtorId = CtorId Int
 
 derive instance eqFunctionId ∷ Eq FunctionId
 derive instance eqLocalId ∷ Eq LocalId
+derive instance ordLocalId ∷ Ord LocalId
 derive instance eqCtorId ∷ Eq CtorId
 
 -- `VarId i` in a constructor field is the owner's i-th parameter.
 type TypeInfo =
   { name ∷ String
   , parameters ∷ Array String
+  , rowParameters ∷ Array String
+  , variables ∷ Array String
+  , sorts ∷ Array Sort
+  , sourceSorts ∷ Array Sort
   , ctors ∷ Array CtorId
   , span ∷ Span
   }
@@ -41,7 +48,12 @@ type Local = { name ∷ String, id ∷ LocalId }
 
 -- A function carries its declared parameter count, which decides what its
 -- bare name means (FN001 design §2).
-data GlobalRef = GlobalFunction FunctionId Int | GlobalCtor CtorId
+data GlobalRef
+  = GlobalFunction FunctionId Int
+  | GlobalCtor CtorId
+  | Operation EffectId Int Int
+  | BuiltinPrint
+  | BuiltinCrash
 
 -- Functions and constructors share one global namespace.
 type Global = { name ∷ String, ref ∷ GlobalRef }
@@ -70,12 +82,48 @@ data Expr
   | Lambda Span (Array Param) Expr
   | Apply Span Expr (Array Expr)
   | Pipe Span Expr Expr
+  | UnitValue Span
+  | Block Span (Array Item) Expr
+  | OperationRef Span EffectId Int
+  | Perform Span EffectId Int (Array Expr)
+  | PrintRef Span
+  | Print Span (Array Expr)
+  | CrashRef Span
+  | Crash Span (Array Expr)
+  | Handler Span (Label (Ty VarId)) (Array HandlerClause)
+  | With Span Expr Expr
+  | Handle Span Expr (Array FailClause)
+  | Fail Span Expr
+
+type HandlerClause =
+  { operation ∷ Int
+  , result ∷ Ty VarId
+  , parameters ∷ Array HandlerParameter
+  , body ∷ Expr
+  , span ∷ Span
+  }
+
+type HandlerParameter = { local ∷ Maybe LocalId, ty ∷ Ty VarId }
+type FailClause =
+  { label ∷ Label (Ty VarId)
+  , local ∷ Maybe LocalId
+  , body ∷ Expr
+  , span ∷ Span
+  }
+
+-- A block item: `let` binds a local, or `_` (Nothing); a discarded item's
+-- value is evaluated and dropped; `defer` registers its expression, whose
+-- span is the item's, for the block's exit (FX001 design §1).
+data Item = Let Span (Maybe LocalId) Expr | Defer Span Expr | Discard Expr
 
 -- A lambda parameter: a local, or `_` (Nothing), which binds nothing. Its
 -- annotation names only the enclosing signature's variables.
 type Param = { local ∷ Maybe LocalId, ty ∷ Maybe (Ty VarId), span ∷ Span }
 
-type Parameter = { name ∷ String, ty ∷ Ty VarId, span ∷ Span }
+-- `rowSpan`: where the written `with` row is, for notes (FX001 Task 9): a
+-- parameter's annotation row, or the signature's own.
+type Parameter =
+  { name ∷ String, ty ∷ Ty VarId, span ∷ Span, rowSpan ∷ Maybe Span }
 
 -- `VarId i` in a signature is `variables !! i`: the i-th distinct type
 -- variable in first-occurrence order, parameters then result.
@@ -83,15 +131,36 @@ type FunctionDecl =
   { id ∷ FunctionId
   , name ∷ String
   , variables ∷ Array String
+  , sorts ∷ Array Sort
+  , row ∷ TyRow VarId
   , parameters ∷ Array Parameter
   , result ∷ Ty VarId
   , body ∷ Expr
+  , span ∷ Span
+  , rowSpan ∷ Maybe Span
+  }
+
+-- `syntax` keeps the parameter types', then the result's, source
+-- references, as `fieldSyntax` does for constructors (FX001 Task 6).
+type OperationInfo =
+  { name ∷ String
+  , parameters ∷ Array Parameter
+  , result ∷ Ty VarId
+  , syntax ∷ Array TypeRef
+  , span ∷ Span
+  }
+
+type EffectInfo =
+  { name ∷ String
+  , parameters ∷ Array String
+  , operations ∷ Array OperationInfo
   , span ∷ Span
   }
 
 type Program =
   { types ∷ Array TypeInfo
   , ctors ∷ Array CtorInfo
+  , effects ∷ Array EffectInfo
   , functions ∷ Array FunctionDecl
   , entry ∷ FunctionId
   }
@@ -112,3 +181,15 @@ exprSpan expression = case expression of
   Lambda span _ _ → span
   Apply span _ _ → span
   Pipe span _ _ → span
+  UnitValue span → span
+  Block span _ _ → span
+  OperationRef span _ _ → span
+  Perform span _ _ _ → span
+  PrintRef span → span
+  Print span _ → span
+  CrashRef span → span
+  Crash span _ → span
+  Handler span _ _ → span
+  With span _ _ → span
+  Handle span _ _ → span
+  Fail span _ → span

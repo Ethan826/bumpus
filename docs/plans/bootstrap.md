@@ -80,3 +80,10 @@ review: spec docs/plans/2026-10-07-closed-adts-design.md, five-layer spec
 docs/plans/2026-10-07-five-layers-design.md, plan
 docs/plans/2026-10-07-closed-adts-plan.md (Tasks 1-8), ADRs 003 and 004.
 Index of milestone documents: language.md, architecture.md, engineering.md.
+
+## Naming update (2026-10-09)
+
+The current language name is Waxwing and source extension is `.wxw`
+(ADR 009). Bootstrap task history above retains its original names.
+Migration at FX001 Task 3 checkpoint: R003 in BACKLOG.md;
+execution and verification evidence in docs/progress.md.

@@ -41,7 +41,8 @@ adding a bypass allowlist.
   and do-blocks directly in case/if branches; parse recovery fails the gate;
 - the same CST gate keeps parser productions applicative (G001;
   tools/style/src/Style/Parser.purs): in Format.Parse and
-  Format.Parse.{Literal, Pattern, Expression, Declaration, Type, Lambda}
+  Format.Parse.{Literal, Pattern, Expression, Declaration, Type, Lambda,
+  Block}
   it rejects every `do` block, the operators `>>=`, `=<<`, `>=>` and
   `<=<` (including sections such as `(>>=)`), and the names `bind`,
   `join`, `discard`, Prelude's `ap`, `ifM`, `whenM`, `unlessM` and
@@ -72,11 +73,21 @@ adding a bypass allowlist.
   hand-kept) in one parallel `node --test` run, except the
   `test/*.serial.test.mjs` files, which it runs afterwards in a second
   run with `--test-concurrency=1` (scale tests that time `go build` or
-  long Bumpus phases against fixed bounds, so the parallel runner's own
+  long Waxwing phases against fixed bounds, so the parallel runner's own
   load cannot fail them; user decision 2026-10-09, FN001 Task 8). A new
   test that builds large Go programs against a time bound takes the
   `.serial.test.mjs` suffix (review convention; the split by suffix is
-  automated in scripts/verify.mjs). Then verify runs
+  automated in scripts/verify.mjs). FN006's 20,000-parameter timing suite
+  is now test/fn-linear-timing.serial.test.mjs, separate from the existing
+  fn-linear.serial.test.mjs; every workload, assertion and bound is
+  unchanged. Repeated parallel-contention failures motivated this runner
+  prerequisite (FX001 Task 3 continuation, user-authorized 2026-10-09).
+  T003's deep/wide match ladder timing block is similarly extracted to
+  test/match-lift-timing.serial.test.mjs; semantic match-lift tests stay
+  parallel. Its source, constants, assertion and 1500 ms bound are identical
+  (controller ruling after a 1670.670250 ms parallel failure). These moves
+  apply the existing fixed-bound scheduling policy, not looser checks.
+  Then verify runs
   scripts/regression.mjs, a table of isolated-copy mutations, each of which
   must pass on the healthy build and fail on its mutant: `branch`
   (Features.Check.Infer branch type), `nil-guard` (Format.Go.Match drops the `!= nil`
@@ -85,13 +96,14 @@ adding a bypass allowlist.
   (Format.Go.Compare reverses the tag comparison), `first-field` (compares
   the last field first), `show-fields` (Format.Go.Show prints only the
   first field) and `state-thread` (Format.Parse.Grammar's `apply` runs the
-  second parser from the original state; examples/answer.bumpus must still
+  second parser from the original state; examples/answer.wxw must still
   compile to bootstrap/answer.go) and `capture` (Format.Go.Match drops a
   match's scrutinee from its free locals, so an enclosing lifted match
   misses a local read only there; probe builds and runs test/match-lift's
   capture program), and since P001 four more, whose probes live in
   test/regression-poly.mjs (imported by test/regression.mjs): `occurs`
-  (Features.Check.Unify `bindBounded` skips the occurs check; probe
+  (`bindBounded` skips the occurs check, in Features.Check.Binding since
+  FX001 Task 3, Features.Check.Unify before; probe
   requires E_TYPE `Infinite type: _ occurs in List(_)`), `rigid` (a rigid
   variable unifies with any type; probe requires `fn f(x: a): Int = x;`
   to be E_TYPE `Expected Int, found a`), `instantiate`
@@ -121,23 +133,24 @@ adding a bypass allowlist.
   `[name, source]` pairs (an array, so a computed name collision is refused
   at declaration rather than collapsing silently) and, on the first `run(name)`, compiles them all, writes a synthetic module
   under `.build/go-batches/<id>/` (its own go.mod with module path
-  `bumpusbatch` and the pinned toolchain's language version, one package
+  `waxwingbatch` and the pinned toolchain's language version, one package
   `c<N>` per case, a dispatcher `main` importing them), builds once with
   GOCACHE under .build and GOWORK off, and runs each case as its own process
   (the binary invoked with the case's package name). `<id>` is the test
   file's basename plus an optional label, sanitized; a batch clears only its
   own directory, never the root, and an id may be claimed once per process.
   Before rewriting, each program must have exactly one `package main` clause
-  and exactly one `func main() { fmt.Println(...) }` line (Format.Go's
-  entryMain) and no `func Main`; only those two lines change. Failure
-  contract: a Bumpus rejection is recorded per case and rethrown, unchanged,
+  and exactly one canonical printed entry (`func main() { fmt.Println(...) }`)
+  or Unit entry (`func main() { waxwingFnN() }`), and no `func Main`; only
+  those two lines change. Failure
+  contract: a Waxwing rejection is recorded per case and rethrown, unchanged,
   by that case's `run` (runGo's error), while the other cases still build;
   an unexpected program shape or a Go compile failure is a batch
   infrastructure failure, thrown by every case's `run`, naming the offending
   case(s) when Go's output identifies their package. `run` keeps runGo's
   contract (stdout, exit status 0 asserted); `result` returns the raw
   process outcome. Panics keep their message and exit status; stack traces
-  differ (package path `bumpusbatch/c<N>`, `Main`). Batch directories
+  differ (package path `waxwingbatch/c<N>`, `Main`). Batch directories
   (binaries included) persist after a run and are replaced only by that
   batch's next run; `rm -rf .build/go-batches` reclaims them. Because the
   directories are fixed per test file, two concurrent test runs in one
@@ -179,7 +192,20 @@ and explicit edge cases with no discarded inputs. Parsing tests compare with
 independent generated trees; executable comparisons use a BigInt interpreter.
 The unifier (Features.Check.Unify, P001 Task 3) is compared with an
 independent union-find oracle (test/unify-oracle.mjs) and checked for
-soundness, acyclicity and most-generality over generated pairs.
+soundness, acyclicity and most-generality over generated pairs. Row
+unification (Features.Check.UnifyRow, FX001 Task 3) is compared with an
+independent recursive Leijen oracle (test/row-oracle.mjs) over generated
+rows with repeated keys, shared tails and rigid tails, and checked for
+soundness (scoped-label equality), symmetric acceptance and acyclicity; its
+side-condition test runs in a timeout-guarded child process. These solved
+properties remain in test/unify-row.test.mjs. The separate deferred-row
+properties (test/row-properties.test.mjs) distinguish pending acceptance
+from solved equality: an independent transactional oracle models rollback,
+postponement and settling, with deferred keys, same-family payloads, arrow
+label arguments and nonempty starting substitutions. Pending constraints
+are retried after the body's ordinary constraints; they are not equality
+witnesses. groundErased is used only at Resolve/Seeds monomorphism
+boundaries; strict ground still checks both type variables and row tails.
 
 Measurement and checking tools are committed, not ad hoc (T003); neither
 runs in verify. scripts/differential.mjs compares two built compilers
@@ -203,7 +229,7 @@ are scope decisions, not hidden failures. No external issue/commit/push rule
 from a reference project is inherited.
 
 Generated output/output caches and lockfiles are excluded from line limits.
-Bumpus fixture files and generated Go are data; maintained source or test code
+Waxwing fixture files and generated Go are data; maintained source or test code
 cannot be moved into those trees to evade checks. The checker tests test the
 checker itself. Structural guarantees are bounded by direct imports and known
 library APIs, not a proof of arbitrary dependency purity.
@@ -212,7 +238,7 @@ library APIs, not a proof of arbitrary dependency purity.
 
 Superpowers is project-local, revision-pinned third-party guidance, preserved
 unmodified under .agents/skills with its MIT notice. It is distinct from
-maintained Bumpus source/tests/tooling; project gates still cover their existing
+maintained Waxwing source/tests/tooling; project gates still cover their existing
 roots without weakened checks. docs/planning-skills.md records instruction
 precedence and adoption. Migrated plans preserve historical evidence without
 asserting retroactive TDD/commit records. Execution uses the installed plan/task/review helpers and real commit ranges.

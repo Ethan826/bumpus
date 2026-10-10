@@ -4,10 +4,10 @@
 -- value is that function's staged wrapper applied to the free locals when
 -- the lambda is evaluated, so its body runs exactly when its last
 -- parameter is applied. With no free local and one parameter the value is
--- the lifted function itself. The k-th lifted function of bumpusFn{f},
+-- the lifted function itself. The k-th lifted function of waxwingFn{f},
 -- numbered in pre-order with the lambda before its body, is
--- bumpusFn{f}Lambda{k}; a discarded parameter is Go's `_`.
-module Format.Go.Lambda (lowerLambda) where
+-- waxwingFn{f}Lambda{k}; a discarded parameter is Go's `_`.
+module Format.Go.Lambda (lowerLambda, liftedFunction) where
 
 import Prelude
 import Data.Array as Array
@@ -17,6 +17,7 @@ import Domain.IR.Internal as IR
 import Domain.IR.Internal (Ty)
 import Format.Go.Apply (applied)
 import Format.Go.Capture (Captured, Free, lambdaFree, none)
+import Format.Go.Context (declared)
 import Format.Go.Data (functionName, goType, localName)
 import Format.Go.Lowered (Lowered, Lowering, Scope, Wrapper)
 import Format.Go.Stage (stageTypes, valueName)
@@ -31,7 +32,9 @@ lowerLambda scope lower next lambda parameters body =
   inner = lower (next + 1) body
   captured = lambdaFree parameters inner.free
   name = functionName scope.owner <> "Lambda" <> show next
-  lifted = liftedFunction name captured parameters body inner.code
+  lifted = liftedFunction scope.shape.context name captured parameters
+    (IR.typeOf body)
+    inner.code
   wrapper = wrapperOf name captured parameters (IR.typeOf body)
   head =
     { code: valueName wrapper
@@ -55,14 +58,17 @@ wrapperOf name captured parameters result =
   where
   parameterType parameter = parameter.ty
 
+-- Also a handler clause's lifted function (Format.Go.Effect).
 liftedFunction
-  ∷ String → Free → Array IR.Param → IR.Expr → String → String
-liftedFunction name captured parameters body code =
+  ∷ Boolean → String → Free → Array IR.Param → Ty → String → String
+liftedFunction context name captured parameters result code =
   "func " <> name <> "("
     <> joinWith ", "
-      (map capturedParameter captured <> map parameter parameters)
+      ( declared context
+          (map capturedParameter captured <> map parameter parameters)
+      )
     <> ") "
-    <> goType (IR.typeOf body)
+    <> goType result
     <> " {\nreturn "
     <> code
     <> "\n}\n"

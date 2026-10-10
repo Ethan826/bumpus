@@ -8,9 +8,10 @@ import Data.Tuple (Tuple(..))
 import Domain.Checked.Internal as Checked
 import Domain.IR.Internal as IR
 import Domain.Resolved (CtorId(..), CtorInfo, FunctionId(..), TypeInfo)
-import Domain.Type (Ty, TypeId(..), ground)
+import Domain.Type (Ty, TypeId(..))
+import Domain.Type.Parts (mentionsTypeVariable, rowArguments)
 import Features.Specialize.Intern (noArrows)
-import Features.Specialize.Keys (Env, State, Work)
+import Features.Specialize.Keys (Env, State, Work, WorkKind(..))
 
 -- Design §6: monomorphic types and functions keep their relative order and
 -- take the first output ids, so a program without type variables comes out
@@ -18,6 +19,7 @@ import Features.Specialize.Keys (Env, State, Work)
 environment ∷ Ty Void → Checked.Program → Env
 environment representative (Checked.Program program) =
   { types: program.types
+  , effects: program.effects
   , ctors: program.ctors
   , functions: program.functions
   , monoTypes
@@ -35,8 +37,10 @@ seeded ∷ Env → State
 seeded env =
   { typeKeys: Map.empty
   , functionKeys: Map.empty
+  , effectKeys: Map.empty
   , types: Map.fromFoldable (Array.mapMaybe typeEntry indexedTypes)
   , ctors: Map.empty
+  , effects: Map.empty
   , functions: Map.empty
   , work: Map.fromFoldable (Array.mapWithIndex Tuple work)
   , arrows: noArrows
@@ -44,6 +48,7 @@ seeded env =
       { types: Array.length typeWork
       , ctors: Array.length (Array.filter isJust monoCtors)
       , functions: Array.length work - Array.length typeWork
+      , effects: 0
       , work: Array.length work
       , polymorphic: 0
       }
@@ -64,11 +69,14 @@ ranks flags = Array.zipWith ranked flags (Array.scanl counted 0 flags)
   counted total flag = if flag then total + 1 else total
   ranked flag total = if flag then Just (total - 1) else Nothing
 
+-- Row variables do not count: specialization erases rows (FX001 design
+-- §4). Type variables do wherever they occur, also only inside a label of
+-- the function's own row (`with State(a)`): those are key arguments too.
 monomorphic ∷ Checked.FunctionDecl → Boolean
-monomorphic function = Array.all isGround
-  (Array.snoc function.parameters function.result)
+monomorphic function = not (Array.any mentionsTypeVariable signature)
   where
-  isGround ty = isJust (ground ty)
+  signature = Array.snoc function.parameters function.result
+    <> rowArguments function.row
 
 ownedBy ∷ Env → CtorInfo → Boolean
 ownedBy env ctor = isJust (join (Array.index env.monoTypes (owner ctor.owner)))
@@ -80,6 +88,7 @@ ownedBy env ctor = isJust (join (Array.index env.monoTypes (owner ctor.owner)))
 outputType ∷ Array (Maybe Int) → TypeInfo → IR.TypeInfo
 outputType monoCtors info =
   { name: info.name
+  , arguments: []
   , ctors: Array.mapMaybe renumbered info.ctors
   , span: info.span
   }
@@ -90,7 +99,7 @@ typeSeed ∷ Int → Tuple (Maybe Int) TypeInfo → Maybe Work
 typeSeed declaration (Tuple rank info) = map seed rank
   where
   seed output =
-    { output, declaration, arguments: [], function: false, span: info.span }
+    { output, declaration, arguments: [], kind: TypeWork, span: info.span }
 
 functionSeed ∷ Maybe Int → Checked.FunctionDecl → Maybe Work
 functionSeed rank function = map seed rank
@@ -99,7 +108,7 @@ functionSeed rank function = map seed rank
     { output
     , declaration: functionIndex function.id
     , arguments: []
-    , function: true
+    , kind: FunctionWork
     , span: function.span
     }
   functionIndex (FunctionId index) = index

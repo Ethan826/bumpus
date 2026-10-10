@@ -108,8 +108,8 @@ test('Format renders type names and witnesses from problem data', async () => {
   assert.equal(message(problem.NonExhaustive.create(literals)),
     'Missing pattern: Pair(-1, true)');
   const span = { start: position(0), end: position(1) };
-  assert.deepEqual(wire({ problem: problem.Internal.create('Broken'), span }),
-    { code: 'E_INTERNAL', message: 'Broken', span });
+  assert.deepEqual(wire({ problem: problem.Internal.create('Broken'), span, related: [] }),
+    { code: 'E_INTERNAL', message: 'Broken', span, related: [] });
 });
 
 // Ruling R5: a table miss is a compiler bug, never a vacuously complete match.
@@ -119,7 +119,7 @@ test('coverage reports an invalid type id as E_INTERNAL', async () => {
   const ir = await load('Domain.Checked.Internal');
   const { TData, TInt } = await load('Domain.Resolved');
   const span = { start: position(0), end: position(1) };
-  const missingType = TData.create(5)([]);
+  const missingType = TData.create(5)([])([]);
   const expr = (ty, node) => ir.Expr.create({ ty, span, node });
   const pattern = ir.Pattern.create(
     { ty: missingType, span, shape: ir.Ctor.create(0)([]) });
@@ -131,7 +131,7 @@ test('coverage reports an invalid type id as E_INTERNAL', async () => {
     functions: [{ id: 0, parameters: [], result: TInt.value, body, span }] });
   assert.equal(result.constructor.name, 'Left', 'invalid type id passed');
   assert.deepEqual(wire(result.value0),
-    { code: 'E_INTERNAL', message: 'Invalid type id', span });
+    { code: 'E_INTERNAL', message: 'Invalid type id', span, related: [] });
 });
 
 // Review Minor 7: resolution enforces arity, so a field count that disagrees
@@ -143,7 +143,7 @@ test('a constructor field-count mismatch is E_INTERNAL', async () => {
   const resolved = await load('Domain.Resolved');
   const { TData, TInt } = resolved;
   const span = { start: position(0), end: position(1) };
-  const box = TData.create(0)([]);
+  const box = TData.create(0)([])([]);
   const types = [{ name: 'Box', ctors: [0], span }];
   const ctors = [{ name: 'Wrap', owner: 0, fields: [TInt.value], span }];
   const wild = ir.Pattern.create({ ty: TInt.value, span, shape: ir.Wildcard.value });

@@ -19,6 +19,7 @@ import Data.Traversable (mapAccumL)
 import Domain.IR.Internal as IR
 import Domain.IR.Internal (FunType, FunTypeId(..), Ty(..))
 import Format.Go.Capture (Free, union)
+import Format.Go.Context (declared, passed)
 import Format.Go.Data (functionName, goType, localName)
 import Format.Go.Lowered (Lowered, Lowering, Scope, Wrapper, several)
 import Format.Stack (Stack)
@@ -41,7 +42,8 @@ blockSize = 64
 
 applied ∷ Scope → Lowering → Chain → Array IR.Expr → Lowered
 applied scope lower chain arguments
-  | Array.length arguments <= blockSize = inline lower chain.head arguments
+  | Array.length arguments <= blockSize =
+      inline scope.shape.context lower chain.head arguments
   | otherwise = blocked scope lower chain arguments
 
 -- The types a value of type `ty` passes through when applied to `count`
@@ -58,9 +60,9 @@ walked table ty count = map goType
     _ → current
   resultOf arrow = arrow.result
 
-inline ∷ Lowering → Lowered → Array IR.Expr → Lowered
-inline lower head arguments =
-  { code: head.code <> joinWith "" (map parenthesized parts.codes)
+inline ∷ Boolean → Lowering → Lowered → Array IR.Expr → Lowered
+inline context lower head arguments =
+  { code: head.code <> joinWith "" (map (parenthesized context) parts.codes)
   , next: parts.next
   , lifted: head.lifted <> parts.lifted
   , free: union ([ head.free ] <> parts.frees)
@@ -107,7 +109,8 @@ block
   → Int
   → Blocks
 block scope lower types arguments so first =
-  { code: name <> "(" <> joinWith ", " ([ so.code ] <> map captured free)
+  { code: name <> "("
+      <> joinWith ", " (passed context ([ so.code ] <> map captured free))
       <> ")"
   , next: parts.next
   , pieces: Stack.push
@@ -115,6 +118,7 @@ block scope lower types arguments so first =
       so.pieces
   }
   where
+  context = scope.shape.context
   name = functionName scope.owner <> "Apply" <> show so.next
   parts = several lower (so.next + 1)
     (Array.slice first (first + blockSize) arguments)
@@ -123,12 +127,16 @@ block scope lower types arguments so first =
   parameter local = localName local.id <> " " <> goType local.ty
   typeAt position = maybe "" identity (Array.index types position)
   helper = "func " <> name <> "("
-    <> joinWith ", " ([ "bumpusValue " <> typeAt first ] <> map parameter free)
+    <> joinWith ", "
+      ( declared context
+          ([ "waxwingValue " <> typeAt first ] <> map parameter free)
+      )
     <> ") "
     <> typeAt (first + Array.length parts.codes)
-    <> " {\nreturn bumpusValue"
-    <> joinWith "" (map parenthesized parts.codes)
+    <> " {\nreturn waxwingValue"
+    <> joinWith "" (map (parenthesized context) parts.codes)
     <> "\n}\n"
 
-parenthesized ∷ String → String
-parenthesized code = "(" <> code <> ")"
+parenthesized ∷ Boolean → String → String
+parenthesized context code = "(" <> joinWith ", " (passed context [ code ]) <>
+  ")"

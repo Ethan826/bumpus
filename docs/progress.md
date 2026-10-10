@@ -2540,3 +2540,604 @@ harvest failure renumbered T005); progress kept both sides. Clean `rm -rf
 output && npm run verify` on the merged tree: exit 0, 541 + 12 tests,
 twenty-two proofs (.build/fn001-merge-verify.log). main fast-forwarded to
 fn001 and pushed to origin; worktree and branch removed.
+
+## FX001 Task 1: runtime shape measurement (2026-10-09)
+
+Branch fx001. No compiler change. Added scripts/effect-probe.mjs (driver:
+explicit build 300 s / run 120 s timeouts, five repetitions, checksums
+verified, load averages before and after each batch),
+scripts/effect-runtime.mjs (Go prelude: `bumpusCtx` list, non-zero-sized
+`bumpusMarker`, `bumpusAbort`, lifted `bumpusHandle` returning
+`(result, abort)`, `bumpusCleanup`, defect report and `main` wrapper),
+scripts/effect-semantics.mjs (Step 2 programs and independently written
+expected output) and scripts/effect-programs.mjs (Step 3 loops and the
+generated lifted-helper program). Semantic checks: all 7 modes pass (clause
+reaches the outer handler; aborts cross unrelated and same-key inner
+handles to their target; clause failures after the helper returns reach
+the outer handle; nested blocks unwind LIFO; cleanup that handles a
+failure internally lets the abort continue; two cleanup failures print the
+three confirmed report lines in order, exit 1; normal-exit cleanup
+failures; crash not caught by handle with cleanup run; guard line; 1,000
+markers distinct). A first run of `abort` failed on my own expected output
+(two nested blocks give `d2 d1 d2 d1`, I had written one pair); corrected
+the expectation, not the program. Two mutants (handle catching every
+abort; clause run in its own context) each fail their check (scratchpad,
+not committed). A second full run reused Go's build cache (identical seed
+per repetition; 0.2-0.4 s builds) and was discarded; the seed now varies
+per run. Measurements (.build/fx001-task1/run3.log): median `go build` 0.83 s
+/ 1.53 s / 2.91 s at 1,000 / 2,000 / 4,000 helpers (bound 10 s). Decision:
+ADOPT the shapes. Details in findings "FX001 Task 1".
+
+### FX001 Task 2: Unit, blocks and let (2026-10-09)
+
+Branch fx001. No existing test assertion changes; the five bootstrap
+snapshots are byte-identical (verify's snapshot tests).
+
+- What changed: Format.Lex reserves `effect handler handle with let defer
+  Unit ctl resume` at once (controller ruling; `pure` stays a name).
+  Domain.Syntax gains `UnitRef`, `UnitValue`, `Block` and `Item` (`Let`,
+  `Discard`); the new Format.Parse.Block parses `{}` (Unit), items
+  separated by `;` (a trailing `;` makes the value `UnitValue` at the
+  closing `}`, which marks the block trailing; `{ let x = 1 }` is E_SYNTAX
+  `Expected ;` at `}`) and `()`; `{` joins the loosest expression dispatch,
+  every item nested (128 nested blocks parse, 129 are E_NESTING). Domain.Type
+  and the IR gain `TUnit` (Go `struct{}`, value `struct{}{}`); Resolved,
+  Checked and IR gain `UnitValue`, `Block` and `Item`. Features.Resolve.Block
+  threads the scope through the items (new Fresh `thread`, a balanced
+  traverse); a `let` is in scope for later items only, shadowing as a match
+  binder, its LocalId taken before its expression's binders. The resolver's
+  scope and the checker's locals became maps (by name, by LocalId) so a
+  20,000-let block costs no scan per lookup. Features.Check.Block: `let` is
+  monomorphic, discards may have any type, the block's type is its value's.
+  Check.Hint adds `TrailingSemicolon` (rendered `; remove the trailing ;?`)
+  on a mismatch whose found expression is a trailing block. Unit is
+  comparable (always equal; ordering lowered through an inline
+  `func(struct{}, struct{}) int` so both operands still run) and prints
+  `()`. Format.Go.Block lifts each block to `bumpusFn{f}Block{k}` (pre-order,
+  counter shared with Match/Lambda/Pipe/Apply), captures in LocalId order
+  (Capture `withoutAll`), each `let` a typed `var` plus `_ = x` (typed
+  because an arity-one function value is a lifted Go func of unnamed type;
+  the brief's `x :=` would leave it unnamed), `_ = e` for `let _` and
+  discards, `return` the value. A Unit `main` emits `func main() {
+  bumpusFn<n>() }` and prints nothing; `import "fmt"` is emitted only when
+  main prints or a printer appends an Int/Bool field. The style gate's
+  applicative-module list adds Format.Parse.Block. The interpreter
+  (test/poly-parse.mjs, test/poly-oracle.mjs) reads and runs blocks, `let`,
+  `()`, `{}` and `f()` calls.
+- Tests seen failing first: test/fx-block.test.mjs, 86 tests, 85 failing
+  and one passing before any code (`1 + { 2 }` was already `Expected an
+  expression` at `{`, kept as a characterization row); log
+  .build/fx001-task2-red.log. One test-construction slip fixed after GREEN
+  (the `()` and `f()` rows pointed at the first occurrence, inside `main()`
+  and `fn f()`). The 20,000-let timing test moved to
+  test/fx-block.serial.test.mjs after the first verify: under the parallel
+  run it took 999 ms against its 1,500 ms bound (load about 5).
+- Isolated mutants (scratchpad copies, not committed), each failing its
+  rows: block items emitted in reverse (3 order probes); hint ignoring the
+  span (the `{ 1; () }` row); a let never entering scope (2 run rows); Unit
+  ordering returning 1 (the two boxed `<=`/`>` rows); Unit main printing
+  (both silent-entry rows).
+- Scale: 20,000 lets compile to Go in 490-510 ms, 40,000 in 915 ms, 80,000
+  in 1,739 ms (linear, no stack failure); bound 1,500 ms.
+- Reach: Parse → Resolve → Check → Specialize → Go, built and run in one
+  batch (two Unit-main programs via runGo, which the batch's Println shape
+  check does not admit); the interpreter agrees on every run row and probe.
+- GREEN: `rm -rf output && npm run verify` exit 0: 626 parallel tests and
+  13 serial (was 541 + 12; +85 and +1), zero failures/skips, twenty-two
+  regression proofs, load 3.6-6.1; the serial 20,000-let test 535 ms of
+  1,500 (log .build/fx001-task2-verify2.log; the first run, before the
+  serial split, .build/fx001-task2-verify.log, also exit 0).
+
+### FX001 Task 3: effect rows and scoped-label unification (2026-10-09)
+
+Branch fx001. Behavior-preserving: no syntax writes a row yet; every
+existing `TFun` carries the closed empty row and every `TData` empty row
+arguments. No existing assertion changes; the five bootstrap snapshots are
+byte-identical (verify's snapshot tests).
+
+- What changed: new Domain.Ids (`TypeId`, moved and re-exported by
+  Domain.Type; `EffectId`) and Domain.Row (`Row t v`, `Label t`,
+  `EffectRef`, `LabelKey`, `TypeHead`, `labelKey`, `closedRow`, `openRow`,
+  `isPure`; parameterized over the argument type, so Domain.Type imports
+  it; `Row` hides Prim's). Domain.Type: `TFun (Ty v) (TyRow v) (Ty v)`,
+  `TData TypeId (Array (Ty v)) (Array (TyRow v))`, `THandler (Label (Ty
+  v)) (TyRow v)`; the Monad/Bind instance is gone, replaced by sort-aware
+  `substitute`/`substituteRow` over `Substitution v w = { types, rows }`
+  (a row tail splices its image: labels appended, its tail the new tail);
+  Functor is `substitute` with `TVar`/`openRow`. Spines are walked as
+  arrow nodes (`stagesThrough`, `foldStages`: no record per arrow);
+  `spine`, `arrows`, `ground`, `children`, `rowsOf`, `rowArguments` and
+  `typeHead` moved to the new Domain.Type.Parts (250-line limit). The
+  checker's substitution moved to Features.Check.Subst (`Subst { types,
+  rows, fresh }`: fresh row metas count down from -1, apart from the
+  checker's, which count up; `walkRow`, `resolveRow`), binding and the
+  depth bound to Features.Check.Binding (`bindType`, `extendRow`,
+  `bindTail`, `exceedsLimit` counting label arguments one level deeper),
+  both re-exported by Features.Check.Unify, whose `TFun`, `TData` and
+  `THandler` cases unify rows through the new Features.Check.UnifyRow
+  (Leijen 2005 §7, a `tailRec` loop over labels, first occurrence by key,
+  the side condition `tail(r1) ∉ dom(θ)` in both the rewrite and the
+  left-over-entry cases; `unifyRowsTraced` also returns `RowEvent`s by
+  `OccurrenceId`, Features.Check.Occurrence; Features.Check.RowSide holds
+  the operand walk). `Failure` gains `RowMissing`, `RowExtra`,
+  `RowSharedTail` and `RowMismatch` (tails alone differ: not in the brief,
+  needed for closed against rigid); Require reports each as the existing
+  whole-type E_TYPE mismatch. Specialize erases rows; `THandler` is an
+  Internal error in Lower and Require and abstract to coverage until Tasks
+  5 and 6. Scheme numbers row holes with type holes. Regression row
+  `occurs` now mutates Features.Check.Binding.
+- Tests seen failing first: test/unify-row.test.mjs and
+  test/row-substitute.test.mjs (both failed to import
+  output/Domain.Row; log .build/fx001-task3-red.log), then 14 tests pass:
+  scoped commutation and order, first occurrence (mismatch never skips),
+  Fail keys by payload identity (deferred keys match nothing until known),
+  the side condition for `Clock + ...r`/`Log + ...r` and for a left-over
+  entry, both in a child process with a 20 s timeout (the generated test
+  then refuses to run if it failed), `RowMissing`/`RowExtra`/
+  `RowMismatch`, 1,500 generated pairs (959 unify; 54 `RowSharedTail`)
+  against the independent recursive oracle test/row-oracle.mjs (same
+  acceptance, symmetric acceptance, scoped-label equality, acyclicity,
+  equal normal forms up to renaming), 1,000-label rows, arrow rows in
+  `unify` (occurs and depth through label arguments), traced events, and
+  five substitution laws. Test support only changed elsewhere: value
+  construction gains row arguments, two renderers (test/fn-shape.mjs,
+  test/fn-checked.mjs) leave out pure rows, and imports follow the moved
+  names.
+- Isolated mutants (scratchpad copy, not committed): the rewrite-case side
+  condition removed, and the left-over-entry one removed: each fails the
+  timeout test at 20 s and the generated test at once; first occurrence
+  replaced by last (`findLastIndex`): three tests fail.
+- Found and fixed on the way: a strict `where` binding resolving both
+  types on every `expectType` (the mismatch message) made the `occurs`
+  regression mutant overflow instead of reporting, and cost about 2x in
+  Require; it is a function now. A helper frame per applied level in
+  `unify` overflowed test/unify-arrow at 1,000 levels; the fold is back in
+  `unifyHeads`. `compare` on applications compares row arguments before
+  type arguments so the recursive comparison stays last.
+- Cost: fn-linear forms at 20,000 parameters through Specialize, alone,
+  5 runs each, this build (before the final `compare` change) against an
+  isolated build of e110526 (ms, medians): value 415/403, over 605/534, lambda 542/539, mismatch
+  181/161, partialFirst 423/396, partialAll 300/289, parenthesized
+  397/400, pipe 289/309. Minimum `--stack-size` for test/poly-depth's
+  1,000-deep check: 575 KB (was 559).
+- Differential: a scratch variant of scripts/differential.mjs comparing
+  resolve and check by acceptance only (their types now carry rows by
+  design) against the e110526 build: 0 differences over 2,486 harvested,
+  1,029 fuzz, 1,000 match and 1,000 mutation sources and 1,085 name
+  probes. Its harvest run (the suite under the hook) failed four timing
+  bounds (fn-linear partialFirst 1,022 ms, partialAll 702, pipe 970; the
+  serial 20,000-let test, run there in parallel, 2,130 ms).
+- Reach: unit and generated tests drive Domain.Type, Features.Check.Unify
+  and UnifyRow directly; through the pipeline only pure rows exist, which
+  every existing test exercises.
+- GREEN: `rm -rf output && npm run verify` exit 0: 640 parallel tests
+  and 13 serial (was 626 + 13; +14), zero failures/skips, twenty-two
+  regression proofs, load 2.0-5.9 (log .build/fx001-task3-verify2.log; an
+  earlier run, .build/fx001-task3-verify.log, failed only the `occurs`
+  proof above).
+
+## R003 Waxwing rename (2026-10-09, verification in progress)
+
+User approved the Bumpus -> Waxwing / `.wxw` migration and subagent help.
+Work uses the existing isolated FX001 tree at 3481468 (Tasks 1-3), with
+main and its pre-existing editor setting untouched. Separate agents handled
+current documentation and test identity edits; a fresh read-only reviewer
+found only a stale `Provisional name` sentence, which was corrected.
+
+CLI is scripts/waxwing.mjs, npm script waxwing; packages are waxwing,
+waxwing-style and waxwing-bootstrap. Renamed nine example/negative sources;
+updated Go names/panics, temporary prefixes, harvest instrumentation,
+current documentation, active FX001 documents, backlog and handoff. Historical
+plans/progress/findings, prior naming evidence and branding provenance remain.
+ADR 009 records the decision. No semantics, verbs, aliases, extension-based
+rejection or final artwork were added.
+
+Evidence so far:
+- Before code edits, `npm run verify` exited 1: 638/640 parallel tests
+  passed; fn-linear lambda 1604.135291 ms > 1545 ms and mismatch
+  819.499333 ms > 525 ms. Serial tests/proofs not reached; FN006 owns the
+  recorded failure/next action. Log .build/waxwing-baseline-verify.log.
+- RED: renamed test/program.test.mjs against original compiled output
+  failed only the expected old usage text (8 pass, 1 fail),
+  .build/waxwing-usage-red.log. `npm run build` then passed with zero
+  warnings/errors, .build/waxwing-build.log.
+- All five examples emitted snapshots equal to the old bytes under only
+  Bumpus/Waxwing and bumpus/waxwing substitutions, then ran through
+  `npm run --silent waxwing -- run`: outputs saved in
+  .build/waxwing-examples.json. Program/compiler/shell tests: 21 passed,
+  no failures/skips, .build/waxwing-cli-green.log.
+- Isolated source restoration: copied the healthy source/tool/test/output
+  tree into .build/waxwing-name-regression, restored only Format.Arguments'
+  old usage text, rebuilt successfully, then test/program.test.mjs failed
+  only the usage assertion (8 pass, 1 fail). Logs
+  .build/waxwing-name-regression-{build,test}.log. Live source unchanged.
+- Post-rename `npm run verify` exited 1: 639/640 parallel tests passed;
+  `twenty thousand declarations compile and run` took 5.106579416 s > 5 s.
+  Serial tests/proofs not reached. Log .build/waxwing-verify.log; T004
+  records the timing failure rather than concealing it with a rerun.
+- During that validation, unrelated checker edits appeared in five files,
+  followed by missing output/Format.Parse/index.js in a harvest smoke
+  attempt (ERR_MODULE_NOT_FOUND; no hook behavior exercised). Concurrent
+  diff/hashes preserved in .build/waxwing-concurrent-{edits.patch,files.json};
+  smoke diagnosis .build/waxwing-harvest-race.log. Asked the user to pause
+  the other FX001 worker; combined-tree verification awaits a stable tree.
+
+No whole-suite success, merge, commit or push is claimed by this entry.
+
+## R003 paused-tree validation and supplied branding (2026-10-09)
+
+The user confirmed the other worker paused. Its eight changed source files
+remain byte-identical to .build/waxwing-paused-files.json; no worker edit
+was reverted or folded into the rename's semantic claims.
+
+- Combined paused tree: `npm run verify` builds with zero warnings/errors,
+  passes strict-rebuild/structural gates and 634/640 parallel tests. Five
+  fn-linear bounds fail (exact timings in FN006); unify-row's deferred-Fail
+  assertion expects RowMissing but receives Subst. R003 records the worker's
+  remaining test/settlement next action, without changing its assertion.
+  Log .build/waxwing-paused-verify.log. Serial tests/proofs not reached.
+- An accidental extra paused-tree verify ran while creating the isolated
+  validation tree because its working directory was wrong. Its log is
+  preserved as .build/waxwing-paused-extra-verify.log: 636/640 passed, three
+  fn-linear timing failures and the same row assertion. The mistaken
+  relative log-move command also failed before correction. Neither run is
+  isolated evidence or a hidden retry to claim a pass.
+- Isolated rename-only tree: .build/waxwing-validation has the renamed
+  code/tests/packages and the original 3481468 versions of the eight worker
+  files (.build/waxwing-validation-scope.json). `npm run verify` builds with
+  zero warnings/errors, passes strict-rebuild/structural gates and 639/640
+  parallel tests. Only pipe at 20,000 parameters exceeds its unchanged
+  750 ms bound (942.893 ms); .build/waxwing-isolated-verify.log. FN006 owns
+  this existing parallel-timing exposure. No whole-suite green is claimed.
+- Ran the remainder explicitly, without rerunning/omitting the failed
+  parallel tests: all test/*.serial.test.mjs via --test-concurrency=1,
+  13 passed, zero failures/skips (.build/waxwing-isolated-serial.log);
+  scripts/regression.mjs, all twenty-two healthy/mutant proofs passed
+  (.build/waxwing-isolated-regression.log). Statuses in
+  .build/waxwing-isolated-remaining-results.json.
+- The WAXWING_HARVEST/waxwingHarvest smoke passes on stable rebuilt live
+  output, recording its source exactly once (.build/waxwing-harvest-smoke.log).
+- User supplied the final flight-lines logo assets in main, then confirmed
+  the files visible there are right after discussing kerning. Copied all
+  five assets/notes byte-for-byte into fx001; hashes recorded in
+  .build/waxwing-branding-hashes.json. Inspected the white preview, parsed
+  both SVGs and confirmed no scripts/raster/external references. Transparent
+  logo PNG is 2048 x 1991; preview 530 x 515. README uses the logo PNG;
+  branding README links vector masters/notes and archived Bumpus provenance.
+  No artwork was generated or edited by this migration.
+- Fresh read-only review found no remaining rename blockers. The stale
+  provisional sentence and harvest-property abbreviation were corrected.
+  git diff --check passes. Current FX001 status/handoff distinguishes the
+  implemented rename from the incomplete worker review fixes.
+
+## R003 final rename evidence (2026-10-09)
+
+The original 3481468 compiler was rebuilt in .build/waxwing-baseline-compiled
+for a differential comparison. Its first scratch build failed because the
+copy omitted tools/style/src (.build/waxwing-original-build.log); supplying
+that unchanged directory fixed the setup, and the next build passed with
+zero warnings/errors (.build/waxwing-original-build-fixed.log).
+
+A scratch copy of scripts/differential.mjs normalizes only Bumpus/Waxwing
+and bumpus/waxwing in emitted-Go hashes; all seven phase comparisons and
+diagnostic comparisons remain. The full harvested corpus comparison was
+interrupted (status 130) after several minutes without a report; T006 owns
+the investigation. The bounded comparison used sources up to 20,000
+characters (2,433 captured sources, 53 stress sources outside this optional
+comparison only). It exited 0: 2,433 harvested, 1,029 fuzz, 1,000 match and
+1,000 mutation sources, plus 1,085 isName probes; zero differences. Log
+.build/waxwing-differential.log; scope .build/waxwing-differential-scope.json.
+The bounded run had already completed when an interrupt was requested.
+A redundant memoized-hash scratch experiment was then stopped (status 130)
+and is not validation evidence; the final scratch checker was restored to
+the successful version. No maintained differential check was weakened.
+
+Final smoke: live npm waxwing run examples/answer.wxw prints 42; all eight
+paused worker files still match their saved hashes; current branding assets
+match the user-supplied originals (.build/waxwing-final-smoke.log).
+The user confirmed the visible logo files are right. Read the supplied
+Claude continuation prompt and the local SDD ledger; they corroborate the
+paused Task 3 review-fix state. No further effects implementation was
+started by this rename task.
+
+Rename implementation is complete on fx001. Full verification is **not
+green**: the isolated rename tree has the recorded pipe timing failure,
+and the live combined tree also contains the unfinished deferred-row test
+mismatch plus timing failures. Serial continuation (13) and all twenty-two
+regression proofs pass; earlier failures remain recorded. The rename and
+eight preserved FX001 worker files remain uncommitted; main is unchanged.
+For the continuation, commit the rename separately from Task 3 review fixes;
+finish those fixes/tests and re-review before Task 4. No merge or push.
+
+
+## FX001 Task 3 review-fix continuation (2026-10-09)
+
+The user resumed FX001 after the rename's separate commit 40cf312.
+Preserved and completed the eight paused source files: deferred Fail keys
+postpone the whole original row equation with type/row/fresh/event rollback;
+settleRows retries after other constraints and preserves undecidable pairs;
+groundErased is used only for Seeds/Resolve monomorphism while strict
+ground remains strict. RowOccurs distinguishes a row's occurs failure.
+The left-over-right path also needed a deferred-key guard: new tests first
+failed 9/10 with RowExtra, then passed after that guard. Exact closed/open
+reflexivity, one-Fail settling, closed deferred right, never-skip-first,
+rollback, retry, arrow continuation and erased grounding cases are covered.
+
+The independent transactional oracle now models rollback, postponement and
+settling. Generators include deferred Fail arguments, same-family
+Error(Int)/Error(Bool), arrow label arguments and nonempty starting type/row
+substitutions. Original 1,500-pair solved laws (including symmetric
+acceptance and scoped equality) remain; 2,000 further pairs in both
+directions distinguish pending acceptance from solved equality and compare
+settling after ordinary constraints. Focused run: 44/44 pass, no skips
+(.build/fx001-task3-fix-focused.log). Seven isolated source mutants all
+compiled successfully then failed intended assertions; full logs/results
+in .build/fx001-task3-fix-mutants, summarized in the local Task 3 report.
+
+Verification history retained:
+
+- First clean-output npm run verify exited 1; build had zero warnings/
+  errors and gates/strict-rebuild passed, but parallel match-lift timing
+  was 1670.670250 ms >1500 (643/644 pass). Exact raw log:
+  .build/fx001-task3-fix-verify.log. T003 records evidence/next action.
+  Explicit serial continuation then passed 21/21, no skips
+  (.build/fx001-task3-fix-serial.log); no unchanged full rerun hid the failure.
+- User-authorized FN006 prerequisite moved the byte-identical
+  fn-linear.test.mjs to fn-linear-timing.serial.test.mjs; the existing
+  fn-linear.serial.test.mjs stays. Controller then authorized extracting
+  only match-lift's timing block to match-lift-timing.serial.test.mjs,
+  keeping semantic tests parallel. Both timing workloads, all constants,
+  assertions and bounds are identical (hash/block identity records in
+  .build/fx001-task3-fix-{timing,ladder}-identity.txt). This applies the
+  existing suffix-driven serial policy; no checks are skipped or weakened.
+- After that actual scheduling change, a second clean-output npm run
+  verify exited 0: 356 modules, zero source/library warnings/errors,
+  pinned formatting, strict-rebuild/structural gates, 643 parallel tests
+  plus 22 serial tests, zero failures/skips, and all 22 existing regression
+  proofs. Ladder: 410.995667 ms test duration against unchanged 1500 ms
+  timed-compilation bound. Complete raw log:
+  .build/fx001-task3-fix-verify-serial-scheduling.log.
+
+The row fix is verified through direct semantic tests/oracles; no syntax
+can create nonempty effect rows yet. Task 5 must settle after body
+constraints and diagnose remaining unknown families. Deferred equations
+currently carry no spans/provenance; Task 9 must preserve/recover origins
+when integrating traced retries. UnifyRow is 249 lines. Both are explicit
+handoff concerns, not claims of completed later tasks. Active effects ADR
+references now use 010 (009 is naming). Ready for independent review before
+Task 4; no merge or push. Local report/ledger:
+.superpowers/sdd/2026-10-09-effects-plan/{task-3-report,progress}.md.
+
+
+### FX001 Task 4 — effect signatures, operations and Console (2026-10-09)
+
+Implemented sorted signature variables with one rigid ambient row,
+explicit rows, declared operations, stage consumption, Console print and
+Unit entry output. Rows erase from specialization arguments. Field and
+operation arrows default to pure, with declared effect names available;
+lambda annotation omissions share the lambda's own fresh ambient row.
+Program.Compile explicitly rejects user effects before specialization;
+handlers and user effect execution remain later tasks. Wire diagnostics
+carry related: [] with existing messages and spans preserved.
+
+Clean-output npm run verify exited 0 (.build/fx001-task4-verify.log):
+zero build warnings/errors, formatting/structure/strict-rebuild gates,
+672 parallel tests, 22 serial tests, no failures or skips, and all 22
+existing actual-source regression proofs. Four additional isolated actual
+source mutants built and failed their named regressions: lambda annotation
+omission, 20,000-arrow row collection, row argument erasure and effect
+names in field types (.build/fx001-task4-sensitivity/{results.json,*-test.log}).
+Earlier failed runs remain documented in the local Task 4 report; no
+unchanged rerun hid a failure. Concrete malformed-input validation gaps
+are BACKLOG FX004, with reproductions and the Task 5 next action.
+No merge or push. Implementation/evidence:
+.superpowers/sdd/2026-10-09-effects-plan/task-4-report.md.
+
+### FX001 Task 5 — handlers and typed failures in Check (2026-10-09)
+
+Implemented handler values, `with`, `handle`, and `fail` through Parse,
+Resolve, and Check. Handler clauses are checked against declared operations;
+`with` consumes the handler capability while preserving the outside row;
+`handle` settles concrete `Fail(E)` keys and forwards unhandled error
+families. Deferred retries preserve the original semantic failure category
+and `fail` span. Nested failures are traversed through their payloads.
+
+Row-parameterized ADTs support interleaved, multiple type/row parameters,
+bare effect labels, and `pure`; source sorts are retained while VarIds stay
+canonical (type slots first). The parser remains Applicative-only; Handler
+type syntax is isolated in Format.Parse.HandlerType. A declared ADT named
+Handler wins for `Handler(Foo)`, while `Handler(Clock)` resolves as a handler
+type when no such ADT exists. Duplicate effects, operations, effect/type
+parameters and function/handler binders use the existing duplicate
+diagnostics. Both written row forms reject repeated or nonfinal tails.
+
+Program.Compile rejects checked Handler/HandlerValue, With, Handle and Fail
+nodes, plus Handler types in signatures, expressions and every constructor
+field, before Specialize. The iterative type walk stays stack-safe at a
+20,000-arrow signature. This is Check-only support: specialization/lowering,
+runtime behavior, and Go emission remain later FX001 tasks.
+
+Root audit findings 1–13 are fixed and recorded with reproductions in
+.superpowers/sdd/2026-10-09-effects-plan/task-5-root-audit.md. The previous
+FX004 validation gaps are closed. Focused handler tests pass 81/81; the
+large-source suite passes 15/15, with 20,000-type duplicate rejection at
+475 ms against its unchanged five-second bound. Eleven new isolated source
+mutations prove the nested Fail, duplicate validation, deferred diagnostic,
+metadata guard and duplicate-scan timing regressions.
+
+Clean-output `npm run verify` exited 0 in
+.build/fx-handler-task5-verify5.log: zero build warnings/errors, pinned
+formatting, strict rebuild and structural gates, 722 parallel tests and 22
+serial tests with no failures or skips, and all 33 actual-source regression
+proofs. Earlier real failures remain preserved: verify2 exposed duplicate
+and resolver-metadata compatibility issues; verify4 exposed eager
+`when`-argument evaluation in duplicate scanning (6.92 s against the
+unchanged five-second limit). Those defects were fixed and their regression
+proofs added before verify5. Full interfaces, evidence and the remaining
+Task 9 origin-provenance handoff are in
+.superpowers/sdd/2026-10-09-effects-plan/task-5-report.md. No runtime or
+specialization behavior is claimed for this task.
+
+### FX001 Task 6 — effect specialization with erased rows (2026-10-09)
+
+Resumed in a Claude Code cloud session on branch claude/vibrant-cerf-3km61i
+(fast-forwarded to fx001 at 9a6befd; no .worktrees, ruling recorded in the
+SDD ledger). The local SDD ledger of Tasks 1-5 was never committed; it was
+recreated from git and this file. Task 6 was implemented inline by the
+controller before the superpowers skills were linked into .claude/skills
+(32ee2d2); it then received an independent task review.
+
+Implemented: effect keys (EffectRef, ground type arguments) in the one
+specialization worklist, created on first reference; user effect keys fill
+their operations' types beside their source (Resolved.OperationInfo gains
+`syntax`), so they reach type keys and the effect keys of handler types;
+`Handler(L …)` lowers to L's key in bodies and constructor fields; rows are
+erased everywhere. The IR gains `THandler EffectKey`, an `effects` table and
+nodes OperationRef, Perform, HandlerValue, Install, Handle and Abort (fail;
+`handle` clauses and aborts carry the payload's declared family). Check.Nested
+judges one reference graph over type and effect declarations (constructor
+fields, operation parameters and results, `Handler(L …)` edges); Grow, the
+mutual pair and the data/effect cycle are E_SPECIALIZATION at the nested
+reference, their bare-parameter versions compile. A function whose type
+variable appears only in its own row's labels is polymorphic (it crashed
+specialization before). Features.Check.Unlowered is replaced by
+Features.Specialize.Unlowered over the emitted IR: effect layouts or effect
+nodes stop at E_INTERNAL "unlowered effect"; unused effect declarations reach
+Go unchanged. Only keys with type arguments count toward the 10,000 limit.
+Tests reach Specialize directly (test/fx-specialize.test.mjs, 18 tests);
+executable probes wait for Task 7.
+
+A Task 5 parser defect surfaced: `with R` inside `Handler(L with R)` was
+silently dropped (and rows after non-arrow types elsewhere). Fixed by a
+Sonnet implementer in 5da7865 and 3aa1217 (round 2 pending at this entry),
+reviewed by Opus; meaningless rows are now E_SYNTAX "Unexpected effect row".
+
+Evidence: RED 15/18 (.build/fx001-task6-red.log; three characterization
+tests passed before). Clean `npm run verify` at 85c5867
+(.build/fx001-task6-verify.log): zero build warnings, gates pass, 752/752
+parallel tests; serial phase 13/22 — the 9 failures are fixed timing bounds
+that fail identically on the pre-Task-6 baseline 9a6befd on this container
+(BACKLOG T007); regression proofs, run explicitly: 33/33 (.build/fx001-
+task6-regression{,2,3}.log; four duplicate-declaration rows now expect an
+accepted program because the old guard no longer masks them). Test-helper
+defect fixed: test/poly-keys.mjs built a 5,000-deep JSON message eagerly
+(stack overflow here). Task review (Opus): spec ✅, quality Approved, no
+Critical/Important; Minor items deferred in the ledger.
+
+## FX001 spec revision: `defer` must not fail (2026-10-09)
+
+Before Task 8, the user was asked how a cleanup failure during an abort
+should behave (abort-to-defect conversion as specified, drop, replace, or
+suppressed causes). The user chose the static rule, after Swift's `defer`:
+a deferred expression that performs an unhandled `Fail` is E_EFFECT
+`defer must not fail, but it performs <L>`; cleanup that can fail handles
+its failure inside the deferred expression. Only defects can fail cleanup,
+so a pending typed abort reaches its `handle` unless a cleanup on the way
+raises a defect (the abort then heads the report) or diverges (corrected
+per CF001 §11). Spec §2 (`defer`
+rule), §3 ("Cleanup failures", with rejected alternatives), §5 (report
+example, probes 6 and 11), plan Global Constraints and Tasks 8, 10 and 12,
+findings and the handoff were updated. Docs only; no code changed.
+
+### FX001 Task 7 — Go lowering of handlers, operations and failures (2026-10-09)
+
+Subagent-driven: Sonnet implementer (e9a613f, fix round 4b80bd1), Opus task
+review and scoped re-review. Effect programs now build and run. ctx mode is
+chosen over the emitted IR (any effect layout or effect node); in it every
+function, stage, lambda, constructor, lifted helper and function type takes
+`ctx *waxwingCtx` first; otherwise Go output is unchanged (bootstrap
+snapshots byte-identical, Console-only programs without ctx). Runtime (Task
+1's adopted shapes, emitted only when used): immutable context list,
+non-zero-sized markers, targeted aborts recovered only by their own lifted
+`handle` helper. Keys: user effect EffectId+1, Fail families by declared
+head (negative keys); missing handler is `panic("no handler for L")`.
+Handler structs per layout (empty for Console/Fail layouts), perform
+functions call clauses with the frame's outer context (intercept-and-
+forward), clauses lifted like lambdas. Features.Specialize.Unlowered is
+deleted; every 'unlowered effect' assertion was replaced by an executable
+assertion (test/fx-run.test.mjs, 24 programs with exact stdout).
+Two checker defects found and fixed: constructor patterns dropped row
+arguments (Check.Match/Tables), and consumption did not resolve a bound row
+tail (Check.Consume); Check-level tests in test/fx-check-fixes.test.mjs,
+each failing with its fix reverted. Review found one Critical: the clauses
+of one `handle` were installed in reverse (runtime panic for Error(Int) vs
+Error(Bool) clauses); fixed with probes. Regression rows: block-order needle
+updated; handler-metadata replaced by effect-free-ctx.
+
+Evidence: `rm -rf output && npm run verify` (.build/fx001-task7-verify.log):
+build, gates, 786/786 parallel tests; serial 12/22, the 10 failures are the
+BACKLOG T007 environment bounds (same set on pre-change baselines);
+regression proofs 33/33 (.build/fx001-task7-regression.log). The
+fx-block.serial 20,000-let test sits at its 1,500 ms bound on this
+container: 49717bc 1,533-1,574 ms vs Task 7 1,386-1,505 ms, alternating.
+
+### FX001 Task 8 — `defer`, `crash`, cleanup and the defect report (2026-10-09)
+
+Subagent-driven: Sonnet implementer (041cb31; fix round d5bfa8d, resumed
+after a container restart), Opus task review and scoped re-review.
+`defer e` (block item) and `crash(value: a): b` (built-in, printable
+argument, no effect, uncatchable) run through every phase. Cleanup runs
+LIFO, exactly once per exiting activation, in the registration context;
+the defect report follows spec §5 (exit status 1, first line the original
+cause, later lines `cleanup failed: `; `<not printable>` decided
+statically). Runtime pieces (Format.Go.Cleanup, Format.Go.Report) are
+emitted only when used; defer and crash do not force ctx; blocks without
+`defer` emit no Go `defer`. Conventions recorded: with no pending cause the
+first cleanup crash is the unprefixed first line; Go runtime panics print
+as `panic: <text>`.
+
+The user's rule that `defer` must not fail is enforced soundly after
+review: the first implementation checked only labels, so five programs
+(callback parameters with ambient or named rows, unsettled closures,
+lambdas decided later) let a typed failure escape cleanup and become a
+fatal report. Ruling (controller, pending user confirmation of strict over
+a lacks-Fail constraint): the deferred expression has its own row; after
+the function's constraints settle, a remaining Fail label or a tail
+resolved to a rigid row variable is E_EFFECT (`defer must not fail, but it
+performs <L>` / `... but it may perform any effect of <r>`). Accepted
+limitations (spec §2, BACKLOG FX007): the bracket idiom needs `with pure`
+callbacks; a local lambda also called outside the `defer` in a non-main
+function is rejected in it. Report.payloadName now walks arrow spines by a
+loop (a 5,000-arrow payload crashed the compiler).
+
+Evidence: fx-cleanup 32/32 (RED 24/26 before, then 7 new failing tests
+for the fix round; seven isolated mutants caught). `npm run verify`
+(.build/fx001-task8-verify.log): build, gates, 818/818 parallel tests;
+serial 12/22, the 10 failures are BACKLOG T007 timing bounds; regression
+proofs 33/33 (.build/fx001-task8-regression.log). Re-review probes:
+legitimate defers (`defer log(1)`, `defer print(x)`, monomorphic helpers)
+accepted; the check is linear (1k-8k defers).
+
+### FX001 Task 9 — effect diagnostic provenance (2026-10-10)
+
+Subagent-driven: Sonnet implementer (2fc7a02; fix rounds 04ab898, cee8542,
+b80cc17), Opus task review and two Opus re-reviews, Sonnet re-review of the
+last one-line fix. (A first dispatch was lost to a container restart; the
+second was briefly stopped by a controller misreading of a user message and
+resumed with its work intact.) Effect errors now carry origin, boundary and
+path notes (spec §6): occurrence links live in the substitution and are
+recorded on every unification path (nested arrow rows, settleRows retries,
+consumption); deferred-row origins are kept apart from the function row;
+note texts follow ruling R4 and the wire carries `related: [{ span,
+message }]`. Resolved gains `rowSpan` on functions and parameters so
+boundary notes point at the written `with` (or the parameter name when the
+concerned row is nested or not the only pure row). Path hops, note count
+and characters are abbreviated (`visibleLabels 4`, `pathHops 2`, `maxNotes
+4`, `maxCharacters 2000` for notes); labels over 120 characters print
+`Effect(…)` in headlines. Pre-FX001 diagnostics are unchanged (`related:
+[]` by construction; wire JSON identical); 20,000-parameter signatures
+check in about 1.5 s.
+
+Known limits recorded: `maxCharacters` bounds notes only — a headline with a
+very long type or effect name can exceed 2,000 characters (BACKLOG E011);
+the late-Fail-key defer note follows let-bound locals only and otherwise
+gives no note (never a wrong one; ~20 probes); origin notes may point
+outside the deferred expression.
+
+Evidence: fx-diagnostics, fx-diagnostic-origins, fx-signature 46/46; the
+fix-round tests were each seen failing (the round-2 tests by the controller
+against 04ab898 in an isolated worktree). Final verify
+(.build/fx001-task9-fix3-verify.log): build, gates, parallel 847/848 — the
+one failure is large-source "three-thousand-constructor match" timing
+(BACKLOG T004; passes alone); serial phase failures are the T007 set;
+regression proofs 33/33 (.build/fx001-task9-fix3-regression.log).

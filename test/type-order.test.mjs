@@ -6,9 +6,12 @@ import assert from 'node:assert/strict';
 import { eqInt } from '../output/Data.Eq/index.js';
 import { ordInt } from '../output/Data.Ord/index.js';
 import { Just } from '../output/Data.Maybe/index.js';
-import { TBool, TData, TFun, TInt, TVar, eqTy, ground, ordTy } from '../output/Domain.Type/index.js';
+import { closedRow } from '../output/Domain.Row/index.js';
+import { TBool, TData, TFun, TInt, TVar, eqTy, ordTy } from '../output/Domain.Type/index.js';
+import { ground } from '../output/Domain.Type.Parts/index.js';
 import * as problem from '../output/Domain.Problem/index.js';
 import { wire } from '../output/Format.Diagnostic/index.js';
+import { eqFlex } from '../output/Features.Check.Subst/index.js';
 import * as unifier from '../output/Features.Check.Unify/index.js';
 import { choose, generator } from './coverage-oracle.mjs';
 
@@ -19,8 +22,8 @@ const longSpine = 20000;
 
 // `parameters` copies of TInt, then `last`, then the result, by a loop.
 const longArrow = (parameters, last, result) => {
-  let built = TFun.create(last)(result);
-  for (let index = 0; index < parameters; index += 1) built = TFun.create(TInt.value)(built);
+  let built = TFun.create(last)(closedRow)(result);
+  for (let index = 0; index < parameters; index += 1) built = TFun.create(TInt.value)(closedRow)(built);
   return built;
 };
 
@@ -34,13 +37,13 @@ test('equality and order on 20,000-long spines need no deep recursion', () => {
   assert.equal(ordering(one, differs), 'LT');
   assert.equal(ordering(differs, one), 'GT');
   assert.equal(ordering(one, longArrow(longSpine, TInt.value, TInt.value)), 'GT');
-  assert.equal(ordering(TFun.create(TInt.value)(TInt.value), one), 'LT');
+  assert.equal(ordering(TFun.create(TInt.value)(closedRow)(TInt.value), one), 'LT');
 });
 
 test('substitution and grounding walk a 20,000-long spine by a loop', () => {
   const one = longArrow(longSpine, TInt.value, TBool.value);
   const substituted = unifier.substitute(unifier.empty)(one);
-  assert.ok(eqTy(unifier.eqFlex).eq(substituted)(one));
+  assert.ok(eqTy(eqFlex).eq(substituted)(one));
   const grounded = ground(one);
   assert.ok(grounded instanceof Just);
   assert.equal(eq(grounded.value0)(one), true);
@@ -72,7 +75,7 @@ const arrowFree = (next, depth) => {
   if (shape === 2) return TVar.create(choose(next, 2));
   const count = choose(next, 3);
   return TData.create(choose(next, 2))(Array.from({ length: count },
-    () => arrowFree(next, depth - 1)));
+    () => arrowFree(next, depth - 1)))([]);
 };
 const generatedPairs = 2000;
 const maximumDepth = 3;
@@ -100,21 +103,21 @@ const listOf = argument => problem.AppliedName.create('List')([argument]);
 test('arrow type names are right-associative, function parameters parenthesized', () => {
   const map = arrow(arrow(name.int, name.int),
     arrow(listOf(name.int), listOf(name.int)));
-  assert.deepEqual(wire({ problem: problem.TypeMismatch.create(map)(name.int), span }), {
-    code: 'E_TYPE', span,
+  assert.deepEqual(wire({ problem: problem.TypeMismatch.create(map)(name.int), span, related: [] }), {
+    code: 'E_TYPE', span, related: [],
     message: 'Expected (Int -> Int) -> List(Int) -> List(Int), found Int'
   });
   const returned = arrow(name.int, arrow(name.int, name.int));
   const nestedResult = listOf(arrow(name.int, name.int));
-  assert.equal(wire({ problem: problem.NotComparable.create(returned), span }).message,
+  assert.equal(wire({ problem: problem.NotComparable.create(returned), span, related: [] }).message,
     'Type Int -> Int -> Int is not comparable');
-  assert.equal(wire({ problem: problem.AmbiguousType.create(nestedResult), span }).message,
+  assert.equal(wire({ problem: problem.AmbiguousType.create(nestedResult), span, related: [] }).message,
     'Ambiguous type List(Int -> Int) in comparison');
 });
 
 test('a 20,000-long arrow type name renders without deep recursion', () => {
   let built = name.int;
   for (let index = 0; index < longSpine; index += 1) built = arrow(name.int, built);
-  const text = wire({ problem: problem.NotComparable.create(built), span }).message;
+  const text = wire({ problem: problem.NotComparable.create(built), span, related: [] }).message;
   assert.equal(text, `Type ${'Int -> '.repeat(longSpine)}Int is not comparable`);
 });

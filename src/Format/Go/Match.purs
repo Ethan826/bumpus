@@ -4,6 +4,7 @@ import Prelude
 import Data.Array as Array
 import Data.String.Common (joinWith)
 import Format.Go.Capture (Captured, armFree, union)
+import Format.Go.Context (declared, passed)
 import Format.Go.Data
   ( boolean
   , fieldName
@@ -28,18 +29,21 @@ type Signature =
 
 -- Each match is lifted to a top-level function, not an immediately invoked
 -- closure: Go's inliner expands nested closures exponentially (E005). The
--- k-th match of bumpusFn{f}, numbered in pre-order with the scrutinee
--- before the arms, is bumpusFn{f}Match{k}. It takes the locals its arms
+-- k-th match of waxwingFn{f}, numbered in pre-order with the scrutinee
+-- before the arms, is waxwingFn{f}Match{k}. It takes the locals its arms
 -- capture, then the scrutinee, which the call site evaluates once, where the
 -- closure did. Arms are tested in order; the panic guards only malformed
--- values. Lifted functions follow their bumpusFn in number order. The
+-- values. Lifted functions follow their waxwingFn in number order. The
 -- match's own free locals, which an enclosing match must capture, are its
 -- scrutinee's and its captures (Format.Go.Capture).
 lowerMatch
   ∷ Scope → Lowering → Int → Ty → IR.Expr → Array IR.Arm → Lowered
 lowerMatch scope lower next result scrutinee arms =
   { code: signature.name <> "("
-      <> joinWith ", " (map capturedName signature.captured <> [ subject.code ])
+      <> joinWith ", "
+        ( passed context
+            (map capturedName signature.captured <> [ subject.code ])
+        )
       <> ")"
   , next: bodies.next
   , lifted: [ lifted ] <> subject.lifted <> bodies.lifted
@@ -59,22 +63,25 @@ lowerMatch scope lower next result scrutinee arms =
   patterns = map armPattern arms
   armPattern arm = arm.pattern
   capturedName captured = localName captured.id
-  lifted = matchFunction signature
+  context = scope.shape.context
+  lifted = matchFunction context signature
     (Array.zipWith (armCode scope.tables) arms bodies.codes)
 
 matchName ∷ FunctionId → Int → String
 matchName owner number = functionName owner <> "Match" <> show number
 
 scrutineeName ∷ String
-scrutineeName = "bumpusScrutinee"
+scrutineeName = "waxwingScrutinee"
 
-matchFunction ∷ Signature → Array String → String
-matchFunction signature arms =
-  "func " <> signature.name <> "(" <> joinWith ", " parameters <> ") "
+matchFunction ∷ Boolean → Signature → Array String → String
+matchFunction context signature arms =
+  "func " <> signature.name <> "("
+    <> joinWith ", " (declared context parameters)
+    <> ") "
     <> goType signature.result
     <> " {\n"
     <> joinWith "" arms
-    <> "panic(\"bumpus: unmatched value\")\n}\n"
+    <> "panic(\"waxwing: unmatched value\")\n}\n"
   where
   parameters = map parameter signature.captured
     <> [ scrutineeName <> " " <> goType signature.scrutinee ]
