@@ -77,12 +77,18 @@ const expectsDiagnostic = (source, code, message, label) => {
   assert.equal(found.message, message, `${label}: wrong diagnostic message`);
 };
 
-const nestedFail = () => expectsDiagnostic(
-  'fn id(x: Int): Int = x; '
-    + 'fn f(e: a): Int with Fail(a) + Fail(Int) = fail(id(fail(e))); '
-    + 'fn main(): Int = 0;',
-  'E_TYPE', 'Fail needs a concrete error family', 'nested Fail payload'
-);
+// Both payloads are unsolved: the walk into the outer Fail's payload must
+// reach the inner one first, else the outer Fail's span is reported.
+const nestedFail = () => {
+  const source = 'fn hole(u: Unit): a = hole(u); fn h(k: b): a = hole(()); '
+    + 'fn f(): Int with Fail(Int) = fail(h(fn(e) => fail(e))); '
+    + 'fn main(): Int = 0;';
+  expectsDiagnostic(source, 'E_TYPE', 'Fail needs a concrete error family',
+    'nested Fail payload');
+  const found = wire(compile(source).value0);
+  assert.equal(found.span.start.offset, source.indexOf('fail(e)'),
+    'nested Fail payload: wrong span');
+};
 
 const duplicateBinder = () => expectsDiagnostic(
   'effect Add { fn add(x: Int, y: Int): Int; }; '

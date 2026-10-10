@@ -114,9 +114,6 @@ for (const [name, source, code, message] of [
   ['same payload family arguments must unify', 'type Error(a) = Error(a); '
     + 'fn main(): Int = handle fail(Error(1)) '
     + '{ fail(error: Error(Bool)) => 0 };', 'E_TYPE', 'Expected Bool, found Int'],
-  ['nested unresolved failure payload is visited', 'fn id(x: Int): Int = x; '
-    + 'fn f(e: a): Int with Fail(a) + Fail(Int) = fail(id(fail(e)));' + main,
-    'E_TYPE', 'Fail needs a concrete error family'],
   ['deferred failure mismatch keeps semantic diagnostic', 'type Error(a) = Error(a); '
     + 'fn main(): Int = { let raise = fn(error) => fail(error); '
     + 'handle raise(Error(1)) { fail(problem: Error(Bool)) => 0 } };',

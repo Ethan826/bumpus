@@ -193,8 +193,12 @@ except `Fail`, keyed by the resolved declared type identity of its payload
 arguments must unify when one is matched against the other. `fail(e)`
 requires `Fail(typeOf(e))`, the full type. A payload whose head is still
 an unsolved meta is decided after the body's other constraints are solved
-(deferred key); one that remains a meta, or is a rigid variable, is E_TYPE
-`Fail needs a concrete error family`. Limitation recorded for STD001: no
+(deferred key); one that remains a meta is E_TYPE `Fail needs a concrete
+error family`. Keys are Int, Bool, Unit or a declared TypeId. A written
+`Fail` payload without a family key (a type variable, a function type or
+a handler type), in a signature or a `handle` clause, is that E_TYPE at
+the written label, with a hint naming `...e`, a concrete family or
+`Result` (BACKLOG FX009, user decision 2026-10-10). Limitation recorded for STD001: no
 fully generic helper turns an arbitrary `Result(error, value)` into a
 failing computation; helpers are per family, or return Result.
 

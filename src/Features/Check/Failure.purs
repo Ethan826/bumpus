@@ -1,4 +1,8 @@
-module Features.Check.Failure (failExpression, settleKeys) where
+module Features.Check.Failure
+  ( failExpression
+  , settleKeys
+  , settleFinal
+  ) where
 
 import Prelude
 import Data.Array as Array
@@ -18,7 +22,7 @@ import Features.Check.Provenance (Consumed(FailOf))
 import Features.Check.Reject (rejected)
 import Features.Check.Scheme (State, Threaded, opened, resolved)
 import Features.Check.TypeName (typeName)
-import Features.Check.Unify (Failure(..), Flex, Subst, settleRows)
+import Features.Check.Unify (Failure(..), Flex, Subst(..), settleRows)
 
 type Result = Either Diagnostic (Threaded Checked.Expr)
 type Env r = CheckEnv (locals ∷ Locals | r)
@@ -53,6 +57,20 @@ settleKeys env state body = either failed checked (settleRows state.subst)
     (firstUnkeyed settled body)
   noUnresolved settled _ = Right settled
   unresolved span = Left (problemAt FailNeedsConcrete span)
+
+-- The keys settled for good, after the deferred rows are. A row pair still
+-- set aside then met a Fail payload no family key decides. Signatures and
+-- handle clauses refuse such payloads where they are written
+-- (Features.Resolve.Row) and `firstUnkeyed` refuses `fail` expressions, so
+-- no program is known to reach this (FX009 review round 2 searched); it
+-- stays as a rejection rather than a silent drop.
+settleFinal
+  ∷ ∀ r. CheckEnv r → State → Checked.Expr → Either Diagnostic Subst
+settleFinal env state body = settleKeys env state body >>= leftover
+  where
+  leftover settled@(Subst bindings) =
+    if Array.null bindings.postponed then Right settled
+    else Left (problemAt FailNeedsConcrete (failureSpan body))
 
 failureSpan ∷ Checked.Expr → Span
 failureSpan body = maybe' noFailure identity (firstFail body)

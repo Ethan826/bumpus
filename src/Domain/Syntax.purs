@@ -13,9 +13,8 @@ type Span = { start ∷ Position, end ∷ Position }
 type Note = { span ∷ Span, reason ∷ NoteReason }
 
 -- Why a note is attached (FX001 design §6); Format.Diagnostic.Note gives
--- each its text. Labels are already named. `ContinuesInto` is internal:
--- Features.Check replaces it, before reporting, with the path through the
--- named function's body to where its label arose.
+-- each its text. `ContinuesInto` is internal: Features.Check replaces it,
+-- before reporting, with the path through the named function's body.
 data NoteReason
   = PerformedHere String
   | FromCallOf String String
@@ -29,6 +28,7 @@ data NoteReason
   | HandledHere String
   | MainOnlyConsole
   | CleanupMustNotFail
+  | FailAlternatives
   | DeclaredHere String
   | InnermostHere String
   | ContinuesInto String Int String
