@@ -1,6 +1,5 @@
 import test from 'node:test';
-import assert from 'node:assert/strict';
-import { clock, db, diagnose, expectDiagnostic, log } from './fx-diagnostics-support.mjs';
+import { clock, db, expectDiagnostic, log } from './fx-diagnostics-support.mjs';
 
 test('repeated Fail families attribute each origin to its own occurrence', () => {
   const types = 'type A = A; type B = B; ';
@@ -201,14 +200,22 @@ test('a late Fail key blames the call of the reported family', () => {
     + 'defer { b(B); a(A) }; ()';
   const work = `fn work(): Unit = handle { ${lambdas} } `
     + '{ fail(error: A) => (), fail(error: B) => () }; ';
-  const { diagnostic } = diagnose('type A = A; type B = B; ' + work
-    + 'fn main(): Unit = ();');
-  const family = /Fail\((A|B)\)/.exec(diagnostic.message)[1];
-  const call = `${family.toLowerCase()}(${family})`;
-  assert.equal(diagnostic.related[0].message,
-    `Fail(${family}) comes from this function value`);
-  const text = 'type A = A; type B = B; ' + work;
-  const at = text.indexOf(call, text.indexOf('defer {'));
-  assert.deepEqual([diagnostic.related[0].span.start.offset,
-    diagnostic.related[0].span.end.offset], [at, at + call.length]);
+  expectDiagnostic('type A = A; type B = B; ' + work + 'fn main(): Unit = ();', {
+    code: 'E_EFFECT', message: 'defer must not fail, but it performs Fail(B)',
+    at: ['defer { b(B); a(A) }'],
+    notes: [[work, 'b(B)', 'Fail(B) comes from this function value'],
+      [work, 'fail(x', 'Fail(B) is raised here']]
+  });
+});
+
+test('with two pure rows in a parameter, the note names the parameter', () => {
+  const once = 'fn once(f: Int -> (Int -> Int with pure) with pure): Int = 0; ';
+  const callback = 'fn(x) => fn(y) => { log(y); y }';
+  expectDiagnostic(log + once + `fn main(): Int = once(${callback});`, {
+    code: 'E_EFFECT',
+    message: 'This function must be pure, but it performs Log',
+    at: [callback],
+    notes: [[callback, 'log(y)', 'Log is performed here'],
+      [once, 'f', 'this parameter must be pure', 'fn once('.length]]
+  });
 });

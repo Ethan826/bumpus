@@ -8,7 +8,8 @@ import Domain.Checked.Internal (Open)
 import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(RowEquality, MustBePure), RowText)
 import Domain.Row (Row(..), isPure)
-import Domain.Type.Parts (rowsOf)
+import Data.Foldable (sum)
+import Domain.Type.Parts (children, rowsOf)
 import Domain.Syntax (Diagnostic, Note, NoteReason(..), Sort(..))
 import Domain.Type (Ty(..))
 import Features.Check.Context (CheckEnv)
@@ -79,10 +80,16 @@ parameter callee index own = maybe [] (Array.singleton <<< pureNote)
     (if own then fromMaybe found.span found.rowSpan else found.span)
     MustBePureParameter
 
+-- Whether the type's own arrow is its only pure row, so the parameter's
+-- written `with` is the one meant.
 topRowPure ∷ Ty Open → Boolean
-topRowPure = case _ of
-  TFun _ row _ → isPure row
+topRowPure ty = case ty of
+  TFun _ row _ → isPure row && pureRows ty == 1
   _ → false
+
+pureRows ∷ Ty Open → Int
+pureRows ty = Array.length (Array.filter isPure (rowsOf ty))
+  + sum (map pureRows (children ty))
 
 -- The callee's row variable whose meta, for this call, ended in `shared`.
 calleeName ∷ State → Use → Callee → Maybe Flex → Maybe String
