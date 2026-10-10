@@ -3141,3 +3141,16 @@ against 04ab898 in an isolated worktree). Final verify
 one failure is large-source "three-thousand-constructor match" timing
 (BACKLOG T004; passes alone); serial phase failures are the T007 set;
 regression proofs 33/33 (.build/fx001-task9-fix3-regression.log).
+
+## FX006 constraints and FX008 hypothesis recorded (2026-10-10)
+
+Docs only, from a review of the draft Waxwing article outline. BACKLOG
+gains FX006 (general resume) ahead of FX001 Task 12, carrying the plan's
+scope plus the user's constraints: multiplicity decided on language terms,
+one-shot by default and declared per operation so multi-shot stays an
+additive, row-visible extension, reserved spelling, at-most-once assumptions
+stated in `defer`/FX003/CF001, and a double-resume regression. FX008
+records an unverified hole in `defer must not fail` through a failing
+handler clause. language-direction.md records the user's direction that the
+language (frontend, syntax, type system) outranks the Go target. No code
+changed; no build or verify ran (a parallel worktree was active).
