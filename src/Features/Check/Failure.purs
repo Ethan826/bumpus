@@ -13,7 +13,9 @@ import Domain.Syntax (Diagnostic, Span, problemAt)
 import Domain.Type (Ty(..))
 import Domain.Type.Parts (typeHead)
 import Features.Check.Context (CheckEnv, Infer, Locals)
-import Features.Check.Consume (consumeAt, failureAt)
+import Features.Check.Consume (consumeAt)
+import Features.Check.Provenance (Consumed(FailOf))
+import Features.Check.Reject (rejected)
 import Features.Check.Scheme (State, Threaded, opened, resolved)
 import Features.Check.TypeName (typeName)
 import Features.Check.Unify (Failure(..), Flex, Subst, settleRows)
@@ -31,7 +33,7 @@ failExpression
   → Result
 failExpression infer env state span value = do
   payload ← infer env state value
-  consumed ← consumeAt env payload.state span
+  consumed ← consumeAt env payload.state span (FailOf env.functionName)
     (Row [ Label FailEffect [ Checked.typeOf payload.value ] ] Nothing)
   pure
     { value: Checked.Expr
@@ -42,10 +44,11 @@ failExpression infer env state span value = do
     , state: consumed { next = consumed.next + 1 }
     }
 
-settleKeys ∷ ∀ r. CheckEnv r → Subst → Checked.Expr → Either Diagnostic Subst
-settleKeys env subst body = either failed checked (settleRows subst)
+settleKeys
+  ∷ ∀ r. CheckEnv r → State → Checked.Expr → Either Diagnostic Subst
+settleKeys env state body = either failed checked (settleRows state.subst)
   where
-  failed failure = failureDiagnostic env body failure
+  failed failure = failureDiagnostic env state body failure
   checked settled = maybe' (noUnresolved settled) unresolved
     (firstUnkeyed settled body)
   noUnresolved settled _ = Right settled
@@ -57,12 +60,18 @@ failureSpan body = maybe' noFailure identity (firstFail body)
   noFailure _ = Checked.spanOf body
 
 failureDiagnostic
-  ∷ ∀ r. CheckEnv r → Checked.Expr → Failure → Either Diagnostic Subst
-failureDiagnostic env body failure = case failure of
+  ∷ ∀ r
+  . CheckEnv r
+  → State
+  → Checked.Expr
+  → Failure
+  → Either Diagnostic Subst
+failureDiagnostic env state body failure = case failure of
   Mismatch found expected → mismatch found expected
-  _ → failureAt env span failure
+  _ → rejected env state origin failure
   where
   span = failureSpan body
+  origin = { span, consumed: FailOf env.functionName, via: Nothing }
   mismatch found expected = do
     let Tuple expectedPart foundPart = firstDifferent expected found
     expectedName ← typeName env span (opened expectedPart)

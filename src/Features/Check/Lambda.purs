@@ -41,7 +41,10 @@ checkLambda infer env state span parameters body = do
       row
   checked ← infer
     ( env
-        { locals = bindAll (bound typed.value) env.locals, current = row }
+        { locals = bindAll (bound typed.value) env.locals
+        , current = row
+        , sites = []
+        }
     )
     staged.state
     body

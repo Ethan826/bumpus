@@ -1,4 +1,9 @@
-module Features.Check.Occurrence (OccurrenceId(..)) where
+module Features.Check.Occurrence
+  ( OccurrenceId(..)
+  , Sides
+  , anonymous
+  , nowhere
+  ) where
 
 import Prelude
 import Domain.Syntax (Span)
@@ -14,3 +19,20 @@ data OccurrenceId = Written Span Int | Extended Int
 
 derive instance eqOccurrenceId ∷ Eq OccurrenceId
 derive instance ordOccurrenceId ∷ Ord OccurrenceId
+
+-- Where each operand's own labels were written.
+type Sides = { left ∷ Span, right ∷ Span }
+
+-- A label of a row nobody wrote at a known place (the sides of an
+-- untraced unification, line 0): no origin or link may be kept for it, as
+-- every such row would share the one id.
+anonymous ∷ OccurrenceId → Boolean
+anonymous = case _ of
+  Written span _ → span.start.line == 0
+  Extended _ → false
+
+-- The span of a row nobody wrote anywhere.
+nowhere ∷ Span
+nowhere = { start: start, end: start }
+  where
+  start = { offset: 0, line: 0, column: 0 }

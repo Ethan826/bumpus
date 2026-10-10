@@ -1,5 +1,6 @@
 module Features.Check.Scheme
   ( State
+  , Site
   , Deferral
   , Threaded
   , Scheme
@@ -8,6 +9,7 @@ module Features.Check.Scheme
   , instantiate
   , at
   , flexible
+  , flexibleRow
   , opened
   , resolved
   , headOf
@@ -29,8 +31,9 @@ import Domain.Checked.Internal (Open(..))
 import Domain.Checked.Internal as Checked
 import Domain.Syntax (Diagnostic, Span)
 import Domain.Type (Ty(..), TyRow, VarId(..))
-import Domain.Row (Row(..), isPure)
+import Domain.Row (Row(..), isPure, openRow)
 import Domain.Type.Parts (children, rowArguments, rowsOf)
+import Features.Check.Provenance (Origins, noOrigins)
 import Features.Check.Unify (Flex, Subst, exceedsLimit, resolve, walk)
 import Features.Check.Unify as Unify
 import Features.Check.Walk (foldTypes, retype)
@@ -40,11 +43,31 @@ import Features.Check.Walk (foldTypes, retype)
 -- `holes` renumbers the ones still unsolved once the function is done.
 -- `deferrals` are the rows of the `defer`ed expressions, for
 -- Features.Check.Defer to judge once the function's keys are settled.
+-- `origins`: where each label occurrence entered a row (design §6), read
+-- only when a rejection is reported.
 type State =
-  { subst ∷ Subst, next ∷ Int, deferrals ∷ Array Deferral }
+  { subst ∷ Subst
+  , next ∷ Int
+  , deferrals ∷ Array Deferral
+  , origins ∷ Origins
+  }
 
--- `current` is the row the `defer` was checked in, which later labels join.
-type Deferral = { span ∷ Span, row ∷ TyRow Open, current ∷ TyRow Open }
+-- Where the leading labels of the current row were written (a signature,
+-- a `with` installation, a `handle`): `count` labels from `span`, the
+-- innermost site first. A label's occurrence is then the site's span and
+-- its position within the site, whatever has been installed around it.
+type Site = { span ∷ Span, count ∷ Int }
+
+-- `current` is the row the `defer` was checked in, which later labels join,
+-- and `sites` where its own labels were written. `body` is the deferred
+-- expression, searched when a rejection is reported.
+type Deferral =
+  { span ∷ Span
+  , row ∷ TyRow Open
+  , current ∷ TyRow Open
+  , sites ∷ Array Site
+  , body ∷ Checked.Expr
+  }
 
 type Threaded a = { value ∷ a, state ∷ State }
 
@@ -76,7 +99,7 @@ instance applicativeThread ∷ Applicative (Thread s) where
     threaded state = Right { value, state }
 
 start ∷ State
-start = { subst: Unify.empty, next: 0, deferrals: [] }
+start = { subst: Unify.empty, next: 0, deferrals: [], origins: noOrigins }
 
 threadAll
   ∷ ∀ s a b
@@ -110,6 +133,12 @@ flexible = map toFlex
   toFlex = case _ of
     Checked.Rigid id → Unify.Rigid id
     Hole meta → Unify.Meta meta
+
+-- A row of the checked IR's types as the unifier's.
+flexibleRow ∷ TyRow Open → TyRow Flex
+flexibleRow found = case flexible (TFun TUnit found TUnit) of
+  TFun _ result _ → result
+  _ → openRow (Unify.Meta 0)
 
 opened ∷ Ty Flex → Ty Open
 opened = map toOpen

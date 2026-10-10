@@ -5,6 +5,7 @@ module Features.Check.RowSide
   , tailOf
   , written
   , expanded
+  , mismatched
   ) where
 
 import Prelude
@@ -13,12 +14,19 @@ import Control.Monad.Rec.Class (Step(..), tailRec)
 import Data.Array as Array
 import Data.Maybe (Maybe, maybe)
 import Data.Tuple (Tuple(..))
-import Domain.Row (Label, Row(..))
+import Domain.Row (EffectRef(..), Label(..), Row(..))
 import Domain.Syntax (Span)
 import Domain.Type (Ty, TyRow, VarId)
-import Features.Check.Occurrence (OccurrenceId)
+import Features.Check.Occurrence (OccurrenceId, Sides, nowhere)
 import Features.Check.Occurrence as Occurrence
-import Features.Check.Subst (Flex(..), Subst, boundRow, metaOf)
+import Features.Check.Subst
+  ( Failure(..)
+  , Flex(..)
+  , Subst
+  , boundRow
+  , metaOf
+  , resolveLabel
+  )
 
 -- An operand's tail, so its cases are plain constructors.
 data Tail = Closed | RigidTail VarId | MetaTail Int
@@ -56,3 +64,17 @@ tailOf = maybe Closed fromFlex
   fromFlex = case _ of
     Rigid id → RigidTail id
     Meta meta → MetaTail meta
+
+-- A failure inside the arguments of two same-key labels, reported (for a
+-- unification whose rows were written somewhere, a consumption's) as the
+-- two labels with the right entry's occurrence, so the message can name
+-- `State(Bool)` against `State(Int)`. `Fail` keeps its argument mismatch:
+-- its payloads are judged by their own family rules.
+mismatched ∷ Sides → Subst → Entry → Entry → Failure → Failure
+mismatched sides subst entry other failure = case failure, entry.label of
+  Mismatch _ _, Label FailEffect _ → failure
+  Mismatch _ _, _ | sides.left /= nowhere → RowPayload
+    (resolveLabel subst entry.label)
+    (resolveLabel subst other.label)
+    other.occurrence
+  _, _ → failure

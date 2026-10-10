@@ -5,19 +5,27 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Foldable (foldM, traverse_)
 import Data.Maybe (Maybe(..), maybe)
+import Data.Tuple (Tuple(..), fst, snd)
 import Domain.Checked.Internal (Open(..))
 import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
 import Domain.Resolved as Resolved
 import Domain.Row (EffectRef(..), Label(..), Row(..), openRow)
-import Domain.Syntax (Diagnostic, Span, problemAt)
+import Domain.Syntax (Diagnostic, Span)
 import Domain.Type (Ty(..), TyRow, VarId(..))
-import Features.Check.Consume (consumeAt)
+import Features.Check.Consume (consumeVia)
 import Features.Check.Context (CheckEnv, Infer, Locals)
+import Features.Check.DeferNotes (failureNotes, tailNotes)
 import Features.Check.Entry (resolvedRow)
+import Features.Check.Occurrence (OccurrenceId)
+import Features.Check.Provenance
+  ( Boundary(DeferItem)
+  , Consumed(Application)
+  , occurrencesOf
+  )
 import Features.Check.RowName (labelName)
 import Features.Check.Require (require)
-import Features.Check.Scheme (State, Threaded, flexible)
+import Features.Check.Scheme (Deferral, State, Threaded, flexible, flexibleRow)
 import Features.Check.Unify (Subst)
 
 type DeferEnv r = CheckEnv (locals ∷ Locals | r)
@@ -28,7 +36,9 @@ type DeferEnv r = CheckEnv (locals ∷ Locals | r)
 -- fresh tail), so the other effects of `e` are the function's own, but
 -- what `e` performs stays known apart from the rest. A `Fail` already
 -- there is E_EFFECT at the item. Anything that reaches the row later (a
--- shared meta, a deferred key) is judged by `settleDeferred`.
+-- shared meta, a deferred key) is judged by `settleDeferred`. Each label
+-- consumed into the enclosing row is linked to the occurrence it has in
+-- the deferred row, through the `defer` boundary (design §6).
 checkDefer
   ∷ ∀ r
   . Infer (locals ∷ Locals | r)
@@ -38,22 +48,47 @@ checkDefer
   → Resolved.Expr
   → Either Diagnostic (Threaded Checked.Expr)
 checkDefer infer env state span value = do
-  inferred ← infer (env { current = row }) (state { next = state.next + 1 })
+  inferred ← infer (env { current = row, sites = [] })
+    (state { next = state.next + 1 })
     value
   typed ← require env inferred.state TUnit inferred.value
   let Row labels _ = resolvedRow typed.subst row
-  traverse_ (refuseFail env span) labels
-  consumed ← consumeAt env typed span (Row labels (Just (Hole typed.next)))
+  traverse_ (refuseFail env typed span) (placed typed labels row)
+  consumed ← consumeVia env typed (crossing span)
+    (occurrencesOf typed.subst (flexibleRow row))
+    (Row labels (Just (Hole typed.next)))
   pure
     { value: inferred.value
     , state: consumed
         { next = consumed.next + 1
         , deferrals = Array.snoc consumed.deferrals
-            { span, row, current: env.current }
+            { span
+            , row
+            , current: env.current
+            , sites: env.sites
+            , body: inferred.value
+            }
         }
     }
   where
   row = openRow (Hole state.next)
+
+-- The labels of a deferred row with the occurrences they have in it.
+placed
+  ∷ State
+  → Array (Label (Ty Open))
+  → TyRow Open
+  → Array (Tuple (Label (Ty Open)) OccurrenceId)
+placed state labels row = Array.zip labels
+  (occurrencesOf state.subst (flexibleRow row))
+
+crossing
+  ∷ Span
+  → { span ∷ Span
+    , consumed ∷ Consumed
+    , via ∷ Maybe Boundary
+    }
+crossing span = { span, consumed: Application, via: Just DeferItem }
 
 -- After the function's keys are settled: each deferred row, resolved, may
 -- hold no `Fail` and must not end in a rigid row variable, which a caller
@@ -67,29 +102,39 @@ settleDeferred env state = do
   finished ← foldM later state state.deferrals
   pure finished.subst
   where
-  judged found = judge env found.span (resolvedRow state.subst found.row)
-  later reached found = bumped <$> consumeAt (env { current = found.current })
+  judged found = judge env state found
+  later reached found = bumped <$> consumeVia
+    (env { current = found.current, sites = found.sites })
     reached
-    found.span
-    (laterRow reached found)
+    (crossing found.span)
+    (map snd kept)
+    (Row (map fst kept) (Just (Hole reached.next)))
+    where
+    kept = Array.filter (not <<< failing <<< fst)
+      (placed reached (rowLabels reached found) found.row)
   bumped reached = reached { next = reached.next + 1 }
-  laterRow reached found = Row
-    (Array.filter (not <<< failing) (rowLabels reached found))
-    (Just (Hole reached.next))
   rowLabels reached found = case resolvedRow reached.subst found.row of
     Row labels _ → labels
 
-judge ∷ ∀ r. DeferEnv r → Span → TyRow Open → Either Diagnostic Unit
-judge env span (Row labels tail) = do
-  traverse_ (refuseFail env span) labels
-  maybe (Right unit) (rigidTail env span) tail
+judge ∷ ∀ r. DeferEnv r → State → Deferral → Either Diagnostic Unit
+judge env state found = do
+  traverse_ (refuseFail env state found.span)
+    (placed state labels found.row)
+  maybe (Right unit) (rigidTail env state found) tail
+  where
+  Row labels tail = resolvedRow state.subst found.row
 
 -- A hole is an unsolved tail, closed to empty; a rigid variable is the
 -- ambient row or a named one, spelled as Row display spells it.
-rigidTail ∷ ∀ r. DeferEnv r → Span → Open → Either Diagnostic Unit
-rigidTail env span = case _ of
+rigidTail
+  ∷ ∀ r. DeferEnv r → State → Deferral → Open → Either Diagnostic Unit
+rigidTail env state found = case _ of
   Hole _ → Right unit
-  Rigid (VarId index) → Left (problemAt (DeferMayPerform (spread index)) span)
+  Rigid variable@(VarId index) → Left
+    { problem: DeferMayPerform (spread index)
+    , span: found.span
+    , related: tailNotes env state found variable
+    }
   where
   spread index = "..." <> maybe "" identity (Array.index env.variables index)
 
@@ -97,10 +142,20 @@ failing ∷ ∀ v. Label (Ty v) → Boolean
 failing (Label effect _) = effect == FailEffect
 
 refuseFail
-  ∷ ∀ r. DeferEnv r → Span → Label (Ty Open) → Either Diagnostic Unit
-refuseFail env span label@(Label _ arguments) =
+  ∷ ∀ r
+  . DeferEnv r
+  → State
+  → Span
+  → Tuple (Label (Ty Open)) OccurrenceId
+  → Either Diagnostic Unit
+refuseFail env state span (Tuple label@(Label _ arguments) occurrence) =
   if failing label then named else Right unit
   where
-  named = labelName env span (Label FailEffect (map flexible payload))
-    >>= (Left <<< flip problemAt span <<< DeferMayFail)
+  named = do
+    name ← labelName env span (Label FailEffect (map flexible payload))
+    Left
+      { problem: DeferMayFail name
+      , span
+      , related: failureNotes state span name occurrence
+      }
   payload = Array.take 1 arguments

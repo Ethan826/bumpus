@@ -24,7 +24,8 @@ import Features.Check.Consume (consumeAt)
 import Features.Check.Context (CheckEnv, Infer)
 import Features.Check.Scheme (State, Threaded)
 import Features.Check.Stages (arrowType)
-import Features.Check.Use (Use, declarationUse)
+import Features.Check.Provenance (Consumed(Operation))
+import Features.Check.Use (Use, declarationUse, withOrigin)
 
 type Result = Either Diagnostic (Threaded Checked.Expr)
 
@@ -64,7 +65,7 @@ printCall infer env state span arguments = maybe' arity found
     | Array.length arguments /= 1 = arity unit
     | otherwise = do
         checked ← infer env state argument
-        consumed ← consumeAt env checked.state span console
+        consumed ← consumeAt env checked.state span (Operation "print") console
         pure
           { value: Checked.Expr
               { ty: TUnit
@@ -149,15 +150,17 @@ operationUse env state span effect@(EffectId owner) index =
   owned info = maybe' missing (used info)
     (Array.index info.operations index)
   used info operation = Right
-    ( declarationUse state info.parameters
-        (map typeSort info.parameters)
-        (map parameterType operation.parameters)
-        operation.result
-        ( Row
-            [ Label (UserEffect effect)
-                (Array.mapWithIndex variable info.parameters)
-            ]
-            Nothing
+    ( withOrigin (Operation operation.name) Nothing
+        ( declarationUse state info.parameters
+            (map typeSort info.parameters)
+            (map parameterType operation.parameters)
+            operation.result
+            ( Row
+                [ Label (UserEffect effect)
+                    (Array.mapWithIndex variable info.parameters)
+                ]
+                Nothing
+            )
         )
     )
   typeSort _ = TypeSort

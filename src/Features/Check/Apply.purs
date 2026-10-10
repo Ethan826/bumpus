@@ -16,6 +16,7 @@ import Domain.Row (openRow)
 import Features.Check.Consume (consumeAt)
 import Domain.Type (Ty(..), TyRow)
 import Features.Check.Context (CheckEnv, Infer)
+import Features.Check.Provenance (Consumed(Application))
 import Features.Check.Require (expectType, require, typeName)
 import Features.Check.Scheme (State, Threaded, headOf, resolved, threadAll)
 
@@ -53,7 +54,7 @@ applyAll
   → Array Resolved.Expr
   → Either Diagnostic (Threaded Checked.Expr)
 applyAll infer env span callee arguments = do
-  applied ← threadAll (applyNext infer env) start arguments
+  applied ← threadAll (applyNext infer env span) start arguments
   pure
     { value: Checked.Expr
         { ty: applied.state.ty
@@ -71,14 +72,15 @@ applyNext
   ∷ ∀ r
   . Infer r
   → CheckEnv r
+  → Span
   → Applying
   → Resolved.Expr
   → Either Diagnostic { value ∷ Checked.Expr, state ∷ Applying }
-applyNext infer env applying argument = do
+applyNext infer env span applying argument = do
   opened ← open env applying.state applying.ty (Resolved.exprSpan argument)
   checked ← infer env opened.state argument
   reached ← require env checked.state opened.value.parameter checked.value
-  consumed ← consumeAt env reached (Resolved.exprSpan argument) opened.value.row
+  consumed ← consumeAt env reached span Application opened.value.row
   pure
     { value: checked.value
     , state: { ty: opened.value.result, state: consumed }
@@ -96,7 +98,8 @@ applyValue
 applyValue env state ty argument = do
   opened ← open env state ty (Checked.spanOf argument)
   reached ← require env opened.state opened.value.parameter argument
-  consumed ← consumeAt env reached (Checked.spanOf argument) opened.value.row
+  consumed ← consumeAt env reached (Checked.spanOf argument) Application
+    opened.value.row
   pure { value: opened.value.result, state: consumed }
 
 -- Whether `ty` may still be applied: an arrow, or a meta not yet bound.

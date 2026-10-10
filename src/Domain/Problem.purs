@@ -1,5 +1,8 @@
 module Domain.Problem where
 
+import Prelude (class Eq)
+import Data.Maybe (Maybe)
+
 -- What went wrong, as data. Features never write diagnostic text; Format
 -- renders it, so a change of surface syntax changes only Format.
 
@@ -14,6 +17,20 @@ data TypeName
   | VariableName String
   | HoleName
   | FunctionName TypeName TypeName
+
+derive instance eqTypeName ∷ Eq TypeName
+
+-- An effect label as names (FX001 design §6): its effect and arguments, so
+-- a mismatch can elide the arguments off the path to the difference.
+type LabelName = { effect ∷ String, arguments ∷ Array TypeName }
+
+-- A row as a comparison prints it: each label's text, whether the other
+-- row lacks it, and the tail (`...r`), if the row has one. Format
+-- abbreviates it; the labels are not cut here.
+type RowText =
+  { labels ∷ Array { text ∷ String, differs ∷ Boolean }
+  , tail ∷ Maybe String
+  }
 
 -- A missing value, with constructor names already resolved.
 data Witness = WAny | WCtor String (Array Witness) | WInt Int | WBool Boolean
@@ -82,7 +99,8 @@ data Problem
   | NotPrintable TypeName
   | DeferMayFail String
   | DeferMayPerform String
-  | RowEquality String String String
+  | RowEquality RowText RowText String
+  | LabelMismatch LabelName LabelName
   | HandlerMissing String
   | HandlerDuplicate String
   | HandlerOperation String String

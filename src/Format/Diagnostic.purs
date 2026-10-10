@@ -8,23 +8,24 @@ module Format.Diagnostic
   ) where
 
 import Prelude
-import Control.Monad.Rec.Class (Step(..), tailRec)
-import Data.Array as Array
-import Data.String (joinWith)
 import Domain.Problem
   ( DuplicateKind(..)
   , EntryKind(..)
   , Hint(..)
   , Problem(..)
-  , TypeName(..)
+  , TypeName
   , UnboundKind(..)
   , Witness(..)
   )
-import Domain.Syntax (Diagnostic, ErrorCode, Note, Span)
+import Domain.Syntax (Diagnostic, ErrorCode, Span)
 import Domain.Syntax as Code
+import Format.Diagnostic.Name (listed)
+import Format.Diagnostic.Name as Name
+import Format.Diagnostic.Note (WireNote, wireNotes)
+import Format.Diagnostic.Row (equalityMessage, mismatchMessage)
 
 type WireDiagnostic =
-  { code ∷ String, message ∷ String, span ∷ Span, related ∷ Array Note }
+  { code ∷ String, message ∷ String, span ∷ Span, related ∷ Array WireNote }
 
 code ∷ Problem → ErrorCode
 code = case _ of
@@ -58,6 +59,7 @@ code = case _ of
   UnhandledEffect _ → Code.EffectError
   MustBePure _ → Code.EffectError
   RowEquality _ _ _ → Code.EffectError
+  LabelMismatch _ _ → Code.TypeMismatch
   RowSort _ → Code.TypeMismatch
   NotPrintable _ → Code.TypeMismatch
   DeferMayFail _ → Code.EffectError
@@ -133,9 +135,8 @@ message = case _ of
   DeferMayPerform tail →
     "defer must not fail, but it may perform any effect of "
       <> tail
-  RowEquality left right tail → left <> " and " <> right
-    <> " cannot be made equal: both end in ..."
-    <> tail
+  RowEquality left right tail → equalityMessage left right tail
+  LabelMismatch expected found → mismatchMessage expected found
   HandlerMissing operation → "Missing clause for " <> operation
   HandlerDuplicate operation → "Duplicate clause for " <> operation
   HandlerOperation operation effect → operation
@@ -147,10 +148,27 @@ message = case _ of
 wire ∷ Diagnostic → WireDiagnostic
 wire diagnostic =
   { code: codeName (code diagnostic.problem)
-  , message: message diagnostic.problem
+  , message: text
   , span: diagnostic.span
-  , related: diagnostic.related
+  , related: notes
   }
+  where
+  text = message diagnostic.problem
+  -- Only the effect and label diagnostics carry notes; the rest never read
+  -- the field, so a diagnostic built without it still renders.
+  notes =
+    if noted diagnostic.problem then wireNotes text diagnostic.related else []
+
+noted ∷ Problem → Boolean
+noted = case _ of
+  EffectNotAllowed _ _ → true
+  UnhandledEffect _ → true
+  MustBePure _ → true
+  RowEquality _ _ _ → true
+  LabelMismatch _ _ → true
+  DeferMayFail _ → true
+  DeferMayPerform _ → true
+  _ → false
 
 entryMessage ∷ EntryKind → String
 entryMessage = case _ of
@@ -191,31 +209,7 @@ unboundWord = case _ of
   UnboundTypeVariable → "type variable"
 
 typeName ∷ TypeName → String
-typeName = case _ of
-  IntName → "Int"
-  BoolName → "Bool"
-  UnitName → "Unit"
-  DataName name → name
-  AppliedName name arguments → name <> listed (map typeName arguments)
-  VariableName name → name
-  HoleName → "_"
-  arrow@(FunctionName _ _) → arrowName arrow
-
--- Right-associative: `(Int -> Int) -> List(Int) -> List(Int)`, a parameter
--- that is itself an arrow parenthesized. The spine of results is followed
--- by a loop, so a name of thousands of parameters costs no stack.
-arrowName ∷ TypeName → String
-arrowName name = tailRec step { written: "", rest: name }
-  where
-  step pending = case pending.rest of
-    FunctionName parameter result → Loop
-      { written: pending.written <> parameterName parameter <> " -> "
-      , rest: result
-      }
-    result → Done (pending.written <> typeName result)
-  parameterName = case _ of
-    parameter@(FunctionName _ _) → "(" <> arrowName parameter <> ")"
-    parameter → typeName parameter
+typeName = Name.typeName
 
 -- Witnesses print as Waxwing patterns: `_`, literals, `Name(field, …)`.
 pattern ∷ Witness → String
@@ -224,9 +218,3 @@ pattern = case _ of
   WInt value → show value
   WBool value → show value
   WCtor name fields → name <> listed (map pattern fields)
-
--- `(a, b)`, or nothing for no items: `Nil`, not `Nil()`.
-listed ∷ Array String → String
-listed items =
-  if Array.null items then ""
-  else "(" <> joinWith ", " items <> ")"

@@ -1,8 +1,6 @@
 module Features.Check.UnifyRow
   ( Unifier
-  , Sides
   , Traced
-  , RowEvent(..)
   , unifyRows
   , unifyRowsTraced
   , untraced
@@ -17,16 +15,17 @@ import Data.Foldable (foldM)
 import Data.Maybe (Maybe(..), maybe, maybe')
 import Data.Tuple (Tuple(..))
 import Domain.Row (Label(..), Row(..), isPure, labelKey, openRow)
-import Domain.Syntax (Span)
 import Domain.Type (Ty, TyRow)
 import Domain.Type.Parts (typeHead)
 import Features.Check.Binding (bindTail, extendRow)
-import Features.Check.Occurrence (OccurrenceId)
+import Features.Check.Occurrence (Sides, nowhere)
+import Features.Check.Origin (RowEvent(..), linked)
 import Features.Check.RowSide
   ( Entry
   , Side
   , Tail(..)
   , expanded
+  , mismatched
   , tailOf
   , written
   )
@@ -44,26 +43,18 @@ import Features.Check.Subst
 -- The type unifier, passed in: Features.Check.Unify calls this module.
 type Unifier = Subst → Ty Flex → Ty Flex → Either Failure Subst
 
--- Where each operand's own labels were written.
-type Sides = { left ∷ Span, right ∷ Span }
-
 -- `postponed`: the pair met a deferred Fail key and was set aside in
 -- `subst` (which is otherwise the substitution it started from), with no
 -- events.
 type Traced = { subst ∷ Subst, events ∷ Array RowEvent, postponed ∷ Boolean }
-
--- What unification did with each label (for provenance, design §6): a
--- left label matched an existing right entry (the right occurrence says
--- through which written row or meta binding it was reached), or a meta
--- tail was extended with a label, which is then occurrence `Extended m`.
-data RowEvent = Matched OccurrenceId OccurrenceId | Extended Int OccurrenceId
 
 type Pending =
   { subst ∷ Subst, left ∷ Side, right ∷ Side, events ∷ Stack RowEvent }
 
 -- The operands as given, which failures name, resolved, and the
 -- substitution before them, to which a postponed pair reverts.
-type Operands = { left ∷ TyRow Flex, right ∷ TyRow Flex, start ∷ Subst }
+type Operands =
+  { left ∷ TyRow Flex, right ∷ TyRow Flex, start ∷ Subst, sides ∷ Sides }
 
 -- Leijen's scoped-label unification (2005, §7; design §2). Each left
 -- label, in order, matches the first right entry with its key, whose
@@ -83,9 +74,10 @@ unifyRows unify subst left right =
   if isPure left && isPure right then Right subst
   else solved <$> unifyRowsTraced unify untraced subst left right
   where
-  solved traced = traced.subst
+  solved traced = linked traced.events traced.subst
 
--- The same, with each label's fate reported by occurrence.
+-- The same, with each label's fate reported by occurrence; the caller
+-- links them (Features.Check.Origin) once it has named them.
 unifyRowsTraced
   ∷ Unifier
   → Sides
@@ -94,7 +86,7 @@ unifyRowsTraced
   → TyRow Flex
   → Either Failure Traced
 unifyRowsTraced unify sides subst left right = tailRec
-  (step unify { left, right, start: subst })
+  (step unify { left, right, start: subst, sides })
   { subst
   , left: written sides.left left
   , right: written sides.right right
@@ -104,9 +96,6 @@ unifyRowsTraced unify sides subst left right = tailRec
 -- Spans for an untraced use, whose events are dropped unread.
 untraced ∷ Sides
 untraced = { left: nowhere, right: nowhere }
-  where
-  nowhere = { start: origin, end: origin }
-  origin = { offset: 0, line: 0, column: 0 }
 
 step
   ∷ Unifier
@@ -138,7 +127,7 @@ consume unify operands pending entry =
   -- The first entry with the key, or with a key not yet known.
   stops key other = maybe true (eq key) (keyOf other)
   decided key index = maybe' (postponed operands)
-    (present unify pending entry <<< withIndex index)
+    (present unify operands.sides pending entry <<< withIndex index)
     (matching key =<< Array.index entries index)
   matching key other =
     if keyOf other == Just key then Just other else Nothing
@@ -147,8 +136,7 @@ consume unify operands pending entry =
 postponed ∷ Operands → Unit → Step Pending (Either Failure Traced)
 postponed operands _ = Done
   ( Right
-      { subst: postpone operands.start
-          { left: operands.left, right: operands.right }
+      { subst: postpone operands.start operands
       , events: []
       , postponed: true
       }
@@ -156,12 +144,14 @@ postponed operands _ = Done
 
 present
   ∷ Unifier
+  → Sides
   → Pending
   → Entry
   → { index ∷ Int, other ∷ Entry }
   → Step Pending (Either Failure Traced)
-present unify pending entry found =
-  either (Done <<< Left) (Loop <<< matched)
+present unify sides pending entry found =
+  either (Done <<< Left <<< mismatched sides pending.subst entry found.other)
+    (Loop <<< matched)
     (foldM unifyPair pending.subst (Array.zip arguments others))
   where
   Label _ arguments = entry.label
@@ -192,6 +182,7 @@ absent operands pending entry _ = case tailOf pending.right.tail of
     ( Left
         ( RowMissing (resolveLabel pending.subst entry.label)
             (resolveRow pending.subst operands.right)
+            entry.occurrence
         )
     )
   where
@@ -219,7 +210,10 @@ finish operands pending _ =
           (Left (shared operands pending.subst))
       | otherwise → either (Done <<< Left) (Loop <<< swapped meta first)
           (extendRow pending.subst meta first.label)
-    _ → Done (Left (RowExtra (resolveLabel pending.subst first.label)))
+    _ → Done
+      ( Left
+          (RowExtra (resolveLabel pending.subst first.label) first.occurrence)
+      )
   swapped meta first made = pending
     { subst = made.subst
     , left = { entries: [], next: 0, tail: Just (Meta made.fresh) }

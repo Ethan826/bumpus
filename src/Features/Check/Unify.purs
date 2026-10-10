@@ -28,7 +28,8 @@ import Features.Check.Subst
   , walk
   , walkRow
   )
-import Features.Check.UnifyRow (unifyRows, unifyRowsTraced, untraced)
+import Features.Check.Origin (linked)
+import Features.Check.UnifyRow (unifyRows, unifyRowsTraced)
 
 -- Rigid matches only the same rigid; a meta binds to any type that does not
 -- properly contain it; applied types unify argument-wise, left to right,
@@ -55,12 +56,14 @@ settleRows = tailRecM pass
     bindings.postponed
   next original found =
     if found.decided then Loop found.subst else Done original
-  retry reached pair = settled reached <$> unifyRowsTraced unify untraced
+  retry reached pair = settled reached <$> unifyRowsTraced unify pair.sides
     reached.subst
     pair.left
     pair.right
   settled reached traced =
-    { subst: traced.subst, decided: reached.decided || not traced.postponed }
+    { subst: linked traced.events traced.subst
+    , decided: reached.decided || not traced.postponed
+    }
 
 unifyAt ∷ Int → Subst → Ty Flex → Ty Flex → Either Failure Subst
 unifyAt level subst left right =

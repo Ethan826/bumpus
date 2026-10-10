@@ -122,6 +122,7 @@ extendBounded (Subst bindings) meta label resolved fresh =
             bindings.rows
         , fresh: fresh - 1
         , postponed: bindings.postponed
+        , links: bindings.links
         }
     , fresh
     }

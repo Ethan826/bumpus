@@ -6,6 +6,7 @@ import { resolve } from '../output/Features.Resolve/index.js';
 import { check } from '../output/Features.Check/index.js';
 import { wire } from '../output/Format.Diagnostic/index.js';
 import { compile } from '../output/Program.Compile/index.js';
+import { spanAt } from './support.mjs';
 
 const phase = source => {
   const parsed = parse(source);
@@ -15,13 +16,15 @@ const phase = source => {
 };
 const accepted = source => assert.ok(phase(source) instanceof Right,
   JSON.stringify(phase(source)));
-const rejected = (source, code, message) => {
+// Effect diagnostics carry notes (Task 9): [text, message, nth occurrence].
+const rejected = (source, code, message, notes = []) => {
   const result = phase(source);
   assert.ok(result instanceof Left, source);
   const diagnostic = wire(result.value0);
   assert.equal(diagnostic.code, code);
   assert.equal(diagnostic.message, message);
-  assert.deepEqual(diagnostic.related, []);
+  assert.deepEqual(diagnostic.related, notes.map(([text, note, nth = 0]) =>
+    ({ span: spanAt(source, text, nth), message: note })));
 };
 
 const clock = 'effect Clock { fn now(): Int; }; ';
@@ -40,14 +43,18 @@ const acceptedCases = [
 ];
 for (const [name, source, valid = true] of acceptedCases) {
   test(name, () => valid ? accepted(source)
-    : rejected(source, 'E_EFFECT', 'Unhandled Clock in main'));
+    : rejected(source, 'E_EFFECT', 'Unhandled Clock in main',
+      [['fn main(): Int with Clock = now();', 'main may perform only Console']]));
 }
 const rejectedCases = [
   ['rigid ambient cannot invent effects', clock + 'fn f(): Int = now(); fn main(): Int = 0;',
-    'E_EFFECT', 'f performs Clock, which its signature does not allow'],
+    'E_EFFECT', 'f performs Clock, which its signature does not allow',
+    [['fn f(): Int = now();', 'the signature of f has an ambient row']]],
   ['pure callback', 'fn use(f: Int -> Int with pure): Int = f(1); '
     + 'fn main(): Int with Console = use(fn(x) => { print(x); x });',
-    'E_EFFECT', 'This function must be pure, but it performs Console'],
+    'E_EFFECT', 'This function must be pure, but it performs Console',
+    [['print(x)', 'Console is performed here'],
+      ['f', 'this parameter must be pure', 1]]],
   ['closed local cannot widen', log + 'fn use(f: Int -> Int with Log): Int with Log = f(1); '
     + 'fn adapt(g: Int -> Int with pure): Int with Log = use(g); fn main(): Int = 0;',
     'E_EFFECT', 'This function must be pure, but it performs Log'],
@@ -60,8 +67,8 @@ const rejectedCases = [
   ['print function', 'fn main(): Unit with Console = print(fn(x) => x);',
     'E_TYPE', 'Expected a printable value, found _ -> _']
 ];
-for (const [name, source, code, message] of rejectedCases) {
-  test(name, () => rejected(source, code, message));
+for (const [name, source, code, message, notes] of rejectedCases) {
+  test(name, () => rejected(source, code, message, notes));
 }
 // FX001 Task 6 moved the guard after Specialize, over the emitted IR: a
 // declared effect nothing uses leaves no effect node and reaches Go.

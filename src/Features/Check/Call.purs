@@ -8,7 +8,7 @@ module Features.Check.Call
 
 import Prelude
 import Data.Array as Array
-import Data.Either (Either(..))
+import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..))
 import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
@@ -18,6 +18,7 @@ import Domain.Syntax (Diagnostic, Span, problemAt)
 import Features.Check.Stages (arrowType)
 import Features.Check.Consume (consumeAt)
 import Features.Check.Apply (applyAll, functionLike)
+import Features.Check.Argument (refused)
 import Features.Check.Context (CheckEnv, Infer)
 import Features.Check.Require (require)
 import Features.Check.Scheme (State, Threaded, threadAll)
@@ -143,10 +144,12 @@ supplied
 supplied infer env span node use arguments = do
   checked ← threadAll (infer env) use.state arguments
   unified ← threadAll checkArgument checked.state
-    (Array.zipWith argumentPair use.value.fields checked.value)
+    ( Array.mapWithIndex indexed
+        (Array.zipWith argumentPair use.value.fields checked.value)
+    )
   consumed ←
     if count == Array.length use.value.fields then
-      consumeAt env unified.state span use.value.row
+      consumeAt env unified.state span use.value.consumed use.value.row
     else pure unified.state
   pure
     { value: Checked.Expr
@@ -164,9 +167,12 @@ supplied infer env span node use arguments = do
     | otherwise = arrowType (Array.drop count use.value.fields)
         (Array.drop count use.value.rows)
         use.value.result
-  argumentPair ty actual = { ty, actual }
-  checkArgument reached pair = threadedUnit <$> require env reached pair.ty
-    pair.actual
+  argumentPair ty actual = { ty, actual, index: 0 }
+  indexed index pair = pair { index = index }
+  checkArgument reached pair = either
+    (Left <<< refused env reached use.value pair.index pair.ty pair.actual)
+    (Right <<< threadedUnit)
+    (require env reached pair.ty pair.actual)
   threadedUnit reached = { value: unit, state: reached }
 
 arityAt ∷ ∀ a. Span → Either Diagnostic a

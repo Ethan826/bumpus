@@ -10,8 +10,9 @@ module Format.Wire
   ) where
 
 import Domain.Host (HostFailure(..))
-import Domain.Syntax (Diagnostic, Note, Span)
+import Domain.Syntax (Diagnostic, Span)
 import Format.Diagnostic (wire)
+import Format.Diagnostic.Note (WireNote)
 
 type PlainRecord = { code ∷ String, message ∷ String }
 type SourceRecord =
@@ -19,7 +20,7 @@ type SourceRecord =
   , message ∷ String
   , span ∷ Span
   , file ∷ String
-  , related ∷ Array Note
+  , related ∷ Array WireNote
   }
 
 type ToolRecord =

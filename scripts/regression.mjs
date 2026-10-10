@@ -165,7 +165,7 @@ const rows = [
   },
   {
     name: 'deferred-fail-effect', file: 'src/Features/Check/Failure.purs',
-    needle: '_ → failureAt env span failure',
+    needle: '_ → rejected env state origin failure',
     replacement: '_ → Left (problemAt (Internal'
       + ' "Failure row settlement failed") span)',
     probe: 'deferred-fail-effect',

@@ -15,9 +15,12 @@ import Domain.Row (EffectRef(..), Label(..), Row(..), closedRow)
 import Domain.Syntax (Diagnostic, Span, problemAt)
 import Domain.Type (Ty(..), TyRow, VarId(..), substitute)
 import Features.Check.Context (CheckEnv, Infer, Locals)
-import Features.Check.Consume (consumeAt)
+import Features.Check.Consume (consumeVia)
+import Features.Check.Provenance (Boundary(Installation), Consumed(Application))
 import Features.Check.Require (require, typeName)
-import Features.Check.Scheme (State, Threaded, headOf, threadAll)
+import Features.Check.RowName (labelName)
+import Features.Check.Scheme (State, Threaded, flexible, headOf, threadAll)
+import Features.Check.Unify (Flex)
 
 type HandlerEnv r = CheckEnv (locals ∷ Locals | r)
 type Checked = Either Diagnostic (Threaded Checked.Expr)
@@ -66,6 +69,7 @@ handlerClause
   let
     scoped = env
       { current = row
+      , sites = []
       , locals = bindParameters checkedParameters env.locals
       }
   checkedBody ← inferHandlerBody infer scoped state clause.body
@@ -115,9 +119,12 @@ withHandler infer env state span handlerExpr body = do
     other → expectedHandler env span other
   where
   withValue handlerValue label row = do
-    consumed ← consumeAt env handlerValue.state span row
-    bodyValue ← infer (env { current = prepend label env.current }) consumed
-      body
+    installed ← labelName env span (flexLabel label)
+    consumed ← consumeVia env handlerValue.state
+      { span, consumed: Application, via: Just (Installation installed) }
+      []
+      row
+    bodyValue ← infer (installing label) consumed body
     pure
       { value: Checked.Expr
           { ty: Checked.typeOf bodyValue.value
@@ -126,6 +133,10 @@ withHandler infer env state span handlerExpr body = do
           }
       , state: bodyValue.state
       }
+  installing label = env
+    { current = prepend label env.current
+    , sites = Array.cons { span, count: 1 } env.sites
+    }
 
 handleFailure
   ∷ ∀ r
@@ -137,8 +148,7 @@ handleFailure
   → Array Resolved.FailClause
   → Checked
 handleFailure infer env state span body clauses = do
-  bodyValue ← infer (env { current = withFailures clauses env.current }) state
-    body
+  bodyValue ← infer failing state body
   finished ← threadAll
     (failureClause infer env (Checked.typeOf bodyValue.value))
     bodyValue.state
@@ -150,6 +160,11 @@ handleFailure infer env state span body clauses = do
         , node: Checked.Handle bodyValue.value finished.value
         }
     , state: finished.state
+    }
+  where
+  failing = env
+    { current = withFailures clauses env.current
+    , sites = Array.cons { span, count: Array.length clauses } env.sites
     }
 
 failureClause
@@ -205,6 +220,9 @@ payloadType (Label _ arguments) = maybe' noPayload identity
   (Array.head arguments)
   where
   noPayload _ = TUnit
+
+flexLabel ∷ Label (Ty Open) → Label (Ty Flex)
+flexLabel (Label effect arguments) = Label effect (map flexible arguments)
 
 prepend ∷ Label (Ty Open) → TyRow Open → TyRow Open
 prepend label (Row labels tail) = Row (Array.cons label labels) tail

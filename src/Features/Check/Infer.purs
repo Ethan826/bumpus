@@ -30,11 +30,13 @@ import Features.Check.Lambda (checkLambda)
 import Features.Check.Pipe (checkPipe)
 import Features.Check.Use (checkCtorRef, checkFunctionRef)
 import Features.Check.Require (bounded, require)
-import Features.Check.Scheme (State, Threaded)
+import Features.Check.Scheme (Site, State, Threaded)
 
 type Env =
   { current ∷ TyRow Open
+  , sites ∷ Array Site
   , functionName ∷ String
+  , functionSpan ∷ Span
   , effects ∷ Array Resolved.EffectInfo
   , functions ∷ Array Resolved.FunctionDecl
   , types ∷ Array Resolved.TypeInfo

@@ -8,9 +8,9 @@ import Domain.Checked.Internal (Open)
 import Domain.Checked.Internal as Checked
 import Domain.Resolved (LocalId)
 import Domain.Resolved as Resolved
-import Domain.Syntax (Diagnostic)
+import Domain.Syntax (Diagnostic, Span)
 import Domain.Type (Ty, TyRow)
-import Features.Check.Scheme (State, Threaded)
+import Features.Check.Scheme (Site, State, Threaded)
 
 -- The type of each local in scope. LocalIds are unique per function, so
 -- a map by id needs no shadowing rule, and a block of 20,000 lets costs
@@ -22,7 +22,9 @@ type Locals = Map LocalId (Ty Open)
 -- open so Features.Check.Infer can pass its own environment through.
 type CheckEnv r =
   { current ∷ TyRow Open
+  , sites ∷ Array Site
   , functionName ∷ String
+  , functionSpan ∷ Span
   , effects ∷ Array Resolved.EffectInfo
   , functions ∷ Array Resolved.FunctionDecl
   , types ∷ Array Resolved.TypeInfo

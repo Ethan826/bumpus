@@ -15,6 +15,8 @@ import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
 import Domain.Resolved (EffectInfo)
 import Domain.Row (Row(..), isPure)
+import Features.Check.Provenance (trail)
+import Features.Check.Report (crossingNotes, originNotes)
 import Features.Check.RowName (labelName, rowConflict)
 import Features.Check.TypeName (Names, typeName)
 import Domain.Syntax (Diagnostic, Span, problemAt)
@@ -68,15 +70,26 @@ expectType env state expected actual span = do
     Occurs meta whole → reported InfiniteType (TVar (Hole meta)) (opened whole)
     TooDeep → tooDeepAt span
     Mismatch _ _ → mismatched unit
-    RowMissing label row → rowFailure label row
-    RowExtra label → rowFailure label (Row [] Nothing)
+    RowMissing label row occurrence → rowFailure label row occurrence
+    RowExtra label occurrence → rowFailure label (Row [] Nothing) occurrence
     RowSharedTail left right → rowConflict env span left right
     RowMismatch _ _ → mismatched unit
+    RowPayload _ _ _ → mismatched unit
     RowOccurs _ _ → mismatched unit
-  rowFailure label row = do
+  -- The label's trail is where it arose, as far as the state knows it.
+  rowFailure label row occurrence = do
     name ← labelName env span label
-    if isPure row then Left (problemAt (MustBePure name) span)
-    else Left (problemAt (EffectNotAllowed "This function" name) span)
+    Left
+      { problem: rowProblem name row
+      , span
+      , related: originNotes span name (walk occurrence)
+          <> crossingNotes name (walk occurrence)
+      }
+  rowProblem name row =
+    if isPure row then MustBePure name
+    else EffectNotAllowed "This function" name
+  walk = trail state.subst state.origins
+
   -- A function: `where` bindings are strict, and this resolves both types.
   mismatched _ = reported TypeMismatch (resolved state.subst expected)
     (resolved state.subst actual)

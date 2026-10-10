@@ -9,6 +9,8 @@ module Features.Check.Subst
   , substituteRow
   , compose
   , postpone
+  , linkTo
+  , linkOf
   , walk
   , walkRow
   , resolve
@@ -35,6 +37,7 @@ import Domain.Type
   , stagesThrough
   )
 import Domain.Type as Type
+import Features.Check.Occurrence (OccurrenceId, Sides)
 import Features.Check.Search (Stack(..), stackItems)
 
 -- A checker variable: a signature's own variable, which is fixed inside
@@ -53,15 +56,20 @@ derive instance ordFlex ∷ Ord Flex
 -- the next, counting down from -1, so it never meets a checker meta,
 -- which counts up from 0 (Features.Check.Scheme). `postponed`: row pairs
 -- whose unification met a Fail label with a deferred key (design §2), in
--- order, to be retried by Features.Check.Unify `settleRows`.
+-- order, to be retried by Features.Check.Unify `settleRows`. `links`
+-- (design §6): an occurrence and the occurrence it is the same label as,
+-- recorded by every row unification, the first per occurrence kept;
+-- nothing in unification reads them.
 newtype Subst = Subst
   { types ∷ Map Int (Ty Flex)
   , rows ∷ Map Int (TyRow Flex)
   , fresh ∷ Int
   , postponed ∷ Array RowPair
+  , links ∷ Map OccurrenceId OccurrenceId
   }
 
-type RowPair = { left ∷ TyRow Flex, right ∷ TyRow Flex }
+-- A postponed pair keeps where its sides were written, for its retry.
+type RowPair = { left ∷ TyRow Flex, right ∷ TyRow Flex, sides ∷ Sides }
 
 -- Types and rows are resolved under the substitution reached at the
 -- failure: a mismatch names the first pair of subterms that differ, left
@@ -70,22 +78,32 @@ type RowPair = { left ∷ TyRow Flex, right ∷ TyRow Flex }
 -- limit. Rows (FX001): `RowMissing`, a label the other row, closed or
 -- rigid, lacks; `RowExtra`, an entry left over against a closed or rigid
 -- tail; `RowSharedTail`, the two rows (Leijen's side condition);
--- `RowMismatch`, two rows that differ in their tails alone; `RowOccurs`,
+-- `RowMismatch`, two rows that differ in their tails alone; `RowPayload`,
+-- a left label and the right entry of its key whose arguments differ,
+-- with the right entry's occurrence; the missing and extra labels carry
+-- theirs;
+-- `RowOccurs`,
 -- a row meta and the label argument holding it in a row (an infinite
 -- row), apart from `Occurs`, whose meta is a type's.
 data Failure
   = Mismatch (Ty Flex) (Ty Flex)
   | Occurs Int (Ty Flex)
   | TooDeep
-  | RowMissing (Label (Ty Flex)) (TyRow Flex)
-  | RowExtra (Label (Ty Flex))
+  | RowMissing (Label (Ty Flex)) (TyRow Flex) OccurrenceId
+  | RowExtra (Label (Ty Flex)) OccurrenceId
+  | RowPayload (Label (Ty Flex)) (Label (Ty Flex)) OccurrenceId
   | RowSharedTail (TyRow Flex) (TyRow Flex)
   | RowMismatch (TyRow Flex) (TyRow Flex)
   | RowOccurs Int (Ty Flex)
 
 empty ∷ Subst
 empty = Subst
-  { types: Map.empty, rows: Map.empty, fresh: -1, postponed: [] }
+  { types: Map.empty
+  , rows: Map.empty
+  , fresh: -1
+  , postponed: []
+  , links: Map.empty
+  }
 
 -- No meta is bound, so resolving under it changes no type.
 isEmpty ∷ Subst → Boolean
@@ -105,7 +123,8 @@ substituteRow subst = Type.substituteRow (substitution subst)
 -- `substitute earlier`; Map.union keeps the earlier side's bindings.
 -- Precondition: `later` was made from `earlier` (or neither made fresh row
 -- metas), so their fresh metas do not collide; the smaller counter is
--- kept. Postponed pairs are the earlier's, then the later's.
+-- kept. Postponed pairs are the earlier's, then the later's; of two links
+-- from one occurrence the earlier's stays.
 compose ∷ Subst → Subst → Subst
 compose later@(Subst laterBindings) (Subst earlierBindings) = Subst
   { types: Map.union (map (substitute later) earlierBindings.types)
@@ -114,12 +133,29 @@ compose later@(Subst laterBindings) (Subst earlierBindings) = Subst
       laterBindings.rows
   , fresh: min laterBindings.fresh earlierBindings.fresh
   , postponed: earlierBindings.postponed <> laterBindings.postponed
+  , links: Map.union earlierBindings.links laterBindings.links
   }
 
 -- The substitution with this row pair set aside, undecided.
-postpone ∷ Subst → RowPair → Subst
-postpone (Subst bindings) pair =
-  Subst bindings { postponed = Array.snoc bindings.postponed pair }
+postpone
+  ∷ ∀ r
+  . Subst
+  → { left ∷ TyRow Flex, right ∷ TyRow Flex, sides ∷ Sides | r }
+  → Subst
+postpone (Subst bindings) pair = Subst bindings
+  { postponed = Array.snoc bindings.postponed
+      { left: pair.left, right: pair.right, sides: pair.sides }
+  }
+
+-- `from` is the same label as `to`; an occurrence's first link stays.
+linkTo ∷ OccurrenceId → OccurrenceId → Subst → Subst
+linkTo from to (Subst bindings) =
+  Subst bindings { links = Map.insertWith keepFirst from to bindings.links }
+  where
+  keepFirst first _ = first
+
+linkOf ∷ Subst → OccurrenceId → Maybe OccurrenceId
+linkOf (Subst bindings) from = Map.lookup from bindings.links
 
 -- The type itself if it is not a bound meta, else the end of its chain.
 -- Only a meta enters the loop: most types walked are not one, and the

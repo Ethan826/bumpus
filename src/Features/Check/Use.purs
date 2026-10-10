@@ -1,5 +1,7 @@
 module Features.Check.Use
   ( Use
+  , Callee
+  , withOrigin
   , functionUse
   , ctorUse
   , declarationUse
@@ -22,18 +24,32 @@ import Domain.Resolved (CtorId(..), FunctionId(..), Ty(..), TypeId(..))
 import Domain.Resolved as Resolved
 import Domain.Syntax (Diagnostic, Span, problemAt)
 import Features.Check.Context (CheckEnv)
+import Features.Check.Provenance (Consumed(..))
 import Features.Check.Scheme (Scheme, State, Threaded, at, instantiate)
 import Features.Check.Tables (ownerType)
 
 -- One use of a function's or constructor's scheme, its variables
 -- instantiated afresh: the parameters (fields) and the result, kept apart
 -- so a direct call never builds the curried arrow (plan, linear cost).
+-- `consumed` names what a saturated use consumes (design §6); `callee`
+-- is the named function it instantiates, for the notes of an argument's
+-- rejection: its parameters' spans, and its declaration.
 type Use =
   { fields ∷ Array (Ty Open)
   , result ∷ Ty Open
   , scheme ∷ Scheme
   , row ∷ TyRow Open
   , rows ∷ Array (TyRow Open)
+  , consumed ∷ Consumed
+  , callee ∷ Maybe Callee
+  }
+
+type Callee =
+  { name ∷ String
+  , span ∷ Span
+  , parameters ∷ Array Span
+  , variables ∷ Array String
+  , sorts ∷ Array Syntax.Sort
   }
 
 type Used = Either Diagnostic (Threaded Use)
@@ -44,12 +60,27 @@ functionUse env state span (FunctionId index) =
   where
   missing _ = Left (problemAt (Internal "Invalid resolved function") span)
   found function = Right
-    ( declarationUse state function.variables function.sorts
-        (map parameterType function.parameters)
-        function.result
-        function.row
+    ( withOrigin (CallOf function.name) (Just (calleeOf function))
+        ( declarationUse state function.variables function.sorts
+            (map parameterType function.parameters)
+            function.result
+            function.row
+        )
     )
   parameterType parameter = parameter.ty
+  calleeOf function =
+    { name: function.name
+    , span: function.span
+    , parameters: map parameterSpan function.parameters
+    , variables: function.variables
+    , sorts: function.sorts
+    }
+  parameterSpan parameter = parameter.span
+
+-- A use that consumes `consumed`, of this callee, if it is a named one.
+withOrigin ∷ Consumed → Maybe Callee → Threaded Use → Threaded Use
+withOrigin consumed callee use = use
+  { value = use.value { consumed = consumed, callee = callee } }
 
 -- Type slots retain their ids; row slots never become type arguments.
 declarationUse
@@ -67,6 +98,8 @@ declarationUse state variables sorts fields result row =
       , scheme: scheme.value { arguments = arguments }
       , row: opened.value
       , rows: staged.value
+      , consumed: Application
+      , callee: Nothing
       }
   , state: staged.state
   }
@@ -93,10 +126,12 @@ ctorUse env state span (CtorId index) =
   missingType _ = Left (problemAt (Internal "Invalid resolved type") span)
   ownerOf (TypeId owner) = Array.index env.types owner
   owned ctor info = Right
-    ( declarationUse state info.variables info.sorts
-        ctor.fields
-        (ownerType ctor.owner info)
-        closedRow
+    ( withOrigin (CallOf ctor.name) Nothing
+        ( declarationUse state info.variables info.sorts
+            ctor.fields
+            (ownerType ctor.owner info)
+            closedRow
+        )
     )
 
 -- A bare reference is a value of the scheme's curried type (design §3).
