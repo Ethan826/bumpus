@@ -3514,3 +3514,7 @@ docs/writing/article-outline.md Part 3 §5 now states:
 
 §4 (the Task 8 case study) was checked against review-task8-result.md:
 the five programs and the 25/25 tests match. It is unchanged.
+
+Verify at 207474b (merge; .build/fx008-merge-outline-verify.log):
+`rm -rf output && GOTOOLCHAIN=go1.26.4 npm run verify` exit 0; 958/958
+parallel, 29/29 serial (timing bounds included), 36 regression proofs.
