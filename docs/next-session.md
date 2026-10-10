@@ -1,50 +1,42 @@
-# Waxwing / FX001 Task 9 next (cloud session 2026-10-09)
+# Waxwing / FX001 paused before Task 10 for the user's review (2026-10-10)
 
-Branch claude/vibrant-cerf-3km61i (contains fx001 through Task 8). Tasks 1-8
-complete; Tasks 9-12 are being amended (re-scan after CF001), then
-executed. CF001 (concurrency design) and FX007 (relaxing strict defer)
-await the user's review.
-Execution is subagent-driven per .agents/skills/subagent-driven-development
-(linked into .claude/skills so new sessions load it): Sonnet implementers,
-Opus reviews and planning (user, 2026-10-09). Pre-flight rulings F1-F19 and
-deferred Task 6 minors live in the git-ignored ledger
-.superpowers/sdd/2026-10-09-effects-plan/progress.md; if it is gone,
-recover from docs/progress.md and git log.
+Branch claude/vibrant-cerf-3km61i (fx001 + Tasks 6-9, all pushed). FX001
+Tasks 1-9 are complete and reviewed; Tasks 10-12 are amended in the plan
+(rulings R1-R12) and not started. The user asked to stop here for review.
 
-Cloud environment notes: spago fetches through the proxy only with
-`NODE_USE_ENV_PROXY=1 npm run build` (run once to fill .spago; do not set it
-during verify, it pollutes the purs-tidy version check). Use
-`GOTOOLCHAIN=go1.26.4`. Fixed timing bounds fail on this container even at
-the pre-Task-6 baseline (BACKLOG T007); report them, never relax them.
-User decision 2026-10-09: `defer` must not fail (spec §2/§3 revised);
-only defects can fail cleanup.
+Awaiting the user's review:
+- CF001 concurrency foundations, docs/plans/2026-10-09-concurrency-
+  foundations-design.md: recommended fork-join subset (`par let`),
+  R0 "performs no X" rule, task-boundary rules, failure selection, discard
+  contract, and the 2026-10-10 operational addendum (§8A: supervision vs
+  structured concurrency, defect boundaries, state ownership, overload,
+  observability, host boundaries, tooling) with decisions O-1..O-7. Four
+  Opus review rounds plus addendum reviews; not authorized for
+  implementation.
+- BK001 Go backend maintainability, docs/plans/2026-10-10-backend-syntax-
+  proposal.md: Tier 1 (total plan records, Signature/Callee by call kind,
+  Go-correct quoting, Lines/Inline helpers) after FX001; migration steps
+  0, 1, 6 before FX005/FX002 lowering. Not authorized.
+- FX007: strict `defer must not fail` (adopted 2026-10-09; bracket idiom
+  needs `with pure` callbacks) vs a future lacks-Fail constraint.
+- Task 12 ADR 010 wording additions from CF001 §10/§8A (cause kinds an
+  open set; report and exit 1 are main's root policy; Go fatal errors are
+  Go's behaviour, not a Waxwing guarantee; `cleanup failed:` means a cause
+  raised by cleanup).
 
-# Waxwing / FX001 Task 3 continuation
+Execution: superpowers subagent-driven-development (skills linked under
+.claude/skills): Sonnet implementers, Opus reviews; Haiku/Sonnet for
+mechanical edits and small re-reviews. Ledger and every brief/report/review
+are snapshotted in docs/sdd/2026-10-09-effects-plan/ (the live workspace
+.superpowers/sdd/ is git-ignored).
 
-Update 2026-10-09: Waxwing / `.wxw` rename is committed separately as
-40cf312 on fx001 in `.worktrees/fx001`; main has not been merged or renamed.
-The user resumed FX001. Tasks 1-2 are complete; Task 3's deferred-Fail-row
-and rows-erasing monomorphism fixes resumed from the eight preserved source
-edits, now completed. Their tests/oracle distinguish postponed constraints from solved
-row equality. Clean-output verification passes (643 parallel + 22 serial
-tests, 22 regression proofs); obtain independent review before Task 4.
-Effects uses ADR 010; naming already occupies ADR 009.
-
-FN006's fixed-bound timing suite is moved to
-`test/fn-linear-timing.serial.test.mjs`, retaining every byte of its contents
-and all workloads/assertions/bounds. The existing fn-linear.serial.test.mjs
-remains. T003's unchanged deep/wide match-ladder timing block is likewise
-extracted into match-lift-timing.serial.test.mjs; its semantic tests remain
-parallel. Current continuation evidence: docs/progress.md and the local SDD
-ledger/report under .superpowers/sdd/2026-10-09-effects-plan/.
-
-Current CLI: `npm run waxwing -- run examples/answer.wxw` after building.
-Final supplied logo: assets/branding/waxwing-logo.png, with editable SVG
-masters/notes alongside it. Rename-only comparison against 3481468 had zero
-differences over 5,462 sources and 1,085 name probes; full corpus comparison
-was interrupted (T006). Historical rename verification failures remain in
-R003/FN006/T004. No merge or push authorized. Keep model delegation small
-and retain independent compiler-semantics review.
+Cloud environment notes: run `NODE_USE_ENV_PROXY=1 npm run build` once to
+fill .spago (not during verify). Use `GOTOOLCHAIN=go1.26.4`. On this
+container fixed timing bounds fail at unchanged baselines (BACKLOG T007,
+T004); per ruling R1 a verify passes when only those fail and
+`node scripts/regression.mjs` exits 0. Never relax a bound. The container
+restarted twice during this session; work in flight was recovered or
+re-dispatched.
 
 # FN001 merged into main
 

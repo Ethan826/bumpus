@@ -3107,3 +3107,37 @@ serial 12/22, the 10 failures are BACKLOG T007 timing bounds; regression
 proofs 33/33 (.build/fx001-task8-regression.log). Re-review probes:
 legitimate defers (`defer log(1)`, `defer print(x)`, monomorphic helpers)
 accepted; the check is linear (1k-8k defers).
+
+### FX001 Task 9 — effect diagnostic provenance (2026-10-10)
+
+Subagent-driven: Sonnet implementer (2fc7a02; fix rounds 04ab898, cee8542,
+b80cc17), Opus task review and two Opus re-reviews, Sonnet re-review of the
+last one-line fix. (A first dispatch was lost to a container restart; the
+second was briefly stopped by a controller misreading of a user message and
+resumed with its work intact.) Effect errors now carry origin, boundary and
+path notes (spec §6): occurrence links live in the substitution and are
+recorded on every unification path (nested arrow rows, settleRows retries,
+consumption); deferred-row origins are kept apart from the function row;
+note texts follow ruling R4 and the wire carries `related: [{ span,
+message }]`. Resolved gains `rowSpan` on functions and parameters so
+boundary notes point at the written `with` (or the parameter name when the
+concerned row is nested or not the only pure row). Path hops, note count
+and characters are abbreviated (`visibleLabels 4`, `pathHops 2`, `maxNotes
+4`, `maxCharacters 2000` for notes); labels over 120 characters print
+`Effect(…)` in headlines. Pre-FX001 diagnostics are unchanged (`related:
+[]` by construction; wire JSON identical); 20,000-parameter signatures
+check in about 1.5 s.
+
+Known limits recorded: `maxCharacters` bounds notes only — a headline with a
+very long type or effect name can exceed 2,000 characters (BACKLOG E011);
+the late-Fail-key defer note follows let-bound locals only and otherwise
+gives no note (never a wrong one; ~20 probes); origin notes may point
+outside the deferred expression.
+
+Evidence: fx-diagnostics, fx-diagnostic-origins, fx-signature 46/46; the
+fix-round tests were each seen failing (the round-2 tests by the controller
+against 04ab898 in an isolated worktree). Final verify
+(.build/fx001-task9-fix3-verify.log): build, gates, parallel 847/848 — the
+one failure is large-source "three-thousand-constructor match" timing
+(BACKLOG T004; passes alone); serial phase failures are the T007 set;
+regression proofs 33/33 (.build/fx001-task9-fix3-regression.log).

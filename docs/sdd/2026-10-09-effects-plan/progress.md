@@ -101,3 +101,27 @@ Ruling R4: Task 9 note reasons/texts as proposed in rescan T9-4; wire `related` 
 Ruling R5-R8: Task 10 files/interpreter/generator/runs as proposed (serial file, env knobs, batches ≤100, shrinker + sensitivity tests).
 Ruling R9-R11: Task 11 no bracket idiom; hand-written inline baseline; host-measured bounds at 3× median; acceptance in parallel fx-services.test.mjs, timing serial.
 Ruling R12: Task 12 adds 4 regression rows + test/regression-fx.mjs; side-condition probe with own timeout; reuse effect-free-ctx; BACKLOG updates existing FX007/CF001 rows.
+Plan amended e2c3809 (868 lines).
+Task 9: dispatched (sonnet), BASE e2c3809
+Container restart #2: Task 9 implementer lost before writing anything (tree clean at e2c3809). Re-dispatched fresh.
+User 2026-10-10: add operational (Gleam/OTP) concerns to the CF001 assessment; do NOT begin Task 9; stop after the assessment for review. Task 9 re-dispatch stopped; its unreviewed partial edits saved to docs/sdd/2026-10-09-effects-plan/task-9-wip-abandoned.patch (git apply to resume) and stashed; tree reset to e2c3809.
+User 2026-10-10 (clarified): do not abandon Task 9; accommodate the new operational thinking. Task 9 WIP restored from stash; implementer resumed. OTP addendum (design only) dispatched in parallel; check its impact on Tasks 10-12 before continuing.
+CF001 ops addendum committed 57231e0 (723 lines; O-1..O-7; Task 12 ADR wording additions; no change to Tasks 9-11). Review (opus) dispatched.
+Task 9: implementer DONE_WITH_CONCERNS 2fc7a02 (coarse boundary spans; maxNotes vs pathHops; report-time callee re-check; bidirectional Matched links). Review (opus) dispatched.
+User 2026-10-10: backend-maintainability proposal (design only; backend-requirements.md). Interpretation per the user's earlier clarification: finish in-flight Task 9 review cycle, write the proposal, then STOP for user review before Task 10.
+CF001 ops review (opus): Accept with fixes; Critical façade-as-Shareable breaks par discard argument; I1-I6. Fix round sent to writer.
+Task 9 review (opus): Needs fixes — I1 boundary spans (carry with/annotation spans through Resolve; with Log misreported as ambient), I2 maxCharacters excludes headline (2,522 chars probe), I3 no note inside deferred expr for later-settled Fail key. Ruling: fix all three (spec §6 names them) + Minor e wording. Fix round 1 → implementer.
+CF001 ops fix round 1 committed 304261f (761 lines; C1 → B3b inert handlers, a pre-existing CF001 flaw). Re-review dispatched.
+CF001 ops re-review (opus): all 16 ADDRESSED; N1 B3b false premise (with-consumption + R0 already reject) → demote; minors. Applying verbatim via haiku.
+CF001 ops addendum: accepted (a7ade34).
+BK001 proposal draft committed 4dcf647 (462 lines; typed builders + plan/syntax split; no library; after FX001). Review (opus) dispatched.
+BK001 review (opus): Accept with fixes; 9 Important (overclaims, wrong facts, D2 sketch not total, two-tier recommendation, priority steps 0/1/6 before CF001/FX005), 9 Minor. Fix round sent to writer.
+BK001 fix round committed ab9cf6f (518 lines). Re-review dispatched.
+Task 9 fix round 1: 04ab898 (rowSpan through Resolve; 120-char label elision; defer note inside; M1/M2). Parallel 842/843 (large-source T004 flake), serial T007, regression 0. Re-review dispatched.
+BK001 re-review (opus): Accept with fixes; N1 Callee rule vs main/stages/function values/templates; N2 D8 is forward risk; N3-N8 minors. Fix round 2 sent.
+BK001: accepted after review + 2 fix rounds (controller spot-check of N1/N2 in round 2) fc133fd; BACKLOG row added.
+Task 9 re-review r1 (opus): I1 partly (N1 nested-arrow param notes on wrong with), I2 OK for required cases (string cut acceptable; payload mismatch structural); bound gap long names → E011, fix comment + record; I3 tested case only (N2 blames first Fail-row call). M1/M2 OK; rowSpan no wire change. Fix round 2 → implementer.
+Task 9 fix round 2: cee8542. Controller evidence: new tests run against 04ab898 in isolated worktree → fail: 'nested pure row names the parameter', 'nested row variable declared at the parameter', 'late Fail key blames its own call' (3 fail, 42 pass); second N2 probe passes there (characterization). Re-review r2 dispatched.
+Task 9 re-review r2 (opus): N1 residual wrong note (topRowPure with two pure rows), N2 fixed (no wrong note in ~20 probes; missing notes acceptable), settleDeferred linear, I2 comment OK (record E011 gap at close). Fix round 3 → implementer (one-line + tighten N2 test).
+Task 9 fix round 3: b80cc17. Re-review r3 (sonnet; small diff) dispatched.
+Task 9: complete (2fc7a02, 04ab898, cee8542, b80cc17). STOP for user review before Task 10 (user 2026-10-10).
