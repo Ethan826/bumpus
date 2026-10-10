@@ -3299,3 +3299,39 @@ Both are new BACKLOG rows.
 
 Verify at 9b47e4b (docs only; .build/fx008-rev5-verify.log): exit 0;
 934/934 parallel, 29/29 serial, 33/33 proofs.
+
+## FX009: unresolved `Fail` payloads rejected (2026-10-10)
+
+Branch fx009, from fx008 at 531e438. Sonnet implementer (c445bac;
+review rounds 33a3a62 and f6cb6d0), Opus review and two re-reviews
+(docs/sdd/2026-10-09-effects-plan/review-fx009-result.md and
+rereview-fx009-result.md).
+
+Defect: leftover deferred-key pairs were dropped silently, so a
+`Fail(a)` parameter row let a failure escape at run time (`no handler
+for Fail`).
+
+User decisions:
+- Written `Fail` payloads without a family key (a type variable, a
+  function type or a handler type) are E_TYPE `Fail needs a concrete
+  error family` at the label, in signatures and `handle` clauses, with a
+  hint.
+- `Fail(Error(a))` and `Fail(Unit)` are allowed.
+- The final settle rejects any leftover pair.
+
+The reviews found no program that reaches that guard (about 50 probes
+compared against a build without it), so it is a 3-line rejection.
+Mutants of the written-label checks are caught by the guard at the
+wrong span.
+
+Evidence:
+- test/fx-fail-pairs.test.mjs: 25 tests, with the rejections seen
+  failing first.
+- Regression rows signature-fail, keyless-fail and clause-fail; nested-fail
+  retargeted with a span assertion.
+- `rm -rf output && npm run verify`: exit 0, 958/958 parallel, 29/29
+  serial, 36 proofs.
+
+Spec §2 "Label keys" updated. Pre-existing and recorded separately: a
+`handle` whose failure key is decided only after deferred rows are
+settled is rejected early (`firstUnkeyed` runs in the first settle).

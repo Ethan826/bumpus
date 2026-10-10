@@ -492,3 +492,13 @@ it with M001/R001. Explicit selection removes implicit-choice ambiguity but
 not ordering consistency in collections or obligations for algebraic laws.
 Rust restricts orphan implementations; Haskell permits orphan instances with
 GHC warnings. No compiler behavior changed or runtime guarantee established.
+
+## Set-aside constraints must be judged, never dropped (FX009, 2026-10-10)
+
+The scoped-label unifier sets aside a `Fail` pair whose key is not yet
+known, and `settleRows` retries it. A pair that is never decided must
+become a diagnostic. Before FX009 it was dropped, and a failure could
+escape to run time. Any constraint deferred "until more is known" needs
+an explicit final judgement. Rejecting malformed labels where they are
+written (no family key) keeps the final guard a backstop rather than the
+primary diagnostic.
