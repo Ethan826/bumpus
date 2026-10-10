@@ -26,7 +26,7 @@ import Features.Check.Scheme (State, firstTooDeep, holes, resolved, start)
 import Features.Check.Unify (Subst, isEmpty)
 import Features.Check.Walk (retype)
 import Features.Check.Defer (settleDeferred)
-import Features.Check.Failure (settleKeys)
+import Features.Check.Failure (settleFinal, settleKeys)
 import Features.Check.Path (expandPath)
 
 check ∷ Resolved.Program → Either Diagnostic Checked.Program
@@ -115,7 +115,7 @@ checkFunction holders env function = do
   maybe (Right unit) tooDeepAt (firstTooDeep finished.subst body.value)
   firstSubst ← settleKeys env finished body.value
   laterSubst ← settleDeferred env (finished { subst = firstSubst }) body.value
-  settledSubst ← settleKeys env (finished { subst = laterSubst }) body.value
+  settledSubst ← settleFinal env (finished { subst = laterSubst }) body.value
   let settled = settle settledSubst body.value
   let ended = finished { subst = settledSubst }
   comparable holders env settled

@@ -170,6 +170,7 @@ noted = case _ of
   LabelMismatch _ _ → true
   DeferMayFail _ → true
   DeferMayPerform _ → true
+  FailNeedsConcrete → true
   _ → false
 
 entryMessage ∷ EntryKind → String

@@ -1,4 +1,8 @@
-module Features.Check.Failure (failExpression, settleKeys) where
+module Features.Check.Failure
+  ( failExpression
+  , settleKeys
+  , settleFinal
+  ) where
 
 import Prelude
 import Data.Array as Array
@@ -18,7 +22,9 @@ import Features.Check.Provenance (Consumed(FailOf))
 import Features.Check.Reject (rejected)
 import Features.Check.Scheme (State, Threaded, opened, resolved)
 import Features.Check.TypeName (typeName)
-import Features.Check.Unify (Failure(..), Flex, Subst(..), settleRows)
+import Features.Check.Postponed (pairs)
+import Features.Check.Unify (Failure(..), Flex, Subst, settleRows)
+import Features.Check.Unsettled (unsettled)
 
 type Result = Either Diagnostic (Threaded Checked.Expr)
 type Env r = CheckEnv (locals ∷ Locals | r)
@@ -49,14 +55,24 @@ settleKeys
 settleKeys env state body = either failed checked (settleRows state.subst)
   where
   failed failure = failureDiagnostic env state body failure
-  checked settled = maybe' (noUnkeyed settled) unresolved
+  checked settled = maybe' (noUnresolved settled) unresolved
     (firstUnkeyed settled body)
-  -- A pair still set aside met a Fail key that stays unknown (a rigid
-  -- variable); it is rejected, never dropped (FX009).
-  noUnkeyed settled@(Subst bindings) _ =
-    if Array.null bindings.postponed then Right settled
-    else unresolved (failureSpan body)
+  noUnresolved settled _ = Right settled
   unresolved span = Left (problemAt FailNeedsConcrete span)
+
+-- The keys settled for good, after the deferred rows are. A pair still set
+-- aside then has a Fail payload that stays an unsolved meta or a rigid
+-- variable: it is rejected, never dropped (FX009). Earlier, a deferred row
+-- may yet bind the meta (design §2).
+settleFinal
+  ∷ ∀ r. CheckEnv r → State → Checked.Expr → Either Diagnostic Subst
+settleFinal env state body = settleKeys env state body >>= leftover
+  where
+  leftover settled = maybe' (clean settled) refuse
+    (Array.head (pairs settled))
+  clean settled _ = Right settled
+  refuse pair = Left
+    (unsettled env (failureSpan body) pair)
 
 failureSpan ∷ Checked.Expr → Span
 failureSpan body = maybe' noFailure identity (firstFail body)

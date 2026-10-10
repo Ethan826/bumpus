@@ -172,13 +172,13 @@ const rows = [
     message: /deferred Fail capability: wrong diagnostic code/
   },
   {
-    // FX009: a pair still set aside after settling is rejected, never
-    // dropped (the rigid Fail(a) row would reach run time unhandled).
-    name: 'postponed-fail', file: 'src/Features/Check/Failure.purs',
-    needle: '    if Array.null bindings.postponed then Right settled\n'
-      + '    else unresolved (failureSpan body)',
-    replacement: '    Right settled',
-    probe: 'postponed-fail', message: /postponed Fail pair: program was accepted/
+    // FX009: a Fail whose family is a type variable is refused where the
+    // signature writes it. Without that, the program is still rejected
+    // (by the set-aside pair guard), but at the call, not the annotation.
+    name: 'signature-fail', file: 'src/Features/Resolve/Row.purs',
+    needle: '  FailEffect, [ TVar _ ] → Left',
+    replacement: '  FailEffect, [ TVar (VarId (-1)) ] → Left',
+    probe: 'signature-fail', message: /signature Fail family:/
   },
   {
     // FX001 Task 7: the mode is chosen over the emitted IR; threading the

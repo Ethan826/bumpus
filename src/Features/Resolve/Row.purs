@@ -9,7 +9,7 @@ import Domain.Ids (EffectId(..))
 import Domain.Problem (Problem(..), UnboundKind(..))
 import Domain.Row (EffectRef(..), Label(..), Row(..))
 import Domain.Syntax as Syntax
-import Domain.Type (Ty, TyRow, VarId(..))
+import Domain.Type (Ty(..), TyRow, VarId(..))
 
 type Effects = Array { name ∷ String, arity ∷ Int }
 
@@ -43,7 +43,22 @@ label effects resolve reference = do
   effect ← lookupEffect effects reference
   if effect.arity /= Array.length reference.arguments then
     Left (Syntax.problemAt (TypeArguments reference.name) reference.span)
-  else Label effect.ref <$> traverse resolve reference.arguments
+  else traverse resolve reference.arguments >>= concrete effect.ref reference
+
+-- A Fail whose family is a type variable has no key to be matched by: it
+-- is refused where it is written (design §2, FX009).
+concrete
+  ∷ EffectRef
+  → Syntax.LabelRef
+  → Array (Ty VarId)
+  → Either Syntax.Diagnostic (Label (Ty VarId))
+concrete effect reference arguments = case effect, arguments of
+  FailEffect, [ TVar _ ] → Left
+    { problem: FailNeedsConcrete
+    , span: reference.span
+    , related: [ { span: reference.span, reason: Syntax.FailAlternatives } ]
+    }
+  _, _ → Right (Label effect arguments)
 
 lookupEffect
   ∷ Effects

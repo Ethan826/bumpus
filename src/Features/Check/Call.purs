@@ -9,7 +9,7 @@ module Features.Check.Call
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
 import Domain.Resolved (CtorId(..), FunctionId(..), Ty(..), VarId)
@@ -20,6 +20,8 @@ import Features.Check.Consume (consumeAt)
 import Features.Check.Apply (applyAll, functionLike)
 import Features.Check.Argument (refused)
 import Features.Check.Context (CheckEnv, Infer)
+import Features.Check.Occurrence (nowhere)
+import Features.Check.Postponed (stampSince)
 import Features.Check.Require (require)
 import Features.Check.Scheme (State, Threaded, threadAll)
 import Features.Check.Use (Use, ctorUse, functionUse)
@@ -172,8 +174,18 @@ supplied infer env span node use arguments = do
   checkArgument reached pair = either
     (Left <<< refused env reached use.value pair.index pair.ty pair.actual)
     (Right <<< threadedUnit)
-    (require env reached pair.ty pair.actual)
+    ( stampSince (sidesOf pair) reached <$> require env reached pair.ty
+        pair.actual
+    )
   threadedUnit reached = { value: unit, state: reached }
+  -- A pair the argument sets aside is reported at the argument, with the
+  -- parameter's `with` row as the annotation it met.
+  sidesOf pair =
+    { left: Checked.spanOf pair.actual, right: parameterRow pair.index }
+  parameterRow index = maybe nowhere rowOf
+    (use.value.callee >>= calleeParameter index)
+  calleeParameter index callee = Array.index callee.parameters index
+  rowOf found = fromMaybe found.span found.rowSpan
 
 arityAt ∷ ∀ a. Span → Either Diagnostic a
 arityAt span = Left (problemAt Arity span)

@@ -20,19 +20,19 @@ const duplicateScanTiming = ({ compile, Left, wire }) => {
   console.log(`large-source duplicate timing: ${seconds}s`);
 };
 
-// FX009: a row pair set aside on a rigid Fail payload is E_TYPE, not dropped.
-const postponedFail = ({ compile, Left, wire }) => {
-  const result = compile('type E = E; '
-    + 'fn g(h: Int -> Unit with Fail(a)): Unit = (); '
-    + 'fn main(): Unit with Console = g(fn(n: Int) => fail(E));');
-  assert.ok(result instanceof Left, 'postponed Fail pair: program was accepted');
+// FX009: Fail(a) in a signature is E_TYPE at the annotation itself.
+const signatureFail = ({ compile, Left, wire }) => {
+  const source = 'type E = E; fn g(h: Int -> Unit with Fail(a)): Unit = (); '
+    + 'fn main(): Unit with Console = g(fn(n: Int) => fail(E));';
+  const result = compile(source);
+  assert.ok(result instanceof Left, 'signature Fail family: accepted');
   const found = wire(result.value0);
-  assert.equal(found.code, 'E_TYPE', 'postponed Fail pair: wrong code');
-  assert.equal(found.message, 'Fail needs a concrete error family',
-    'postponed Fail pair: wrong message');
+  assert.equal(found.code, 'E_TYPE', 'signature Fail family: wrong code');
+  assert.equal(found.span.start.offset, source.indexOf('Fail(a)'),
+    'signature Fail family: wrong span');
 };
 
 export const task5Probes = {
-  'postponed-fail': postponedFail,
+  'signature-fail': signatureFail,
   'duplicate-scan-timing': duplicateScanTiming
 };

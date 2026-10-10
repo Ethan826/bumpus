@@ -16,6 +16,8 @@ import Domain.Row (openRow)
 import Features.Check.Consume (consumeAt)
 import Domain.Type (Ty(..), TyRow)
 import Features.Check.Context (CheckEnv, Infer)
+import Features.Check.Occurrence (Sides, nowhere)
+import Features.Check.Postponed (stampSince)
 import Features.Check.Provenance (Consumed(Application))
 import Features.Check.Require (expectType, require, typeName)
 import Features.Check.Scheme (State, Threaded, headOf, resolved, threadAll)
@@ -79,7 +81,8 @@ applyNext
 applyNext infer env span applying argument = do
   opened ← open env applying.state applying.ty (Resolved.exprSpan argument)
   checked ← infer env opened.state argument
-  reached ← require env checked.state opened.value.parameter checked.value
+  reached ← stampSince (argumentSides checked.value) checked.state
+    <$> require env checked.state opened.value.parameter checked.value
   consumed ← consumeAt env reached span Application opened.value.row
   pure
     { value: checked.value
@@ -97,10 +100,16 @@ applyValue
   → Either Diagnostic (Threaded (Ty Open))
 applyValue env state ty argument = do
   opened ← open env state ty (Checked.spanOf argument)
-  reached ← require env opened.state opened.value.parameter argument
+  reached ← stampSince (argumentSides argument) opened.state
+    <$> require env opened.state opened.value.parameter argument
   consumed ← consumeAt env reached (Checked.spanOf argument) Application
     opened.value.row
   pure { value: opened.value.result, state: consumed }
+
+-- A pair an argument sets aside is reported at the argument; a function
+-- value has no parameter annotation to point at.
+argumentSides ∷ Checked.Expr → Sides
+argumentSides argument = { left: Checked.spanOf argument, right: nowhere }
 
 -- Whether `ty` may still be applied: an arrow, or a meta not yet bound.
 functionLike ∷ State → Ty Open → Boolean

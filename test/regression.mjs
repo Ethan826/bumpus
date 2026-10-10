@@ -77,12 +77,12 @@ const expectsDiagnostic = (source, code, message, label) => {
   assert.equal(found.message, message, `${label}: wrong diagnostic message`);
 };
 
-// The nested Fail is in a lambda argument: the walk into the outer Fail's
-// payload must reach it and report its span. Without the walk, FX009's
-// set-aside pair still rejects the program, but at the outer Fail.
+// Both payloads are unsolved: the walk into the outer Fail's payload must
+// reach the inner one first, else the outer Fail's span is reported.
 const nestedFail = () => {
-  const source = 'fn h(k: a): Int = 0; fn f(): Int with Fail(Int) = '
-    + 'fail(h(fn(e) => fail(e))); fn main(): Int = 0;';
+  const source = 'fn hole(u: Unit): a = hole(u); fn h(k: b): a = hole(()); '
+    + 'fn f(): Int with Fail(Int) = fail(h(fn(e) => fail(e))); '
+    + 'fn main(): Int = 0;';
   expectsDiagnostic(source, 'E_TYPE', 'Fail needs a concrete error family',
     'nested Fail payload');
   const found = wire(compile(source).value0);
