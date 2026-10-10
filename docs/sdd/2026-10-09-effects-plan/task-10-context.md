@@ -1,59 +1,56 @@
 # Task 10 context (controller; read after task-10-brief.md)
 
-Branch claude/vibrant-cerf-3km61i in /home/user/waxwing (no worktree).
-FX001 Tasks 1-9 are complete. Task 10 adds NO compiler (PureScript) code:
-it is a test-side reference interpreter, program generator, shrinker and a
-differential corpus. Spec (binding for semantics):
-docs/plans/2026-10-09-effects-design.md (§2 evaluation/defer rule, §3
-cleanup/defect semantics, §5 defect report and row display). ADR 005 gives
-payload printing. If the brief and the spec disagree, the brief's exact
-texts win; the spec wins on semantics; report any conflict.
+Branch claude/vibrant-cerf-3km61i, restarted from main 234d115 (Tasks 1-9
+merged via Ethan826/waxwing#1). Work in /home/user/waxwing (no worktree).
+The brief carries the 2026-10-09 amendments (rulings R5-R8: files,
+interpreter semantics, generator, runs). Spec (binding semantics):
+docs/plans/2026-10-09-effects-design.md §2 (rows, `defer` rule incl. the
+strict rigid-tail rule), §3 (handler semantics, revised cleanup failures,
+defects, crash), §5 (defect report). Where an interpreter detail is not
+pinned by the spec, match the shipped compiler's documented contract and
+say so in the report; a real compiler/interpreter disagreement is
+reported, never papered over in either.
 
-## What earlier tasks left you
-- Executable probes to validate against (import, never copy):
-  test/fx-block-programs.mjs (`runs`), test/fx-console.test.mjs (Console
-  probes; move inline cases into an importable module if needed),
-  test/fx-run-programs.mjs (`cases`), and Task 8's run cases inline in
-  test/fx-cleanup.test.mjs (248 lines) — move them unchanged to
-  test/fx-cleanup-programs.mjs and import them back.
-- test/poly-parse.mjs (226 lines) is an independent parser of the
-  pre-effects language; extend it by import only, never edit it.
-- Existing helpers for building many generated programs in one Go
-  invocation: grep "go-batch" in test/ (e.g. test/poly-properties.test.mjs,
-  test/adt-properties.test.mjs) and follow their pattern; serial files are
-  test/*.serial.test.mjs (run in verify's serial phase).
-- Strict defer (adopted 2026-10-09): `defer must not fail, but it performs
-  <L>` / `defer must not fail, but it may perform any effect of <r>`
-  (E_EFFECT, defer span). Relaxation is FX007 — generated defers must obey
-  the strict rule as the brief describes.
-- Runtime key scheme (Task 7): user effects keyed by effect identity
-  regardless of type arguments; Fail keyed by the payload's declared type
-  head; clauses of one `handle` are frames with the FIRST clause innermost.
+## Shipped facts the interpreter must mirror (Tasks 7-9)
+- Runtime keys: user effect = EffectId+1 (State(Int) and State(Bool) share
+  a key; first-occurrence typing makes the innermost frame's layout match);
+  Fail families by the payload's declared head (Error(Int)/Error(Bool)
+  share). The clauses of one `handle` are installed first clause innermost.
+- Clause context: a clause runs in the context at its `with` (outer).
+  Targeted aborts go to the innermost `handle` for the key in the context
+  where `fail` executes.
+- Cleanup: LIFO, exactly once per exiting activation, in the registration
+  context. Defect report (Format/Go/Report.purs, Cleanup.purs): first line
+  the original cause; later causes prefixed `cleanup failed: `; with no
+  pending cause the first cleanup crash is the unprefixed first line; a
+  pending typed abort is NOT delivered if cleanup raises a defect (it heads
+  the report); Go runtime panics print `panic: <text>`; exit status 1.
+  `<not printable>` payloads decided statically.
+- Strict `defer`: typed failures can never escape cleanup in accepted
+  programs; treat any typed abort escaping cleanup in the interpreter as a
+  difference/bug signal (ruling R6).
+- Evaluation order FN001 (arguments and stages interleave; over-application;
+  `|>` left first).
+- Existing executable expectations to validate the interpreter against
+  first (brief Step 1): test/fx-run-programs.mjs, test/fx-cleanup.test.mjs,
+  test/fx-console*/fx-block tests, fn-* run tests. Existing oracles for
+  style/precedent: test/fn-oracle*.mjs, test/value-oracle.mjs,
+  test/fn-programs.mjs (FN001 generator).
 
-## Rules (AGENTS.md applies to test/ tooling too)
-- 250 physical lines maximum per file (about 100 target); split modules.
-  test/style.test.mjs and test/structure.test.mjs gate this.
-- Test-side JS must not import compiler output (output/ or src/).
-- Never weaken an assertion, raise a bound or skip a test.
-- Each new behavioural test seen failing first where meaningful; for the
-  sensitivity check, the flag itself is the failing witness.
-
-## Environment
-- Build `node scripts/build.mjs` (already built; rebuild only if needed).
-  Focused tests `node --test test/x.test.mjs`. GOTOOLCHAIN=go1.26.4 always.
-- Before committing: `rm -rf output && GOTOOLCHAIN=go1.26.4 npm run verify
-  > .build/fx001-task10-verify.log 2>&1` and `GOTOOLCHAIN=go1.26.4 node
-  scripts/regression.mjs > .build/fx001-task10-regression.log 2>&1`.
-  Ruling R1: passes when the only failures are the BACKLOG T007 serial
-  timing set (fn-linear-timing up to 8, fn-scale 5,000-parameter 2,
-  fx-block 20,000-let at its bound, occasionally large-source T004) and
-  regression exits 0. Never change a bound. Your new differential serial
-  test must itself pass (0 differences, coverage met).
-- Record the default 500-program run's census, seed, counts and wall time
-  in your report (the controller writes docs/progress.md).
-- You may edit docs/engineering.md (corpus knobs) only; no other docs.
-- Commit with message `test: FX001 reference interpreter and differential
-  corpus` and trailers:
+## Process
+- This task is large: commit in coherent stages (interpreter validated
+  against hand-written traces; then generator + census; then differential
+  serial test + shrinker + sensitivity check), each with tests green, and
+  keep the report file current as you go — the container has restarted
+  several times today.
+- Build `node scripts/build.mjs`; focused `node --test ...`;
+  GOTOOLCHAIN=go1.26.4; gates test/style.test.mjs, test/structure.test.mjs
+  (they also govern test/ and scripts/ files: 250-line cap etc.).
+- Before the final commit: full `GOTOOLCHAIN=go1.26.4 npm run verify`
+  (.build/fx001-task10-verify.log) and `node scripts/regression.mjs`
+  (ruling R1: passes when only the BACKLOG T007/T004 timing set fails and
+  regression exits 0). Never change a bound.
+- Commit trailers:
   Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
   Claude-Session: https://claude.ai/code/session_01YZ4BVF4ByMDQWv2sZgis28
-  Do not push. Never run two builds concurrently.
+  Do not push; do not edit docs/.
