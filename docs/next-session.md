@@ -1,13 +1,22 @@
-# Waxwing / FX001 paused after Task 10 (2026-10-10)
+# Waxwing / FX001: Task 10 done; FX008 design next (2026-10-10)
 
-Branch claude/vibrant-cerf-3km61i (fx001 + Tasks 6-10, all pushed). FX001
-Tasks 1-10 are complete and reviewed; Tasks 11-12 are amended in the plan
-(rulings R1-R12) and not started. The user asked for Task 10 only.
+Branch claude/vibrant-cerf-3km61i = main (PR Ethan826/waxwing#1, Tasks 1-9)
++ Task 10 (reference interpreter, generator, 500-program differential
+corpus with 0 differences; test-side only) + docs. FX001 Tasks 1-10 are
+complete and reviewed; Tasks 11-12 are amended in the plan (rulings
+R1-R12) and not started. Work continues on the user's machine.
 
-Task 10 (docs/progress.md) added a test-side reference interpreter and a
-500-program differential corpus (0 differences). It found FX008: a
-`defer`red operation whose handler clause fails escapes the strict rule.
-FX008 needs a rule decision with the user before or alongside Task 12.
+Next, before Tasks 11-12: FX008 (BACKLOG), a soundness hole in the strict
+`defer must not fail` rule. Cleanup may perform an operation whose handler
+clause fails — the handler may be installed by a caller in another
+function — so a typed abort can end a cleanup (pinned in
+test/fx-oracle.test.mjs). User decisions 2026-10-10: do not weaken the
+language's structure or design (no runtime delivery or conversion of such
+aborts); fix by type-level tracking: performing L under a handler whose
+clauses may fail may abort, carried through rows and across calls. Write a
+design note (spec §2/§3 change), get it reviewed, decide with the user,
+then implement test-first; afterwards lift Task 10's generator restriction
+(fail-free random clauses).
 
 Awaiting the user's review:
 - CF001 concurrency foundations, docs/plans/2026-10-09-concurrency-
