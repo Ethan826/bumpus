@@ -22,7 +22,7 @@ import Domain.Syntax as Code
 import Format.Diagnostic.Name (listed)
 import Format.Diagnostic.Name as Name
 import Format.Diagnostic.Note (WireNote, wireNotes)
-import Format.Diagnostic.Row (equalityMessage, mismatchMessage)
+import Format.Diagnostic.Row (equalityMessage, mismatchMessage, shortLabel)
 
 type WireDiagnostic =
   { code ∷ String, message ∷ String, span ∷ Span, related ∷ Array WireNote }
@@ -124,14 +124,16 @@ message = case _ of
   NonExhaustive witness → "Missing pattern: " <> pattern witness
   Internal text → text
   Hinted problem hint → message problem <> hintMessage hint
-  EffectNotAllowed name label → name <> " performs " <> label
+  EffectNotAllowed name label → name <> " performs " <> shortLabel label
     <> ", which its signature does not allow"
-  UnhandledEffect label → "Unhandled " <> label <> " in main"
-  MustBePure label → "This function must be pure, but it performs " <> label
+  UnhandledEffect label → "Unhandled " <> shortLabel label <> " in main"
+  MustBePure label → "This function must be pure, but it performs "
+    <> shortLabel label
   RowSort true → "Expected an effect row, found a type"
   RowSort false → "Expected a type, found an effect row"
   NotPrintable ty → "Expected a printable value, found " <> typeName ty
-  DeferMayFail label → "defer must not fail, but it performs " <> label
+  DeferMayFail label → "defer must not fail, but it performs "
+    <> shortLabel label
   DeferMayPerform tail →
     "defer must not fail, but it may perform any effect of "
       <> tail

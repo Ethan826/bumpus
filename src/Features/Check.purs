@@ -84,6 +84,7 @@ environment program function =
   , sites: [ { span: function.span, count: labelCount row } ]
   , functionName: function.name
   , functionSpan: function.span
+  , rowSpan: function.rowSpan
   , effects: program.effects
   , functions: program.functions
   , types: program.types

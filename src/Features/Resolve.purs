@@ -108,7 +108,22 @@ resolveSignature types effects function = do
   parameter resolved declaration = withType declaration <$> resolved
     declaration.ty
   withType declaration ty =
-    { name: declaration.name, ty, span: declaration.span }
+    { name: declaration.name
+    , ty
+    , span: declaration.span
+    , rowSpan: annotationSpan declaration.ty
+    }
+
+writtenSpan ∷ Maybe Syntax.RowRef → Maybe Syntax.Span
+writtenSpan = map rowSpan
+  where
+  rowSpan (Syntax.RowRef span _ _) = span
+
+-- The span of a parameter's written `with` row, if it is an arrow's.
+annotationSpan ∷ Syntax.TypeRef → Maybe Syntax.Span
+annotationSpan = case _ of
+  Syntax.FunRef _ _ (Just (Syntax.RowRef span _ _)) _ → Just span
+  _ → Nothing
 
 entryPoint
   ∷ Array Definition → Either Syntax.Diagnostic Resolved.FunctionId
@@ -174,4 +189,5 @@ resolveFunction globals tables effects effectInfos definition =
     , result: definition.signature.result
     , body
     , span: definition.function.span
+    , rowSpan: writtenSpan definition.function.row
     }

@@ -3,6 +3,8 @@ module Format.Diagnostic.Row
   , pathHops
   , maxNotes
   , maxCharacters
+  , maxLabelCharacters
+  , shortLabel
   , equalityMessage
   , mismatchMessage
   , unabbreviated
@@ -12,6 +14,7 @@ import Prelude
 import Data.Array as Array
 import Data.Maybe (maybe)
 import Data.String (joinWith)
+import Data.String as String
 import Data.Tuple (Tuple(..), fst, snd)
 import Domain.Problem (LabelName, Problem(..), RowText, TypeName(..))
 import Format.Diagnostic.Name (listed, typeName)
@@ -30,6 +33,20 @@ maxNotes = 4
 
 maxCharacters ∷ Int
 maxCharacters = 2000
+
+-- A label printed in a headline or note is at most this long; past it its
+-- arguments become `(…)`, so the effect is still named and the whole
+-- diagnostic stays within `maxCharacters` (design §6, until E011's type
+-- elision exists).
+maxLabelCharacters ∷ Int
+maxLabelCharacters = 120
+
+shortLabel ∷ String → String
+shortLabel label =
+  if String.length label <= maxLabelCharacters then label
+  else maybe label elided (String.indexOf (String.Pattern "(") label)
+  where
+  elided at = String.take at label <> "(…)"
 
 -- `Clock + ...r and Log + ...r cannot be made equal: both end in ...r`,
 -- each row abbreviated.
@@ -59,7 +76,7 @@ abbreviated row = rendered (labelParts <> maybe [] Array.singleton row.tail)
     if Array.null parts then "pure" else joinWith " + " parts
 
 textOf ∷ { text ∷ String, differs ∷ Boolean } → String
-textOf label = label.text
+textOf label = shortLabel label.text
 
 -- Every label, for a test to compare against the bound.
 unabbreviated ∷ Problem → String

@@ -38,7 +38,7 @@ effects types declarations = do
     <$> resolveTypeWith types (summaries declarations) variables Nothing
       declaration.ty
   withType declaration ty =
-    { name: declaration.name, ty, span: declaration.span }
+    { name: declaration.name, ty, span: declaration.span, rowSpan: Nothing }
   withSignature declaration parameters result =
     { name: declaration.name
     , parameters

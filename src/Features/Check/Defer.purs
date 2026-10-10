@@ -53,7 +53,7 @@ checkDefer infer env state span value = do
     value
   typed ← require env inferred.state TUnit inferred.value
   let Row labels _ = resolvedRow typed.subst row
-  traverse_ (refuseFail env typed span) (placed typed labels row)
+  traverse_ (refuseFail env typed span inferred.value) (placed typed labels row)
   consumed ← consumeVia env typed (crossing span)
     (occurrencesOf typed.subst (flexibleRow row))
     (Row labels (Just (Hole typed.next)))
@@ -118,7 +118,7 @@ settleDeferred env state = do
 
 judge ∷ ∀ r. DeferEnv r → State → Deferral → Either Diagnostic Unit
 judge env state found = do
-  traverse_ (refuseFail env state found.span)
+  traverse_ (refuseFail env state found.span found.body)
     (placed state labels found.row)
   maybe (Right unit) (rigidTail env state found) tail
   where
@@ -146,9 +146,10 @@ refuseFail
   . DeferEnv r
   → State
   → Span
+  → Checked.Expr
   → Tuple (Label (Ty Open)) OccurrenceId
   → Either Diagnostic Unit
-refuseFail env state span (Tuple label@(Label _ arguments) occurrence) =
+refuseFail env state span body (Tuple label@(Label _ arguments) occurrence) =
   if failing label then named else Right unit
   where
   named = do
@@ -156,6 +157,6 @@ refuseFail env state span (Tuple label@(Label _ arguments) occurrence) =
     Left
       { problem: DeferMayFail name
       , span
-      , related: failureNotes state span name occurrence
+      , related: failureNotes state span body name occurrence
       }
   payload = Array.take 1 arguments

@@ -8,7 +8,12 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.String as String
 import Data.Traversable (mapAccumL)
 import Domain.Syntax (Note, NoteReason(..), Span)
-import Format.Diagnostic.Row (maxCharacters, maxNotes, pathHops)
+import Format.Diagnostic.Row
+  ( maxCharacters
+  , maxNotes
+  , pathHops
+  , shortLabel
+  )
 
 -- A note as the wire carries it: its span and rendered text.
 type WireNote = { span ∷ Span, message ∷ String }
@@ -81,21 +86,23 @@ withinCharacters message notes = (foldl add start notes).kept
 
 noteText ∷ NoteReason → String
 noteText = case _ of
-  PerformedHere label → label <> " is performed here"
-  FromCallOf label callee → label <> " comes from this call of " <> callee
-  FromFunctionValue label → label <> " comes from this function value"
-  RaisedHere label → label <> " is raised here"
+  PerformedHere label → shortLabel label <> " is performed here"
+  FromCallOf label callee → shortLabel label <> " comes from this call of " <>
+    callee
+  FromFunctionValue label → shortLabel label <>
+    " comes from this function value"
+  RaisedHere label → shortLabel label <> " is raised here"
   ThroughFunction callee → "through " <> callee
   MoreCalls count → "… " <> show count <> " more calls"
   SignatureForbids callee label → "the signature of " <> callee
     <> " does not allow "
-    <> label
+    <> shortLabel label
   SignatureAmbient callee → "the signature of " <> callee
     <> " has an ambient row"
   MustBePureParameter → "this parameter must be pure"
-  HandledHere label → label <> " is handled here"
+  HandledHere label → shortLabel label <> " is handled here"
   MainOnlyConsole → "main may perform only Console"
   CleanupMustNotFail → "cleanup registered here must not fail"
   DeclaredHere name → name <> " is declared here"
-  InnermostHere label → "the innermost " <> label <> " is here"
+  InnermostHere label → "the innermost " <> shortLabel label <> " is here"
   ContinuesInto _ _ _ → ""

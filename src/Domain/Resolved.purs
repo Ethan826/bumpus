@@ -120,7 +120,10 @@ data Item = Let Span (Maybe LocalId) Expr | Defer Span Expr | Discard Expr
 -- annotation names only the enclosing signature's variables.
 type Param = { local ∷ Maybe LocalId, ty ∷ Maybe (Ty VarId), span ∷ Span }
 
-type Parameter = { name ∷ String, ty ∷ Ty VarId, span ∷ Span }
+-- `rowSpan`: where the written `with` row is, for notes (FX001 Task 9): a
+-- parameter's annotation row, or the signature's own.
+type Parameter =
+  { name ∷ String, ty ∷ Ty VarId, span ∷ Span, rowSpan ∷ Maybe Span }
 
 -- `VarId i` in a signature is `variables !! i`: the i-th distinct type
 -- variable in first-occurrence order, parameters then result.
@@ -134,6 +137,7 @@ type FunctionDecl =
   , result ∷ Ty VarId
   , body ∷ Expr
   , span ∷ Span
+  , rowSpan ∷ Maybe Span
   }
 
 -- `syntax` keeps the parameter types', then the result's, source

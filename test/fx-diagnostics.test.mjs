@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as rows from '../output/Format.Diagnostic.Row/index.js';
-import { clock, database, diagnose, expectDiagnostic, log, maxCharacters, state }
+import { clock, database, diagnose, expectDiagnostic, length, log,
+  maxCharacters, state }
   from './fx-diagnostics-support.mjs';
 
 const chain = depth => {
@@ -58,8 +59,8 @@ test('an operation in a lambda passed through three higher-order functions '
     code: 'E_EFFECT', message: 'This function must be pure, but it performs Log',
     at: [`keep(keep(keep(${callback})))`],
     notes: [[callback, 'log(x)', 'Log is performed here'],
-      ['fn once(f: Int -> Int with pure)', 'f',
-        'this parameter must be pure', 'fn once('.length]]
+      ['fn once(f: Int -> Int with pure)', 'with pure',
+        'this parameter must be pure']]
   });
 });
 
@@ -143,6 +144,42 @@ test('a large payload mismatch elides the subterms off the differing path', () =
     'Expected State(Pair(…, List(Bool))), found State(Pair(…, List(Int)))');
 });
 
+const longType = `T${'x'.repeat(2500)}`;
+const longEffect = `type ${longType} = ${longType}; effect E(a) { fn op(): a; }; `;
+
+test('a label with a 2,500-character argument keeps the whole diagnostic bounded', () => {
+  const raise = `fn raise(): Int with E(${longType}) = { op(); 1 }; `;
+  const { diagnostic } = diagnose(longEffect + raise
+    + 'fn main(): Int = raise();');
+  assert.equal(diagnostic.message, 'Unhandled E(…) in main');
+  assert.ok(length(diagnostic) <= maxCharacters, `${length(diagnostic)}`);
+});
+
+test('long labels in a row conflict still name the label and the shared tail', () => {
+  const source = longEffect + log + 'fn both(f: Int -> Int with '
+    + `E(${longType}) + ...r, g: Int -> Int with Log + ...r): Int = 0; `
+    + 'fn main(): Int = { let h = fn(x) => x; both(h, h) };';
+  const { diagnostic } = diagnose(source);
+  assert.equal(diagnostic.message, 'Log + ...r and E(…) + ...r '
+    + 'cannot be made equal: both end in ...r');
+  assert.ok(length(diagnostic) <= maxCharacters, `${length(diagnostic)}`);
+});
+
+test('a closed written row that lacks a label names its with, not an ambient row', () => {
+  const stamp = 'fn stamp(): Int with Log = tick(); ';
+  expectDiagnostic(log + clock + 'fn tick(): Int with Clock = now(); ' + stamp
+    + 'fn main(): Int = 0;', {
+    code: 'E_EFFECT',
+    message: 'stamp performs Clock, which its signature does not allow',
+    at: [stamp.trim(), 'tick()'],
+    notes: [['fn tick(): Int with Clock = now();', 'now()',
+      'Clock is performed here'],
+    [stamp.trim(), 'with Log', 'the signature of stamp does not allow Clock']]
+  });
+});
+
+// The guarantee is structural (Format.Diagnostic `noted` renders notes for
+// effect and label problems only); these sources sample the other kinds.
 test('diagnostics outside the effect system carry no notes', () => {
   for (const source of [
     'fn main(): Int = true;',

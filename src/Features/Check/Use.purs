@@ -12,7 +12,7 @@ module Features.Check.Use
 import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), maybe')
+import Data.Maybe (Maybe(..), fromMaybe, maybe')
 import Domain.Row (closedRow)
 import Domain.Type (TyRow)
 import Domain.Syntax as Syntax
@@ -75,7 +75,7 @@ functionUse env state span (FunctionId index) =
     , variables: function.variables
     , sorts: function.sorts
     }
-  parameterSpan parameter = parameter.span
+  parameterSpan parameter = fromMaybe parameter.span parameter.rowSpan
 
 -- A use that consumes `consumed`, of this callee, if it is a named one.
 withOrigin ∷ Consumed → Maybe Callee → Threaded Use → Threaded Use

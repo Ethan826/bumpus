@@ -1,6 +1,7 @@
 module Features.Check.Context (CheckEnv, Infer, Locals, bindAll) where
 
 import Data.Either (Either)
+import Data.Maybe (Maybe)
 import Data.Foldable (foldl)
 import Data.Map (Map)
 import Data.Map as Map
@@ -25,6 +26,7 @@ type CheckEnv r =
   , sites ∷ Array Site
   , functionName ∷ String
   , functionSpan ∷ Span
+  , rowSpan ∷ Maybe Span
   , effects ∷ Array Resolved.EffectInfo
   , functions ∷ Array Resolved.FunctionDecl
   , types ∷ Array Resolved.TypeInfo

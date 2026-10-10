@@ -54,7 +54,7 @@ const rejectedCases = [
     + 'fn main(): Int with Console = use(fn(x) => { print(x); x });',
     'E_EFFECT', 'This function must be pure, but it performs Console',
     [['print(x)', 'Console is performed here'],
-      ['f', 'this parameter must be pure', 1]]],
+      ['with pure', 'this parameter must be pure']]],
   ['closed local cannot widen', log + 'fn use(f: Int -> Int with Log): Int with Log = f(1); '
     + 'fn adapt(g: Int -> Int with pure): Int with Log = use(g); fn main(): Int = 0;',
     'E_EFFECT', 'This function must be pure, but it performs Log'],

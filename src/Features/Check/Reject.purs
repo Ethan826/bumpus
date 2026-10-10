@@ -3,19 +3,16 @@ module Features.Check.Reject
   , siteOccurrence
   , rightSpan
   , declaredNote
-  , signature
+  , signatureNote
   ) where
 
 import Prelude
 import Control.Monad.Rec.Class (Step(..), tailRec)
 import Data.Array as Array
 import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(..), maybe, maybe')
-import Domain.Checked.Internal (Open(..))
+import Data.Maybe (maybe, maybe')
 import Domain.Problem (Problem(..))
-import Domain.Row (Row(..))
 import Domain.Syntax (Diagnostic, Note, NoteReason(..), Span, problemAt)
-import Domain.Type (VarId(..))
 import Features.Check.Context (CheckEnv)
 import Features.Check.Occurrence (OccurrenceId(..))
 import Features.Check.Provenance (Boundary(..), Hop, Origin, trail)
@@ -57,7 +54,7 @@ rejected env state origin failure = case failure of
       , span
       , related: originNotes span name (hops occurrence)
           <> crossingNotes name (hops occurrence)
-          <> [ boundaryNote env.functionSpan name (signature env) ]
+          <> [ signatureNote env name ]
       }
   hops occurrence = startingAt origin occurrence (walk occurrence)
   walk occurrence = trail state.subst state.origins
@@ -87,16 +84,15 @@ innermost shown hops = maybe [] noted (Array.head hops)
     Extended _ → maybe [] (Array.singleton <<< arose) hop.origin
   arose origin = noteAt origin.span (InnermostHere shown)
 
--- The boundary refusing a label: the signature, or its ambient row.
-signature ∷ ∀ r. CheckEnv r → Boundary
-signature env =
-  if ambient env.current then AmbientSignature env.functionName
-  else Signature env.functionName
+-- The boundary refusing a label: the signature's written `with` (a row
+-- with labels and the ambient tail included), or, when none was written,
+-- the signature, whose row is only the ambient one.
+signatureNote ∷ ∀ r. CheckEnv r → String → Note
+signatureNote env name = maybe ambient written env.rowSpan
   where
-  ambient (Row _ tail) = maybe false named tail
-  named = case _ of
-    Rigid (VarId index) → Array.index env.variables index == Just ""
-    Hole _ → false
+  ambient = boundaryNote env.functionSpan name
+    (AmbientSignature env.functionName)
+  written span = boundaryNote span name (Signature env.functionName)
 
 -- `...r is declared here`, for the shared tail of a conflict.
 declaredNote ∷ Span → Problem → Array Note

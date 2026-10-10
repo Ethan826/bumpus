@@ -73,7 +73,7 @@ test('a closed signature that does not allow a label names the signature', () =>
     at: [stamp.trim(), 'tick()'],
     notes: [['fn tick(): Int with Clock = now();', 'now()',
       'Clock is performed here'],
-    [stamp.trim(), stamp.trim(), 'the signature of stamp does not allow Clock']]
+    [stamp.trim(), 'with pure', 'the signature of stamp does not allow Clock']]
   });
 });
 
@@ -109,7 +109,8 @@ test('defer performing a Fail whose key settles after the defer', () => {
   expectDiagnostic(unitFail + work + 'fn main(): Unit = ();', {
     code: 'E_EFFECT', message: 'defer must not fail, but it performs Fail(E)',
     at: ['defer f(y)'],
-    notes: [[work, 'fail(x', 'Fail(E) is raised here']]
+    notes: [[work, 'f(y)', 'Fail(E) comes from this function value', 'let g'.length],
+      [work, 'fail(x', 'Fail(E) is raised here']]
   });
 });
 
@@ -135,7 +136,21 @@ test('defer calling a named-row callback names the application and the row', () 
     at: ['defer release(())'],
     notes: [[bracket, 'release(())',
       'any effect of ...e comes from this function value'],
-    [bracket, 'release', '...e is declared here']]
+    [bracket, 'with ...e', '...e is declared here']]
   });
 });
 
+
+test('defer calling a named function with a callback names the call', () => {
+  const use = 'fn use(f: Unit -> Unit with ...e): Unit with ...e = f(()); ';
+  const bracket = 'fn bracket(release: Unit -> Unit): Unit = '
+    + '{ defer use(release); () }; ';
+  expectDiagnostic(use + bracket + 'fn main(): Unit = ();', {
+    code: 'E_EFFECT',
+    message: 'defer must not fail, but it may perform any effect of ...',
+    at: ['defer use(release)'],
+    notes: [[bracket, 'use(release)',
+      'any effect of ... comes from this call of use'],
+    [bracket.trim(), bracket.trim(), '... is declared here']]
+  });
+});

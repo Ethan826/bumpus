@@ -3,7 +3,7 @@ module Features.Check.Infer (Env, infer) where
 import Prelude
 import Data.Either (Either(..))
 import Data.Map as Map
-import Data.Maybe (maybe')
+import Data.Maybe (Maybe, maybe')
 import Domain.Checked.Internal (Open)
 import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(..))
@@ -37,6 +37,7 @@ type Env =
   , sites ∷ Array Site
   , functionName ∷ String
   , functionSpan ∷ Span
+  , rowSpan ∷ Maybe Span
   , effects ∷ Array Resolved.EffectInfo
   , functions ∷ Array Resolved.FunctionDecl
   , types ∷ Array Resolved.TypeInfo
