@@ -3456,3 +3456,15 @@ substantive issue.
 The wording fixes are applied. By the user's condition (2026-10-10), the
 written spec is approved. The implementation plan is next, starting with
 the probe gate. Probes are kept in .build/fx008-probes/ (rev6-rev10).
+
+## SCH001 schema direction committed (2026-10-10)
+
+The SCH001 schema-direction materials (BACKLOG SCH001; findings;
+provenance; the language-direction, language-audit-plan and
+tooling-direction notes; a progress entry) were written by another session
+in this shared checkout. Commit 4539150, whose message names only FX008
+revision 10, swept them in by mistake, because it used `git commit -a`.
+At the user's request (2026-10-10) the remaining file,
+docs/plans/2026-10-10-schema-direction.md, is committed here. The
+content was not edited. Process fix: commits in a shared checkout stage
+explicit paths only.
