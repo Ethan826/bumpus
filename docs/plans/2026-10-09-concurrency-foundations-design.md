@@ -195,14 +195,16 @@ Both are rejected: the first by the handler-type rule (the Log clause
 row holds local Counter), the second by a Shareable check on captured
 free variables. In FX001 every type is Shareable, so it rejects nothing
 yet; FX003 cannot land without it. Affine transfer is deferred.
-**B3b. Inert captures (added 2026-10-10, §8A.3).** Shareable is not
-enough for `par`: a child may capture a handler value only if it is
-*inert*, i.e. `Handler(L with R)` with R closed and Fail-only (R0 applied
-to clause rows, transitively through handler-typed captures). Otherwise
-`par let a = fail(E), b = with logH { log("x") };` with printing `logH`
-clauses has Fail-only rows (B2) and Shareable captures, yet `b` may print
-before it is discarded. Reachable in FX001 (handler values with Console
-clauses exist); required rejection test.
+**B3b. No hidden clause effects (added 2026-10-10, §8A.3).** Shareable
+captures plus R0 already make a child's observable effects row-visible:
+`with h { … }` consumes `h`'s clause row R into the installing row (effects
+design §4 `with` rule), so `par let a = fail(E), b = with logH { log("x")
+};` with printing `logH` is rejected by R0 (`… but it performs Console`),
+and a handler parameter with an ambient row is rejected when installed
+(rigid tail). Parent-installed clauses never run in a child (R0, §7 C1). The
+only route around this is a runtime primitive outside every row, so FX002
+façades perform a built-in non-Fail label (`Send`, discharged only by the
+runtime, O-3). Required test: the example above, rejected by R0.
 
 **B4. Child failures.** Outcomes: value, typed abort (B1), or defect with
 its causes. The parent binds values or re-raises the selected outcome (§6):
@@ -252,7 +254,10 @@ polls reach it. The condition is not checkable statically.
 - *Polls.* Function entry and every join are poll points. A poll is a
   nil-checked load of the task pointer plus an atomic load of its flag;
   it does not fire while the task runs deferred expressions. A discarded
-  task waiting at its own join abandons it and unwinds. Setting a flag therefore wakes a blocked join, and a fork reads its parent's flag and registers under the same lock, so a child forked concurrently with a discard is flagged either way. The join does not
+  task waiting at its own join abandons it and unwinds. Setting a flag
+  therefore wakes a blocked join, and a fork reads its parent's flag and
+  registers under the same lock, so a child forked concurrently with a
+  discard is flagged either way. The join does not
   wait for discarded children; they release their budget slot on exit.
 - *Stack and memory.* A spawned child starts on a fresh stack, so per
   goroutine depth never exceeds the sequential depth, and a sequential
@@ -290,7 +295,7 @@ sequentially (eager discard never stops a child left of a failure).
 
 Why rows are restricted: discarding equals never having run only if the
 discarded child did nothing observable, which holds for Fail-only rows
-(R0) with Shareable, inert captures (B3, B3b). Other labels' effects already happened.
+(R0) with Shareable captures (B3); B3b explains why no clause effect hides from R0. Other labels' effects already happened.
 
 ```
 // hypothetical
@@ -428,7 +433,7 @@ causes escalate.
 | `crash` | ends the program | ends its task; the program only by escalation | unchanged without services; opt-in inside one |
 | causes | pending first, then `cleanup failed: ` lines; a pending abort meeting a cleanup defect heads them | same list per task, handed to the supervisor; cancelled siblings: `X` (above) | compatible if `cleanup failed: ` is defined by meaning (a cause raised by cleanup; today every non-first cause), so future non-cleanup causes get their own prefix |
 | cause kinds | `crash: V`, `fail(T): V`, `no handler for L`, `panic: …` | more (e.g. a restart-limit cause) | compatible if ADR 010 calls the kinds an open set |
-| exit status | 1 after a Waxwing report, only when `usesDefects`; otherwise guard panics (`no handler for L`, unmatched or malformed value) and all Go fatal errors are reported by Go: by default exit 2, other GOTRACEBACK settings differ (`crash` aborts) | proposed contract: 1 after any Waxwing report; whatever Go reports itself (fatal errors, panics on unrooted goroutines) follows Go, not a Waxwing guarantee | compatible |
+| exit status | 1 after a Waxwing report, only when `usesDefects`; otherwise guard panics (`no handler for L`, unmatched or malformed value) and all Go fatal errors are reported by Go: by default exit 2, other GOTRACEBACK settings differ (`GOTRACEBACK=crash` aborts, SIGABRT on Unix) | proposed contract: 1 after any Waxwing report; whatever Go reports itself (fatal errors, panics on unrooted goroutines) follows Go, not a Waxwing guarantee | compatible |
 | `os.Exit` | only in `main`'s `waxwingReport` | main root's policy; services and exports never exit | compatible: `guardedMain` already confines it |
 
 Restart is safe only for state the failed task owned (§8A.3); a defect
@@ -445,14 +450,14 @@ installed and whether its type is Shareable (B3).
 | Model | Waxwing form | T | R | P | Safer or simpler with |
 |---|---|---|---|---|---|
 | Task-local handler | `with counter(0) { … }` in one task; not Shareable | race freedom: only the owner reaches the state (B3, capture check) | none | none | affine transfer into a child or service; region effects with runST-style encapsulation keep references in the task |
-| Typed actor | a service installs the state handler; others hold a façade `Handler(Counter)` whose clauses send and await a one-shot reply | typed messages; façade Shareable but not inert: send/await are operations of a built-in non-Fail label (e.g. `Send`) in its clause row, so B3b keeps it out of `par` children; state handler never crosses | mailbox, scheduling, replies, owner/caller death | capacity, timeouts | atomicity is per message: `get` then `put` loses updates, so offer `modify(f)` with pure `f`; commutative messages give an order-independent final state if each is applied exactly once (no timeout removal) and no reply exposes intermediate state; lattice state with threshold reads only as a trusted built-in (§4.7) |
+| Typed actor | a service installs the state handler; others hold a façade `Handler(Counter)` whose clauses send and await a one-shot reply | typed messages; façade Shareable; send/await are operations of a built-in non-Fail label (`Send`) in its clause row, so installing it in a `par` child puts `Send` in the child's row and R0 rejects it (B3b); state handler never crosses | mailbox, scheduling, replies, owner/caller death | capacity, timeouts | atomicity is per message: `get` then `put` loses updates, so offer `modify(f)` with pure `f`; commutative messages give an order-independent final state if each is applied exactly once (no timeout removal) and no reply exposes intermediate state; lattice state with threshold reads only as a trusted built-in (§4.7) |
 | Shared capability | trusted built-in (accumulator, LVar-like cell), Shareable | Shareable typing | per-operation atomicity, publication | which built-in | §4.6 laws, trusted only (§4.7) |
 
 Fit: evidence nodes are immutable (Task 7), so a façade node may reach
 any task; the mailbox is the only mutable object. Façade clauses run on
 the caller (B2), the state handler's on the owner. FX002-era `par let a =
 with c { tick() }, b = with c { tick() };` serializes both ticks at `c`, and
-is rejected in CF001 (B3b): discarding `b` after its send is observable.
+is rejected in CF001 (R0 via `Send`, B3b): discarding `b` after its send is observable.
 
 ### 8A.4 Overload and communication
 
@@ -525,13 +530,27 @@ reproducible schedules (sequential oracle plus injected yields, §9).
 ### 8A.8 Contracts now, mechanisms later
 
 Settle before FX002 (§10 item 9):
-- **O-1** Containment unit is the task: no `handle` catches a defect; only task roots observe one; supervisors act by built-in policy only, no Waxwing code receives causes; supervisor-cancelled tasks record `X`; process exit is `main`'s root policy.
+- **O-1** Containment unit is the task: no `handle` catches a defect; only
+  task roots observe one; supervisors act by built-in policy only, no
+  Waxwing code receives causes; supervisor-cancelled tasks record `X`;
+  process exit is `main`'s root policy.
 - **O-2** Long-lived task boundaries (services, escaping callbacks) are Fail-free (R0); typed outcomes travel as values and replies.
-- **O-3** One owner per mutable state; cross-task routes: façades to the owner or trusted Shareable built-ins; no user locks; communication is a row-visible label, so façades are never inert (B3b).
-- **O-4** Restart is a fresh activation, only after the old cleanup completed (else abandon and escalate); cleanup defects count with their failure; survivors belong to the supervisor; supervisors are scopes.
-- **O-5** The report is a schedule-independent cause list; kinds and prefixes an open set, `cleanup failed: ` meaning "raised by cleanup"; exit 1 after a Waxwing report; what Go reports itself follows GOTRACEBACK (default 2), not a Waxwing guarantee; task paths elsewhere.
+- **O-3** One owner per mutable state; cross-task routes: façades to the
+  owner or trusted Shareable built-ins; no user locks; communication is a
+  built-in row-visible label (`Send`), so R0 keeps façades out of `par`
+  children (B3b).
+- **O-4** Restart is a fresh activation, only after the old cleanup
+  completed (else abandon and escalate); cleanup defects count with their
+  failure; survivors belong to the supervisor; supervisors are scopes.
+- **O-5** The report is a schedule-independent cause list; kinds and
+  prefixes an open set, `cleanup failed: ` meaning "raised by cleanup"; exit
+  1 after a Waxwing report; what Go reports itself follows GOTRACEBACK
+  (default 2), not a Waxwing guarantee; task paths elsewhere.
 - **O-6** Task identity is explicit; CF001's record has id, parent, name; the contract reserves blocked-on and cancellation reason.
-- **O-7** Exports and escaping callbacks are root tasks; exports never exit; an unsupervised callback defect cancels `main`'s scope and is reported by `main`; host and task cancellation map both ways; every blocking wait (send, receive, reply) is a cancellation point (extends C1).
+- **O-7** Exports and escaping callbacks are root tasks; exports never exit;
+  an unsupervised callback defect cancels `main`'s scope and is reported by
+  `main`; host and task cancellation map both ways; every blocking wait
+  (send, receive, reply) is a cancellation point (extends C1).
 
 Later: strategies, intensity, mailboxes, overload/timeout APIs and defaults, dump trigger,
 pprof labels, secondary report lines, dynamic supervisors, syntax, layering check, `//line`, shared runtime.
@@ -540,7 +559,7 @@ pprof labels, secondary report lines, dynamic supervisors, syntax, layering chec
 
 **Subset.** One built-in structured fork-join item (hypothetical `par let
 x1 = e1, …, xn = en;`) whose children are Fail-only under R0 and capture
-only Shareable, inert values (B3, B3b), with conditional sequential equivalence and
+only Shareable values (B3), with conditional sequential equivalence and
 leftmost selection (§6), bounded live tasks with inline fallback, a
 root for every child (inline included), eager discard, propagated to nested tasks and stopped at function-entry and join polls with the discard runtime contract (§6), abort
 transfer at the join (B1, B4), and the defect runtime emitted with `par`. No shared mutable state, no effectful children, no user laws.
@@ -592,13 +611,12 @@ against runs with injected yields and budgets 0, 1 and B.
 Not guaranteed: anything about effectful children; cancellation beyond
 discard; lawful reductions (CF002 candidate: built-in `Int` sum first).
 
-**Addendum impact (2026-10-10).** One real conflict, corrected: §6's
-"discarding equals never having run" needs more than Fail-only rows and
-Shareable captures, because by B2 an installed handler's clause effects
-are invisible in the child's row. The subset now also requires inert
-captures (B3b; O-3 for FX002 façades), adding excluded programs (children
-installing captured handlers with non-Fail clause rows) and a test. Selection,
-the discard contract and O1-O11 are otherwise unchanged. Additive: the
+**Addendum impact (2026-10-10).** No conflict for FX001/CF001 programs:
+`with` consumes a handler's clause row into the installing row, so R0 sees
+every effect a child can cause (B3b). FX002 façades keep this only if
+communication is a row-visible built-in label (O-3); B3b adds a test, not an
+exclusion. The subset, R0, B1-B5, selection, the discard contract and O1-O11
+are unchanged. Additive: the
 task record carries id, parent and a path name (O-6), never printed in
 the report (O-5), so §6's equivalence still covers stderr.
 
@@ -606,7 +624,7 @@ the report (O-5), so §6's equivalence still covers stderr.
 
 **Settle before concurrency (FX002), mutable state (FX003), resumable
 handlers (FX006):**
-1. R0, for `defer` (ruled; strictness adopted 2026-10-09, relaxation BACKLOG FX007) and `par`, with B3b inert captures.
+1. R0, for `defer` (ruled; strictness adopted 2026-10-09, relaxation BACKLOG FX007) and `par` (B3b: façade communication must be a row label).
 2. B1 (lookup inherited, unwinding local, abort transfer at join).
 3. B3 as a transitive property of handler types plus the capture check:
    before FX003, which cannot land without it.
@@ -646,7 +664,10 @@ the operational mechanisms listed at the end of §8A.8.
    recursion or another construct into a Go loop keeps a poll in each
    iteration.
 6. Task 8 runtime contract: the discard sentinel, its non-defect
-   treatment in `waxwingCleanup` (cleanup defects of a discarded task are dropped, see §6; D §3's rejection of "dropping the cleanup failure" is scoped to tasks whose outcome can be selected), poll masking during cleanup, and
+   treatment in `waxwingCleanup` (cleanup defects of a discarded task are
+   dropped, see §6; D §3's rejection of "dropping the cleanup failure" is
+   scoped to tasks whose outcome can be selected), poll masking during
+   cleanup, and
    discard propagation to nested tasks with shielding of tasks forked in
    cleanup (§6).
 No change is needed to row erasure, markers, the `defer`-must-not-fail
@@ -665,7 +686,7 @@ with supervision; none changes behaviour. Recommended for ADR 010 (plan
 Task 12, wording only): cause kinds are an open set; `cleanup failed: `
 marks causes raised by cleanup (today every non-first cause: Task 10
 unaffected); the report and exit 1 are `main`'s root policy, present only
-with `defer` or `crash`; failures Go reports itself follow GOTRACEBACK
+with `defer` or `crash` (from CF001 also `par`); failures Go reports itself follow GOTRACEBACK
 (default exit 2): Go's behaviour, not a Waxwing guarantee. Deferred to FX002: D
 decision 9 and §3 "Defects" ("unwind to program exit") become "unwind to
 their task's root; for `main`, program exit".
@@ -731,12 +752,27 @@ fetched). Re-read theorem wording in full text before writing any proof.
 - Atkey. Parameterised notions of computation. JFP 19(3-4), 2009, 335-376.
 - Jung, Jourdan, Krebbers, Dreyer. RustBelt: securing the foundations of the Rust programming language. POPL 2018.
 - Leijen. Structured asynchrony with algebraic effects. TyDe 2017 (MSR-TR-2017-21).
-- Sivaramakrishnan et al. Retrofitting effect handlers onto OCaml. PLDI 2021. One-shot continuations that must be resumed or explicitly discontinued: from an OCaml project announcement, not re-verified in the paper or manual.
+- Sivaramakrishnan et al. Retrofitting effect handlers onto OCaml. PLDI
+  2021. One-shot continuations that must be resumed or explicitly
+  discontinued: from an OCaml project announcement, not re-verified in the
+  paper or manual.
 - Ahman, Pretnar. Asynchronous effects. PACMPL 5 (POPL 2021), article 24.
 - Shapiro, Preguiça, Baquero, Zawirski. Conflict-free replicated data types. SSS 2011, LNCS 6976, 386-400.
-- Gleam OTP v1.3.0 docs, fetched 2026-10-10 (curl; the tool fetch failed on DNS): gleam-otp.hexdocs.pm `gleam/otp/actor` (sequential message handling; `call` timeout crashes the caller; `named` takeover), `gleam/otp/static_supervisor` (strategies; `restart_tolerance` default intensity 2, period 5; `auto_shutdown`), `gleam/otp/supervision` (Permanent/Transient/Temporary; `Worker(shutdown_ms)`).
-- Go docs fetched 2026-10-10: pkg.go.dev/runtime/pprof (goroutine profile `debug=2`; labels inherited by new goroutines); pkg.go.dev/runtime (GOTRACEBACK: unrecovered panic or fatal error exits with code 2); pkg.go.dev/cmd/compile (line directives). Armstrong's 2003 thesis was not consulted; nothing here relies on it.
-- Go `sync.WaitGroup` documentation (pkg.go.dev/sync), fetched 2026-10-09: "a call to Done 'synchronizes before' the return of any Wait call that it unblocks." The Go memory model page (go.dev/ref/mem) could not be fetched: unverified.
+- Gleam OTP v1.3.0 docs, fetched 2026-10-10 (curl; the tool fetch failed on
+  DNS): gleam-otp.hexdocs.pm `gleam/otp/actor` (sequential message handling;
+  `call` timeout crashes the caller; `named` takeover),
+  `gleam/otp/static_supervisor` (strategies; `restart_tolerance` default
+  intensity 2, period 5; `auto_shutdown`), `gleam/otp/supervision`
+  (Permanent/Transient/Temporary; `Worker(shutdown_ms)`).
+- Go docs fetched 2026-10-10: pkg.go.dev/runtime/pprof (goroutine profile
+  `debug=2`; labels inherited by new goroutines); pkg.go.dev/runtime
+  (GOTRACEBACK: unrecovered panic or fatal error exits with code 2);
+  pkg.go.dev/cmd/compile (line directives). Armstrong's 2003 thesis was not
+  consulted; nothing here relies on it.
+- Go `sync.WaitGroup` documentation (pkg.go.dev/sync), fetched 2026-10-09:
+  "a call to Done 'synchronizes before' the return of any Wait call that it
+  unblocks." The Go memory model page (go.dev/ref/mem) could not be fetched:
+  unverified.
 
 ## Review response (2026-10-09)
 
@@ -757,5 +793,6 @@ Round 4 (re-review 3 minors N1-N5): applied verbatim from the re-review.
 
 Addendum 2026-10-10 (cc-requirements-ops.md): §8A (contracts O-1 to O-7); §9 impact note;
 §10 item 9, can-wait and Task 8/ADR 010 notes; Gleam OTP and Go sources.
-Addendum review (review-cf001-ops-result.md): C1 (B3b, O-3; §9 note now names a real conflict),
+Addendum review (review-cf001-ops-result.md): C1 (B3b observation, O-3 `Send` label; no CF001 conflict, since `with` consumes clause rows),
 I1-I6 (O-1, 8A.2, O-4, O-5, O-7, §10 ADR note) and M1-M9 applied; declined: none.
+Addendum re-review (2026-10-10): B3b demoted to an observation (R0 already rejects via `with` consumption); minors applied verbatim.
