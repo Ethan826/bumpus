@@ -1,3 +1,14 @@
+# Waxwing / FX008: design note under review (2026-10-10)
+
+Branch fx008 (local; from claude/vibrant-cerf-3km61i at fdd375a). Baseline
+verify green (.build/fx008-baseline-verify.log). FX008 design note:
+docs/plans/2026-10-10-abort-tracking-design.md (approach A, `nofail`
+marks on labels; decisions D0-D7 for the user). Independent Opus review:
+docs/sdd/2026-10-09-effects-plan/review-fx008-design-result.md. Revision 1
+applies it (C1, C2 fixed; L4/L5; D0-D7); re-review and round 3 in
+rereview-fx008-design-result.md; revisions 2-3 fix N1 (fixpoint termination). Next: the user's decision; then a plan amendment and
+test-first implementation, then FX001 Tasks 11-12. Nothing implemented.
+
 # Waxwing / FX001: Task 10 done; FX008 design next (2026-10-10)
 
 Branch claude/vibrant-cerf-3km61i = main (PR Ethan826/waxwing#1, Tasks 1-9)

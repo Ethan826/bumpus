@@ -3202,3 +3202,51 @@ partial applications" (phases 253 ms; new in this log, and failing alone
 three times at 310-341 ms with compiler, scripts and that test unchanged
 since 89de11c — the container's bound, recorded under T007). Regression
 proofs 33/33 (.build/fx001-task10-fix-regression.log).
+
+## FX008 design note: tracking handlers that may fail (2026-10-10)
+
+Branch fx008 (from claude/vibrant-cerf-3km61i at fdd375a), on the user's
+machine. Baseline `rm -rf output && npm run verify`
+(.build/fx008-baseline-verify.log): exit 0; build, gates, 934/934
+parallel tests, 29/29 serial tests (the T003/T004/T007 timing bounds all
+passed here), 33/33 regression proofs. The user ran verify on main in the
+same checkout about the same time, and this session had just switched the
+checkout to fx008; overlap was not established, and this run passed.
+
+Design only, no code: docs/plans/2026-10-10-abort-tracking-design.md.
+Recommended approach A: a `nofail` mark on each non-Fail label occurrence;
+`with h` gives the body's label h's mark; handler clauses get own rows
+(the R0 technique), and clause labels relate to the handler by ⊑, not
+unification; `defer` demands N on every label it performs; signatures
+write `nofail L` to rely on a handler not failing; a per-declaration
+two-point propagation, linear, with no scheme constraints; marks erased
+before specialization, so Go is unchanged. Alternatives B (totality per
+effect) and C (inferred marks) are recorded. Newly rejected: one pinned
+acceptance (fx-cleanup-programs `a defer performing a non-Fail effect`,
+migrated with `with nofail Log`), plus the pinned oracle hole. Independent
+Opus review dispatched; user decisions D1-D5 pending.
+
+Review (Opus, review-fx008-design-result.md): Accept with fixes. Critical:
+C1, the solve was seeded only from defer demands, so a handler mark made N
+by a callee's `nofail` signature was never checked (the cross-function
+hole stayed open); C2, separate clause rows need late consumption that
+keeps `Fail`, to a fixpoint, or the base effect system becomes unsound
+(the reviewer's late-`Fail` program is `Unhandled Fail(E) in main` today).
+Important: equality merges through monomorphic locals (I1), no mark
+polymorphism for forwarding helpers (I2), an understated migration (I3),
+and a soundness argument to restate (I4). The reviewer ran the hole and
+the I1/I2 programs on the current compiler (accepted; I1/I2 run
+correctly). Revision 1 of the note applies every finding: a fixed settle
+order, seeding from every N mark, limitations L4/L5 with decisions D6/D7,
+the D0 interpretation decision, and minors M1-M10.
+
+Re-review (rereview-fx008-design-result.md): C1, C2, I3, I4 and M1-M10
+addressed; new Critical N1: the late-consumption fixpoint does not
+terminate when a restricted row shares its tail with its target (the
+reviewer's programs: a never-called lambda with a Console-only cleanup,
+accepted today; a no-`defer` clause form, rejected today, which would
+hang). Revision 2 adds a shared-suffix rule, the full settle order (N2)
+and N3-N5. Round 3 judged the rule sound but the termination measure
+unsound as written (it used provenance links, which may cycle and must
+not influence typing); revision 3 uses a copy map local to that step.
+Revision 3 is not re-reviewed. Stopped for the user's decisions D0-D7.
