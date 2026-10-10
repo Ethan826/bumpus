@@ -3443,3 +3443,16 @@ no unsound acceptance. Revision 10 applies the corrections:
 A mapping argument in the review shows that no program accepted today is
 rejected. The user's approval condition (no substantive issue) is not
 met; awaiting the user.
+
+FX008 revision 10 re-check (review-fx008-rev10-result.md): no
+substantive issue.
+- Termination is established with a wording correction: N1, class
+  identity across merges.
+- Inference compatibility is established. A supplement covers the "type
+  solved" direction (pair1). gain1 is a sound gain.
+- Scheduling is established. N2: the feed graph uses the clause row's own
+  tail.
+
+The wording fixes are applied. By the user's condition (2026-10-10), the
+written spec is approved. The implementation plan is next, starting with
+the probe gate. Probes are kept in .build/fx008-probes/ (rev6-rev10).

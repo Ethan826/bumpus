@@ -1,7 +1,10 @@
 # Tracking handlers that may fail: design (FX008)
 
-Status: design note, revision 10 (2026-10-10). Awaiting the user's
-written-spec approval. Not implemented. It amends the
+Status: design note, revision 10 (2026-10-10). **Approved by the user**
+on 2026-10-10. The approval was conditional on a focused review finding
+no substantive issue, and review-fx008-rev10-result.md found none. Next:
+the implementation plan, starting with the probe gate. Nothing is
+implemented. Not implemented. It amends the
 effects spec (docs/plans/2026-10-09-effects-design.md) §2 and §3, and
 CF001 §5/O-2/§8A (D4), when approved.
 
@@ -52,7 +55,10 @@ History:
   - Scheduling (correction S): the settling loop consumes clause rows the
     same way (set1.wxw). Consumption into R ignores marks.
 
-  Revision 10's corrections are the reviewer's own and are unreviewed.
+  Revision 10's corrections were re-checked in review-fx008-rev10-result.md:
+  no substantive issue. Its wording fixes are applied: N1 class
+  identity, N2 the feed-graph row, N4 φ closing, the compatibility
+  supplement, and gain1.
 - Revision 7 applies the review of revision 6
   (review-fx008-rev6-result.md: no Critical findings; I1-I4, M1-M9).
   - I1: consuming R lost type inference and could change Go output.
@@ -345,7 +351,14 @@ and C fresh:
       so R's marks stay dead.
     - When two classes merge, their φ's are unified, ignoring marks.
     - When a class's tail becomes rigid ϱ, φ_t := ϱ. A closed tail closes
-      φ_t.
+      φ_t. That matches today exactly, because today R *is* the clause row.
+      Leaving it open, as the revision 8 review allowed, is also compatible;
+      closing was chosen (rev10 N4).
+    - **Class identity (rev10 N1).** A class keeps its identity and its φ
+      when it merges with a class that holds no clause row. Only an
+      extension of a class's tail starts a new class, with a fresh φ.
+      Reading "class" as "representative meta, with a fresh φ per new
+      representative" makes cyc1.wxw (accepted today) diverge.
 
     This rebuilds today's shape exactly. Today each R_i *is* its clause
     row P_i + t, so R_i = P_i + φ_t. It replaces revision 9's F1
@@ -357,9 +370,20 @@ and C fresh:
     to R, and each φ_t to t. Today's solution then satisfies every
     constraint of the procedure. So no program accepted today is rejected
     by a unification failure, a side-condition error or a cycle test,
-    which also settles revision 8's unproven claim. The only intended
-    change: sh1.wxw (two clauses of one handler sharing a tail) is
-    rejected today and stays rejected.
+    which also settles revision 8's unproven claim. sh1.wxw (two clauses
+    of one handler sharing a tail) is rejected today and stays rejected.
+
+    **Supplement (rev10).** The mapping alone only shows that revision 10's
+    solution is at least as general as today's. Outcomes that need a type
+    to be *solved* (eager decisions, "Ambiguous type", "Fail needs a
+    concrete error family", Go defaulting) need the other direction too:
+    every pairing that today's reverse link makes reaches a watched clause
+    tail, and the hook pairs it at the same index. So type metas get the
+    same solution. Evidence: rev10 pair1.wxw prints `0` today, and its
+    control with the link broken is "Ambiguous".
+
+    One sound gain: rev10 gain1.wxw is rejected today (`Unhandled
+    Cell(Bool) in main`) and accepted by revision 10 (§6, §9).
   - **F2, cycles.** Before consumption, §3.5 (c)'s per-key cycle test runs
     on the clause-row-to-R edges. The search starts only from dirty rows,
     which keeps the cost linear (T003). A positive sum is today's
@@ -389,14 +413,18 @@ and C fresh:
     - The eager decisions are the `Scheme.headOf` callers: Handler.purs
       `withHandler`, Apply's `open`, and Hint.
     - Apply's `functionLike` is a pure `State → Boolean`, so `sync` runs in
-      its callers (Call.purs and Pipe.purs). The §3.5 loop covers bindings made during
-    settling.
+      its callers (Call.purs and Pipe.purs).
+    - The §3.5 loop covers bindings made during settling.
     - **Settling (correction S).** The §3.5 loop's step (d) consumes
       clause-to-R entries in the same way, as `labels(c) + φ_t` and
       ignoring marks. A merge of clause tails made during settling (for
       example a postponed `fail` retried in step (a), review rev9
       set1.wxw) then links the R's exactly as one made during checking.
       Without this, acceptance would depend on when the merge happened.
+      In the loop's feed graph, cycle test and F2, a clause-to-R entry's
+      row is the clause row itself, with its own tail; `labels(c) + φ_t`
+      is only what step (d) consumes. Using φ's tail there would drop real
+      edges and could let the loop grow forever (rev10 N2).
     - **What is relied on in the code.** Row bindings come only from
       `bindTail` and `extendRow`. Postponed pairs revert `dirty` with
       their bindings. A merge of two watched classes binds a watched meta.
@@ -411,12 +439,11 @@ and C fresh:
     today. Without the hook, review rev7 late1.wxw and late2.wxw (no
     `defer`, accepted today) become `Expected a handler`.
   - It also restores today's rejections of rig1.wxw and rig2.wxw.
-  - Information flows one way, clause row to R, plus F1's R ≡ R. Today
-    R ≡ ρ also bound the clause row's tail to the context's rest. With F1
-    the hook review found no program without `defer` whose acceptance or
-    Go output changes for that reason, beyond the gains listed in §6. It
-    found none whose behaviour changes. This is a claim from probes, not a
-    proof; the implementation's first task re-runs every probe (§10).
+  - Information flows one way, clause row to R, plus F1′'s φ sharing.
+    Today R ≡ ρ also bound the clause row's tail to the context's rest.
+    The compatibility argument and its supplement above show that F1′
+    restores that link's type solutions. The probe gate, the
+    implementation's first task, re-runs every probe (§10).
   - The §3.5 loop still consumes every clause row into R and C each
     round. That is idempotent for R once the hook has run.
 - C's unsolved tail closes to empty after the tail pass. A rigid clause
@@ -744,6 +771,8 @@ No longer rejected since revision 6:
   used under a fail-free and a failing handler).
 - I2's forwarding helper.
 - N5's `run`.
+- Review rev10 gain1.wxw, a sound gain: rejected today with `Unhandled
+  Cell(Bool) in main`.
 - Review rev6 annotb.wxw (a lambda annotated `x: Handler(Log)` and a
   `defer` under the same handler value), because local annotations get
   mark metas.
@@ -837,6 +866,8 @@ Acceptances, with run output:
   byte-identical; one1, one3 and one1rev8;
 - review rev9 ov1, ov1f, set1, cyc1 and cyc1ok (`0`, as today), and sh1,
   ov1ctl and set1ctl (rejected, as today);
+- review rev10 pair1 (`0`, as today; pair1ctl stays "Ambiguous") and
+  gain1 (accepted, a sound gain over today);
 - cycle2open, f1, f2, f3 and argbind;
 - Console cleanup;
 - the migrated fx-cleanup program.
