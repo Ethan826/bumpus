@@ -502,3 +502,20 @@ escape to run time. Any constraint deferred "until more is known" needs
 an explicit final judgement. Rejecting malformed labels where they are
 written (no family key) keeps the final guard a backstop rather than the
 primary diagnostic.
+
+## Schema and parsing boundaries (2026-10-10)
+
+The roadmap mentioned schema ingress only as research, not a first-party
+requirement. SCH001 now records the user's explicit direction. Effect and
+schemata-ts connect parsing/encoding with test-data generation; schemata-ts's
+Schemable interpretation is relevant to selectable class dictionaries. Derived
+generators do not derive business properties, prove laws or independently
+validate a parser generated from the same description. Arbitrary predicates
+and lossy transforms need explicit support and codec-specific laws.
+
+SCH001 precedent comparison (2026-10-10): the interpreter-parametric idea
+has a direct io-ts precedent and broader tagless-final literature. ZIO
+Schema supports the multi-interpretation goal through a different encoding.
+Effect also has an AST and interpreter customization. Library-specific
+conveniences do not establish architectural superiority; io-ts's relevant
+API is explicitly experimental. Details/sources in schema-direction.

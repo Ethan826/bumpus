@@ -33,6 +33,13 @@ services fulfilled by host-library adapters or fakes. Review package/host
 dependency resolution, locks and compiled exports with M001/I001/FX001;
 Effect Platform is a precedent, not a selected implementation mechanism.
 
+2026-10-10 user addition: first-party Schema support (SCH001) connects
+boundary parsing into domain values with property-test data generation.
+"Parse don't validate" is the contract; built-in syntax versus library/
+derivation support remains open. Compare Effect and schemata-ts in
+[schema direction](2026-10-10-schema-direction.md), coordinated with data,
+records/classes, modules/FFI and PBT001. Select its v1 subset in a design.
+
 ## Early-release priorities
 
 - Rank-1 polymorphism and parameterized ADTs (P001).

@@ -62,6 +62,12 @@ future backend equivalence tests must state their common semantics.
 Existing host-side compiler properties do not satisfy this language-library
 milestone by themselves.
 
+SCH001 now supplies the requested schema-derived generator/shrinker
+connection: [schema direction](2026-10-10-schema-direction.md). Independent
+properties and malformed-input tests remain necessary; a schema describes
+valid data rather than inferring business correctness. Generator derivation
+must report unsupported refinements and avoid vacuous filtering.
+
 ## LIT001: Literate capabilities (exploratory)
 
 Explore writing explanations and checked Waxwing code together. The user's

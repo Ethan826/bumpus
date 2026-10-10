@@ -79,3 +79,16 @@ TypeScript module-theory and GHC orphan-warning documentation. Source links
 and independent design questions are in
 docs/plans/2026-10-10-modules-and-instance-selection-direction.md. No external
 implementation copied; no module, class or evidence mechanism implemented.
+
+2026-10-10 Schema direction: user supplied
+https://github.com/rae-hill/schemata-ts. Consulted its README and linked
+Schema interface documentation, and official Effect v4 Schema introduction/
+transformation docs. Conceptual influence: separate encoded/domain types,
+Schemable interpreters, parsing, codecs and arbitrary derivation. Recorded
+independently in docs/plans/2026-10-10-schema-direction.md; no implementation
+code copied and no claims of a complete source/library audit.
+
+2026-10-10 Schema follow-up: consulted official io-ts Schema/Schemable APIs,
+Effect SchemaAST and advanced-usage docs, ZIO Schema introduction and
+Kiselyov's tagless-final research overview. Recorded conceptual precedents
+and representation tradeoffs in schema-direction. No source code copied.

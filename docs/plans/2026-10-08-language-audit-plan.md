@@ -36,6 +36,12 @@ are discovery links, not a versioned evidence ledger.
 | Idris | [Idris 2 docs](https://idris2.readthedocs.io/en/latest/), versioned reference and Prelude | Interfaces, totality, diagnostics and refined-data lessons; record advanced mechanisms without adopting dependent types/indexed monads |
 | Clojure | [Reader reference](https://clojure.org/reference/reader), linked language/reference sections and core API | Persistent collections, sequence/transducer APIs, protocol/interop design, data-oriented ergonomics |
 
+SCH001 adds a targeted supplementary comparison, not another full roster
+brief: [schemata-ts](https://github.com/rae-hill/schemata-ts), supplied by the
+user 2026-10-10. Compare its Schemable interpreters, Transcoder and Arbitrary
+with Effect Schema (distinguishing v3/v4 APIs), explicit dictionaries and
+Waxwing boundary parsing. Scope: docs/plans/2026-10-10-schema-direction.md.
+
 All twelve are required roster entries. Add other references only to answer
 a documented gap/question, with an explicit scope note; do not let "etc."
 turn the audit into an unbounded bibliography.

@@ -1,6 +1,6 @@
 # Tracking handlers that may fail: design (FX008)
 
-Status: design note, revision 9 (2026-10-10). Awaiting the user's
+Status: design note, revision 10 (2026-10-10). Awaiting the user's
 written-spec approval. Not implemented. It amends the
 effects spec (docs/plans/2026-10-09-effects-design.md) §2 and §3, and
 CF001 §5/O-2/§8A (D4), when approved.
@@ -41,7 +41,18 @@ History:
   - M1-M5, and the implementation placement (data sets in Subst, `sync`
     in the checker).
 
-  F1 and F2 are unreviewed.
+  F1 and F2 were reviewed in review-fx008-rev9-f1f2-result.md.
+- Revision 10 applies that focused review. It found a substantive issue:
+  all three properties failed as written. It found no unsound acceptance.
+  - Termination (correction T): a clause row is processed only on a
+    signature change, and `sync` runs to a fixpoint (cyc1.wxw looped).
+  - Inference (F1′): a remainder meta per clause-tail class replaces
+    R ≡ R, which over-restored (ov1.wxw). A mapping argument shows no
+    program accepted today is rejected.
+  - Scheduling (correction S): the settling loop consumes clause rows the
+    same way (set1.wxw). Consumption into R ignores marks.
+
+  Revision 10's corrections are the reviewer's own and are unreviewed.
 - Revision 7 applies the review of revision 6
   (review-fx008-rev6-result.md: no Critical findings; I1-I4, M1-M9).
   - I1: consuming R lost type inference and could change Go output.
@@ -324,33 +335,76 @@ and C fresh:
   - **What it watches.** Each clause row's *resolved* tail is watched. A
     meta-to-meta merge may bind the other meta, so the watch follows the
     resolution, not one meta (M4).
-  - **What it does.** When such a tail is bound or merged during checking,
-    the *whole* clause row is consumed into R with a fresh tail. That
-    consumption ignores marks, and labels it adds to R get fresh marks, so
-    R's marks stay dead (M3). If c's tail becomes rigid, R's resolved
-    unbound tail meta is bound to that variable (M2); a closed clause
-    tail leaves R open.
-  - **F1, two handlers.** When clause rows of two different handlers
-    resolve to the same tail, their R's are unified, ignoring marks. This
-    restores today's R1 ≡ R2: today each clause row is its R, and both
-    share the called lambda's tail. Without F1, review rev8 two1, two3,
-    two1f (no `defer`, accepted today) are rejected, and two2's emitted Go
-    changes. F1 is a third source of the L4 merge (§7).
-  - **F2, cycles.** Before each consumption, §3.5 (c)'s per-key cycle test
-    is applied to the clause-row-to-R edges, and a positive sum is today's
-    side-condition error (`… cannot be made equal: both end in …`).
-    Consuming only newly arrived labels would loop forever on review rev8
-    cyc2 and cyc3 (rejected today) and pair duplicates wrongly.
+  - **What it does (revision 10, correction F1′ of
+    review-fx008-rev9-f1f2-result.md).** Clause rows are grouped by the
+    class of their resolved tail.
+    - Each class t has one *remainder meta* φ_t.
+    - Every clause row c of the class, of any handler or the same handler,
+      is consumed into its handler's R as `labels(c) + φ_t`. The
+      consumption ignores marks, and labels it adds to R get fresh marks,
+      so R's marks stay dead.
+    - When two classes merge, their φ's are unified, ignoring marks.
+    - When a class's tail becomes rigid ϱ, φ_t := ϱ. A closed tail closes
+      φ_t.
+
+    This rebuilds today's shape exactly. Today each R_i *is* its clause
+    row P_i + t, so R_i = P_i + φ_t. It replaces revision 9's F1
+    (R_i ≡ R_j), which over-restored: ov1.wxw, accepted today, would be
+    rejected because a label in front of one clause's tail leaked into the
+    other's R.
+
+    **Compatibility argument.** Map each clause row c to today's R, each R
+    to R, and each φ_t to t. Today's solution then satisfies every
+    constraint of the procedure. So no program accepted today is rejected
+    by a unification failure, a side-condition error or a cycle test,
+    which also settles revision 8's unproven claim. The only intended
+    change: sh1.wxw (two clauses of one handler sharing a tail) is
+    rejected today and stays rejected.
+  - **F2, cycles.** Before consumption, §3.5 (c)'s per-key cycle test runs
+    on the clause-row-to-R edges. The search starts only from dirty rows,
+    which keeps the cost linear (T003). A positive sum is today's
+    side-condition error. A cycle exposed by a class merge is an ordinary
+    clause-to-R edge after the merge, with an unchanged sum. The next test
+    reports it, after at most one finite consumption. The order is
+    therefore F1′ merges, then F2, then consumption, so the error is
+    reported before that step (the review's order point).
+  - **Termination (correction T).**
+    - A clause row is processed only when its *signature* changed since
+      its last consumption: its per-key label counts, plus its resolved
+      tail's class and kind (unbound, rigid, closed). A rename of the tail
+      meta, which every fresh-tail consumption causes (`unifyTails` binds
+      the larger meta), is not a change. Without this, review rev9
+      cyc1.wxw (accepted today) re-dirties itself forever.
+    - `sync` iterates to a fixpoint, with at most (N0 + n_c + 1)(2n_c + 1)
+      × n_c consumptions, where N0 is the starting number of unbound
+      classes and n_c the number of clause rows.
+    - The §3.5 loop's bound is unchanged.
   - **Where it runs.** It is not a callback inside Unify, Binding or
     Subst; that would blame failures on unrelated pairs, bypass
     `consumeVia`'s provenance, and revert postponed pairs. Subst carries
     `watched` and `dirty` sets of tail metas, maintained by `bindTail` and
     `extendRow`, as data only. A checker-level `sync` drains `dirty` after
-    each inferred node, and before every eager decision (the handler-head
-    check in `withHandler`, Apply's `open`/`functionLike`, Hint): F2, then
-    F1, then the consumption. The §3.5 loop covers bindings made during
-    settling. The cost is proportional to dirty rows, so linearity is
-    kept. Final acceptance does not depend on when `sync` runs (M5).
+    each inferred node, and before every eager decision: F1′ merges, then
+    F2, then consumption, to a fixpoint.
+    - The eager decisions are the `Scheme.headOf` callers: Handler.purs
+      `withHandler`, Apply's `open`, and Hint.
+    - Apply's `functionLike` is a pure `State → Boolean`, so `sync` runs in
+      its callers (Call.purs and Pipe.purs). The §3.5 loop covers bindings made during
+    settling.
+    - **Settling (correction S).** The §3.5 loop's step (d) consumes
+      clause-to-R entries in the same way, as `labels(c) + φ_t` and
+      ignoring marks. A merge of clause tails made during settling (for
+      example a postponed `fail` retried in step (a), review rev9
+      set1.wxw) then links the R's exactly as one made during checking.
+      Without this, acceptance would depend on when the merge happened.
+    - **What is relied on in the code.** Row bindings come only from
+      `bindTail` and `extendRow`. Postponed pairs revert `dirty` with
+      their bindings. A merge of two watched classes binds a watched meta.
+      `sync`'s own bindings are re-dirtied.
+    - With T, F1′ and S, acceptance does not depend on drain order, merge
+      order among three or more handlers, or where `sync` runs. Diagnostic
+      headlines are fixed by source order. The cost is proportional to
+      dirty rows.
   - This keeps R in step with the clauses as checking proceeds. Today the
     clause row *is* R, so eager decisions such as `with get()`'s handler
     head (Handler.purs `headOf`) and Apply's `open` see the same labels as
@@ -435,7 +489,10 @@ One handler can thus be several restricted entries.
    - (d) In that order, consume each row's resolved labels into its
      target, with a fresh tail, directionally (§3.4: target ⊑ row on
      matched pairs; copies at tail binding). Clause rows and installed C
-     keep `Fail`; deferred rows leave it out, as today.
+     keep `Fail`; deferred rows leave it out, as today. Consumption into
+     R ignores marks (R's marks are dead). Consuming with marks would add
+     an edge ρ2 ⊑ c1 through R1 ≡ R2 ≡ ρ2, from a context where h1 is never
+     installed (review rev9).
    - **Exit** after a round in which (a) decided no pair and no restricted
      row's resolved label count changed, whatever binding caused the
      change. Argument-level row bindings count: a late label's argument
@@ -778,6 +835,8 @@ Acceptances, with run output:
 - review rev7 late1.wxw and late2.wxw (`0`, as today) and late3.wxw;
 - review rev8 two1, two2, two3 and two1f, as today, with two2's Go text
   byte-identical; one1, one3 and one1rev8;
+- review rev9 ov1, ov1f, set1, cyc1 and cyc1ok (`0`, as today), and sh1,
+  ov1ctl and set1ctl (rejected, as today);
 - cycle2open, f1, f2, f3 and argbind;
 - Console cleanup;
 - the migrated fx-cleanup program.
@@ -793,8 +852,11 @@ Isolated regression mutants, each caught:
 - C unified with ρ at `with` (the two-row install fails);
 - the one-way hook dropped (late1 becomes `Expected a handler`; rig1 is
   accepted);
-- F1 dropped (two1 becomes ambiguous);
+- F1′ dropped (two1 becomes ambiguous);
+- F1′ replaced by R ≡ R (ov1 is rejected);
 - F2 dropped, or only new labels consumed (cyc2 hits the timeout);
+- signature-change test T dropped (cyc1 hits the timeout);
+- correction S dropped (set1 becomes ambiguous);
 - R consumed instead of unified (meta2 becomes ambiguous; hole2c's Go
   changes);
 - marks equated by R ≡ ρ (I1's let-bound handler is rejected);
