@@ -3407,3 +3407,10 @@ Evidence:
 Spec §2 "Label keys" updated. Pre-existing and recorded separately: a
 `handle` whose failure key is decided only after deferred rows are
 settled is rejected early (`firstUnkeyed` runs in the first settle).
+
+FX009 merged into fx008 (26fefe3, user decision 2026-10-10). Verify on the
+merged tree (.build/fx009-merge-verify.log): exit 0, 958/958 parallel,
+29/29 serial, 36 proofs. The user asked for one focused review of FX008
+revision 9's F1/F2 procedure (termination, inference compatibility,
+scheduling). On no substantive issue, the user approves the written spec
+and the implementation plan follows, starting with the probe gate.

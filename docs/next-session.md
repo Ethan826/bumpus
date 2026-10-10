@@ -1,16 +1,15 @@
-# Waxwing / FX008: design note under review (2026-10-10)
+# Waxwing / FX008: design revision 9; FX009 merged (2026-10-10)
 
-Branch fx008 (local; from claude/vibrant-cerf-3km61i at fdd375a). Baseline
-verify green (.build/fx008-baseline-verify.log). FX008 design note:
-docs/plans/2026-10-10-abort-tracking-design.md (approach A, `nofail`
-marks on labels; decisions D0-D7 for the user). Independent Opus review:
-docs/sdd/2026-10-09-effects-plan/review-fx008-design-result.md. Revision 1
-applies it (C1, C2 fixed; L4/L5; D0-D7); re-review and round 3 in
-rereview-fx008-design-result.md; revisions 2-3 fix N1 (fixpoint termination). Revision 5 adopts the focused termination review's corrected
-procedure (review-fx008-termination-result.md); current-checker defects
-FX009 and FX010 found. Outside advice in note §12 (advice only). Next:
-the user's decisions D0-D7; then a plan amendment and
-test-first implementation, then FX001 Tasks 11-12. Nothing implemented.
+Branch fx008 (local). FX009 is fixed and merged (26fefe3; verify green:
+958/958, 29/29, 36 proofs). FX008 design note
+docs/plans/2026-10-10-abort-tracking-design.md is at revision 9, with the
+user's decisions D0-D7 in §11. A focused review of F1/F2 (the one-way
+hook's procedure) is in progress:
+docs/sdd/2026-10-09-effects-plan/review-fx008-rev9-f1f2-result.md. If it
+finds no substantive issue, the user approves the written spec. Then
+write the implementation plan (superpowers writing-plans), whose first
+task is the probe gate (.build/fx008-probes/). FX001 Tasks 11-12 follow
+FX008. Open rows: FX010, FX011, FX012. Nothing of FX008 is implemented.
 
 # Waxwing / FX001: Task 10 done; FX008 design next (2026-10-10)
 
