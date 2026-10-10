@@ -3299,3 +3299,16 @@ Both are new BACKLOG rows.
 
 Verify at 9b47e4b (docs only; .build/fx008-rev5-verify.log): exit 0;
 934/934 parallel, 29/29 serial, 33/33 proofs.
+
+User decisions 2026-10-10 (interview; note §11): D0-D5 as recommended;
+D6 mark variables (`nofail(k) L`) and D7 directional checking are
+included in FX008. Revision 6 of the note adds them. Including D7 needed
+two structural changes, which remove the merge and forwarding limitations
+(L4 mostly, L5):
+- `with` consumes the handler's clause row as a restricted row instead of
+  unifying it with the context;
+- each installation gets its own frame mark.
+
+Mark solving becomes a path check over a two-point lattice with rigid
+mark variables. One Opus review of the whole note is in progress. FX009
+is being fixed test-first in parallel, on branch fx009 in a worktree.
