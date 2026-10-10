@@ -3250,3 +3250,6 @@ and N3-N5. Round 3 judged the rule sound but the termination measure
 unsound as written (it used provenance links, which may cycle and must
 not influence typing); revision 3 uses a copy map local to that step.
 Revision 3 is not re-reviewed. Stopped for the user's decisions D0-D7.
+
+Verify at afedaec (docs only; .build/fx008-design-verify.log): `rm -rf output
+&& npm run verify` exit 0; 934/934 parallel, 29/29 serial, 33/33 proofs.
