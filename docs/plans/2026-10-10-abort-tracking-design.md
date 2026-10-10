@@ -706,6 +706,25 @@ amended:
 The dropped-handler diagnostic and the key-count baseline are
 unaffected.
 
+## 11a. User decisions (2026-10-10, interview)
+
+- D0: yes. Effectful cleanup stays allowed when its handler cannot fail.
+  Programs that relied on an unknown handler become errors.
+- D1: a mark per label occurrence (approach A).
+- D2: `nofail`, contextual. It means no escaping typed abort; defects
+  and divergence remain possible.
+- D3: all three opening positions (§3.4).
+- D4: CF001 changes to "abort-free" now, in the same change as the spec
+  amendment.
+- D5: FX007 is re-scoped to written abort-free row constraints
+  (`nofail ...e`). Implementation is deferred.
+- D6: mark variables are **included in FX008**, spelled `nofail(k) L`.
+- D7: directional checking is **included in FX008**.
+- Process: revision 6 covers D0-D7 and the spec §2/§3 text. One Opus
+  review follows, including a second check of the revision 5 settling
+  procedure. Then the user approves the written spec.
+- FX009 is fixed now, separately and test-first, in parallel.
+
 ## 11. Decisions for the user
 
 - **D0. Interpretation.** Confirm A1-A3 (§0), including the newly
