@@ -1,7 +1,7 @@
 # Tracking handlers that may fail: design (FX008)
 
-Status: design note, revision 7 (2026-10-10). Awaiting the user's
-written-spec approval. Not implemented. It amends the
+Status: design note, revision 8 (2026-10-10). Awaiting a narrow review of
+the one-way hook, then the user's written-spec approval. Not implemented. It amends the
 effects spec (docs/plans/2026-10-09-effects-design.md) §2 and §3, and
 CF001 §5/O-2/§8A (D4), when approved.
 
@@ -23,6 +23,17 @@ History:
 
   Mark solving becomes a path check over a two-point lattice with rigid
   variables (§3.5 step 5).
+- Revision 8 (2026-10-10) applies the review of revision 7
+  (review-fx008-rev7-result.md: no Critical findings; soundness
+  established).
+  - I1, by the user's decision: a one-way hook keeps R in step with the
+    clause rows.
+  - I2: R's marks are dead, and labels it adds get fresh marks.
+  - I3: written handler types get their own C, never an alias of R.
+  - I4: the merge through one handler value's R is pinned as L4.
+  - M1-M4 applied.
+
+  The hook is unreviewed.
 - Revision 7 applies the review of revision 6
   (review-fx008-rev6-result.md: no Critical findings; I1-I4, M1-M9).
   - I1: consuming R lost type inference and could change Go output.
@@ -34,7 +45,7 @@ History:
   - I4: unmarked labels in local annotations get fresh mark metas; l4b is
     pinned as L4.
 
-  Revision 7 has not been reviewed.
+  Revision 7 was reviewed in review-fx008-rev7-result.md.
 
 ## 0. Understanding
 
@@ -134,7 +145,7 @@ The reviewer found no simpler sound design that meets the constraints.
 The reviews' remaining gap in A, mark polymorphism and directional
 checking, is filled in revision 6 (D6, D7).
 
-## 3. Design (approach A, revision 6: D6 and D7 included)
+## 3. Design (approach A; D6 and D7 included since revision 6)
 
 ### 3.1 Meaning and invariant
 
@@ -268,13 +279,24 @@ parameters are never opened, which would be unsound.
 
 **Two clause rows in a handler type (revision 7, review rev6 I1).**
 Internally a handler type is `Handler(m L with R | C)`. Written syntax is
-unchanged: a written `Handler(m L with R)` has C = R.
+unchanged. A written `Handler(m L with R)` gets its own C, never an
+alias of R (review rev7 I3, annotc.wxw):
+- in a signature, a structural copy of R with the same written marks and
+  the same closed or rigid tail;
+- in a local annotation, R's written labels with fresh mark metas and a
+  fresh tail meta.
 - R is the *inference row*. It behaves exactly as today: clause effects
   reach it, and `with` unifies it with the context ρ. So inference, and
   with it acceptance of programs without `defer` and Go output, are
   unchanged.
   - The unification R ≡ ρ ignores marks: it equates types, effects and
-    tails, never marks.
+    tails, never marks. A label it adds to either side by extension gets a
+    fresh mark meta with no edge. The same holds for R ≡ R when two
+    handler types unify. R's marks are dead. Every edge ρ needs comes from
+    C's consumption, the frame constraints and call-site consumption, so
+    this is sound. A literal implementation would share label objects,
+    and so marks, by identity, which rejects safe programs (review rev7
+    I2, merge1.wxw).
   - Revision 6 instead consumed R, which lost inference that flows
     through R ≡ ρ ≡ ρ′ when one handler value is installed twice (review
     meta2.wxw: an `Opt(_)` comparison becomes ambiguous; hole2c.wxw: a
@@ -288,10 +310,29 @@ unchanged: a written `Handler(m L with R)` has C = R.
 and C fresh:
 - Each clause is checked against its own row c. Each c is consumed into R
   (inference, as clause effects reach R today) and into C (marks). Late
-  labels reach both through §3.5 steps 1-3, and `Fail` is kept.
+  labels reach C through §3.5 steps 1-3, and `Fail` is kept.
+- **One-way hook (revision 8; user decision 2026-10-10 on review rev7
+  I1).** Each clause row's tail meta is *watched*. Whenever any
+  unification during checking binds it, the newly arrived labels are
+  consumed into R at once. If the binding makes c's tail rigid, R's tail
+  is bound to that variable at once.
+  - This keeps R in step with the clauses as checking proceeds. Today the
+    clause row *is* R, so eager decisions such as `with get()`'s handler
+    head (Handler.purs `headOf`) and Apply's `open` see the same labels as
+    today. Without the hook, review rev7 late1.wxw and late2.wxw (no
+    `defer`, accepted today) become `Expected a handler`.
+  - It also restores today's rejections of rig1.wxw and rig2.wxw.
+  - Information flows one way, clause row to R. Today R ≡ ρ also bound the
+    clause row's tail to the context's rest. Without that reverse link, a
+    program can only gain acceptance, or leave a type meta unsolved that
+    nothing observes. Such a meta defaults to the representative and may
+    change emitted Go text, but not behaviour. The hook's review must
+    confirm this, or find a counterexample to list in §6.
+  - The §3.5 loop still consumes every clause row into R and C each
+    round. That is idempotent for R once the hook has run.
 - C's unsolved tail closes to empty after the tail pass. A rigid clause
-  tail binds C's tail through that pass, and R's through ordinary
-  unification as today.
+  tail binds both C's and R's tails, through that pass only (review rev7
+  M1).
 - Own-abort constraint: a `Fail` label, or a rigid tail, in a clause row
   imposes M ⊑ m, so m cannot be N.
 - Requirement marks: C ⊑ c for each clause row c.
@@ -475,7 +516,8 @@ mode, finiteness and the snapshots are unchanged.
 
 **4.2 Scoped labels.**
 - Marks belong to occurrences and follow first-occurrence matching. Copies
-  keep position and multiplicity.
+  keep position and multiplicity. A label added to a target by extension
+  gets a fresh mark t ⊑ s (§3.4).
 - Key definition and the side condition are unchanged.
 - The unifier properties gain marks and directional pairs.
 
@@ -486,7 +528,8 @@ mode, finiteness and the snapshots are unchanged.
 - C is the clause effects with their assumptions.
 
 An N handler type promises no escaping `fail` and no unknown calls;
-installations add the outer frames. Written types have C = R. Because R
+installations add the outer frames. Written types get their own C,
+copied from R (§3.4). Because R
 still unifies, a handler value installed under two rows still makes them
 equal for types, as today, but not for marks.
 - Handler values stay neither comparable nor printable.
@@ -538,14 +581,15 @@ erasure.
    - Then m ⊑ f gives m = N: by the own-abort constraint, no clause row
      has `Fail` or a rigid tail, so a `fail` in a clause is handled inside
      it.
-   - Every label the clauses perform is in R, by the restricted-row
+   - Every label the clauses perform is in C, by the restricted-row
      consumption, late labels included. Its outer occurrence in ρ has
      mark ⊑ f = N.
    - By induction on evaluation, those outer frames cannot abort.
    - So no clause run by this frame ends in an abort.
-   - Handler values reach installations only by type equality, or by
-     opening at weakening positions. So m is honest wherever it is
-     installed.
+   - Handler values reach installations only by type equality (C ≡ C,
+     marks included), or by opening at weakening positions. So m and C are
+     honest wherever the handler is installed. R adds only equalities, and
+     its marks are dead.
 2. **Assumptions are met.** Each consumption imposes frame ⊑ assumption
    (directional), and copies made at tail binding inherit that edge. So a
    computation that assumes N for κ runs under an N frame:
@@ -566,8 +610,10 @@ erasure.
 Earlier reviews probed handler values in parameters, results, fields and
 data; opening and variance; escaping lambdas; ambient and named rows;
 nested and forwarding handlers; `handle` and handlers inside cleanup;
-staging; recursion; and deferred keys. Revision 6 changes the `with` and
-consumption rules, so those probes must be re-run against it.
+staging; recursion; and deferred keys. Revisions 6 and 7 change the
+`with` and consumption rules. The reviews of both re-ran those probes
+(review-fx008-rev6-result.md, review-fx008-rev7-result.md) and found no
+unsound acceptance.
 
 ## 6. Compatibility
 
@@ -587,6 +633,13 @@ except the last, which is imprecision:
   through without fixing it.
 - A late-label system with no finite solution (review N1 and dup.wxw,
   both accepted today with a spurious label): the side-condition error.
+- **A merge through one handler value's R (L4).** Review rev7 merge2.wxw,
+  accepted today and printing `1 9`: one handler value installed by two
+  lambdas makes their contexts share a tail through R ≡ ρ1 ≡ ρ2, and a
+  `defer` in one caller meets a failing handler in the other. Separate
+  handler literals are accepted. This is the price of keeping today's
+  inference. I1's let-bound program stays accepted, because its
+  installation contexts are concrete.
 - **The residual merge (L4).** Review rev6 l4b.wxw, accepted today and
   printing `0`: a no-op lambda `k` shares a tail with a function whose
   `defer log(0)` runs under a fail-free handler. `k` is also called
@@ -604,8 +657,11 @@ No longer rejected since revision 6:
 - Revision 5 rejected all of these.
 
 Unchanged:
-- programs without `defer` keep their acceptance and meaning (`with`
-  still unifies R with ρ as today, ignoring marks);
+- programs without `defer` keep their acceptance and meaning. `with`
+  still unifies R with ρ as today, ignoring marks, and the one-way hook
+  keeps R in step with the clauses. The one exception is the lost
+  reverse link (§3.4 hook), which can only gain acceptance or leave an
+  unobserved type unsolved; its review must confirm this;
 - run-time behaviour.
 
 Some exact diagnostic texts without `defer` may move, because clause rows
@@ -623,8 +679,10 @@ recorded.
 - **L4 (residual).** Copies are made when a tail is bound. Labels that
   later reach a *shared* tail are shared by identity, so their marks are
   equal. This is sound but less precise. Example to pin: review rev6
-  l4b.wxw (§6). Fixing it would need copies on every later arrival at a
-  shared tail, which is a follow-up if real programs hit it.
+  l4b.wxw (§6). A second source is tails shared through one handler
+  value's R (rev7 merge2.wxw). Fixing either would need copies on every
+  later arrival at a shared tail, which is a follow-up if real programs
+  hit it.
 - **L6.** Mark variables are not allowed in `type` or `effect`
   declarations. Row arguments carry marks inside rows.
 
@@ -638,8 +696,8 @@ L5 (no mark polymorphism) is resolved by per-installation frames and
   - A new paragraph "Marks" condensing §3.1-§3.4.
   - "Consumption and opening": directional pairs, copies at tail binding,
     and handler-type opening only.
-  - `handler` rule: `Handler(m L with R)`, own rows, exact R, own-abort
-    constraint.
+  - `handler` rule: `Handler(m L with R | C)`, own rows, inference row R,
+    exact clause row C, own-abort constraint.
   - `with` rule: R unified as today, ignoring marks; C consumed; frame
     mark f and its
     constraints.
@@ -665,7 +723,9 @@ Rejections, each asserted with exact text, primary span and notes:
 - a rigid `nofail(k)` demanded N;
 - review C2's late `Fail` and T1's rigid tail (both still rejected);
 - review dup and n1 (side-condition error, under a timeout);
-- review rev6 l4b.wxw (the pinned L4 limitation).
+- review rev7 rig1.wxw and rig2.wxw (rejected, as today, through the
+  hook);
+- review rev6 l4b.wxw and rev7 merge2.wxw (the pinned L4 limitation).
 
 Acceptances, with run output:
 - an N signature under a fail-free handler;
@@ -676,6 +736,8 @@ Acceptances, with run output:
 - review rev6 meta2.wxw (accepted, as today) and hole2c.wxw (Go output
   byte-identical to today: one `Opt(Bool)` layout);
 - review rev6 extb.wxw (prints `12 0 9`) and annotb.wxw (prints `1 2`);
+- review rev7 merge1.wxw (`1 9`), annotc.wxw and annotd.wxw (`1 5 9`);
+- review rev7 late1.wxw and late2.wxw (`0`, as today) and late3.wxw;
 - cycle2open, f1, f2, f3 and argbind;
 - Console cleanup;
 - the migrated fx-cleanup program.
@@ -689,11 +751,16 @@ Isolated regression mutants, each caught:
 - equality instead of directional pairs (I1 fails);
 - no copies at tail binding (the I1 lambda fails);
 - C unified with ρ at `with` (the two-row install fails);
+- the one-way hook dropped (late1 becomes `Expected a handler`; rig1 is
+  accepted);
 - R consumed instead of unified (meta2 becomes ambiguous; hole2c's Go
   changes);
 - marks equated by R ≡ ρ (I1's let-bound handler is rejected);
 - the extension label sharing the stage label's mark (extb is rejected);
 - written M in local annotations (annotb is rejected);
+- marks shared by identity when R ≡ ρ extends a row (merge1 is
+  rejected);
+- C aliased to R in local annotations (annotc is rejected);
 - per-installation frame replaced by m (I2 fails);
 - m ⊑ f dropped (a failing handler under a `defer` is accepted);
 - outer-occurrence ⊑ f dropped (a forwarding clause into a failing outer
@@ -716,6 +783,7 @@ Differential testing:
 | Consume | directional consumption |
 | Use, Stages | instantiation of mark variables, handler-type opening |
 | Handler | clause own rows into R and C; `with` unifies R (marks ignored) and consumes C; frame marks |
+| Subst, Unify | the one-way hook: watched clause-row tail metas, with consumption into R on binding |
 | Defer and a new Settle module | the rev 5 loop over all restricted rows, tail pass |
 | Features.Check.Mark (new) | the edge graph and the path check |
 | DeferNotes, RowName, Domain.Problem, Format.Diagnostic | notes, printing, kinds |

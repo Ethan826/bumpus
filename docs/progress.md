@@ -3334,3 +3334,24 @@ the revision 5 loop holds with installation entries.
 - New BACKLOG FX011: `handler Console` gives E_INTERNAL.
 
 Revision 7 is unreviewed.
+
+FX008 revision 7 check (Opus, review-fx008-rev7-result.md): soundness
+established. The two-row split restores meta2 and hole2c, but not all of
+today's inference: late1 and late2, without `defer`, would be rejected.
+User decision: a one-way hook keeps R in step with the clause rows
+(revision 8). The other findings are applied as text:
+- R's marks are dead;
+- written handler types get their own C;
+- merge2 is pinned as L4;
+- M1-M4.
+
+A narrow review of the hook is in progress.
+
+FX009 re-review (Opus, rereview-fx009-result.md):
+- N1: the guard is reachable through payloads with no family key, such
+  as `Fail(Int -> Int)`, which reproduces the original panic.
+- N2: `handle` clause payloads give E_INTERNAL.
+
+User decision: every written `Fail` payload without a family key is
+E_TYPE at the label, in signatures and in `handle` clauses. Round 2 is in
+progress.
