@@ -195,6 +195,14 @@ Both are rejected: the first by the handler-type rule (the Log clause
 row holds local Counter), the second by a Shareable check on captured
 free variables. In FX001 every type is Shareable, so it rejects nothing
 yet; FX003 cannot land without it. Affine transfer is deferred.
+**B3b. Inert captures (added 2026-10-10, §8A.3).** Shareable is not
+enough for `par`: a child may capture a handler value only if it is
+*inert*, i.e. `Handler(L with R)` with R closed and Fail-only (R0 applied
+to clause rows, transitively through handler-typed captures). Otherwise
+`par let a = fail(E), b = with logH { log("x") };` with printing `logH`
+clauses has Fail-only rows (B2) and Shareable captures, yet `b` may print
+before it is discarded. Reachable in FX001 (handler values with Console
+clauses exist); required rejection test.
 
 **B4. Child failures.** Outcomes: value, typed abort (B1), or defect with
 its causes. The parent binds values or re-raises the selected outcome (§6):
@@ -282,7 +290,7 @@ sequentially (eager discard never stops a child left of a failure).
 
 Why rows are restricted: discarding equals never having run only if the
 discarded child did nothing observable, which holds for Fail-only rows
-(R0) with Shareable captures (B3). Other labels' effects already happened.
+(R0) with Shareable, inert captures (B3, B3b). Other labels' effects already happened.
 
 ```
 // hypothetical
@@ -361,7 +369,7 @@ so Waxwing can contain recoverable defects only (§2). **T** types/effects guara
 |---|---|---|
 | Lifetime | ends before its scope's join | until stopped or its supervisor exits |
 | Failure goes to | parent, at the join (B1, B4) | its supervisor |
-| Typed abort at boundary | transferred to a live `handle` (B1) | impossible (no blocked parent keeps a target live): body Fail-free under R0; typed results travel in replies |
+| Typed abort at boundary | transferred to a live `handle` (B1) | none: when a service fails its parent is at no join, so no delivery point exists, and a restartable child must not end the enclosing `handle`; body Fail-free under R0; typed results travel in replies |
 | Restart | never (would repeat effects) | by policy |
 
 A supervisor is a scope: services cannot outlive it; its exit cancels
@@ -374,15 +382,20 @@ abandoned (visible in the dump) and the shutdown escalated.
 
 **Restart dependencies.** A service given at start only façades (§8A.3)
 of earlier services has dependencies forming a DAG in start order, and
-RestForOne restarts exactly the holders of invalidated façades. Or (FX002
+RestForOne restarts at least the holders of invalidated façades. Or (FX002
 chooses) a named façade re-resolved per call (Gleam `named`: "take over
 from an older one that has exited due to a failure"); callers then see a
 typed `Unavailable` during a restart.
 
 **Resources across restarts.** A restart is a fresh activation from the
-initializer. The dead activation's `defer`s run exactly once first (C3;
-Task 8's per-activation slice gives this per goroutine); its continuations
-are discarded (C6). What must survive (a listener, a pool) belongs to the
+initializer, started only after the old activation's cleanup completed
+(exactly once, C3; Task 8's per-activation slice gives this per
+goroutine); its continuations are discarded (C6). If that cleanup exceeds
+the shutdown deadline, the child is abandoned (dump-visible), never
+restarted, and the supervisor escalates, so two activations never run
+together. A cleanup defect joins the one failure's cause list and counts
+once toward intensity; an initializer failure counts as a failure; the
+window and clock are later. What must survive (a listener, a pool) belongs to the
 supervisor scope, acquired and `defer`red there, passed as a Shareable
 capability. T: R0, B3, capability passing. R: restart loop, intensity,
 ordered shutdown, cleanup before restart. P: strategy, restart type,
@@ -400,19 +413,29 @@ root applies the root's policy: a `par` child records it for the join
 (B4); a service root hands the cause list (strings, not a typed value) to
 its supervisor, which restarts or, past intensity, fails with its own
 defect that escalates; at `main`'s root the result is today's report.
+Supervisors act on causes only by built-in policy (restart, escalate, an
+event line on stderr); no Waxwing code receives a cause list (recommended
+for O-1). An opaque observable outcome for user code is deferred; it would
+make a task boundary D9's catch point and needs its own decision. A task
+cancelled by its supervisor (OneForAll, RestForOne, shutdown) records `X`
+as discard does: its cleanup causes go only to the supervisor's event
+line, never to intensity or the report; only the triggering child's
+causes escalate.
 
 | Point | Task 8 | With supervisors | Verdict |
 |---|---|---|---|
-| `handle` | never catches a defect | unchanged; "uncatchable" = no Waxwing expression observes a defect; only task roots do, and only `par` joins, supervisors and export roots (§8A.6) act | compatible; settle now |
+| `handle` | never catches a defect | unchanged; "uncatchable" = no Waxwing expression observes a defect; only task roots do, and only `par` joins, supervisors, export and escaping-callback roots (§8A.6) act | compatible; settle now |
 | `crash` | ends the program | ends its task; the program only by escalation | unchanged without services; opt-in inside one |
-| causes | pending first, then `cleanup failed: ` lines; a pending abort meeting a cleanup defect heads them | same list per task, handed to the supervisor; cancelled siblings: C2 | compatible |
+| causes | pending first, then `cleanup failed: ` lines; a pending abort meeting a cleanup defect heads them | same list per task, handed to the supervisor; cancelled siblings: `X` (above) | compatible if `cleanup failed: ` is defined by meaning (a cause raised by cleanup; today every non-first cause), so future non-cleanup causes get their own prefix |
 | cause kinds | `crash: V`, `fail(T): V`, `no handler for L`, `panic: …` | more (e.g. a restart-limit cause) | compatible if ADR 010 calls the kinds an open set |
-| exit status | 1 after a report; Go fatal errors and unrecovered panics exit 2 (Go `runtime` docs) | 1 for an escalated defect; 2 not containable | compatible |
+| exit status | 1 after a Waxwing report, only when `usesDefects`; otherwise guard panics (`no handler for L`, unmatched or malformed value) and all Go fatal errors are reported by Go: by default exit 2, other GOTRACEBACK settings differ (`crash` aborts) | proposed contract: 1 after any Waxwing report; whatever Go reports itself (fatal errors, panics on unrooted goroutines) follows Go, not a Waxwing guarantee | compatible |
 | `os.Exit` | only in `main`'s `waxwingReport` | main root's policy; services and exports never exit | compatible: `guardedMain` already confines it |
 
 Restart is safe only for state the failed task owned (§8A.3); a defect
 inside a shared capability's operation could break it, so shared built-ins
 make each operation atomic and keep no invariant across operations.
+T: nothing new (O-1 is a runtime rule; `handle` typing is unchanged). R:
+roots, forwarding, intensity, event lines. P: strategy, intensity.
 
 ### 8A.3 State ownership and service execution
 
@@ -422,13 +445,14 @@ installed and whether its type is Shareable (B3).
 | Model | Waxwing form | T | R | P | Safer or simpler with |
 |---|---|---|---|---|---|
 | Task-local handler | `with counter(0) { … }` in one task; not Shareable | race freedom: only the owner reaches the state (B3, capture check) | none | none | affine transfer into a child or service; region effects with runST-style encapsulation keep references in the task |
-| Typed actor | a service installs the state handler; others hold a façade `Handler(Counter)` whose clauses send and await a one-shot reply | typed messages; façade Shareable (clauses only send/await); state handler never crosses | mailbox, scheduling, replies, owner/caller death | capacity, timeouts | atomicity is per message: `get` then `put` loses updates, so offer `modify(f)` with pure `f`; commutative messages give an order-independent final state; semilattice state with threshold reads gives determinism (§4.6) |
+| Typed actor | a service installs the state handler; others hold a façade `Handler(Counter)` whose clauses send and await a one-shot reply | typed messages; façade Shareable but not inert: send/await are operations of a built-in non-Fail label (e.g. `Send`) in its clause row, so B3b keeps it out of `par` children; state handler never crosses | mailbox, scheduling, replies, owner/caller death | capacity, timeouts | atomicity is per message: `get` then `put` loses updates, so offer `modify(f)` with pure `f`; commutative messages give an order-independent final state if each is applied exactly once (no timeout removal) and no reply exposes intermediate state; lattice state with threshold reads only as a trusted built-in (§4.7) |
 | Shared capability | trusted built-in (accumulator, LVar-like cell), Shareable | Shareable typing | per-operation atomicity, publication | which built-in | §4.6 laws, trusted only (§4.7) |
 
 Fit: evidence nodes are immutable (Task 7), so a façade node may reach
 any task; the mailbox is the only mutable object. Façade clauses run on
-the caller (B2), the state handler's on the owner: FX002-era `par let a =
-with c { tick() }, b = with c { tick() };` serializes both ticks at `c`.
+the caller (B2), the state handler's on the owner. FX002-era `par let a =
+with c { tick() }, b = with c { tick() };` serializes both ticks at `c`, and
+is rejected in CF001 (B3b): discarding `b` after its send is observable.
 
 ### 8A.4 Overload and communication
 
@@ -442,22 +466,25 @@ with c { tick() }, b = with c { tick() };` serializes both ticks at `c`.
 Gleam's `call` makes the caller crash on timeout "rather than leaving the
 processes in an invalid state"; Waxwing prefers a failure the caller can
 `handle`. The fetched pages state no mailbox bound. Typed messages give no
-*deadlock freedom* (`call` cycles, a clause calling its own service; would:
-layering, i.e. only façades of earlier services and replies via one-shot
-slots, plus a capture check; timeouts give failure, not freedom), no
-*determinism* (senders interleave; would: Fail-only `par`, §4.6 built-ins,
-one sender per mailbox), no *bounded resources* (would: bounded mailboxes,
-the §6 budget, a static service set; the heap stays shared).
+*deadlock freedom* (`call` cycles, a clause calling its own service (O-3),
+two services blocked sending into each other's full mailboxes, waiting in
+cleanup (C5); would: layering, i.e. only façades of earlier services and
+replies via one-shot slots, plus a capture check and non-blocking sends
+upward; timeouts give failure, not freedom), no *determinism* (senders
+interleave; would: Fail-only `par`, §4.6 built-ins, or one deterministic
+sender per mailbox without deadlines), no *bounded resources* (would:
+bounded mailboxes, the §6 budget, a static service set; the heap stays
+shared).
 
 ### 8A.5 Observability
 
-| Facility | Content | Cost | Reserve in CF001 |
+| Facility | Content | Cost | Reserved |
 |---|---|---|---|
-| Task record | id, parent, path (`main/2/1`; service names later), kind | already allocated per child | id, parent, name fields |
+| Task record | id, parent, path (`main/2/1`; service names later), kind | already allocated per child | CF001 fields: id, parent, name |
 | Registry | live tasks, child links | links exist for discard; root list: lock per spawn/exit | links; root list later |
-| Blocked-on | join, receive, call to S, foreign call | a store around each block | field; values FX002 |
+| Blocked-on | join, receive, call to S, foreign call | a store around each block | contract only (O-6); FX002 |
 | Queues | length per mailbox | counter | FX002 |
-| Cancellation | atomic flag (CF001) + reason: discard, sibling, deadline, shutdown | one word | reason field |
+| Cancellation | atomic flag (CF001) + reason: discard, sibling, deadline, shutdown | one word | contract only (O-6); FX002 |
 | Failure | cause list + task path | path built on failure only | path never in the report |
 | Dump | task tree + `pprof.Lookup("goroutine").WriteTo(w, 2)` (all stacks, as a dying program prints) | nothing until used | trigger later |
 | Labels | `pprof.SetGoroutineLabels`, inherited by new goroutines | a context per spawn | later, opt-in |
@@ -467,14 +494,16 @@ covers it; a task path would make a `par` report differ from the
 sequential one); paths go to dumps and supervisor event lines (FX002).
 Task identity is explicit (C1), never the goroutine: inline children (§6)
 share their parent's, and resume-readiness (4) forbids goroutine state.
+T: nothing beyond C1's explicit task identity. R: all of the above. P:
+dump trigger, labels, names.
 
 ### 8A.6 Host boundaries
 
 | Crossing | Proposed rule | T | R | P |
 |---|---|---|---|---|
 | Foreign import | Go `error` → typed Fail (I001); Go panic → defect `panic: …` (`waxwingCauses`); foreign handles not Shareable until I001 classifies them (B3); blocking calls get a `context.Context` cancelled with the task (C1); goroutines the library starts are outside the tree, their panics fatal | Fail in row | context bridge, adapter recovery | timeouts |
-| Scoped callback (during the foreign call, same goroutine) | may perform the caller's effects; no abort crosses Go frames unless the adapter re-raises (spec §4 I001 obligation) | rows | adapter | none |
-| Escaping callback (stored; later or another goroutine) | Shareable and Fail-free (R0): its `handle` may have exited, task-local handlers may be dead; runs as a new root task with its own cleanup; defects to its owning supervisor, else the report | B3 + R0 at conversion | root, registry | owner |
+| Scoped callback (during the foreign call, same goroutine) | may perform the caller's effects; no abort or defect unwinds through foreign frames: the adapter recovers at the callback boundary and re-raises after the foreign call returns (spec §4 I001 obligation); never unwind through C frames (cgo) | rows | adapter | none |
+| Escaping callback (stored; later or another goroutine) | Shareable and Fail-free (R0): its `handle` may have exited, task-local handlers may be dead; runs as a new root task with its own cleanup; defects go to its owning supervisor; unsupervised, they cancel `main`'s scope and `main`'s root reports them first, after its own cleanup, exit 1 (a forward across goroutines; the report still originates in `main`) | B3 + R0 at conversion | root, registry | owner |
 | Export (Go → Waxwing) | each call is a root task with handlers from host-supplied implementations; typed failure → Go `error`; defect → distinct error or re-panic, never `os.Exit`; concurrent calls share only Shareable capabilities; host `context.Context` → cancellation | closed row of host-provided effects | root, conversions | PKG001 convention |
 
 ```
@@ -496,13 +525,13 @@ reproducible schedules (sequential oracle plus injected yields, §9).
 ### 8A.8 Contracts now, mechanisms later
 
 Settle before FX002 (§10 item 9):
-- **O-1** Containment unit is the task: no `handle` catches a defect; only task roots observe one; process exit is `main`'s root policy.
+- **O-1** Containment unit is the task: no `handle` catches a defect; only task roots observe one; supervisors act by built-in policy only, no Waxwing code receives causes; supervisor-cancelled tasks record `X`; process exit is `main`'s root policy.
 - **O-2** Long-lived task boundaries (services, escaping callbacks) are Fail-free (R0); typed outcomes travel as values and replies.
-- **O-3** One owner per mutable state; cross-task routes: façades to the owner or trusted Shareable built-ins; no user locks.
-- **O-4** Restart is a fresh activation after exactly-once cleanup; survivors belong to the supervisor; supervisors are scopes.
-- **O-5** The report is a schedule-independent cause list, kinds an open set; exit 1 (Waxwing) vs 2 (Go fatal); task paths elsewhere.
-- **O-6** Task identity is explicit; the record reserves id, parent, name, blocked-on and cancellation reason.
-- **O-7** Exports and escaping callbacks are root tasks; exports never exit; host and task cancellation map both ways.
+- **O-3** One owner per mutable state; cross-task routes: façades to the owner or trusted Shareable built-ins; no user locks; communication is a row-visible label, so façades are never inert (B3b).
+- **O-4** Restart is a fresh activation, only after the old cleanup completed (else abandon and escalate); cleanup defects count with their failure; survivors belong to the supervisor; supervisors are scopes.
+- **O-5** The report is a schedule-independent cause list; kinds and prefixes an open set, `cleanup failed: ` meaning "raised by cleanup"; exit 1 after a Waxwing report; what Go reports itself follows GOTRACEBACK (default 2), not a Waxwing guarantee; task paths elsewhere.
+- **O-6** Task identity is explicit; CF001's record has id, parent, name; the contract reserves blocked-on and cancellation reason.
+- **O-7** Exports and escaping callbacks are root tasks; exports never exit; an unsupervised callback defect cancels `main`'s scope and is reported by `main`; host and task cancellation map both ways; every blocking wait (send, receive, reply) is a cancellation point (extends C1).
 
 Later: strategies, intensity, mailboxes, overload/timeout APIs and defaults, dump trigger,
 pprof labels, secondary report lines, dynamic supervisors, syntax, layering check, `//line`, shared runtime.
@@ -511,7 +540,7 @@ pprof labels, secondary report lines, dynamic supervisors, syntax, layering chec
 
 **Subset.** One built-in structured fork-join item (hypothetical `par let
 x1 = e1, …, xn = en;`) whose children are Fail-only under R0 and capture
-only Shareable values (B3), with conditional sequential equivalence and
+only Shareable, inert values (B3, B3b), with conditional sequential equivalence and
 leftmost selection (§6), bounded live tasks with inline fallback, a
 root for every child (inline included), eager discard, propagated to nested tasks and stopped at function-entry and join polls with the discard runtime contract (§6), abort
 transfer at the join (B1, B4), and the defect runtime emitted with `par`. No shared mutable state, no effectful children, no user laws.
@@ -563,17 +592,21 @@ against runs with injected yields and budgets 0, 1 and B.
 Not guaranteed: anything about effectful children; cancellation beyond
 discard; lawful reductions (CF002 candidate: built-in `Int` sum first).
 
-**Addendum impact (2026-10-10).** The subset, R0, B1-B5, selection,
-discard contract and O1-O11 are unchanged; §8A found no conflict. One
-additive change: the task record carries id, parent and a path name
-(O-6), never printed in the report (O-5), so §6's equivalence still
-covers stderr.
+**Addendum impact (2026-10-10).** One real conflict, corrected: §6's
+"discarding equals never having run" needs more than Fail-only rows and
+Shareable captures, because by B2 an installed handler's clause effects
+are invisible in the child's row. The subset now also requires inert
+captures (B3b; O-3 for FX002 façades), adding excluded programs (children
+installing captured handlers with non-Fail clause rows) and a test. Selection,
+the discard contract and O1-O11 are otherwise unchanged. Additive: the
+task record carries id, parent and a path name (O-6), never printed in
+the report (O-5), so §6's equivalence still covers stderr.
 
 ## 10. Handoff
 
 **Settle before concurrency (FX002), mutable state (FX003), resumable
 handlers (FX006):**
-1. R0, for `defer` (ruled; strictness adopted 2026-10-09, relaxation BACKLOG FX007) and `par`.
+1. R0, for `defer` (ruled; strictness adopted 2026-10-09, relaxation BACKLOG FX007) and `par`, with B3b inert captures.
 2. B1 (lookup inherited, unwinding local, abort transfer at join).
 3. B3 as a transitive property of handler types plus the capture check:
    before FX003, which cannot land without it.
@@ -629,8 +662,11 @@ goroutine-safe; `main`'s report needs the child root to forward defects);
 its `defer` check needs R0, as ruled. None of
 Tasks 6-8 needs to be undone. §8A.2 lists Task 8's compatibility points
 with supervision; none changes behaviour. Recommended for ADR 010 (plan
-Task 12, wording only): cause kinds are an open set, the report and exit 1
-are `main`'s root policy, Go fatal errors exit 2. Deferred to FX002: D
+Task 12, wording only): cause kinds are an open set; `cleanup failed: `
+marks causes raised by cleanup (today every non-first cause: Task 10
+unaffected); the report and exit 1 are `main`'s root policy, present only
+with `defer` or `crash`; failures Go reports itself follow GOTRACEBACK
+(default exit 2): Go's behaviour, not a Waxwing guarantee. Deferred to FX002: D
 decision 9 and §3 "Defects" ("unwind to program exit") become "unwind to
 their task's root; for `main`, program exit".
 
@@ -721,3 +757,5 @@ Round 4 (re-review 3 minors N1-N5): applied verbatim from the re-review.
 
 Addendum 2026-10-10 (cc-requirements-ops.md): §8A (contracts O-1 to O-7); §9 impact note;
 §10 item 9, can-wait and Task 8/ADR 010 notes; Gleam OTP and Go sources.
+Addendum review (review-cf001-ops-result.md): C1 (B3b, O-3; §9 note now names a real conflict),
+I1-I6 (O-1, 8A.2, O-4, O-5, O-7, §10 ADR note) and M1-M9 applied; declined: none.
