@@ -10,8 +10,8 @@ Task 1's measurements reject a runtime shape. Tasks 1-5 are complete
 (Waxwing rename 40cf312). Tasks 6-9 are complete and reviewed on branch
 claude/vibrant-cerf-3km61i (cloud session, 2026-10-09; no worktree);
 Tasks 9-12 were amended 2026-10-09 after the CF001 design work and an
-Opus re-scan (ledger: rescan-9-12, rulings R1-R12). Task 10 is next,
-paused for the user's review (2026-10-10). Current evidence is in docs/progress.md and the local SDD
+Opus re-scan (ledger: rescan-9-12, rulings R1-R12). Task 10 is
+complete (2026-10-10); Task 11 is next, not started. Current evidence is in docs/progress.md and the local SDD
 ledger (.superpowers/sdd/, git-ignored).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

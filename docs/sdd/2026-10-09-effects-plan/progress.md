@@ -125,3 +125,19 @@ Task 9 fix round 2: cee8542. Controller evidence: new tests run against 04ab898 
 Task 9 re-review r2 (opus): N1 residual wrong note (topRowPure with two pure rows), N2 fixed (no wrong note in ~20 probes; missing notes acceptable), settleDeferred linear, I2 comment OK (record E011 gap at close). Fix round 3 → implementer (one-line + tighten N2 test).
 Task 9 fix round 3: b80cc17. Re-review r3 (sonnet; small diff) dispatched.
 Task 9: complete (2fc7a02, 04ab898, cee8542, b80cc17). STOP for user review before Task 10 (user 2026-10-10).
+User 2026-10-10: "Run Task 10" — pause lifted for Task 10 only; stop after Task 10 completes (Tasks 11-12 not requested).
+Ruling: Task 10 implementer on sonnet (user: cheaper models; prior rulings) — escalate to opus on BLOCKED or fix round 4 — cost if wrong: extra turns.
+Ruling: implementer edits docs/engineering.md only; controller writes the progress entry from the report — matches Tasks 6-9 practice — cost: none.
+Task 10: dispatched (sonnet), BASE 89de11c
+Task 10: implementer DONE_WITH_CONCERNS 50f84ae (strict-defer hole via failing handler clause found; parser re-implemented not extended; shrink first 3 diffs). Review (opus): Needs fixes — I1 Task 7 inline run probes (fx-specialize, fx-handler-check) not moved/traced; I2 verify gate (parallel T004, serial T003 ladder); I3 defer hole escalation.
+Ruling: accept fx-oracle-parse re-implementing the grammar (poly-parse is a closed closure, editing it is forbidden) — cost if wrong: a second parser to maintain.
+Ruling: accept shrinking only the first 3 differences per run (every difference's seed+source still written) — each candidate costs a Go build — cost if wrong: manual shrink of later diffs.
+Ruling: accept sensitivity check as interpreter vs flagged interpreter (serial run proves Go = interpreter) — cost: none.
+Ruling: verify gate — parallel T004 (3,000-constructor match) and serial T003 ladder failed identically in Task 9 logs (.build/fx001-task9-verify.log, fx001-task9-serial.log; base 89de11c differs from b80cc17 by docs/assets only); treat as the recorded timing set, controller adds recurrences to BACKLOG T003/T004; implementer reports the shrinker test's parallel-phase wall time — cost if wrong: a timing regression hidden in known noise.
+Ruling: strict-defer hole (defer op reaching a failing handler clause) → new BACKLOG item by controller, linked to FX007; generator restriction (fail-free random clauses) stays until fixed — cost: reduced clause-abort coverage meanwhile.
+Ruling: do not amend the pushed commit's trailer (Sonnet line) — no force-push for metadata; later commits use the Opus trailer — cost: one inaccurate trailer.
+Task 10: minor (deferred): Int 32-bit wrap latent; fx-oracle-parse.mjs 240 lines (split later).
+Task 10: fix round 1/5 (7 addressed, 0 open — Task 7 probes moved+traced, shrinker time, evidence before shrink, GOWORK+shrink budget, exact census, engineering.md sentence, URL paths; commits 50f84ae..9365db3)
+Task 10: minor (deferred): fx-oracle-frames.mjs:3 header comment stale ({created, called}); callback created with no handler counts as escaped; shrink deadline checked between candidates only; escaped-callback count equals crossing count (glance).
+Controller check: fn-scale "chain of 1,000 partial applications" failed in the fix serial log (not in Task 9's); fails alone 3/3 (310-341 ms phases) with src/scripts/test file unchanged since 89de11c → container bound, recorded under T007. Implementer's claim that it failed in Task 9's log was wrong (only test 19 did).
+Task 10: complete (commits 50f84ae..9365db3, review clean). STOP: user asked for Task 10 only.

@@ -3141,3 +3141,64 @@ against 04ab898 in an isolated worktree). Final verify
 one failure is large-source "three-thousand-constructor match" timing
 (BACKLOG T004; passes alone); serial phase failures are the T007 set;
 regression proofs 33/33 (.build/fx001-task9-fix3-regression.log).
+
+### FX001 Task 10 — reference interpreter and differential corpus (2026-10-10)
+
+Subagent-driven: Sonnet implementer (50f84ae; fix round 9365db3), Opus task
+review, Sonnet scoped re-review. Test-side only: no compiler source
+changed (`git diff 89de11c -- src scripts` is empty). New files:
+test/fx-oracle*.mjs (independent lexer, parser, values, frames, cleanup and
+interpreter; no compiler import), test/fx-gen-*.mjs and fx-programs.mjs
+(generator), fx-census.mjs, fx-shrink.mjs, fx-diff-support.mjs,
+fx-oracle.test.mjs (parallel) and fx-differential.serial.test.mjs (serial,
+ruling F11). Executable probes moved unchanged into importable modules and
+imported back: fx-cleanup-programs, fx-console-programs, fx-task7-programs
+(Task 7's eight inline run probes from fx-specialize and fx-handler-check).
+docs/engineering.md documents the corpus and the knobs `WAXWING_FX_SEED`
+and `WAXWING_FX_PROGRAMS`.
+
+The interpreter models the shipped semantics: handler frames keyed by effect
+identity, `Fail` by the payload's declared head, the first clause innermost,
+clauses in their `with`'s outer context, `defer` LIFO in its registration
+context, the pending abort heading a cleanup-crash report, `cleanup
+failed: ` lines in execution order. It is validated against every
+executable probe of Tasks 2, 4, 7 and 8 (fx-oracle.test.mjs 86/86); the
+fx-cleanup `injected` cases and fx-block `orders` probes (Go transformed
+after emission) are excluded by name. Ruled deviations: the oracle parser
+re-implements the grammar rather than extending poly-parse.mjs (a closed
+closure that may not be edited); only the first three differences per run
+are shrunk (every difference's seed and source are written first); the
+sensitivity check compares the interpreter with its inner-clause-context
+flag (50 programs, at least one difference), Go-vs-interpreter equality
+being the serial run's job.
+
+Default run: 500 programs, seed 20261010 (program i uses seed 20261010+i),
+five go-batches of 100, 0 differences, 0 rejections, 0 interpreter errors,
+12.9 s (.build/fx001-task10-fix-default.log). Census (minimum): nested
+same-key 225 (50), intercept-and-forward 68 (50), aborts crossing an
+unrelated handle 109 (50), stage order with over-application 90 (50),
+escaped callbacks 109 (50); cleanup normal 267, abort 363, defect 119,
+crash on normal exit 65, crash while abort pending 38, several crashes 38,
+own failure during abort 193, registration context 74, unreached defer 143
+(25 each). 25 rejection variants give E_EFFECT with the Task 8 texts at the
+`defer` span. Extra run: seed 7, 2,000 programs, 0 differences
+(.build/fx001-task10-large.log). Mutation witnesses (isolated copies):
+inner clause context, first clause outermost, FIFO cleanup, abort not
+heading the report, eager argument evaluation each fail the hand traces;
+disabling item removal or literal replacement fails the shrinker tests.
+
+Finding: the interpreter exposed a hole in the strict `defer` rule — a
+deferred operation whose handler clause fails ends cleanup in a typed abort
+(BACKLOG FX008). The generator emits only fail-free random clauses until it
+is fixed.
+
+Verify (.build/fx001-task10-fix-verify.log): build, gates, parallel 933/934
+— the one failure is large-source "three-thousand-constructor match" (T004;
+passes alone). Serial phase run directly (.build/fx001-task10-fix-serial.log):
+the new differential tests pass; failures are timing bounds only — the T007
+set, fn-scale 1,000-long arrow (also failed in Task 9's serial log), the
+match ladder (T003, also failed in Task 9's), and fn-scale "chain of 1,000
+partial applications" (phases 253 ms; new in this log, and failing alone
+three times at 310-341 ms with compiler, scripts and that test unchanged
+since 89de11c — the container's bound, recorded under T007). Regression
+proofs 33/33 (.build/fx001-task10-fix-regression.log).

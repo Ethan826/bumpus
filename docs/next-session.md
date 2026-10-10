@@ -1,8 +1,13 @@
-# Waxwing / FX001 paused before Task 10 for the user's review (2026-10-10)
+# Waxwing / FX001 paused after Task 10 (2026-10-10)
 
-Branch claude/vibrant-cerf-3km61i (fx001 + Tasks 6-9, all pushed). FX001
-Tasks 1-9 are complete and reviewed; Tasks 10-12 are amended in the plan
-(rulings R1-R12) and not started. The user asked to stop here for review.
+Branch claude/vibrant-cerf-3km61i (fx001 + Tasks 6-10, all pushed). FX001
+Tasks 1-10 are complete and reviewed; Tasks 11-12 are amended in the plan
+(rulings R1-R12) and not started. The user asked for Task 10 only.
+
+Task 10 (docs/progress.md) added a test-side reference interpreter and a
+500-program differential corpus (0 differences). It found FX008: a
+`defer`red operation whose handler clause fails escapes the strict rule.
+FX008 needs a rule decision with the user before or alongside Task 12.
 
 Awaiting the user's review:
 - CF001 concurrency foundations, docs/plans/2026-10-09-concurrency-
