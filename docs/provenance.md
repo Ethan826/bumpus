@@ -72,3 +72,10 @@ wordmark approximation, navy #10212D and coral #BD6048. These supplied notes
 are preserved; no new artwork or third-party source code was generated or
 copied for this migration. Historical Bumpus branding provenance remains in
 assets/branding/bumpus-README.md with the original image.
+
+2026-10-10 modules and instance selection: conceptual comparison of official
+fp-ts Semigroup, PureScript module, Rust visibility/coherence, OCaml module,
+TypeScript module-theory and GHC orphan-warning documentation. Source links
+and independent design questions are in
+docs/plans/2026-10-10-modules-and-instance-selection-direction.md. No external
+implementation copied; no module, class or evidence mechanism implemented.

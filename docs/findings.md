@@ -482,3 +482,13 @@ checking. The 20,000-type duplicate test is 475 ms after the fix (same 5 s
 bound); an isolated restored-strictness mutation fails that workload's
 timing assertion. Full Task 5 evidence and Task 9 deferred-row provenance
 handoff: .superpowers/sdd/2026-10-09-effects-plan/task-5-report.md.
+
+## Module boundaries and explicit instances (2026-10-10)
+
+C001 already called for several selectable instances per type without
+mandatory newtypes. The new modules-and-instance-selection direction expands
+that requirement to dictionary construction and composition, and coordinates
+it with M001/R001. Explicit selection removes implicit-choice ambiguity but
+not ordering consistency in collections or obligations for algebraic laws.
+Rust restricts orphan implementations; Haskell permits orphan instances with
+GHC warnings. No compiler behavior changed or runtime guarantee established.

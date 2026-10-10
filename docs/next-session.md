@@ -6,7 +6,10 @@ docs/plans/2026-10-10-abort-tracking-design.md (approach A, `nofail`
 marks on labels; decisions D0-D7 for the user). Independent Opus review:
 docs/sdd/2026-10-09-effects-plan/review-fx008-design-result.md. Revision 1
 applies it (C1, C2 fixed; L4/L5; D0-D7); re-review and round 3 in
-rereview-fx008-design-result.md; revisions 2-3 fix N1 (fixpoint termination). Next: the user's decision; then a plan amendment and
+rereview-fx008-design-result.md; revisions 2-3 fix N1 (fixpoint termination). Revision 5 adopts the focused termination review's corrected
+procedure (review-fx008-termination-result.md); current-checker defects
+FX009 and FX010 found. Outside advice in note §12 (advice only). Next:
+the user's decisions D0-D7; then a plan amendment and
 test-first implementation, then FX001 Tasks 11-12. Nothing implemented.
 
 # Waxwing / FX001: Task 10 done; FX008 design next (2026-10-10)

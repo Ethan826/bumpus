@@ -84,6 +84,11 @@ derive, and several selectable instances per type without mandatory
 newtypes. Instance identity and safe use of instance-sensitive collections
 remain design questions. No new class syntax is decided here.
 
+2026-10-10 elaboration: [modules and instance selection](2026-10-10-modules-and-instance-selection-direction.md)
+records fp-ts-style instance construction, explicit evidence, coherence and
+collection identity, plus module boundaries, abstract types and resolution.
+This is direction and open design work for C001/R001/M001, not a spec.
+
 ## Row-polymorphism and application architecture hypothesis
 
 Functions should express the services they need while accepting a larger

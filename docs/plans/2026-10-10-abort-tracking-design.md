@@ -6,8 +6,13 @@ Accept with fixes, C1-C2, I1-I4, M1-M10). Revision 2 applies the scoped
 re-review (rereview-fx008-design-result.md: C1, C2, I3, I4 and M1-M10
 addressed; I1 and I2 partly; new N1 non-termination, Critical, and
 N2-N5). Round 3 (N1 only) found the shared-suffix rule sound but the
-measure unsound as written, because it relied on provenance links; the
-recommended copy map and two wording fixes are applied, unreviewed. The note is awaiting the
+measure unsound as written, because it relied on provenance links.
+Revision 4 replaced the late-consumption step (§3.5 steps 1-3) after
+the user shared outside advice (§12). A focused termination review
+(review-fx008-termination-result.md) refuted P3 and P4 as written and
+found T1 (clause rigid tails dropped, Critical). Revision 5 adopts its
+corrected procedure. That procedure is the reviewer's own and has not
+been checked by a second party. The note is awaiting the
 user's decision and is not approved; nothing here is implemented. It will
 amend the effects spec (docs/plans/2026-10-09-effects-design.md) §2 and §3
 once the user decides. Context: BACKLOG FX008 and FX007; CF001 R0
@@ -211,7 +216,7 @@ fresh mark meta.
   blur what the clauses themselves perform.
 - Labels that reach a clause row later (through a shared meta, such as a
   callback's row fixed after the handler expression) are consumed into R
-  at settling, keeping `Fail` (§3.5 step 2). Today they reach R
+  at settling, keeping `Fail` (§3.5 steps 1-3). Today they reach R
   automatically, because clauses check against R itself
   (Handler.purs:38,71). Without late consumption the base effect system
   would become unsound (review C2).
@@ -243,36 +248,90 @@ again, then the comparable and printable checks, then the entry check
 restricted rows (deferred own rows and clause own rows); steps 2, 4 and 5
 are new (review C2, N2):
 
-1. `settleKeys`, unchanged.
-2. **Late consumption, to a fixpoint.** Labels that reached a restricted
-   row after it was checked are consumed into its target: the current row
-   at the `defer`, or R for a clause. Consuming can bind further metas, so
-   the step repeats until nothing new arrives. Clause rows keep `Fail`.
-   Deferred rows exclude it, as today, because step 4 rejects it.
-   - **Shared suffix (review N1, round 3).** Before each consumption,
-     follow both rows' substitution chains. Their common suffix starts at
-     the first tail meta the two chains share; resolved labels that merely
-     look equal do not count. Consume only the restricted row's labels
-     before that suffix, and never extend a shared tail. If a consumed
-     key is missing from *all* of the target's labels, including those in
-     the shared suffix, that is the existing side-condition error (`…
-     cannot be made equal: both end in …`), not a new label. Without this
-     rule, extending the shared tail would also grow the restricted row,
-     and the loop would never end.
-   - **Termination.** Step 2 keeps its own map from each extension meta
-     it creates to the (restricted row, label index) it copies. A label
-     that reaches a restricted row through a mapped meta counts as its
-     origin pair, and no pair is copied twice. Provenance links are not used:
-     spec §6 forbids provenance from influencing typing, and the links can
-     cycle. The pairs are bounded by the restricted rows' labels present
-     when step 2 starts, so the step terminates; a round that copies
-     nothing new ends it. The bound also covers two rows whose targets end
-     in each other's tails, which the direct shared-suffix check does not
-     see. If implementation shows the map is awkward, the fallback is to
-     never extend a tail that ends any restricted row: one pass and no
-     fixpoint, at the cost of rare spurious side-condition errors, which
-     §6 would then list.
-3. `settleKeys` again, as today.
+1–3. **Settle keys and consume late labels, as one loop** (revision 5).
+   This is the corrected procedure of the focused termination review,
+   review-fx008-termination-result.md. It replaces revision 4, which
+   failed P3 and P4, could hang (rule (c) on duplicates), and dropped
+   clause rows' rigid tails (T1). Each round:
+   - (a) Run `settleKeys`. Deferred `Fail` keys settled here may add
+     labels to restricted rows, clause rows included.
+   - (b) Resolve every restricted row X_i and its target T_i. Build the
+     **feed graph**: an edge i → j when T_i's and X_j's tails resolve to
+     the same unbound meta, compared as metas. Fix the round's order: a
+     topological order of the graph's strongly connected components, with
+     source position inside and between them.
+   - (c) For each key κ, let w_i(κ) = count_κ(X_i) − count_κ(T_i). Leave
+     out `Fail` keys for deferred rows. If some cycle (self-loops
+     included) has Σ w_i(κ) > 0, report the existing side-condition error
+     (`… cannot be made equal: both end in …`). Report it at that cycle's
+     earliest row with w_i(κ) > 0. Such a cycle has no finite solution,
+     and its sum never changes under later bindings. Cycles whose sum is
+     at most 0 for every key are allowed. The count must be per key: a
+     test of key presence alone hangs on duplicates (review dup.wxw).
+   - (d) In that order, consume each row's resolved labels into its
+     target, with a fresh tail. Clause rows keep `Fail`; deferred rows
+     leave it out, as today.
+   - **Exit** after a round in which (a) decided no pair and no restricted
+     row's resolved label count changed, whatever binding caused the
+     change. Argument-level row bindings count: a late label's argument
+     can bind a clause row's tail (review argbind.wxw).
+   - **On exit**, a deferred-key pair still set aside is E_TYPE `Fail
+     needs a concrete error family`. Then run the clause-tail pass.
+   - **Clause-tail pass (review T1).** A clause row whose resolved tail is
+     a rigid ϱ (for example, a clause calling an ambient-row callback)
+     needs R to end in ϱ.
+     - Bind R's unbound tail meta to ϱ. If R is closed, or ends in another
+       variable, report the missing-capability error.
+     - Repeat while that gives another clause row a rigid tail. Each
+       repetition binds a distinct meta.
+     - This pass runs after the loop, never inside it, so acceptance does
+       not depend on order.
+     - It adds no labels, so it cannot reopen the loop.
+     - Today the rule holds automatically, because clauses check against
+       R. Without the pass, the base effect system is unsound (the
+       review's rigid.wxw is rejected today).
+
+   Properties (the user's conditions, established by the focused review
+   with this correction; argument in the review file):
+   1. **Occurrence and multiplicity.** Rows grow only at their tails, and
+      keys are fixed after the first round. So the r-th occurrence of a key
+      in a restricted row always pairs with the r-th occurrence in its
+      target. Re-consuming the whole row is required: consuming only new
+      labels would pair a late duplicate with the wrong frame. No
+      provenance is read (spec §6).
+   2. **Repeated arrivals constrain.** Every round re-unifies every pair.
+      Old pairs are no-ops; new pairs are imposed.
+   3. **No early stop.** The exit test counts every source of new labels:
+      settled keys, feed-edge extensions, and argument-level bindings.
+   4. **Termination and order.**
+      - No step creates a new row-meta class. Each argument-level change
+        to the graph merges, closes or rigidifies a class, so there are at
+        most N0 + 1 epochs, where N0 is the initial number of classes.
+      - Within an epoch, propagation is Bellman-Ford relaxation. So the
+        loop runs at most (N0 + 1)(2n + 1) + 1 rounds, for n restricted
+        rows, plus the pairs that (a) decides.
+      - With no feed edges the loop takes two rounds, so linearity is
+        unaffected.
+      - The procedure accepts exactly when the containments and
+        equalities have a finite solution, which does not depend on
+        order.
+      - Sibling tie-breaks give the same equation set in every order;
+        for example `State(Int)` and `State(Bool)` reaching one tail from
+        two feeders mismatch in both orders, and only the headline
+        differs.
+
+   **Fallback, disqualified.** The fallback is never to extend a tail that
+   ends any restricted row. It rejects four programs that are accepted
+   today and that the corrected procedure accepts (review f1-f3,
+   cycle2open):
+   - a defer inside a clause;
+   - a clause inside a defer;
+   - a program with no `defer` at all (C2's late `Fail` inside an outer
+     clause), which breaks the success criterion that programs without
+     `defer` keep their acceptance;
+   - a satisfiable two-row cycle.
+
+   It is recorded only so that it is not chosen silently.
 4. **Defer judgement**, as today: a `Fail` label, or a rigid tail, is
    E_EFFECT. This judgement moves from before late consumption
    (Defer.purs:102-103) to after it. That is needed for C2, and it can
@@ -409,7 +468,7 @@ edges.
      nothing.
    - A lambda's row unifies with the current row at each call.
    - A clause runs in its `with`'s outer context. Its own row's labels
-     reach R, including late labels (§3.5 step 2), and R unifies with that
+     reach R, including late labels (§3.5 steps 1-3), and R unifies with that
      context's row. So the clause's operation marks describe the outer
      frames.
    - Values leave a declaration only through signature types, whose marks
@@ -471,14 +530,19 @@ or possible, except the last two, which are imprecision:
   Log + ...e)): Unit with nofail Log + ...e = with h { … }`: R's M `Log`
   mismatches the own row's N `Log`. That is sound behaviour, but R's
   invariance rejects it.
-- **A restricted row sharing its tail with its target** (§3.5 step 2,
+- **A restricted row whose late labels have no finite solution**
+  (§3.5 steps 1-3, step (c)). For example, review dup.wxw, accepted
+  today, whose defer row ends up `[Console, Log, Log] + τ` against
+  `[Log, Console] + τ`. It becomes the side-condition error. Today a
+  single pass adds a spurious label and stops.
+- **A restricted row sharing its tail with its target** (§3.5 steps 1-3,
   review N1). For example, a never-called lambda with `let k = fn(n: Int)
   => print(n); defer k(1); with handler Log { … } { k(2) }`. It is
   accepted today with a spurious `Log`. It becomes the existing
   side-condition error at the `defer`, because the monomorphic `k` is
   typed as performing `Log`. The no-`defer` form (a clause and the body
   both calling one local lambda) stays rejected with today's
-  side-condition error; without the shared-suffix rule it would hang.
+  side-condition error; without the cycle-weight rule it would hang.
 
 Unchanged:
 - programs without `defer` (acceptance and meaning);
@@ -571,13 +635,25 @@ Other checks:
 - linearity: 8,000 defers and 1,000 nested handlers settle in linear
   time.
 
+Termination review probes (.build/fx008-probes/), each with its expected
+outcome:
+- n1 and dup: rejected, under a timeout;
+- cycle2open, f1, f2, f3, argbind: accepted, with today's output;
+- rigid: rejected (T1);
+- argbind with the clause-tail pass mutated: accepted (the mutant is
+  caught).
+
 Termination (N1): the never-called-lambda program of §6 and the
 no-`defer` clause form each terminate with the side-condition error,
 under a test timeout.
 
 Isolated regression mutants, each caught:
 - seeding from demands only (cross-function program accepted);
-- the shared-suffix rule dropped (the N1 programs hit the timeout);
+- the per-key cycle weight replaced by key presence (dup hits the
+  timeout);
+- the exit test counting only feed-edge extensions (argbind's late `Fail`
+  never reaches R);
+- the clause-tail pass dropped (rigid accepted);
 - clause late consumption dropped, or `Fail` filtered from it (C2 program
   accepted);
 - clause rows shared with R (a precision acceptance fails);
@@ -654,3 +730,42 @@ unaffected.
   builds handlers inline, where marks are metas.
 - **D7. Directional consumption** (L4): a follow-up item (recommended), or
   part of FX008.
+
+## 12. Outside advice (2026-10-10; not the user's decisions)
+
+The user shared outside advice and asked that it be treated as advice
+only. D0-D7 remain open. Its technical points, recorded here:
+
+- **Recommendations:** D0 yes; D1 marks per occurrence; D2 `nofail`,
+  defined narrowly (no escaping typed abort; defects and divergence still
+  possible); D3 yes, with the opening rules reviewed carefully at callback
+  positions; D4 "abort-free" now; D5 re-scope FX007 around abort-free row
+  constraints; D6 a near-term follow-up, before reusable handler libraries
+  are treated as supported; D7 a follow-up with concrete acceptance
+  examples pinned now.
+- **Task 11 is not evidence of adequacy.** That Task 11 works with inline
+  handlers is delivery evidence, not evidence that the abstraction is
+  satisfactory. D6 and D7 affect ordinary composition: forwarding helpers,
+  and one value reused under different handlers. Writing a relationship
+  once in a type is close to the language's purpose, so duplication must
+  not become the long-term design. D6 and D7 stay visible as
+  composability work and are not closed by Task 11.
+- **The callback rule is conservative.** Rejecting callbacks whose
+  ambient rows are unconstrained is defensible. A future design should
+  accept callbacks whose rows establish abort freedom explicitly (the
+  `nofail ...e` direction, §4.5).
+- **Termination must be established, not assumed:** occurrence and
+  multiplicity preserved; repeated arrivals constrain; no early stop while
+  substitutions create obligations; indirect cycles terminate; acceptance
+  independent of order. These are the required properties of §3.5 steps
+  1-3, under focused review.
+- **The fallback is a separate precision trade-off.** It may not be
+  chosen silently during implementation; its extra rejections need
+  concrete examples and review (§3.5).
+- **Scope of the guarantee.** Erasing marks before specialization gives a
+  static guarantee without runtime machinery. It does not establish race
+  freedom, determinism or safe resource sharing, which remain separate
+  concurrency obligations (CF001).
+- **What verify shows.** The green verifies show that the documentation
+  changes preserve the existing compiler. They do not validate the
+  proposed checker.

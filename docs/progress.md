@@ -3253,3 +3253,46 @@ Revision 3 is not re-reviewed. Stopped for the user's decisions D0-D7.
 
 Verify at afedaec (docs only; .build/fx008-design-verify.log): `rm -rf output
 && npm run verify` exit 0; 934/934 parallel, 29/29 serial, 33/33 proofs.
+
+## Module and instance-selection direction (2026-10-10)
+
+At the user's request, documented module-system comparisons and fp-ts-style
+selection/construction of instances without mandatory newtypes in
+docs/plans/2026-10-10-modules-and-instance-selection-direction.md. Linked
+from language direction and C001/M001 backlog entries. Separates user
+preferences, recommendations and open decisions; covers abstraction/type
+identity, coherence, collection consistency and evidence for algebraic laws.
+No implementation or syntax approved. Active FX008 documents left untouched.
+Documentation inspection only; verification not run, preserving the user's
+instruction not to run checks for this discussion.
+
+Outside advice, shared by the user 2026-10-10 and treated as advice only
+(note §12; D0-D7 open), asked for a focused termination review. Revision
+4 rewrote §3.5 steps 1-3. The fresh Opus review
+(review-fx008-termination-result.md) found:
+- P1 established; P2 established, given P3's correction;
+- P3 and P4 refuted as written. Argument-level bindings add labels
+  (argbind), the cycle test hangs on duplicates (dup), and satisfiable
+  cycles are rejected (cycle2open);
+- new Critical T1: clause rows' rigid tails are dropped (rigid.wxw is
+  rejected today and would be accepted).
+
+Revision 5 adopts the corrected procedure:
+- per-key cycle weights;
+- exit when no label count changes, whatever binding caused it;
+- leftover set-aside pairs become E_TYPE;
+- a clause-tail pass after the loop;
+- the stated bound is (N0 + 1)(2n + 1) + 1 rounds;
+- the fallback is disqualified by four programs accepted today (f1-f3 and
+  cycle2open).
+
+The procedure is the reviewer's and has had no second check.
+
+Probes are copied to .build/fx008-probes/. The controller reproduced two
+defects in today's checker:
+- FX009: failvar2.wxw is accepted, and `run` panics with `no handler for
+  Fail`;
+- FX010: argbind-internal.wxw gives E_INTERNAL `Effect row consumption
+  failed`.
+
+Both are new BACKLOG rows.
