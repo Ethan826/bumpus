@@ -5,23 +5,18 @@ Status: Proposed (BK001); not authorized; pending user review. Revised
 effects-plan/review-bk001-result.md; responses at the end).
 
 Requirements (binding): .superpowers/sdd/2026-10-09-effects-plan/
-backend-requirements.md (user, 2026-10-10). Ground truth: src/Format/Go.purs
-and src/Format/Go/*.purs at 2fc7a02 (unchanged at 4dcf647), their git
-history, docs/progress.md, the SDD review ledgers, BACKLOG.md,
-scripts/structure.mjs, spago.yaml/spago.lock and the tests named below.
-Everything under "proposed" is design only.
+backend-requirements.md. Ground truth: src/Format/Go*.purs at 2fc7a02
+(unchanged at 4dcf647), git history, docs/progress.md, SDD review ledgers,
+BACKLOG.md, scripts/structure.mjs, spago files and the tests named below.
 
 ## 1. Scope and non-goals
 
-In scope: how Format.Go builds Go text; which representation would make
-it more readable and harder to get wrong; an incremental migration that
-keeps output byte-identical; what carries over to future targets.
-
-Non-goals: no implementation now; FX001's milestone (Tasks 9-12) is
-unchanged and no FX001 task depends on this; no change to emitted Go
-semantics, naming, runtime contracts or the ctx/defect modes; no new
-runtime, tool boundary or build-time Go tool; no design of the lowered IR
-(L001) or of any other target.
+In scope: how Format.Go builds Go text, a representation that makes it
+more readable and harder to get wrong, a byte-identical migration, and
+what carries over to future targets. Non-goals: no implementation now;
+FX001 (Tasks 9-12) unchanged; no change to emitted Go semantics, naming,
+runtime contracts or modes; no new runtime, tool boundary or build-time Go
+tool; no design of L001 or of any other target.
 
 ## 2. Survey of Format.Go
 
@@ -89,11 +84,11 @@ depth:
 | D5 | `payloadName` recursed along arrow spines; 5,000 arrows overflowed the JS stack (Task 8 review Important 2; fixed d5bfa8d) | stack depth in emission | Nothing representational; any new traversal must obey the same rule (§3.4) |
 | D6 | Nested IIFEs made `go build` exponential (E005); one long expression builds superlinearly (G003, findings.md:310-326) | build cost of emitted shape | Not prevented; an `iife` builder makes the sites countable |
 | D7 | Type names (Report.purs:48-51) and the effect name (Effect.purs:51-55) spliced into Go string literals unescaped (Task 8 review Minor) | literal quoting | One Go-correct quoting function. Latent: Lex.purs:202-211 limits names to ASCII letters, digits and `_`, so unreachable today; the comment the review asked for was never added |
-| D8 | ctx threading by convention: signatures (`declared`, `parameterList`, `contextParameter`, literal `ctx`) and calls (`passed`, `"ctx"`) agree only by review; `effect-free-ctx` regression row (scripts/regression.mjs:177) | declaration/call agreement | Calls built from the callee's own `Signature` (§3.1), so ctx is inserted from the declaration's flag |
+| D8 | ctx threading by convention: signatures (`declared`, `parameterList`, `contextParameter`, literal `ctx`) and calls (`passed`, `"ctx"`) agree only by review; no mismatch recorded; the `effect-free-ctx` row (scripts/regression.mjs:177) guards mode selection, a different check | declaration/call agreement (forward risk) | Calls built from the callee's own `Signature` (§3.1), by call kind |
 
-Risk ranking (likelihood × cost of a silent miss): D8 and D2 highest
-(every new lowering adds signatures and lookups; CF001 and the planned
-FX005 will change ctx threading), then D1/D3-style planning errors in
+Risk ranking (likelihood × cost of a silent miss): D2 highest (every new
+lowering adds lookups), D8 next as forward risk (no mismatch recorded,
+but the planned FX005 and FX002 change ctx threading), then D1/D3-style planning errors in
 Handle and Stage, then D7 (latent), then D2′, syntax and precedence (none
 observed; comparisons are fully parenthesized, Compare.purs:58-72).
 
@@ -107,8 +102,19 @@ observed; comparisons are fully parenthesized, Compare.purs:58-72).
 - (A+) Tier 1 of the recommendation: (A) plus the three things the
   defects ask for: Go-free plan records built totally; a `Signature`
   record and a `Callee` derived from it, so calls get ctx from the
-  callee's declaration (`callee ∷ Signature → Callee`, `call ∷ Callee →
-  Array String → String`); and one Go-correct `quoted`.
+  callee's declaration (`callee ∷ Signature → Callee` for declared
+  functions, constructors, lifted helpers and stages; `valueCallee ∷
+  String → Callee` for a function value, ctx from the program's
+  function-type mode; `call ∷ Context → Callee → Array String → String`,
+  where `Context` is `Threaded` (passes `ctx`) or `Root` (passes `nil`,
+  for `main`); a callee whose `Signature.context` is false (later stages,
+  runtime helpers) gets none); and one Go-correct `quoted`. Calls into
+  and out of `raw` runtime templates (`waxwingFind`, `waxwingInstall`,
+  `waxwingFail`, the frame fold, runtime-invoked handler clauses) stay
+  spelled in the template or at their one call site. For agreement to come
+  from the declaration, the `Signature` built where a function,
+  constructor or lifted helper is declared must reach its callers, so
+  `Wrapper` (Lowered.purs:73) or `Shape` gains it.
 - (A′) Tier 2: the (A+) helpers over opaque newtypes `Name`, `Type`,
   `Expr`, `Stmt`, `Decl` holding already-rendered text. Text is still
   produced eagerly, so no second traversal exists.
@@ -128,7 +134,11 @@ counts and which must reach zero at migration step 7. `Expr` carries its
 class, `newtype Expr = Expr { text ∷ String, primary ∷ Boolean }`:
 postfix builders (`call`, `select`, `index`, `assert`) parenthesize a
 non-primary operand (today's output has none, so byte identity holds),
-and `binary` always parenthesizes, as Compare does today.
+and `binary` always parenthesizes, as Compare does today. Function
+literals, composite literals, conversions, calls, selectors and
+parenthesized binaries are primary (Go `Operand`/`PrimaryExpr`), so
+`func() T { … }()` (Expression.purs:92-96) gains no parentheses;
+`&T{…}`, `*p` and unary `-` are not.
 `funcLiteral ∷ Signature → Layout → Array Stmt → Expr` is the only
 `Stmt → Expr` bridge; `iife` is `call` of a `funcLiteral` with no
 arguments, and its call sites are counted separately (D6).
@@ -163,7 +173,7 @@ oracles; that duplicates `go build`.
 | New code | ~120 lines | +~200 lines in 2 modules | library: none; in-repo ~200 | ~200 types + ~250 renderer |
 | Byte-identical migration | easy | easy: renders the same strings | hard: layout decided by the renderer; every one-line form needs explicit `group`/`flatten` | moderate: both layouts reproduced |
 | Stack profile | unchanged | unchanged | new: deep `Cat` chains | one more bounded-depth traversal |
-| Interface churn | none (`String` stays) | `Lowered.code`, `lifted` change type | low | `Lowered` changes type |
+| Interface churn | `Wrapper`/`Shape` gains `Signature` | `Lowered.code`, `lifted` change type | low | `Lowered` changes type |
 
 ### 3.4 Fit with project constraints
 
@@ -173,14 +183,12 @@ oracles; that duplicates `go build`.
   one-line functions; (C)'s renderer would be an E003-style flat dispatch.
   Builder names avoid PureScript keywords (`caseOf`, `ifThen`,
   `typeDecl`, `varDecl`).
-- Stack safety (spines of 20,000 arrows, 20,000-`let` blocks, 20,000
-  parameters): builders take `Array`s, Syntax defines no `List`, and
-  multi-element output uses `joinWith`; plans keep `mapAccumL`, which
-  traverses in balanced halves (Lowered.purs:179). Nesting is bounded by
-  E_NESTING (128) times a small lowering factor. (A+)/(A′) render eagerly
-  and add no recursion; step 2 adds a 20,000-parameter Entry test through
-  the builders. (B) is the risk: a 20,000-statement body as right-nested
-  `Cat` nodes is 20,000 deep unless the renderer runs an explicit stack.
+- Stack safety (20,000-arrow spines, 20,000 `let`s or parameters):
+  builders take `Array`s (no `List`), join with `joinWith`, and plans keep
+  `mapAccumL` (balanced, Lowered.purs:179); nesting is bounded by
+  E_NESTING. (A+)/(A′) render eagerly and add no recursion; step 2 adds a
+  20,000-parameter Entry test. (B) risks 20,000-deep `Cat` chains unless
+  its renderer runs an explicit stack.
 - Libraries: dodo-printer 2.2.3 (spago.lock:145) and prettier-printer
   3.0.0 (:430) are only in the registry 81.0.0 package-set listing, not
   resolved. The pure-layer allowlist (scripts/structure.mjs:18, enforced
@@ -198,7 +206,7 @@ oracles; that duplicates `go build`.
 | Representation | Basis | Tier |
 |---|---|---|
 | Go-free plan records per generator, built totally | demonstrated: D1, D2, D3 | 1 |
-| `Signature { name, context, parameters, result }` and `Callee` from it | demonstrated: D8 (34 ctx-helper and literal uses, 26 `func` sites) | 1 |
+| `Signature { name, context, parameters, result }` and `Callee` from it | risk: no recorded signature/call mismatch (`effect-free-ctx` is mode selection, not agreement); justified by the ctx changes FX005 and FX002 will make (CF001 §10 items 4, 6; changes 5-6) | 1 (if forward risk is accepted) |
 | Go-correct `quoted` string literal | demonstrated (latent): D7 | 1 |
 | Named layouts `Lines` / `Inline` for block-taking helpers | needed for byte identity (§5.3) | 1 |
 | `Type` with no empty value | loud failure only (D2′); risk, not a silent mistake | 2 |
@@ -309,18 +317,18 @@ entryDeclarations plan =
   where
   names = entryNames (Go.calleeName plan.wrapper)
   signature = entrySignature plan names
-  walk = Go.countDown names.position (Array.length plan.placed - 1)
-    [ Go.switchOn (Go.index (Go.ref names.kinds) (Go.ref names.position))
+  walk = Go.countDown Go.Lines names.position (Array.length plan.placed - 1)
+    [ Go.switchOn Go.Lines (Go.index (Go.ref names.kinds) (Go.ref names.position))
         (map (unpack names) plan.arrays)
     ]
-  final = Go.call plan.wrapper (map (argument names) plan.placed)
+  final = Go.call Go.Threaded plan.wrapper (map (argument names) plan.placed)
 
 table ∷ Name → Array Int → Decl
 table name values =
   Go.varDecl name (Go.arrayLiteral Go.int32Type (map Go.int values))
 
 unpack ∷ EntryNames → Storage → Go.Case
-unpack names storage = Go.caseOf (Go.int storage.kind)
+unpack names storage = Go.caseOf Go.Lines (Go.int storage.kind)
   [ Go.define names.node
       (Go.assert (Go.ref names.chain) (Go.pointer (nodeType storage.node)))
   , Go.assign (Go.index (Go.ref (slotArray storage.kind)) slot)
@@ -332,9 +340,10 @@ unpack names storage = Go.caseOf (Go.int storage.kind)
 ```
 
 `entrySignature` builds `{ name: names.entry, context: <the wrapper
-callee's context>, parameters: [ chain any ], result }`; `Go.call` inserts
-`ctx` from the callee's own flag, so the entry and the wrapped function
-cannot disagree (D8). `nodeValue`/`nodePrevious` are the `Name`s Stage's
+callee's context>, parameters: [ chain any ], result }`; `Go.call
+Go.Threaded` passes `ctx` exactly when the callee's own `Signature` has
+it, so the entry and the wrapped function cannot disagree (D8).
+`arrayLiteral` renders a sized `[n]T{…}`, n the element count. `nodeValue`/`nodePrevious` are the `Name`s Stage's
 `nodeType` declares. `storageVar`, `argument`, `placedKind`, `placedSlot`,
 `entryNames` and `slotArray` are one-line helpers.
 
@@ -352,7 +361,7 @@ helpers do not become a layout engine:
 
 | Layout | Rendering | Current uses |
 |---|---|---|
-| `Lines` | header ` {\n`, each statement then `\n`, no indentation, `}`; a top-level declaration adds `\n` before and after | function bodies, Entry, Handle, Match, Block |
+| `Lines` | header ` {\n`, each statement then `\n`, no indentation, `}`; the separator around a top-level declaration is a parameter of `declarations` (Entry and Stage: `\n` before and after; functions and lifted helpers: `\n` between, as Go.purs:52 and :125 do today), pinned per call site in step 1 | function bodies, Entry, Handle, Match, Block |
 | `Inline` | header `{ `, statements joined by `; `, ` }` | `func X(e any) T { return … }` (functions.go:180, 201), the `if` IIFE `{ if c { return a }; return b }`, `func main() { … }` (pinned by go-batch.mjs:37-48), one-line arms `if c { return x }` |
 
 `case k:` is followed by its statements in `Lines` form. Tab-indented
@@ -361,19 +370,17 @@ runtime text is not produced by helpers; it stays in `raw` templates
 
 ## 6. Preservation
 
-- Evaluation order: helpers never reorder; `Array` arguments and
-  statements render in the order given. Constructs that encode order stay
-  explicit: Apply's argument blocks (block-order row), the pipe
-  temporary, the lifted match scrutinee, the IIFE for `if`, `defer`
-  registration.
-- Determinism: no map is iterated while rendering; plans sort by kind or
-  keep today's first-request and first-appearance orders.
-- Generated naming: unchanged. Spellings stay in Format.Go.Data
-  (`functionName`, `localName`, …) and the per-function pre-order counter
-  in Lowered.
-- Runtime contracts: ctx first in every ctx-mode signature and call (from
-  `Signature.context`), handler/marker/frame layout, cleanup LIFO and the
-  defect report text are unchanged; ctx mode selection
+- Evaluation order: helpers never reorder; order-encoding constructs stay
+  explicit (Apply's argument blocks, the pipe temporary, the lifted match
+  scrutinee, the `if` IIFE, `defer` registration). Determinism: no map is
+  iterated while rendering. Naming: spellings stay in Format.Go.Data and
+  the pre-order counter in Lowered.
+- Runtime contracts: ctx first in every signature whose
+  `Signature.context` is true (functions, constructors, lifted helpers,
+  first stages, stage closures, entries; not later stages `(e any)`) and
+  in every call of such a callee; `main` passes `nil`; calls into and out
+  of `raw` runtime templates stay spelled in the template. Handler/marker/
+  frame layout, cleanup LIFO and the defect report text are unchanged; ctx mode selection
   (Context.usesContext) is planning and does not move.
 - Fixed runtime support stays readable templates: Context.runtime
   (Context.purs:108-175), Cleanup.cleanupRuntime, the fixed parts of the
@@ -381,10 +388,16 @@ runtime text is not produced by helpers; it stays in `raw` templates
   `raw` declaration, reviewed like data. Parameterized generators (per-type
   Compare/Show helpers, Effect structs and perform functions, Handle,
   Stage, Entry, Match, Block) migrate.
-- Quoting: `quoted` implements Go's interpreted-string escaping (`\"`,
-  `\\`, `\n`, `\t`, `\xNN` or `\u` forms for other control and non-ASCII
-  code points). It must not use PureScript `show`, whose decimal escapes
-  (`\127`, prelude `showStringImpl`) Go rejects. Until step 6, the comment
+- Quoting: `quoted` implements Go's interpreted-string escaping: `\"`,
+  `\\`, `\n`, `\r`, `\t`; other code points below U+0020 and U+007F as
+  `\xNN` (a single byte, equal to the code point only below U+0080);
+  every other code point emitted as itself (Go source is UTF-8) or as
+  `\uXXXX` / `\UXXXXXXXX` (eight digits above U+FFFF), never `\xNN`;
+  `'` is not escaped (`\'` is invalid in Go strings). It decodes UTF-16
+  surrogate pairs first; a lone surrogate has no Go escape and cannot
+  arise from Lex-restricted names (Lex.purs:202-211). It must not use
+  PureScript `show`, whose decimal escapes (`\127`, prelude
+  `showStringImpl`) Go rejects. Until step 6, the comment
   the Task 8 review asked for goes on Report `described` and Effect
   `perform` in the next commit that touches either file.
 
@@ -402,10 +415,13 @@ green, emitted Go byte-identical, regression proofs 100%.
 1. Tier 1 helpers: `Signature`/`Callee`, `quoted`, the comma/call/block
    helpers with both layouts, and unit tests pinning each helper's text,
    quoting included.
-2. Entry and Stage's node numbering (§5): total plans; functions.go.
-   Afterwards decide Tier 2 (§9).
-3. Stage, Lambda, Value, Apply, Pipe: functions.go; removes `maybe ""`
-   (D2′).
+2. Entry and Stage's node numbering (§5): total plans; stages generated
+   by iterating the `Parameter` array (`mapWithIndex`, with the next
+   element zipped), not `Array.index`, so `numberOf`, `parameter` and
+   `node` lose their defaults (D2, D2′); functions.go. Afterwards decide
+   Tier 2 (§9).
+3. Stage's remaining parts, Lambda, Value, Apply, Pipe: functions.go;
+   `Wrapper` gains each callee's `Signature`.
 4. Match, Data, Compare, Show: shapes.go, tree.go, lists.go.
 5. Go.purs (`function`, `entryMain`, `imports`), keeping the one-line
    `main` go-batch.mjs matches.
@@ -415,10 +431,11 @@ green, emitted Go byte-identical, regression proofs 100%.
 7. Tier 2 only: `Lowered.code`/`lifted` become `Expr`/`Array Decl`;
    `fromLowered` count reaches zero.
 
-Ordering: steps 0, 1 and 6 are the prerequisite for CF001 and FX005
-lowering implementation (6 depends only on 0-1). Steps 2-5 and 7 are
+Ordering: steps 0, 1 and 6 are the prerequisite for FX005 and FX002
+lowering (FX002 implements CF001; FX005 precedes FX002, CF001
+design:631-632); 6 depends only on 0-1. Steps 2-5 and 7 are
 unordered and may follow. Independently of BK001, any earlier change to
-Stage or Entry (for example FX005 or CF001 lowering) should make
+Stage or Entry (for example FX005 or FX002 lowering) should make
 `numberOf`/`lookupOr` total then rather than wait.
 
 Costs to plan for:
@@ -470,13 +487,17 @@ Two tiers; only Tier 1 is recommended now.
 
 Tier 1 (smallest useful abstraction, (A+)): Go-free plan records built
 totally (no default-on-miss lookups), a `Signature` with a `Callee`
-derived from it so every call takes ctx from its callee's declaration,
+derived from it so each call takes ctx by call kind from its callee's
+declaration (§3.1),
 one Go-correct `quoted`, and `String` helpers for the repeated shapes of
 §2.1 with explicit `Lines`/`Inline` layouts; a `raw` path for fixed
-runtime templates. Each part answers a recorded defect class: D1 and D3
-(plans), D2 (total plans), D7 (quoting), D8 (`Callee`), and the 607
-concatenations. `Lowered` keeps `String`, so there is no interface churn,
-no new traversal and no dependency or gate change.
+runtime templates. Basis: recorded defects D1 and D3 (plans), D2 (total
+plans) and D7 (quoting, latent); D8 (`Callee`; forward risk, kept in Tier
+1 only if the user accepts that basis); and the 607 concatenations.
+`Lowered.code` keeps `String`; `Wrapper` (or `Shape`) gains each callee's
+`Signature`, the only interface change (cost: every `Wrapper` producer in
+Lowered and its readers in Value, Stage, Apply and Lambda, in step 3 and
+step 6). No new traversal and no dependency or gate change.
 
 Tier 2 (optional, decided after migration step 2): the (A′) opaque
 newtypes with the export-list rules of §3.1 (`primary` tag, `funcLiteral`
@@ -487,8 +508,8 @@ is justified by a recorded defect today (§4). A full AST (C) waits for a
 consumer that must read Go back; a Doc (B) waits for width-based layout.
 
 Priority: after FX001 (Tasks 9-12 and merge; not added to that
-milestone). Steps 0, 1 and 6 must precede CF001 and FX005 lowering
-implementation (CF001 is a proposed design pending review; FX005 is
+milestone). Steps 0, 1 and 6 must precede FX005 and FX002 (CF001's
+implementation) lowering (CF001 is a design pending user review; FX005 is
 planned in effects-design.md:695 and CF001 design:631, not a BACKLOG
 row); steps 2-5 and 7 can wait, though G003's statement splitting and
 A002's implementation are easier after step 4. It does not block CF001's
@@ -497,7 +518,7 @@ work (E007, E008, T002) and timing environment work (T003, T007).
 
 Proposed BACKLOG row (for the controller):
 
-| BK001 | Proposed | Go backend maintainability, docs/plans/2026-10-10-backend-syntax-proposal.md (not authorized; pending user review). Tier 1: Go-free plan records built totally, `Signature`/`Callee` so calls take ctx from the callee's declaration, Go-correct string quoting, `String` helpers with explicit `Lines`/`Inline` layouts, `raw` only for fixed runtime templates. Tier 2 (opaque `Expr`/`Stmt`/`Type`/`Name`/`Decl` newtypes) optional, decided after step 2. Evidence: 607 concatenations in 20 modules; D1 frame order (4b80bd1); D2 key-0 defaults (4b80bd1; still Stage.purs:194 `numberOf`, Entry.purs:106-107 `lookupOr`); D3 unused arrow type (3a3d197); D7 unescaped names (Task 8 review; latent); D8 ctx agreement by convention. No library (structure gate allowlist); no gofmt at build time. Steps 0, 1, 6 before CF001/FX005 lowering; 2-5, 7 later; each byte-identical against bootstrap/*.go and an effect-mode emit corpus; 12 Format.Go regression needles re-targeted and re-proven. Accept: verify green, regression proofs 100%, no Format.Go module over 250 lines. |
+| BK001 | Proposed | Go backend maintainability, docs/plans/2026-10-10-backend-syntax-proposal.md (not authorized; pending user review). Tier 1: Go-free plan records built totally, `Signature`/`Callee` so calls take ctx from the callee's declaration, Go-correct string quoting, `String` helpers with explicit `Lines`/`Inline` layouts, `raw` only for fixed runtime templates. Tier 2 (opaque `Expr`/`Stmt`/`Type`/`Name`/`Decl` newtypes) optional, decided after step 2. Evidence: 607 concatenations in 20 modules; D1 frame order (4b80bd1); D2 key-0 defaults (4b80bd1; still Stage.purs:194 `numberOf`, Entry.purs:106-107 `lookupOr`); D3 unused arrow type (3a3d197); D7 unescaped names (Task 8 review; latent); D8 ctx agreement by convention (forward risk; no mismatch recorded). No library (structure gate allowlist); no gofmt at build time. Steps 0, 1, 6 before FX005/FX002 lowering; 2-5, 7 later; each byte-identical against bootstrap/*.go and an effect-mode emit corpus; 12 Format.Go regression needles re-targeted and re-proven. Accept: verify green, regression proofs 100%, no Format.Go module over 250 lines. |
 
 ## Review response (2026-10-10)
 
@@ -514,5 +535,9 @@ Proposed BACKLOG row (for the controller):
 | I9 layouts | §5.3 `Lines`/`Inline` defined; step 1 pins both |
 | M1-M9 | 2,766 lines; effect name (§2.2, D7); keyword-free names `caseOf`/`ifThen`/`typeDecl`/`varDecl`/`switchOn`; `Go.int32Type`; `nodeValue`/`nodePrevious` from Stage; §6 quoting without `show`; "no Go syntax" plans carrying a `Callee`; FX005 cited as planned; §3.4 stack sentence |
 | Early-action note | D7 comment and `numberOf`/`lookupOr` totality recorded in §6 and §7 |
+
+| N1 `Callee` coverage | §3.1 call kinds (`callee`, `valueCallee`, `Threaded`/`Root`, ctx-free later stages, `raw` calls); §6 contract sentence; §9 and §3.3 `Wrapper` interface change with cost |
+| N2 D8 basis | D8 row, §4 row and §9 relabel `Signature`/`Callee` as forward risk (FX005/FX002); risk ranking reordered |
+| N3-N8 | replacement texts applied: quoting rule (§6), declaration separators (§5.3), layout arguments and `arrayLiteral` (§5.2), primary literals (§3.1), step 2 Stage totality (§7), FX002 in ordering, priority and BACKLOG row |
 
 Declined: none.
