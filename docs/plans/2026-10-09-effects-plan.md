@@ -854,7 +854,8 @@ programs at `Features.Check.Unlowered` (Global Constraints).
   types plus the capture check, CF §10.3), FX005 (`ctx` elimination and cached
   lookup; Task 1 lookup at depth 10,000 took 11.8 s per 10^6; caches are per
   task or immutable at publication, never written into a node reachable from
-  another goroutine, CF §10.4; before FX002), FX006 (general resume `ctl`;
+  another goroutine, CF §10.4; before FX002), FX006 (row added 2026-10-10 with design
+  constraints; extend it here: general resume `ctl`;
   continuation ownership C6 and discard as an exit reason; multi-shot `defer`
   unresolved; no capture across a foreign frame, I001; confining CPS without
   row-keyed specialization, since rows are erased, spec §4). Update CF001

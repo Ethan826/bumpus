@@ -3468,3 +3468,49 @@ At the user's request (2026-10-10) the remaining file,
 docs/plans/2026-10-10-schema-direction.md, is committed here. The
 content was not edited. Process fix: commits in a shared checkout stage
 explicit paths only.
+## FX006 constraints and FX008 hypothesis recorded (2026-10-10)
+
+Docs only, from a review of the draft Waxwing article outline. BACKLOG
+gains FX006 (general resume) ahead of FX001 Task 12, carrying the plan's
+scope plus the user's constraints: multiplicity decided on language terms,
+one-shot by default and declared per operation so multi-shot stays an
+additive, row-visible extension, reserved spelling, at-most-once assumptions
+stated in `defer`/FX003/CF001, and a double-resume regression. FX008
+records an unverified hole in `defer must not fail` through a failing
+handler clause. (Merged 2026-10-10 into branch fx008, which already
+tracked and verified this hole as FX008: the duplicate row was folded into
+that record. See "FX008 merge with the article-outline branch" below.) language-direction.md records the user's direction that the
+language (frontend, syntax, type system) outranks the Go target. No code
+changed; no build or verify ran (a parallel worktree was active).
+
+## FX008 merge with the article-outline branch (2026-10-10)
+
+Branch claude/optimistic-dijkstra-6i21jy (81990d6, 2b42574; docs only,
+from main 234d115) is merged into fx008 with a merge commit. Its FX006
+row and the language-direction section "Language before target" are kept
+unchanged. The FX008 work does not contradict FX006's constraints:
+design §4.6 makes any `ctl` clause's handler may-fail until general
+resume. Its Task 12 change to the effects plan is kept.
+
+Its FX008 row duplicated this branch's FX008, recorded there as an
+unverified hypothesis. It is folded into this branch's row and removed.
+The folded-in facts:
+- the argument that the handler need not be local;
+- the Task 8 review's claim that clauses reach the deferred row only
+  through metas or rigid tails, which this case refutes.
+
+Established on the current compiler (probes in .build/fx008-probes/facts/):
+- the lexical and cross-function forms are accepted;
+- without a pending abort, the cleanup's `fail(E)` skips the enclosing
+  `handle` for E: exit 1, stderr `fail(E): E`;
+- with a pending `fail(F)`, F never reaches its `handle`: exit 1, stderr
+  `fail(F): F` then `cleanup failed: fail(E): E`.
+
+docs/writing/article-outline.md Part 3 §5 now states:
+- how the hole was found: the Task 10 reference interpreter;
+- the review findings on termination and on rejected programs, with
+  references;
+- the repair status: design approved, plan in progress, not implemented.
+
+§4 (the Task 8 case study) was checked against review-task8-result.md:
+the five programs and the 25/25 tests match. It is unchanged.

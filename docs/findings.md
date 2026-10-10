@@ -519,3 +519,13 @@ Schema supports the multi-interpretation goal through a different encoding.
 Effect also has an AST and interpreter customization. Library-specific
 conveniences do not establish architectural superiority; io-ts's relevant
 API is explicitly experimental. Details/sources in schema-direction.
+
+## Shared checkouts need explicit staging (2026-10-10)
+
+Two sessions edited one checkout concurrently. A `git commit -a` in one
+of them committed the other's uncommitted SCH001 edits under an unrelated
+message (4539150; corrected in progress, not by rewriting history).
+Independently, a second session recorded the FX008 hole as a new BACKLOG
+row on its own branch, duplicating this branch's record. In a shared
+checkout, stage explicit paths. Before adding a BACKLOG row, check the
+other active branches for one.

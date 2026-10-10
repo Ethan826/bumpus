@@ -372,6 +372,18 @@ separate focused designs; sharing pure modules across targets presupposes
 M001 and compatible public data/serialization contracts. None is supplied
 by an additional emitter alone.
 
+### Language before target (user direction, 2026-10-10)
+
+Waxwing is its frontend, syntax and type system; the Go target is the least
+important part. Semantic rules (resumption multiplicity, cleanup,
+concurrency, effect typing) are decided and justified on language terms. A
+Go convenience such as goroutine-backed continuations or Go's scheduler may
+inform cost, but is never the reason for a rule. Capability comparisons
+with other languages, such as Koka, are made at the language level:
+implementation choices (rows erased before specialization) and host-interop
+boundaries (no continuation capture across a foreign frame) are not
+language gaps. Applied first to general resume (BACKLOG FX006).
+
 ## Planning sequence and evidence
 
 LA001 adds a structured cross-language/library/runtime audit:
