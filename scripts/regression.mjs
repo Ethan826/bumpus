@@ -172,6 +172,15 @@ const rows = [
     message: /deferred Fail capability: wrong diagnostic code/
   },
   {
+    // FX009: a pair still set aside after settling is rejected, never
+    // dropped (the rigid Fail(a) row would reach run time unhandled).
+    name: 'postponed-fail', file: 'src/Features/Check/Failure.purs',
+    needle: '    if Array.null bindings.postponed then Right settled\n'
+      + '    else unresolved (failureSpan body)',
+    replacement: '    Right settled',
+    probe: 'postponed-fail', message: /postponed Fail pair: program was accepted/
+  },
+  {
     // FX001 Task 7: the mode is chosen over the emitted IR; threading the
     // context through every program breaks Console-only output.
     name: 'effect-free-ctx', file: 'src/Format/Go/Context.purs',

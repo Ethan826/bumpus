@@ -20,6 +20,19 @@ const duplicateScanTiming = ({ compile, Left, wire }) => {
   console.log(`large-source duplicate timing: ${seconds}s`);
 };
 
+// FX009: a row pair set aside on a rigid Fail payload is E_TYPE, not dropped.
+const postponedFail = ({ compile, Left, wire }) => {
+  const result = compile('type E = E; '
+    + 'fn g(h: Int -> Unit with Fail(a)): Unit = (); '
+    + 'fn main(): Unit with Console = g(fn(n: Int) => fail(E));');
+  assert.ok(result instanceof Left, 'postponed Fail pair: program was accepted');
+  const found = wire(result.value0);
+  assert.equal(found.code, 'E_TYPE', 'postponed Fail pair: wrong code');
+  assert.equal(found.message, 'Fail needs a concrete error family',
+    'postponed Fail pair: wrong message');
+};
+
 export const task5Probes = {
+  'postponed-fail': postponedFail,
   'duplicate-scan-timing': duplicateScanTiming
 };
