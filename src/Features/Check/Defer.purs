@@ -53,7 +53,8 @@ checkDefer infer env state span value = do
     value
   typed ← require env inferred.state TUnit inferred.value
   let Row labels _ = resolvedRow typed.subst row
-  traverse_ (refuseFail env typed span inferred.value) (placed typed labels row)
+  traverse_ (refuseFail env typed span inferred.value inferred.value)
+    (placed typed labels row)
   consumed ← consumeVia env typed (crossing span)
     (occurrencesOf typed.subst (flexibleRow row))
     (Row labels (Just (Hole typed.next)))
@@ -96,13 +97,13 @@ crossing span = { span, consumed: Application, via: Just DeferItem }
 -- after its `defer` is consumed into the enclosing row now. The result is
 -- the substitution to settle once more.
 settleDeferred
-  ∷ ∀ r. DeferEnv r → State → Either Diagnostic Subst
-settleDeferred env state = do
+  ∷ ∀ r. DeferEnv r → State → Checked.Expr → Either Diagnostic Subst
+settleDeferred env state whole = do
   traverse_ judged state.deferrals
   finished ← foldM later state state.deferrals
   pure finished.subst
   where
-  judged found = judge env state found
+  judged found = judge env state whole found
   later reached found = bumped <$> consumeVia
     (env { current = found.current, sites = found.sites })
     reached
@@ -116,9 +117,15 @@ settleDeferred env state = do
   rowLabels reached found = case resolvedRow reached.subst found.row of
     Row labels _ → labels
 
-judge ∷ ∀ r. DeferEnv r → State → Deferral → Either Diagnostic Unit
-judge env state found = do
-  traverse_ (refuseFail env state found.span found.body)
+judge
+  ∷ ∀ r
+  . DeferEnv r
+  → State
+  → Checked.Expr
+  → Deferral
+  → Either Diagnostic Unit
+judge env state whole found = do
+  traverse_ (refuseFail env state found.span whole found.body)
     (placed state labels found.row)
   maybe (Right unit) (rigidTail env state found) tail
   where
@@ -147,9 +154,16 @@ refuseFail
   → State
   → Span
   → Checked.Expr
+  → Checked.Expr
   → Tuple (Label (Ty Open)) OccurrenceId
   → Either Diagnostic Unit
-refuseFail env state span body (Tuple label@(Label _ arguments) occurrence) =
+refuseFail
+  env
+  state
+  span
+  whole
+  body
+  (Tuple label@(Label _ arguments) occurrence) =
   if failing label then named else Right unit
   where
   named = do
@@ -157,6 +171,6 @@ refuseFail env state span body (Tuple label@(Label _ arguments) occurrence) =
     Left
       { problem: DeferMayFail name
       , span
-      , related: failureNotes state span body name occurrence
+      , related: failureNotes state span whole body name occurrence
       }
   payload = Array.take 1 arguments

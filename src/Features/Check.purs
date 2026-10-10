@@ -114,7 +114,7 @@ checkFunction holders env function = do
   finished ← require env body.state (rigid function.result) body.value
   maybe (Right unit) tooDeepAt (firstTooDeep finished.subst body.value)
   firstSubst ← settleKeys env finished body.value
-  laterSubst ← settleDeferred env (finished { subst = firstSubst })
+  laterSubst ← settleDeferred env (finished { subst = firstSubst }) body.value
   settledSubst ← settleKeys env (finished { subst = laterSubst }) body.value
   let settled = settle settledSubst body.value
   let ended = finished { subst = settledSubst }

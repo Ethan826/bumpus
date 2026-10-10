@@ -1,5 +1,6 @@
 import test from 'node:test';
-import { clock, db, expectDiagnostic, log } from './fx-diagnostics-support.mjs';
+import assert from 'node:assert/strict';
+import { clock, db, diagnose, expectDiagnostic, log } from './fx-diagnostics-support.mjs';
 
 test('repeated Fail families attribute each origin to its own occurrence', () => {
   const types = 'type A = A; type B = B; ';
@@ -153,4 +154,61 @@ test('defer calling a named function with a callback names the call', () => {
       'any effect of ... comes from this call of use'],
     [bracket.trim(), bracket.trim(), '... is declared here']]
   });
+});
+
+test('a nested pure row names the parameter, not the outer with', () => {
+  const once = 'fn once(f: Int -> (Int -> Int with pure) with Log): Int = 0; ';
+  const callback = 'fn(x) => fn(y) => { log(y); y }';
+  expectDiagnostic(log + once + `fn main(): Int = once(${callback});`, {
+    code: 'E_EFFECT',
+    message: 'This function must be pure, but it performs Log',
+    at: [callback],
+    notes: [[callback, 'log(y)', 'Log is performed here'],
+      [once, 'f', 'this parameter must be pure', 'fn once('.length]]
+  });
+});
+
+test('a nested row variable is declared at the parameter, not a with', () => {
+  const run = 'fn run(k: (Unit -> Unit with ...e) -> Unit with pure, '
+    + 'g: Unit -> Unit with ...e): Unit with ...e = { defer g(()); () }; ';
+  expectDiagnostic(run + 'fn main(): Unit = ();', {
+    code: 'E_EFFECT',
+    message: 'defer must not fail, but it may perform any effect of ...e',
+    at: ['defer g(())'],
+    notes: [[run, 'g(())', 'any effect of ...e comes from this function value'],
+      [run, 'k', '...e is declared here', 'fn run('.length]]
+  });
+});
+
+// The Fail note blames the call that brings in the reported label, not the
+// first call whose row holds some Fail.
+test('a late Fail key blames its own call, not an innocent identity call', () => {
+  const lambdas = 'let k = fn(u) => u; let a = fn(x) => fail(x); '
+    + 'defer { k(()); a(A) }; ()';
+  const work = `fn work(): Unit = handle { ${lambdas} } `
+    + '{ fail(error: A) => () }; ';
+  expectDiagnostic('type A = A; ' + work + 'fn main(): Unit = ();', {
+    code: 'E_EFFECT', message: 'defer must not fail, but it performs Fail(A)',
+    at: ['defer { k(()); a(A) }'],
+    notes: [[work, 'a(A)', 'Fail(A) comes from this function value',
+      'fn work(): Unit = handle { let k'.length],
+    [work, 'fail(x', 'Fail(A) is raised here']]
+  });
+});
+
+test('a late Fail key blames the call of the reported family', () => {
+  const lambdas = 'let b = fn(x) => fail(x); let a = fn(x) => fail(x); '
+    + 'defer { b(B); a(A) }; ()';
+  const work = `fn work(): Unit = handle { ${lambdas} } `
+    + '{ fail(error: A) => (), fail(error: B) => () }; ';
+  const { diagnostic } = diagnose('type A = A; type B = B; ' + work
+    + 'fn main(): Unit = ();');
+  const family = /Fail\((A|B)\)/.exec(diagnostic.message)[1];
+  const call = `${family.toLowerCase()}(${family})`;
+  assert.equal(diagnostic.related[0].message,
+    `Fail(${family}) comes from this function value`);
+  const text = 'type A = A; type B = B; ' + work;
+  const at = text.indexOf(call, text.indexOf('defer {'));
+  assert.deepEqual([diagnostic.related[0].span.start.offset,
+    diagnostic.related[0].span.end.offset], [at, at + call.length]);
 });

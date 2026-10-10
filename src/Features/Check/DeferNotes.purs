@@ -4,12 +4,13 @@ import Prelude
 import Data.Array as Array
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Domain.Checked.Internal (Open(..))
+import Domain.Resolved (LocalId)
 import Domain.Checked.Internal as Checked
 import Domain.Resolved as Resolved
-import Domain.Row (EffectRef(..), Label(..), Row(..))
+import Domain.Row (Row(..))
 import Data.Tuple (Tuple(..))
 import Domain.Syntax (Note, NoteReason(..), Span)
-import Domain.Type (TyRow, VarId(..))
+import Domain.Type (Ty(..), TyRow, VarId(..))
 import Domain.Type.Parts (children, rowsOf)
 import Features.Check.Context (CheckEnv)
 import Features.Check.Occurrence (OccurrenceId)
@@ -18,27 +19,67 @@ import Features.Check.Report (crossingNotes, noteAt, originNotes)
 import Features.Check.Scheme (Deferral, State, resolved)
 
 -- A deferred expression that performs `label`: where inside it the label
--- arose, through a called function's row or a `Fail` key settled later. A
--- key settled later leaves no origin at the application that brought the
--- `Fail` in, so the first application whose row now holds one is noted.
-failureNotes ∷ State → Span → Checked.Expr → String → OccurrenceId → Array Note
-failureNotes state span body label occurrence =
+-- arose, through a called function's row. A `Fail` key settled after the
+-- `defer` leaves no origin at the application that brought it in; the
+-- `fail` that raised it is known, so the application is the first in the
+-- deferred expression whose callee is a local bound to a function
+-- containing that `fail` (`whole` is the function's body, where the
+-- binding is).
+failureNotes
+  ∷ State
+  → Span
+  → Checked.Expr
+  → Checked.Expr
+  → String
+  → OccurrenceId
+  → Array Note
+failureNotes state span whole body label occurrence =
   brought <> originNotes span label hops <> crossingNotes label hops
   where
   hops = trail state.subst state.origins occurrence
-  brought =
-    if Array.any consumed (Array.mapMaybe originOf hops) then []
-    else maybe [] (Array.singleton <<< bring)
-      (firstApplication failing state body)
+  origins = Array.mapMaybe originOf hops
   originOf hop = hop.origin
-  consumed origin = case origin.consumed of
-    Operation _ → false
-    FailOf _ → false
-    _ → true
+  brought =
+    if Array.any viaCall origins then []
+    else maybe [] (bringing <<< spanOfOrigin) (Array.find raised origins)
+  spanOfOrigin origin = origin.span
+  bringing raiseSpan = maybe [] (Array.singleton <<< bring)
+    (boundCall (letsContaining raiseSpan whole) body)
+  raised origin = case origin.consumed of
+    FailOf _ → true
+    _ → false
+  viaCall origin = case origin.consumed of
+    CallOf _ → true
+    Application → true
+    _ → false
   bring application = noteAt (Checked.spanOf application)
     (FromFunctionValue label)
-  failing (Row labels _) = Array.any isFail labels
-  isFail (Label effect _) = effect == FailEffect
+
+-- The first application in the expression whose callee is one of the locals.
+boundCall ∷ Array LocalId → Checked.Expr → Maybe Checked.Expr
+boundCall locals whole@(Checked.Expr expression) = case expression.node of
+  Checked.Apply (Checked.Expr callee) _ | boundTo callee.node → Just whole
+  _ → Array.head (Array.mapMaybe (boundCall locals) (parts whole))
+  where
+  boundTo = case _ of
+    Checked.Local local → Array.elem local locals
+    _ → false
+
+-- The locals `let`-bound, anywhere in the expression, to a value whose
+-- span contains `inner`.
+letsContaining ∷ Span → Checked.Expr → Array LocalId
+letsContaining inner whole@(Checked.Expr expression) =
+  here <> Array.concatMap (letsContaining inner) (parts whole)
+  where
+  here = case expression.node of
+    Checked.Block items _ → Array.mapMaybe bound items
+    _ → []
+  bound = case _ of
+    Checked.Let (Just local) (Checked.Expr value)
+      | contains value.span inner → Just local
+    _ → Nothing
+  contains outer within = outer.start.offset <= within.start.offset
+    && within.end.offset <= outer.end.offset
 
 -- A deferred expression that may perform any effect of a rigid row: the
 -- application (or named call) whose row carried the tail, and where the
@@ -119,7 +160,12 @@ declaration env variable@(VarId index)
       maybe env.functionSpan parameterSpan
         (Array.find mentions parameters)
       where
-      parameterSpan parameter = fromMaybe parameter.span parameter.rowSpan
+      parameterSpan parameter =
+        if ownRow parameter.ty then fromMaybe parameter.span parameter.rowSpan
+        else parameter.span
+      ownRow = case _ of
+        TFun _ (Row _ tail) _ → tail == Just variable
+        _ → false
       parameters = maybe [] _.parameters (Array.find named env.functions)
       named function = function.name == env.functionName
       mentions parameter = tailsIn parameter.ty

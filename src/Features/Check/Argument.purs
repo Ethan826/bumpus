@@ -3,14 +3,14 @@ module Features.Check.Argument (refused) where
 import Prelude
 import Data.Array as Array
 import Data.Either (either)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Domain.Checked.Internal (Open)
 import Domain.Checked.Internal as Checked
 import Domain.Problem (Problem(RowEquality, MustBePure), RowText)
 import Domain.Row (Row(..), isPure)
 import Domain.Type.Parts (rowsOf)
 import Domain.Syntax (Diagnostic, Note, NoteReason(..), Sort(..))
-import Domain.Type (Ty)
+import Domain.Type (Ty(..))
 import Features.Check.Context (CheckEnv)
 import Features.Check.Report (noteAt)
 import Features.Check.Scheme (State, flexible)
@@ -44,7 +44,9 @@ refused env state use index expected actual diagnostic =
   -- Only a parameter written `with pure` is the boundary: the same
   -- message also reports a closed pure argument given to a wider one.
   pureNote callee =
-    if Array.any isPure (rowsOf expected) then parameter callee index else []
+    if Array.any isPure (rowsOf expected) then parameter callee index
+      (topRowPure expected)
+    else []
   conflict callee left right tail =
     if tail == "" then maybe diagnostic (named callee left right)
       (calleeName state use callee (sharedTail callee))
@@ -67,11 +69,20 @@ refused env state use index expected actual diagnostic =
 spelled ∷ String → RowText → RowText
 spelled name row = row { tail = map (const ("..." <> name)) row.tail }
 
-parameter ∷ Callee → Int → Array Note
-parameter callee index = maybe [] (Array.singleton <<< pureNote)
+-- The `with pure` annotation when the parameter's own arrow is the pure
+-- one; for a pure row nested in its type, the parameter's name.
+parameter ∷ Callee → Int → Boolean → Array Note
+parameter callee index own = maybe [] (Array.singleton <<< pureNote)
   (Array.index callee.parameters index)
   where
-  pureNote span = noteAt span MustBePureParameter
+  pureNote found = noteAt
+    (if own then fromMaybe found.span found.rowSpan else found.span)
+    MustBePureParameter
+
+topRowPure ∷ Ty Open → Boolean
+topRowPure = case _ of
+  TFun _ row _ → isPure row
+  _ → false
 
 -- The callee's row variable whose meta, for this call, ended in `shared`.
 calleeName ∷ State → Use → Callee → Maybe Flex → Maybe String

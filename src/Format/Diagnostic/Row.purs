@@ -34,10 +34,12 @@ maxNotes = 4
 maxCharacters ∷ Int
 maxCharacters = 2000
 
--- A label printed in a headline or note is at most this long; past it its
--- arguments become `(…)`, so the effect is still named and the whole
--- diagnostic stays within `maxCharacters` (design §6, until E011's type
--- elision exists).
+-- A label printed in a headline, row or note is at most this long; past it
+-- its arguments become `(…)`, so the effect is still named. This bounds
+-- labels only: `maxCharacters` is a hard bound on notes, not on a headline,
+-- which still grows with a long leaf type or effect name (a payload
+-- mismatch's elided arguments, an effect named in 2,500 characters). That
+-- gap waits for E011's type elision (design §6).
 maxLabelCharacters ∷ Int
 maxLabelCharacters = 120
 
