@@ -1,7 +1,7 @@
 # Tracking handlers that may fail: design (FX008)
 
-Status: design note, revision 8 (2026-10-10). Awaiting a narrow review of
-the one-way hook, then the user's written-spec approval. Not implemented. It amends the
+Status: design note, revision 9 (2026-10-10). Awaiting the user's
+written-spec approval. Not implemented. It amends the
 effects spec (docs/plans/2026-10-09-effects-design.md) §2 and §3, and
 CF001 §5/O-2/§8A (D4), when approved.
 
@@ -33,7 +33,15 @@ History:
   - I4: the merge through one handler value's R is pinned as L4.
   - M1-M4 applied.
 
-  The hook is unreviewed.
+  The hook was reviewed in review-fx008-rev8-hook-result.md.
+- Revision 9 applies that review: no Critical findings; soundness
+  unaffected.
+  - F1: R ≡ R when two handlers' clause rows share a tail.
+  - F2: whole-row consumption with the per-key cycle test.
+  - M1-M5, and the implementation placement (data sets in Subst, `sync`
+    in the checker).
+
+  F1 and F2 are unreviewed.
 - Revision 7 applies the review of revision 6
   (review-fx008-rev6-result.md: no Critical findings; I1-I4, M1-M9).
   - I1: consuming R lost type inference and could change Go output.
@@ -312,27 +320,55 @@ and C fresh:
   (inference, as clause effects reach R today) and into C (marks). Late
   labels reach C through §3.5 steps 1-3, and `Fail` is kept.
 - **One-way hook (revision 8; user decision 2026-10-10 on review rev7
-  I1).** Each clause row's tail meta is *watched*. Whenever any
-  unification during checking binds it, the newly arrived labels are
-  consumed into R at once. If the binding makes c's tail rigid, R's tail
-  is bound to that variable at once.
+  I1; revision 9 fixes per review-fx008-rev8-hook-result.md).**
+  - **What it watches.** Each clause row's *resolved* tail is watched. A
+    meta-to-meta merge may bind the other meta, so the watch follows the
+    resolution, not one meta (M4).
+  - **What it does.** When such a tail is bound or merged during checking,
+    the *whole* clause row is consumed into R with a fresh tail. That
+    consumption ignores marks, and labels it adds to R get fresh marks, so
+    R's marks stay dead (M3). If c's tail becomes rigid, R's resolved
+    unbound tail meta is bound to that variable (M2); a closed clause
+    tail leaves R open.
+  - **F1, two handlers.** When clause rows of two different handlers
+    resolve to the same tail, their R's are unified, ignoring marks. This
+    restores today's R1 ≡ R2: today each clause row is its R, and both
+    share the called lambda's tail. Without F1, review rev8 two1, two3,
+    two1f (no `defer`, accepted today) are rejected, and two2's emitted Go
+    changes. F1 is a third source of the L4 merge (§7).
+  - **F2, cycles.** Before each consumption, §3.5 (c)'s per-key cycle test
+    is applied to the clause-row-to-R edges, and a positive sum is today's
+    side-condition error (`… cannot be made equal: both end in …`).
+    Consuming only newly arrived labels would loop forever on review rev8
+    cyc2 and cyc3 (rejected today) and pair duplicates wrongly.
+  - **Where it runs.** It is not a callback inside Unify, Binding or
+    Subst; that would blame failures on unrelated pairs, bypass
+    `consumeVia`'s provenance, and revert postponed pairs. Subst carries
+    `watched` and `dirty` sets of tail metas, maintained by `bindTail` and
+    `extendRow`, as data only. A checker-level `sync` drains `dirty` after
+    each inferred node, and before every eager decision (the handler-head
+    check in `withHandler`, Apply's `open`/`functionLike`, Hint): F2, then
+    F1, then the consumption. The §3.5 loop covers bindings made during
+    settling. The cost is proportional to dirty rows, so linearity is
+    kept. Final acceptance does not depend on when `sync` runs (M5).
   - This keeps R in step with the clauses as checking proceeds. Today the
     clause row *is* R, so eager decisions such as `with get()`'s handler
     head (Handler.purs `headOf`) and Apply's `open` see the same labels as
     today. Without the hook, review rev7 late1.wxw and late2.wxw (no
     `defer`, accepted today) become `Expected a handler`.
   - It also restores today's rejections of rig1.wxw and rig2.wxw.
-  - Information flows one way, clause row to R. Today R ≡ ρ also bound the
-    clause row's tail to the context's rest. Without that reverse link, a
-    program can only gain acceptance, or leave a type meta unsolved that
-    nothing observes. Such a meta defaults to the representative and may
-    change emitted Go text, but not behaviour. The hook's review must
-    confirm this, or find a counterexample to list in §6.
+  - Information flows one way, clause row to R, plus F1's R ≡ R. Today
+    R ≡ ρ also bound the clause row's tail to the context's rest. With F1
+    the hook review found no program without `defer` whose acceptance or
+    Go output changes for that reason, beyond the gains listed in §6. It
+    found none whose behaviour changes. This is a claim from probes, not a
+    proof; the implementation's first task re-runs every probe (§10).
   - The §3.5 loop still consumes every clause row into R and C each
     round. That is idempotent for R once the hook has run.
 - C's unsolved tail closes to empty after the tail pass. A rigid clause
-  tail binds both C's and R's tails, through that pass only (review rev7
-  M1).
+  tail binds R's tail through the hook during checking, and C's through
+  the tail pass. The pass is a no-op for R when R already ends in the
+  same rigid tail (rev8 M1).
 - Own-abort constraint: a `Fail` label, or a rigid tail, in a clause row
   imposes M ⊑ m, so m cannot be N.
 - Requirement marks: C ⊑ c for each clause row c.
@@ -725,6 +761,8 @@ Rejections, each asserted with exact text, primary span and notes:
 - review dup and n1 (side-condition error, under a timeout);
 - review rev7 rig1.wxw and rig2.wxw (rejected, as today, through the
   hook);
+- review rev8 cyc2 and cyc3 (today's side-condition error, under a
+  timeout);
 - review rev6 l4b.wxw and rev7 merge2.wxw (the pinned L4 limitation).
 
 Acceptances, with run output:
@@ -738,6 +776,8 @@ Acceptances, with run output:
 - review rev6 extb.wxw (prints `12 0 9`) and annotb.wxw (prints `1 2`);
 - review rev7 merge1.wxw (`1 9`), annotc.wxw and annotd.wxw (`1 5 9`);
 - review rev7 late1.wxw and late2.wxw (`0`, as today) and late3.wxw;
+- review rev8 two1, two2, two3 and two1f, as today, with two2's Go text
+  byte-identical; one1, one3 and one1rev8;
 - cycle2open, f1, f2, f3 and argbind;
 - Console cleanup;
 - the migrated fx-cleanup program.
@@ -753,6 +793,8 @@ Isolated regression mutants, each caught:
 - C unified with ρ at `with` (the two-row install fails);
 - the one-way hook dropped (late1 becomes `Expected a handler`; rig1 is
   accepted);
+- F1 dropped (two1 becomes ambiguous);
+- F2 dropped, or only new labels consumed (cyc2 hits the timeout);
 - R consumed instead of unified (meta2 becomes ambiguous; hole2c's Go
   changes);
 - marks equated by R ≡ ρ (I1's let-bound handler is rejected);
@@ -783,12 +825,21 @@ Differential testing:
 | Consume | directional consumption |
 | Use, Stages | instantiation of mark variables, handler-type opening |
 | Handler | clause own rows into R and C; `with` unifies R (marks ignored) and consumes C; frame marks |
-| Subst, Unify | the one-way hook: watched clause-row tail metas, with consumption into R on binding |
+| Subst, Unify | `watched` and `dirty` tail sets, maintained by `bindTail` and `extendRow` |
+| Handler and a new Sync module | the hook's `sync`: F2 cycle test, F1 R ≡ R, whole-row consumption into R |
 | Defer and a new Settle module | the rev 5 loop over all restricted rows, tail pass |
 | Features.Check.Mark (new) | the edge graph and the path check |
 | DeferNotes, RowName, Domain.Problem, Format.Diagnostic | notes, printing, kinds |
 | Check-to-IR boundary | strip marks |
 | oracle parser, generators, tests | — |
+
+**Probe gate (first plan task).** Every review probe is kept: the probes
+in .build/fx008-probes/ and its rev6-rev8 subdirectories, to be copied
+into the test tree when the plan starts. Each is recorded with today's
+outcome, and the first implementation task asserts for each either
+today's outcome or the change §6 lists. Any unlisted change stops the
+work and is reported to the user. This is the empirical check of the
+claims that §3.4 and §6 rest on probes.
 
 `Label` has about 100 sites in about 20 modules. Expect roughly twice
 Task 8 and its fix round. Plan it in several tasks:

@@ -156,3 +156,93 @@ and no anonymous lambdas. M3's same-change backlog, progress and findings
 updates are missing. Minor: `typeHead` gives `Unit` a key, but spec §2
 lists only Int, Bool and TypeId (`Fail(Unit)` is accepted and runs). Align
 the spec or the code.
+
+## Round 2: f6cb6d0
+
+Verdict: **Approved**, on one condition. M3 (BACKLOG FX009 status, plus a
+progress and findings entry) must land in the same change before merge.
+
+### What I ran vs read
+
+Ran in the worktree: `npm run build`; `npm run verify` (exit 0, 958/958
+parallel, 29/29 serial, 36 regression proofs); `node scripts/regression.mjs
+signature-fail keyless-fail clause-fail nested-fail`; the three new probes
+against their mutant builds in `.build/regression/<row>`; `waxwing run` on
+a `Fail(Box(Int -> Int))` program, which prints 3.
+
+Ran in scratch: `ng2`, the f6cb6d0 source with `settleFinal`'s check
+replaced by `if true`. All earlier probe sets (a-c), plus 17 new probes,
+went through both the fixed build and ng2.
+
+Read: the f6cb6d0 diff, the `Checked.Node` constructors against
+`firstUnkeyed`, and the new tests and probes.
+
+### Status of earlier findings
+
+- **N1: addressed.** `failFamily` rejects `TVar`, `TFun` and `THandler`
+  payloads at the written label, with the hint. I checked this in
+  signatures, parameter, nested and result rows, `Handler(...)`, row
+  arguments, type fields, effect operations and lambda annotations
+  (`fn(h: … Fail(Int -> Int)) => …`). The unsound program from round 1 is
+  now rejected at `Fail(Int -> Int)`. `Fail(Box(Int -> Int))`,
+  `Fail(Unit)` and `Fail(Error(a))` are accepted, and the Box program
+  runs.
+- **N2: addressed.** `fail(e: a)` and `fail(e: Int -> Int)` clauses now
+  give E_TYPE at the clause type, not E_INTERNAL.
+- **M3: not addressed.** `git diff 531e438..HEAD -- BACKLOG.md docs` is
+  empty, and FX009 is still `Open` in the branch.
+
+### Can anything still reach the guard?
+
+I found no program that does. Across every probe set, the fixed build and
+ng2 give identical results, about 50 programs in all. That includes all of
+my earlier reaching programs, and partial application, `defer`, let-bound
+lambdas, the `applyValue` path, row callbacks, deferred keys bound late,
+effect type arguments instantiated to function types
+(`handler Raise(Int -> Int) { raise(x) => fail(x) }`), `fail(f)` with `f` a
+function local, and unused `fn(y) => fail(y)`.
+
+Why: a `Fail` label now comes only from a written label or clause, which
+resolve checks, or from a `fail` expression. `firstUnkeyed` covers every
+`Node` that has subexpressions, and it runs inside `settleKeys`, before
+the leftover check. Let-bound locals are monomorphic, so no scheme can
+introduce a keyless payload.
+
+The minimal guard is acceptable. It is a 3-line defensive rejection, not
+a dropped constraint. It is also exercised: under the signature-fail and
+keyless-fail mutants, it is what rejects the probe program, at `h(1)`
+instead of the annotation, which is why those probes fail on span. So it
+is not dead code in the proofs. AGENTS.md and docs/engineering.md impose
+no further requirement here.
+
+Pre-existing, not FX009: `firstUnkeyed` also runs in the first
+`settleKeys`, before `settleDeferred`. So `handle fail(x) { fail(e: E) =>
+() }`, where `x` is bound to `E` only by a deferred `put`
+(`lateFailMeta`), is rejected on base and on the fix alike. Spec §2 says
+"decided after the body's other constraints are solved". Consider a
+backlog note.
+
+### Regression rows
+
+Each row fails for its own reason. I ran each probe against its mutant:
+
+| Row | Mutation | Probe failure | Why |
+|---|---|---|---|
+| signature-fail | `TVar _ → false` | `Fail family (variable): wrong span` | guard rejects at `h(1)` |
+| keyless-fail | `TFun _ _ _ → false` | `Fail family (function): wrong span` | guard rejects at `h(1)` |
+| clause-fail | clause check removed | `Fail family (clause): wrong code` | E_INTERNAL from specialization |
+
+There is no row for `THandler`. The fx-fail-pairs tests cover the
+`Handler(Console)` payload in every position, so that is acceptable.
+nested-fail is unchanged and still holds. Nothing was weakened.
+
+### Conformance
+
+- Row.purs is 94 lines, Failure.purs 173, test/fx-fail-pairs.test.mjs 104,
+  scripts/regression.mjs 245.
+- No `let … in`, and no anonymous lambdas in PureScript.
+- `failFamily`'s `keyless` is a named `where` binding.
+- Deleting Postponed, Unsettled and the Call/Apply stamping returns
+  `supplied` to its base size, which resolves the earlier `where`-count
+  concern.
+- The only open conformance item is M3.
