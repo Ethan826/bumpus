@@ -2,7 +2,8 @@
 
 Status: Proposed design investigation (CF001); not authorized for
 implementation; pending user review. Revised 2026-10-09 after an
-adversarial review (findings and responses at the end).
+adversarial review (findings and responses at the end). Operational
+addendum 2026-10-10: §8A.
 
 Requirements: .superpowers/sdd/2026-10-09-effects-plan/cc-requirements.md
 (user, 2026-10-09). Ground truth: spec docs/plans/2026-10-09-effects-
@@ -18,7 +19,8 @@ programmers do not manage synchronization and the runtime stays small.
 
 Non-goals: no general scheduler, channels, async I/O, timeouts,
 supervision, mutable cells, user laws or new syntax; example syntax is
-hypothetical.
+hypothetical. §8A analyses supervision, services and host boundaries as
+contracts only.
 
 ## 2. Shipped baseline and its contracts (Tasks 6-8)
 
@@ -346,6 +348,165 @@ Row erasure (Task 6) can remain. What future work needs, and where:
 Only CPS-based general resume needing that bit in keys is a genuine
 incompatibility, and it is already recorded (decision 1 revision).
 
+## 8A. Operational model (addendum, 2026-10-10)
+
+Requirements: .superpowers/sdd/2026-10-09-effects-plan/cc-requirements-ops.md (user, 2026-10-10).
+Design only; nothing enters CF001's subset unless §9 says so. Gleam OTP is a comparison, not a
+target: BEAM processes have separate heaps, goroutines share one heap and one fatal-error domain,
+so Waxwing can contain recoverable defects only (§2). **T** types/effects guarantee, **R** runtime, **P** policy.
+
+### 8A.1 Scoped tasks versus supervised services
+
+| | Scoped child (`par`, CF001) | Service (FX002+, hypothetical) |
+|---|---|---|
+| Lifetime | ends before its scope's join | until stopped or its supervisor exits |
+| Failure goes to | parent, at the join (B1, B4) | its supervisor |
+| Typed abort at boundary | transferred to a live `handle` (B1) | impossible (no blocked parent keeps a target live): body Fail-free under R0; typed results travel in replies |
+| Restart | never (would repeat effects) | by policy |
+
+A supervisor is a scope: services cannot outlive it; its exit cancels
+them (C1-C4) in reverse start order. Gleam: OneForOne, OneForAll,
+RestForOne (failed child and later ones); Permanent, Transient or Temporary
+children; over *intensity* restarts in *period* s (default 2 in 5) the
+supervisor ends its children and itself; workers get `shutdown_ms`, then a
+kill. Go cannot kill a goroutine: a diverging shielded cleanup can only be
+abandoned (visible in the dump) and the shutdown escalated.
+
+**Restart dependencies.** A service given at start only façades (§8A.3)
+of earlier services has dependencies forming a DAG in start order, and
+RestForOne restarts exactly the holders of invalidated façades. Or (FX002
+chooses) a named façade re-resolved per call (Gleam `named`: "take over
+from an older one that has exited due to a failure"); callers then see a
+typed `Unavailable` during a restart.
+
+**Resources across restarts.** A restart is a fresh activation from the
+initializer. The dead activation's `defer`s run exactly once first (C3;
+Task 8's per-activation slice gives this per goroutine); its continuations
+are discarded (C6). What must survive (a listener, a pool) belongs to the
+supervisor scope, acquired and `defer`red there, passed as a Shareable
+capability. T: R0, B3, capability passing. R: restart loop, intensity,
+ordered shutdown, cleanup before restart. P: strategy, restart type,
+intensity/period, shutdown deadline, resource placement.
+
+Exposed (not a CF001 correctness issue): a discarded task whose pure cleanup diverges holds
+its budget slot (§6) forever; long-lived programs lose parallelism (inline fallback stays correct).
+
+### 8A.2 Defect boundaries
+
+Task 8, unchanged: defect → LIFO cleanup collecting causes → `main`'s
+`waxwingReport` (Cleanup.purs `guardedMain`) → stderr cause list → exit 1.
+Evolution: a defect terminates the innermost *task*; after its cleanup its
+root applies the root's policy: a `par` child records it for the join
+(B4); a service root hands the cause list (strings, not a typed value) to
+its supervisor, which restarts or, past intensity, fails with its own
+defect that escalates; at `main`'s root the result is today's report.
+
+| Point | Task 8 | With supervisors | Verdict |
+|---|---|---|---|
+| `handle` | never catches a defect | unchanged; "uncatchable" = no Waxwing expression observes a defect; only task roots do, and only `par` joins, supervisors and export roots (§8A.6) act | compatible; settle now |
+| `crash` | ends the program | ends its task; the program only by escalation | unchanged without services; opt-in inside one |
+| causes | pending first, then `cleanup failed: ` lines; a pending abort meeting a cleanup defect heads them | same list per task, handed to the supervisor; cancelled siblings: C2 | compatible |
+| cause kinds | `crash: V`, `fail(T): V`, `no handler for L`, `panic: …` | more (e.g. a restart-limit cause) | compatible if ADR 010 calls the kinds an open set |
+| exit status | 1 after a report; Go fatal errors and unrecovered panics exit 2 (Go `runtime` docs) | 1 for an escalated defect; 2 not containable | compatible |
+| `os.Exit` | only in `main`'s `waxwingReport` | main root's policy; services and exports never exit | compatible: `guardedMain` already confines it |
+
+Restart is safe only for state the failed task owned (§8A.3); a defect
+inside a shared capability's operation could break it, so shared built-ins
+make each operation atomic and keep no invariant across operations.
+
+### 8A.3 State ownership and service execution
+
+Effects name operations; ownership follows where the handler is
+installed and whether its type is Shareable (B3).
+
+| Model | Waxwing form | T | R | P | Safer or simpler with |
+|---|---|---|---|---|---|
+| Task-local handler | `with counter(0) { … }` in one task; not Shareable | race freedom: only the owner reaches the state (B3, capture check) | none | none | affine transfer into a child or service; region effects with runST-style encapsulation keep references in the task |
+| Typed actor | a service installs the state handler; others hold a façade `Handler(Counter)` whose clauses send and await a one-shot reply | typed messages; façade Shareable (clauses only send/await); state handler never crosses | mailbox, scheduling, replies, owner/caller death | capacity, timeouts | atomicity is per message: `get` then `put` loses updates, so offer `modify(f)` with pure `f`; commutative messages give an order-independent final state; semilattice state with threshold reads gives determinism (§4.6) |
+| Shared capability | trusted built-in (accumulator, LVar-like cell), Shareable | Shareable typing | per-operation atomicity, publication | which built-in | §4.6 laws, trusted only (§4.7) |
+
+Fit: evidence nodes are immutable (Task 7), so a façade node may reach
+any task; the mailbox is the only mutable object. Façade clauses run on
+the caller (B2), the state handler's on the owner: FX002-era `par let a =
+with c { tick() }, b = with c { tick() };` serializes both ticks at `c`.
+
+### 8A.4 Overload and communication
+
+| Concern | Proposed contract | T | R | P |
+|---|---|---|---|---|
+| Mailbox | bounded per service | message type | queue | capacity |
+| Full mailbox | send blocks (backpressure) until the deadline, then typed `Fail(Overloaded)`; a non-blocking send fails at once; no silent drop by default | failure in row | wake-up | block, reject or drop |
+| Deadline | inherited (child ≤ parent); expiry cancels the scope (C1-C4) | none | timers, polls | values |
+| Request/reply | one-shot affine reply slot. Caller timeout: typed `Fail(Timeout)`, request removed if unstarted, late reply dropped. Caller death: slot closed, server may poll it. Server death: caller gets typed `Fail(Unavailable)`; the defect goes to the supervisor | reply type, Fail in caller row | slot states | timeouts |
+
+Gleam's `call` makes the caller crash on timeout "rather than leaving the
+processes in an invalid state"; Waxwing prefers a failure the caller can
+`handle`. The fetched pages state no mailbox bound. Typed messages give no
+*deadlock freedom* (`call` cycles, a clause calling its own service; would:
+layering, i.e. only façades of earlier services and replies via one-shot
+slots, plus a capture check; timeouts give failure, not freedom), no
+*determinism* (senders interleave; would: Fail-only `par`, §4.6 built-ins,
+one sender per mailbox), no *bounded resources* (would: bounded mailboxes,
+the §6 budget, a static service set; the heap stays shared).
+
+### 8A.5 Observability
+
+| Facility | Content | Cost | Reserve in CF001 |
+|---|---|---|---|
+| Task record | id, parent, path (`main/2/1`; service names later), kind | already allocated per child | id, parent, name fields |
+| Registry | live tasks, child links | links exist for discard; root list: lock per spawn/exit | links; root list later |
+| Blocked-on | join, receive, call to S, foreign call | a store around each block | field; values FX002 |
+| Queues | length per mailbox | counter | FX002 |
+| Cancellation | atomic flag (CF001) + reason: discard, sibling, deadline, shutdown | one word | reason field |
+| Failure | cause list + task path | path built on failure only | path never in the report |
+| Dump | task tree + `pprof.Lookup("goroutine").WriteTo(w, 2)` (all stacks, as a dying program prints) | nothing until used | trigger later |
+| Labels | `pprof.SetGoroutineLabels`, inherited by new goroutines | a context per spawn | later, opt-in |
+
+The report stays a schedule-independent cause list (§6's equivalence
+covers it; a task path would make a `par` report differ from the
+sequential one); paths go to dumps and supervisor event lines (FX002).
+Task identity is explicit (C1), never the goroutine: inline children (§6)
+share their parent's, and resume-readiness (4) forbids goroutine state.
+
+### 8A.6 Host boundaries
+
+| Crossing | Proposed rule | T | R | P |
+|---|---|---|---|---|
+| Foreign import | Go `error` → typed Fail (I001); Go panic → defect `panic: …` (`waxwingCauses`); foreign handles not Shareable until I001 classifies them (B3); blocking calls get a `context.Context` cancelled with the task (C1); goroutines the library starts are outside the tree, their panics fatal | Fail in row | context bridge, adapter recovery | timeouts |
+| Scoped callback (during the foreign call, same goroutine) | may perform the caller's effects; no abort crosses Go frames unless the adapter re-raises (spec §4 I001 obligation) | rows | adapter | none |
+| Escaping callback (stored; later or another goroutine) | Shareable and Fail-free (R0): its `handle` may have exited, task-local handlers may be dead; runs as a new root task with its own cleanup; defects to its owning supervisor, else the report | B3 + R0 at conversion | root, registry | owner |
+| Export (Go → Waxwing) | each call is a root task with handlers from host-supplied implementations; typed failure → Go `error`; defect → distinct error or re-panic, never `os.Exit`; concurrent calls share only Shareable capabilities; host `context.Context` → cancellation | closed row of host-provided effects | root, conversions | PKG001 convention |
+
+```
+// hypothetical, I001-era: rejected, the escaping callback performs Fail
+handle { onEvent(fn(e) => fail(Bad(e))) } { fail(x: Bad) => () }
+```
+
+### 8A.7 Practical delivery (recorded; not added to FX001)
+
+**Debugging**: `//line file.wx:L:C` directives (Go: "so that compilers
+and debuggers will report positions in the original input") make panics
+and dumps cite Waxwing source; task dumps §8A.5; a new item with FX002.
+**IDE001**: hover shows rows, Shareable/local class, R0/B3 diagnostics,
+static supervision trees. **PKG001**: the export convention above; one
+shared versioned runtime package per binary (each program emits its own
+today), or two Waxwing libraries keep two registries. **DOC001/AI001**:
+reproducible schedules (sequential oracle plus injected yields, §9).
+
+### 8A.8 Contracts now, mechanisms later
+
+Settle before FX002 (§10 item 9):
+- **O-1** Containment unit is the task: no `handle` catches a defect; only task roots observe one; process exit is `main`'s root policy.
+- **O-2** Long-lived task boundaries (services, escaping callbacks) are Fail-free (R0); typed outcomes travel as values and replies.
+- **O-3** One owner per mutable state; cross-task routes: façades to the owner or trusted Shareable built-ins; no user locks.
+- **O-4** Restart is a fresh activation after exactly-once cleanup; survivors belong to the supervisor; supervisors are scopes.
+- **O-5** The report is a schedule-independent cause list, kinds an open set; exit 1 (Waxwing) vs 2 (Go fatal); task paths elsewhere.
+- **O-6** Task identity is explicit; the record reserves id, parent, name, blocked-on and cancellation reason.
+- **O-7** Exports and escaping callbacks are root tasks; exports never exit; host and task cancellation map both ways.
+
+Later: strategies, intensity, mailboxes, overload/timeout APIs and defaults, dump trigger,
+pprof labels, secondary report lines, dynamic supervisors, syntax, layering check, `//line`, shared runtime.
+
 ## 9. Recommendation: CF001
 
 **Subset.** One built-in structured fork-join item (hypothetical `par let
@@ -402,6 +563,12 @@ against runs with injected yields and budgets 0, 1 and B.
 Not guaranteed: anything about effectful children; cancellation beyond
 discard; lawful reductions (CF002 candidate: built-in `Int` sum first).
 
+**Addendum impact (2026-10-10).** The subset, R0, B1-B5, selection,
+discard contract and O1-O11 are unchanged; §8A found no conflict. One
+additive change: the task record carries id, parent and a path name
+(O-6), never printed in the report (O-5), so §6's equivalence still
+covers stderr.
+
 ## 10. Handoff
 
 **Settle before concurrency (FX002), mutable state (FX003), resumable
@@ -418,9 +585,12 @@ handlers (FX006):**
 7. Continuation ownership C6: before general resume.
 8. Whether effectful parallelism promises more than race freedom
    (recommend: no determinism promise; leftmost selection by default).
+9. Operational contracts O-1 to O-7 (§8A.8): before FX002, I001's
+   callback rules and PKG001's export convention; O-5 also in ADR 010.
 
 **Can wait:** the budget B; join primitive; Console line atomicity;
-chunking of large `par`; goroutine- versus CPS-backed one-shot resume.
+chunking of large `par`; goroutine- versus CPS-backed one-shot resume;
+the operational mechanisms listed at the end of §8A.8.
 
 **Necessary changes to the existing design** (spec text, not code):
 1. §2 `defer` rule: adopt R0 (row tails). Example: `after` in §5.
@@ -457,7 +627,12 @@ ctx-mode trigger and function-entry polls change §4 (change 5). Task 8:
 compatible at runtime after change 6 (per-activation cleanup state is
 goroutine-safe; `main`'s report needs the child root to forward defects);
 its `defer` check needs R0, as ruled. None of
-Tasks 6-8 needs to be undone.
+Tasks 6-8 needs to be undone. §8A.2 lists Task 8's compatibility points
+with supervision; none changes behaviour. Recommended for ADR 010 (plan
+Task 12, wording only): cause kinds are an open set, the report and exit 1
+are `main`'s root policy, Go fatal errors exit 2. Deferred to FX002: D
+decision 9 and §3 "Defects" ("unwind to program exit") become "unwind to
+their task's root; for `main`, program exit".
 
 ## 11. Documentation audit (corrections for the controller to apply)
 
@@ -523,6 +698,8 @@ fetched). Re-read theorem wording in full text before writing any proof.
 - Sivaramakrishnan et al. Retrofitting effect handlers onto OCaml. PLDI 2021. One-shot continuations that must be resumed or explicitly discontinued: from an OCaml project announcement, not re-verified in the paper or manual.
 - Ahman, Pretnar. Asynchronous effects. PACMPL 5 (POPL 2021), article 24.
 - Shapiro, Preguiça, Baquero, Zawirski. Conflict-free replicated data types. SSS 2011, LNCS 6976, 386-400.
+- Gleam OTP v1.3.0 docs, fetched 2026-10-10 (curl; the tool fetch failed on DNS): gleam-otp.hexdocs.pm `gleam/otp/actor` (sequential message handling; `call` timeout crashes the caller; `named` takeover), `gleam/otp/static_supervisor` (strategies; `restart_tolerance` default intensity 2, period 5; `auto_shutdown`), `gleam/otp/supervision` (Permanent/Transient/Temporary; `Worker(shutdown_ms)`).
+- Go docs fetched 2026-10-10: pkg.go.dev/runtime/pprof (goroutine profile `debug=2`; labels inherited by new goroutines); pkg.go.dev/runtime (GOTRACEBACK: unrecovered panic or fatal error exits with code 2); pkg.go.dev/cmd/compile (line directives). Armstrong's 2003 thesis was not consulted; nothing here relies on it.
 - Go `sync.WaitGroup` documentation (pkg.go.dev/sync), fetched 2026-10-09: "a call to Done 'synchronizes before' the return of any Wait call that it unblocks." The Go memory model page (go.dev/ref/mem) could not be fetched: unverified.
 
 ## Review response (2026-10-09)
@@ -541,3 +718,6 @@ sentinel and record `X` for anything recovered while flagged. Declined in
 all rounds: none.
 
 Round 4 (re-review 3 minors N1-N5): applied verbatim from the re-review.
+
+Addendum 2026-10-10 (cc-requirements-ops.md): §8A (contracts O-1 to O-7); §9 impact note;
+§10 item 9, can-wait and Task 8/ADR 010 notes; Gleam OTP and Go sources.
