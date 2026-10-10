@@ -3355,3 +3355,20 @@ FX009 re-review (Opus, rereview-fx009-result.md):
 User decision: every written `Fail` payload without a family key is
 E_TYPE at the label, in signatures and in `handle` clauses. Round 2 is in
 progress.
+
+FX008 revision 9 applies the hook review (review-fx008-rev8-hook-result.md;
+no Critical findings, soundness unaffected):
+- F1: R ≡ R when two handlers' clause rows share a tail. Without it,
+  two1, two3 and two1f, which have no `defer` and are accepted today,
+  would be rejected, and two2's Go would change.
+- F2: whole-row consumption with the per-key cycle test. Without it the
+  hook loops forever on cyc2 and cyc3.
+- M1-M5.
+
+F1 and F2 are unreviewed. A probe gate, which re-runs every review probe
+(kept in .build/fx008-probes/), is now the first plan task.
+
+FX009's round 2 was approved by the re-review, and the branch's docs are
+committed (3518678 on fx009). Verify at 3518678: exit 0, 958/958
+parallel, 29/29 serial, 36 proofs. It awaits the user's merge decision.
+New BACKLOG FX012: `firstUnkeyed` runs before deferred rows settle.
