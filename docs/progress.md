@@ -3296,3 +3296,6 @@ defects in today's checker:
   failed`.
 
 Both are new BACKLOG rows.
+
+Verify at 9b47e4b (docs only; .build/fx008-rev5-verify.log): exit 0;
+934/934 parallel, 29/29 serial, 33/33 proofs.
